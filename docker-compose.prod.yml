@@ -67,7 +67,7 @@ services:
     networks: [yowyob, tnt-core-net]
 
   tnt-core-db:
-    image: postgres:16-alpine
+    image: postgis/postgis:16-3.4-alpine
     container_name: tiibntick-core-db
     restart: unless-stopped
     environment:
