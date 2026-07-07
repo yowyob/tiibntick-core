@@ -6,9 +6,11 @@
 # ── Stage 1: build du reactor complet, jar bootstrap repackagé ──────────────
 FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /workspace
+# Les jars RT-comops (yowyob.comops.api:*:0.1.0-SNAPSHOT) sont téléchargés par le
+# workflow CI dans m2repo/ (release asset de yowyob/kernel-core-m2) puis injectés ici.
+COPY m2repo/ /root/.m2/repository/
 COPY . .
-RUN --mount=type=cache,target=/root/.m2 \
-    mvn -B -q -pl tnt-bootstrap -am -DskipTests clean package \
+RUN mvn -B -q -pl tnt-bootstrap -am -DskipTests clean package \
     && cp tnt-bootstrap/target/tnt-bootstrap-*.jar /workspace/app.jar
 
 # ── Stage 2: image runtime (Debian JRE pour OR-Tools) ───────────────────────

@@ -13,6 +13,14 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
+      - name: Récupérer les jars du kernel (RT-comops)
+        env:
+          GH_TOKEN: ${{ secrets.UPSTREAM_TOKEN }}
+        run: |
+          mkdir -p m2repo
+          gh release download latest -R yowyob/kernel-core-m2 -p 'rt-comops-m2.tgz' -O rt-comops-m2.tgz
+          tar xzf rt-comops-m2.tgz -C m2repo
+          echo "jars RT-comops:"; ls m2repo/yowyob/comops/api | head
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
