@@ -1,0 +1,51 @@
+databaseChangeLog:
+  - changeSet:
+      id: 004-create-tnt-delivery-persons
+      author: MANFOUO Braun
+      comment: "Creates the tnt_delivery_persons table"
+      changes:
+        - createTable:
+            tableName: tnt_delivery_persons
+            columns:
+              - column: { name: id,                          type: UUID,             constraints: { primaryKey: true, nullable: false } }
+              - column: { name: tenant_id,                   type: UUID,             constraints: { nullable: false } }
+              - column: { name: actor_id,                    type: UUID,             constraints: { nullable: false } }
+              - column: { name: logistics_type,              type: VARCHAR(20),      constraints: { nullable: false } }
+              - column: { name: logistics_class,             type: VARCHAR(20),      constraints: { nullable: false } }
+              - column: { name: tank_capacity,               type: DOUBLE PRECISION, constraints: { nullable: false } }
+              - column: { name: gross_floor,                 type: DOUBLE PRECISION }
+              - column: { name: total_seat_number,           type: INTEGER }
+              - column: { name: color,                       type: VARCHAR(50) }
+              - column: { name: commercial_register_number,  type: VARCHAR(100) }
+              - column: { name: remaining_deliveries,        type: INTEGER,          defaultValueNumeric: 0 }
+              - column: { name: failed_deliveries,           type: INTEGER,          defaultValueNumeric: 0 }
+              - column: { name: total_deliveries,            type: INTEGER,          defaultValueNumeric: 0 }
+              - column: { name: current_latitude,            type: DOUBLE PRECISION }
+              - column: { name: current_longitude,           type: DOUBLE PRECISION }
+              - column: { name: location_updated_at,         type: TIMESTAMPTZ }
+              - column: { name: status,                      type: VARCHAR(20),      constraints: { nullable: false } }
+              - column: { name: created_at,                  type: TIMESTAMPTZ,      constraints: { nullable: false } }
+              - column: { name: updated_at,                  type: TIMESTAMPTZ,      constraints: { nullable: false } }
+              - column: { name: version,                     type: BIGINT,           defaultValueNumeric: 0, constraints: { nullable: false } }
+
+        - createIndex:
+            indexName: idx_tnt_dp_tenant_status
+            tableName: tnt_delivery_persons
+            columns:
+              - column: { name: tenant_id }
+              - column: { name: status }
+
+        - createIndex:
+            indexName: idx_tnt_dp_actor
+            tableName: tnt_delivery_persons
+            columns:
+              - column: { name: tenant_id }
+              - column: { name: actor_id }
+            unique: true
+
+        - createIndex:
+            indexName: idx_tnt_dp_location
+            tableName: tnt_delivery_persons
+            columns:
+              - column: { name: current_latitude }
+              - column: { name: current_longitude }

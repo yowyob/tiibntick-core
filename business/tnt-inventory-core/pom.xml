@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.yowyob.tiibntick.core</groupId>
+        <artifactId>tiibntick-core-parent</artifactId>
+        <version>0.0.1</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>tnt-inventory-core</artifactId>
+    <packaging>jar</packaging>
+    <name>TiiBnTick — tnt-inventory-core</name>
+    <description>
+        L4 Business — Stock entries, Inventory movements, Physical inventory sessions,
+        Relay hub package entry tracking (HubPackageEntry), Occupancy rate computation,
+        Overdue package detection, Reorder alerts.
+        Extends RT-comops-inventory-core kernel via logical UUID reference (kernelStockEntryId).
+        Author: MANFOUO Braun.
+    </description>
+
+    <dependencies>
+
+        <!-- ══ TiiBnTick Foundation ══════════════════════════════════════════
+             tnt-common-core transitively provides:
+               - RT-comops-common-core (BaseEntity, Money, Address, GeoCoordinates, etc.)
+               - RT-comops-kernel-core (TenantContext, non-functional services)
+             No need to declare those directly.
+        ══════════════════════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-common-core</artifactId>
+        </dependency>
+
+        <!-- ══ Kernel Yowyob — Inventory domain ═════════════════════════════
+             RT-comops-inventory-core provides the Kernel stock entry concept.
+             tnt-inventory-core does NOT extend Kernel classes: it references
+             them via kernelStockEntryId (nullable UUID) and KernelInventoryPort.
+        ══════════════════════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>yowyob.comops.api</groupId>
+            <artifactId>RT-comops-inventory-core</artifactId>
+        </dependency>
+
+        <!-- RT-comops-settings-core: system parameter access (warehouse thresholds) -->
+        <dependency>
+            <groupId>yowyob.comops.api</groupId>
+            <artifactId>RT-comops-settings-core</artifactId>
+        </dependency>
+
+        <!-- ══ TiiBnTick L0 — Event bus ═════════════════════════════════════ -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>yow-event-kernel</artifactId>
+        </dependency>
+
+        <!-- ══ Spring Boot (non-runnable module) ════════════════════════════ -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-r2dbc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- ══ R2DBC / PostgreSQL ════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>r2dbc-postgresql</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.liquibase</groupId>
+            <artifactId>liquibase-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- ══ Serialization ═════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+
+        <!-- ══ Kafka — reactive event publishing ════════════════════════════ -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.projectreactor.kafka</groupId>
+            <artifactId>reactor-kafka</artifactId>
+        </dependency>
+
+        <!-- ══ Lombok ════════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- ══ Tests ═════════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

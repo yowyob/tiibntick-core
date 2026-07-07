@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- Author: MANFOUO Braun | tnt-incident-core schema v1.0 -->
+
+    <changeSet id="001-create-tnt-incidents" author="MANFOUO Braun">
+        <createTable tableName="tnt_incidents">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="reference_code" type="VARCHAR(50)"><constraints unique="true" nullable="false"/></column>
+            <column name="tenant_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="agency_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="source_platform" type="VARCHAR(30)"><constraints nullable="false"/></column>
+            <column name="mission_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="category" type="VARCHAR(50)"><constraints nullable="false"/></column>
+            <column name="type" type="VARCHAR(100)"><constraints nullable="false"/></column>
+            <column name="severity" type="VARCHAR(20)"><constraints nullable="false"/></column>
+            <column name="status" type="VARCHAR(40)"><constraints nullable="false"/></column>
+            <column name="resolution_mode" type="VARCHAR(40)"/>
+            <column name="reported_by_actor_id" type="UUID"/>
+            <column name="reported_by_role" type="VARCHAR(40)"/>
+            <column name="description" type="TEXT"><constraints nullable="false"/></column>
+            <column name="affected_parcel_ids" type="TEXT" defaultValue="[]"/>
+            <column name="multi_parcel_incident" type="BOOLEAN" defaultValueBoolean="false"/>
+            <column name="own_blockchain_chain_id" type="VARCHAR(100)"/>
+            <column name="reported_at" type="TIMESTAMPTZ"/>
+            <column name="detected_at" type="TIMESTAMPTZ"/>
+            <column name="acknowledged_at" type="TIMESTAMPTZ"/>
+            <column name="triaged_at" type="TIMESTAMPTZ"/>
+            <column name="resolved_at" type="TIMESTAMPTZ"/>
+            <column name="closed_at" type="TIMESTAMPTZ"/>
+            <column name="last_escalation_level" type="INTEGER" defaultValueNumeric="0"/>
+            <column name="auto_resolution_attempts" type="INTEGER" defaultValueNumeric="0"/>
+            <column name="inter_agency_involved" type="BOOLEAN" defaultValueBoolean="false"/>
+            <column name="geo_lat" type="DOUBLE PRECISION"/>
+            <column name="geo_lng" type="DOUBLE PRECISION"/>
+            <column name="geo_address_label" type="VARCHAR(300)"/>
+            <column name="geo_nearest_hub_id" type="UUID"/>
+            <column name="geo_zone_risk_index" type="DOUBLE PRECISION"/>
+            <column name="sla_original_deadline" type="TIMESTAMPTZ"/>
+            <column name="sla_estimated_delay_minutes" type="BIGINT"/>
+            <column name="sla_revised_deadline" type="TIMESTAMPTZ"/>
+            <column name="sla_breached" type="BOOLEAN"/>
+            <column name="sla_breach_minutes" type="BIGINT"/>
+            <column name="risk_global_score" type="DOUBLE PRECISION"/>
+            <column name="risk_auto_resolution_recommended" type="BOOLEAN"/>
+            <column name="risk_recommended_action" type="VARCHAR(100)"/>
+            <column name="compensation_estimated_xaf" type="DECIMAL(18,2)"/>
+            <column name="compensation_coverage_type" type="VARCHAR(30)"/>
+            <column name="version" type="BIGINT" defaultValueNumeric="0"/>
+            <column name="created_at" type="TIMESTAMPTZ" defaultValueComputed="NOW()"/>
+            <column name="updated_at" type="TIMESTAMPTZ" defaultValueComputed="NOW()"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="001-create-tnt-incident-event-logs" author="MANFOUO Braun">
+        <createTable tableName="tnt_incident_event_logs">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="incident_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="event_type" type="VARCHAR(80)"><constraints nullable="false"/></column>
+            <column name="occurred_at" type="TIMESTAMPTZ"><constraints nullable="false"/></column>
+            <column name="performed_by_actor_id" type="UUID"/>
+            <column name="performed_by_role" type="VARCHAR(40)"/>
+            <column name="payload" type="TEXT"/>
+            <column name="blockchain_tx_hash" type="VARCHAR(128)"/>
+            <column name="blockchain_chain_ref" type="VARCHAR(100)"/>
+            <column name="written_on_parcel_chain" type="BOOLEAN" defaultValueBoolean="false"/>
+            <column name="written_on_incident_chain" type="BOOLEAN" defaultValueBoolean="false"/>
+            <column name="created_at" type="TIMESTAMPTZ" defaultValueComputed="NOW()"/>
+        </createTable>
+        <addForeignKeyConstraint constraintName="fk_event_log_incident"
+                                 baseTableName="tnt_incident_event_logs" baseColumnNames="incident_id"
+                                 referencedTableName="tnt_incidents" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="001-create-tnt-incident-evidences" author="MANFOUO Braun">
+        <createTable tableName="tnt_incident_evidences">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="incident_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="evidence_type" type="VARCHAR(40)"><constraints nullable="false"/></column>
+            <column name="file_url" type="TEXT"><constraints nullable="false"/></column>
+            <column name="mime_type" type="VARCHAR(100)"/>
+            <column name="captured_at" type="TIMESTAMPTZ"/>
+            <column name="captured_by_actor_id" type="UUID"/>
+            <column name="captured_by_role" type="VARCHAR(40)"/>
+            <column name="validated" type="BOOLEAN" defaultValueBoolean="false"/>
+            <column name="validated_at" type="TIMESTAMPTZ"/>
+            <column name="validated_by_actor_id" type="UUID"/>
+            <column name="blockchain_tx_hash" type="VARCHAR(128)"/>
+            <column name="sha256_checksum" type="VARCHAR(64)"/>
+            <column name="latitude" type="DOUBLE PRECISION"/>
+            <column name="longitude" type="DOUBLE PRECISION"/>
+            <column name="created_at" type="TIMESTAMPTZ" defaultValueComputed="NOW()"/>
+            <column name="updated_at" type="TIMESTAMPTZ" defaultValueComputed="NOW()"/>
+        </createTable>
+        <addForeignKeyConstraint constraintName="fk_evidence_incident"
+                                 baseTableName="tnt_incident_evidences" baseColumnNames="incident_id"
+                                 referencedTableName="tnt_incidents" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="001-create-tnt-incident-driver-replacements" author="MANFOUO Braun">
+        <createTable tableName="tnt_incident_driver_replacements">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="incident_id" type="UUID"><constraints nullable="false" unique="true"/></column>
+            <column name="original_driver_id" type="UUID"/>
+            <column name="original_vehicle_id" type="UUID"/>
+            <column name="replacement_driver_id" type="UUID"/>
+            <column name="replacement_vehicle_id" type="UUID"/>
+            <column name="replacement_agency_id" type="UUID"/>
+            <column name="handover_lat" type="DOUBLE PRECISION"/>
+            <column name="handover_lng" type="DOUBLE PRECISION"/>
+            <column name="handover_address" type="VARCHAR(300)"/>
+            <column name="handover_scheduled_at" type="TIMESTAMPTZ"/>
+            <column name="handover_at" type="TIMESTAMPTZ"/>
+            <column name="handover_status" type="VARCHAR(30)"/>
+            <column name="original_driver_confirmed_at" type="TIMESTAMPTZ"/>
+            <column name="replacement_driver_confirmed_at" type="TIMESTAMPTZ"/>
+            <column name="original_price_xaf" type="DECIMAL(18,2)"/>
+            <column name="adjusted_price_xaf" type="DECIMAL(18,2)"/>
+            <column name="extra_km_fee" type="DECIMAL(18,2)"/>
+            <column name="urgency_fee" type="DECIMAL(18,2)"/>
+            <column name="pricing_reason" type="VARCHAR(300)"/>
+            <column name="blockchain_tx_hash" type="VARCHAR(128)"/>
+            <column name="created_at" type="TIMESTAMPTZ" defaultValueComputed="NOW()"/>
+            <column name="updated_at" type="TIMESTAMPTZ" defaultValueComputed="NOW()"/>
+        </createTable>
+        <addForeignKeyConstraint constraintName="fk_replacement_incident"
+                                 baseTableName="tnt_incident_driver_replacements" baseColumnNames="incident_id"
+                                 referencedTableName="tnt_incidents" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="001-create-tnt-inter-agency-cooperations" author="MANFOUO Braun">
+        <createTable tableName="tnt_incident_inter_agency_cooperations">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="incident_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="requesting_agency_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="responding_agency_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="cooperation_type" type="VARCHAR(40)"><constraints nullable="false"/></column>
+            <column name="status" type="VARCHAR(20)"><constraints nullable="false"/></column>
+            <column name="requested_at" type="TIMESTAMPTZ"/>
+            <column name="accepted_at" type="TIMESTAMPTZ"/>
+            <column name="completed_at" type="TIMESTAMPTZ"/>
+            <column name="rejected_at" type="TIMESTAMPTZ"/>
+            <column name="rejection_reason" type="TEXT"/>
+            <column name="request_details" type="TEXT"/>
+            <column name="response_details" type="TEXT"/>
+            <column name="blockchain_tx_hash" type="VARCHAR(128)"/>
+            <column name="notified_requesting_driver" type="BOOLEAN" defaultValueBoolean="false"/>
+            <column name="notified_responding_driver" type="BOOLEAN" defaultValueBoolean="false"/>
+            <column name="created_at" type="TIMESTAMPTZ" defaultValueComputed="NOW()"/>
+            <column name="updated_at" type="TIMESTAMPTZ" defaultValueComputed="NOW()"/>
+        </createTable>
+        <addForeignKeyConstraint constraintName="fk_coop_incident"
+                                 baseTableName="tnt_incident_inter_agency_cooperations" baseColumnNames="incident_id"
+                                 referencedTableName="tnt_incidents" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="001-create-tnt-incident-blockchain-records" author="MANFOUO Braun">
+        <createTable tableName="tnt_incident_blockchain_records">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="incident_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="chain_id" type="VARCHAR(100)"><constraints nullable="false"/></column>
+            <column name="block_index" type="BIGINT"><constraints nullable="false"/></column>
+            <column name="previous_hash" type="VARCHAR(128)"/>
+            <column name="current_hash" type="VARCHAR(128)"><constraints nullable="false"/></column>
+            <column name="event_type" type="VARCHAR(80)"/>
+            <column name="payload" type="TEXT"/>
+            <column name="nonce" type="BIGINT"/>
+            <column name="verified" type="BOOLEAN" defaultValueBoolean="false"/>
+            <column name="created_at" type="TIMESTAMPTZ" defaultValueComputed="NOW()"/>
+        </createTable>
+        <addForeignKeyConstraint constraintName="fk_blockchain_incident"
+                                 baseTableName="tnt_incident_blockchain_records" baseColumnNames="incident_id"
+                                 referencedTableName="tnt_incidents" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="001-create-tnt-parcel-incident-links" author="MANFOUO Braun">
+        <createTable tableName="tnt_parcel_incident_links">
+            <column name="parcel_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="incident_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="parcel_chain_id" type="VARCHAR(100)"/>
+            <column name="parcel_chain_tail_hash" type="VARCHAR(128)"/>
+            <column name="incident_chain_id" type="VARCHAR(100)"/>
+            <column name="incident_chain_head_hash" type="VARCHAR(128)"/>
+            <column name="incident_chain_tail_hash" type="VARCHAR(128)"/>
+            <column name="linked_at" type="TIMESTAMPTZ"/>
+            <column name="resumed_at" type="TIMESTAMPTZ"/>
+            <column name="resumption_confirmed" type="BOOLEAN" defaultValueBoolean="false"/>
+        </createTable>
+        <addPrimaryKey tableName="tnt_parcel_incident_links"
+                       columnNames="parcel_id,incident_id"
+                       constraintName="pk_parcel_incident_link"/>
+        <addForeignKeyConstraint constraintName="fk_link_incident"
+                                 baseTableName="tnt_parcel_incident_links" baseColumnNames="incident_id"
+                                 referencedTableName="tnt_incidents" referencedColumnNames="id"/>
+    </changeSet>
+
+</databaseChangeLog>

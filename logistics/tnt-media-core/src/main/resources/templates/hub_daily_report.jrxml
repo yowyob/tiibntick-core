@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- TiiBnTick — Hub Daily Report Template -->
+<!-- Author: MANFOUO Braun -->
+<!DOCTYPE jasperReport PUBLIC "-//JasperReports//DTD Report Design//EN"
+        "http://jasperreports.sourceforge.net/dtds/jasperreport.dtd">
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports
+              http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
+              name="hub_daily_report"
+              pageWidth="595" pageHeight="842"
+              columnWidth="555" leftMargin="20" rightMargin="20"
+              topMargin="20" bottomMargin="20"
+              uuid="a7b8c9d0-e1f2-3456-0abc-567890123456">
+
+    <parameter name="hubName" class="java.lang.String"/>
+    <parameter name="reportDate" class="java.lang.String"/>
+    <parameter name="packagesReceived" class="java.lang.String"/>
+    <parameter name="packagesDispatched" class="java.lang.String"/>
+    <parameter name="packagesPending" class="java.lang.String"/>
+    <parameter name="generatedAt" class="java.lang.String"/>
+
+    <queryString><![CDATA[]]></queryString>
+
+    <title>
+        <band height="60">
+            <staticText>
+                <reportElement x="0" y="0" width="555" height="28"/>
+                <textElement textAlignment="Center"><font size="16" isBold="true"/></textElement>
+                <text><![CDATA[RAPPORT JOURNALIER HUB — TiiBnTick Point]]></text>
+            </staticText>
+            <line><reportElement x="0" y="40" width="555" height="1"/></line>
+        </band>
+    </title>
+
+    <summary>
+        <band height="300">
+            <staticText>
+                <reportElement x="0" y="10" width="200" height="18"/>
+                <textElement><font isBold="true"/></textElement>
+                <text><![CDATA[Point Relais:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="10" width="355" height="18"/>
+                <textFieldExpression><![CDATA[$P{hubName}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="34" width="200" height="18"/>
+                <textElement><font isBold="true"/></textElement>
+                <text><![CDATA[Date:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="34" width="355" height="18"/>
+                <textFieldExpression><![CDATA[$P{reportDate}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="62" width="200" height="18"/>
+                <textElement><font isBold="true"/></textElement>
+                <text><![CDATA[Colis reçus:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="62" width="355" height="18"/>
+                <textFieldExpression><![CDATA[$P{packagesReceived}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="86" width="200" height="18"/>
+                <textElement><font isBold="true"/></textElement>
+                <text><![CDATA[Colis expédiés:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="86" width="355" height="18"/>
+                <textFieldExpression><![CDATA[$P{packagesDispatched}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="110" width="200" height="18"/>
+                <textElement><font isBold="true"/></textElement>
+                <text><![CDATA[En attente:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="110" width="355" height="18"/>
+                <textFieldExpression><![CDATA[$P{packagesPending}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="260" width="555" height="20" forecolor="#888888"/>
+                <textElement textAlignment="Center"><font size="7"/></textElement>
+                <text><![CDATA[TiiBnTick — Rapport journalier généré automatiquement]]></text>
+            </staticText>
+        </band>
+    </summary>
+</jasperReport>

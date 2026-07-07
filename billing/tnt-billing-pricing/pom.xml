@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.yowyob.tiibntick.core</groupId>
+        <artifactId>tiibntick-core-parent</artifactId>
+        <version>0.0.1</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>tnt-billing-pricing</artifactId>
+    <name>TiiBnTick Core — Billing Pricing Engine</name>
+    <description>
+        Selling-price computation engine: BillingPolicy aggregate, PricingRule DSL-driven,
+        SurchargeRule, Promotion, LoyaltyRule, CommissionRule. Consumes tnt-billing-dsl
+        for DSL condition evaluation and produces PriceEvaluation breakdowns.
+    </description>
+    <packaging>jar</packaging>
+
+    <dependencies>
+
+        <!-- ═══════════════════════════════════════════════════
+             Internal — tnt-billing-dsl (DSL evaluator + types)
+             ═══════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-billing-dsl</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- ═══════════════════════════════════════════════════
+             Yowyob Kernel
+             ═══════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>yowyob.comops.api</groupId>
+            <artifactId>RT-comops-common-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>yowyob.comops.api</groupId>
+            <artifactId>RT-comops-kernel-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>yowyob.comops.api</groupId>
+            <artifactId>RT-comops-settings-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>yow-event-kernel</artifactId>
+        </dependency>
+
+        <!-- ═══════════════════════════════════════════════════
+             Spring Boot (autoconfigure only — non-runnable JAR)
+             ═══════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- ═══════════════════════════════════════════════════
+             R2DBC + PostgreSQL (reactive persistence)
+             ═══════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-r2dbc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>r2dbc-postgresql</artifactId>
+        </dependency>
+
+        <!-- ═══════════════════════════════════════════════════
+             Liquibase — schema migrations
+             ═══════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.liquibase</groupId>
+            <artifactId>liquibase-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-jdbc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- ═══════════════════════════════════════════════════
+             Jackson — JSON serialization for embedded VOs
+             ═══════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+
+        <!-- ═══════════════════════════════════════════════════
+             API documentation
+             ═══════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
+        </dependency>
+
+        <!-- ═══════════════════════════════════════════════════
+             Tooling
+             ═══════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- ═══════════════════════════════════════════════════
+             Test
+             ═══════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-test</artifactId>
+            <version>${reactor-test.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

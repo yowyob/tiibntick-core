@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- TiiBnTick — Monthly Report Template -->
+<!-- Author: MANFOUO Braun -->
+<!DOCTYPE jasperReport PUBLIC "-//JasperReports//DTD Report Design//EN"
+        "http://jasperreports.sourceforge.net/dtds/jasperreport.dtd">
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports
+              http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
+              name="monthly_report"
+              pageWidth="595" pageHeight="842"
+              columnWidth="555" leftMargin="20" rightMargin="20"
+              topMargin="20" bottomMargin="20"
+              uuid="f6a7b8c9-d0e1-2345-fab0-456789012345">
+
+    <parameter name="agencyName" class="java.lang.String"/>
+    <parameter name="reportMonth" class="java.lang.String"/>
+    <parameter name="totalMissions" class="java.lang.String"/>
+    <parameter name="totalRevenue" class="java.lang.String"/>
+    <parameter name="currency" class="java.lang.String"/>
+    <parameter name="generatedAt" class="java.lang.String"/>
+
+    <queryString><![CDATA[]]></queryString>
+
+    <title>
+        <band height="60">
+            <staticText>
+                <reportElement x="0" y="0" width="555" height="28"/>
+                <textElement textAlignment="Center"><font size="16" isBold="true"/></textElement>
+                <text><![CDATA[RAPPORT MENSUEL D'ACTIVITÉ — TiiBnTick]]></text>
+            </staticText>
+            <line><reportElement x="0" y="40" width="555" height="1"/></line>
+        </band>
+    </title>
+
+    <summary>
+        <band height="300">
+            <staticText>
+                <reportElement x="0" y="10" width="200" height="18"/>
+                <textElement><font isBold="true"/></textElement>
+                <text><![CDATA[Agence:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="10" width="355" height="18"/>
+                <textFieldExpression><![CDATA[$P{agencyName}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="34" width="200" height="18"/>
+                <textElement><font isBold="true"/></textElement>
+                <text><![CDATA[Mois:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="34" width="355" height="18"/>
+                <textFieldExpression><![CDATA[$P{reportMonth}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="58" width="200" height="18"/>
+                <textElement><font isBold="true"/></textElement>
+                <text><![CDATA[Missions totales:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="58" width="355" height="18"/>
+                <textFieldExpression><![CDATA[$P{totalMissions}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="82" width="200" height="18"/>
+                <textElement><font isBold="true"/></textElement>
+                <text><![CDATA[Chiffre d'affaires:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="82" width="355" height="18"/>
+                <textFieldExpression><![CDATA[$P{totalRevenue} + " " + $P{currency}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="260" width="555" height="20" forecolor="#888888"/>
+                <textElement textAlignment="Center"><font size="7"/></textElement>
+                <text><![CDATA[TiiBnTick — Rapport généré automatiquement]]></text>
+            </staticText>
+        </band>
+    </summary>
+</jasperReport>

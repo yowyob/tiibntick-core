@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+        TiiBnTick — tnt-tp-core (L2 Identity Layer)
+        ============================================
+        Third-Party management for TiiBnTick logistics.
+        Extends RT-comops-tp-core (Yowyob Kernel) via UUID reference — no Java inheritance.
+        TiiBnTick-specific extensions:
+          - TntClientProfile   : KYC status, loyalty tier, phone masking, TNT roles
+          - KycRecord          : simplified KYC adapted to the informal Cameroonian context
+          - LoyaltyAccount     : points earn/redeem, tier progression
+          - ThirdPartyRating   : 1-5 star ratings after delivery missions
+          - PhoneAlias         : relay-point anonymity mapping
+
+        Kernel integration rule:
+          No Java inheritance from Kernel classes.
+          thirdPartyId: UUID is the logical reference key to RT-comops-tp-core.
+
+         changes:
+          - Added tnt-auth-core: @CurrentUser TntUserIdentity replaces @RequestHeader("X-Tenant-Id")
+            in all controllers; ReactiveSecurityContextExtractor used in services.
+          - Added tnt-roles-core: @RequirePermission declarative enforcement on service methods.
+          - Added spring-boot-starter-aop: required for @RequirePermission AOP aspect.
+
+        Author: MANFOUO Braun
+        GitLab: https://gitlab.com/tiibntick-org/tiibntick-core
+    -->
+
+    <parent>
+        <groupId>com.yowyob.tiibntick.core</groupId>
+        <artifactId>tiibntick-core-parent</artifactId>
+        <version>0.0.1</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>tnt-tp-core</artifactId>
+    <packaging>jar</packaging>
+    <name>TiiBnTick — tnt-tp-core (L2 Identity)</name>
+    <description>
+        Third-Party management for TiiBnTick logistics.
+        Extends RT-comops-tp-core via UUID reference (thirdPartyId) — no Java inheritance.
+        Provides KYC, loyalty, phone masking, rating, and TNT-specific roles.
+    </description>
+
+    <dependencies>
+
+        <!-- ─── FOUNDATION — tnt-common-core ─────────────────────────────────────── -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-common-core</artifactId>
+        </dependency>
+
+        <!-- ─── FOUNDATION — tnt-auth-core ─────────────────────────────────────────
+             Enables @CurrentUser TntUserIdentity in controllers (replaces @RequestHeader).
+             ReactiveSecurityContextExtractor used in services for tenant scoping.
+             ──────────────────────────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-auth-core</artifactId>
+        </dependency>
+
+        <!-- ─── FOUNDATION — tnt-roles-core ────────────────────────────────────────
+             Provides @RequirePermission AOP annotation for declarative permission
+             enforcement on service methods (actor:read/write/approve, billing:read/write).
+             ──────────────────────────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-roles-core</artifactId>
+        </dependency>
+
+        <!-- ─── KERNEL — RT-comops-tp-core ─────────────────────────────────────── -->
+        <dependency>
+            <groupId>yowyob.comops.api</groupId>
+            <artifactId>RT-comops-tp-core</artifactId>
+        </dependency>
+
+        <!-- ─── KERNEL — RT-comops-auth-core ────────────────────────────────────── -->
+        <dependency>
+            <groupId>yowyob.comops.api</groupId>
+            <artifactId>RT-comops-auth-core</artifactId>
+        </dependency>
+
+        <!-- ─── L0 — Event bus ─────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>yow-event-kernel</artifactId>
+        </dependency>
+
+        <!-- ─── SPRING — AOP (required for @RequirePermission aspect) ────────────── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+
+        <!-- ─── SPRING — WebFlux ────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+
+        <!-- ─── SPRING — R2DBC ──────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-r2dbc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>r2dbc-postgresql</artifactId>
+        </dependency>
+
+        <!-- ─── DATABASE — Liquibase ────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.liquibase</groupId>
+            <artifactId>liquibase-core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- ─── MESSAGING — Kafka ───────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+
+        <!-- ─── VALIDATION ──────────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- ─── API DOCUMENTATION ───────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
+        </dependency>
+
+        <!-- ─── CODE GENERATION ─────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.mapstruct</groupId>
+            <artifactId>mapstruct</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- ─── OBSERVABILITY ───────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
+        <!-- ─── AUTOCONFIGURATION ───────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+
+        <!-- ─── TESTS ───────────────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

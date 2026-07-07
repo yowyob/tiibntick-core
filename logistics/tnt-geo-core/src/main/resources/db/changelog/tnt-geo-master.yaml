@@ -1,0 +1,44 @@
+databaseChangeLog:
+  - changeSet:
+      id: tnt-geo-001-road-nodes
+      author: MANFOUO Braun
+      changes:
+        - sqlFile:
+            path: v1.0/01_create_road_nodes.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+  - changeSet:
+      id: tnt-geo-002-road-arcs
+      author: MANFOUO Braun
+      changes:
+        - sqlFile:
+            path: v1.0/02_create_road_arcs.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+  - changeSet:
+      id: tnt-geo-003-service-zones
+      author: MANFOUO Braun
+      changes:
+        - sqlFile:
+            path: v1.0/03_create_service_zones.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+  - changeSet:
+      id: tnt-geo-004-points-of-interest
+      author: MANFOUO Braun
+      changes:
+        - sqlFile:
+            path: v1.0/04_create_points_of_interest.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+  - changeSet:
+      id: tnt-geo-005-relay-hubs
+      author: MANFOUO Braun
+      changes:
+        - sqlFile:
+            path: v1.0/05_create_relay_hubs.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+  - include:
+      file: db/changelog/v1.0/06_freelancer_org_service_zones.sql
+      relativeToChangelogFile: false

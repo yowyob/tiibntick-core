@@ -1,0 +1,122 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: V001-billing-schema
+      author: MANFOUO Braun
+      comment: "Creates the billing schema if it does not yet exist"
+      changes:
+        - sql:
+            sql: "CREATE SCHEMA IF NOT EXISTS billing;"
+
+  - changeSet:
+      id: V001-dsl-rule-table
+      author: MANFOUO Braun
+      comment: "Creates the billing.dsl_rule table — DSL tariff rules for TiiBnTick billing engine"
+      changes:
+        - createTable:
+            schemaName: billing
+            tableName: dsl_rule
+            columns:
+
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+
+              - column:
+                  name: name
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: description
+                  type: TEXT
+
+              - column:
+                  name: condition_expression
+                  type: TEXT
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: action_expression
+                  type: TEXT
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: actions_json
+                  type: TEXT
+                  defaultValue: "[]"
+
+              - column:
+                  name: priority
+                  type: INT
+                  defaultValueNumeric: 100
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: active
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: tenant_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: policy_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMPTZ
+                  defaultValueComputed: NOW()
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: updated_at
+                  type: TIMESTAMPTZ
+                  defaultValueComputed: NOW()
+                  constraints:
+                    nullable: false
+
+        - createIndex:
+            schemaName: billing
+            tableName: dsl_rule
+            indexName: idx_dsl_rule_policy_id_priority
+            columns:
+              - column:
+                  name: policy_id
+              - column:
+                  name: priority
+                  descending: false
+
+        - createIndex:
+            schemaName: billing
+            tableName: dsl_rule
+            indexName: idx_dsl_rule_tenant_id
+            columns:
+              - column:
+                  name: tenant_id
+
+        - createIndex:
+            schemaName: billing
+            tableName: dsl_rule
+            indexName: idx_dsl_rule_policy_active
+            columns:
+              - column:
+                  name: policy_id
+              - column:
+                  name: active

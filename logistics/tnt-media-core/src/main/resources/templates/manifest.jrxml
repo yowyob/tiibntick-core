@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- TiiBnTick — Delivery Manifest Template -->
+<!-- Author: MANFOUO Braun -->
+<!DOCTYPE jasperReport PUBLIC "-//JasperReports//DTD Report Design//EN"
+        "http://jasperreports.sourceforge.net/dtds/jasperreport.dtd">
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports
+              http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
+              name="manifest"
+              pageWidth="595"
+              pageHeight="842"
+              columnWidth="555"
+              leftMargin="20"
+              rightMargin="20"
+              topMargin="20"
+              bottomMargin="20"
+              uuid="a1b2c3d4-e5f6-7890-abcd-ef1234567890">
+
+    <property name="com.jaspersoft.studio.unit." value="pixel"/>
+
+    <!-- ── Parameters ── -->
+    <parameter name="trackingCode" class="java.lang.String"/>
+    <parameter name="missionId" class="java.lang.String"/>
+    <parameter name="agencyName" class="java.lang.String"/>
+    <parameter name="shipperName" class="java.lang.String"/>
+    <parameter name="recipientName" class="java.lang.String"/>
+    <parameter name="deliveryAddress" class="java.lang.String"/>
+    <parameter name="packageDescription" class="java.lang.String"/>
+    <parameter name="createdAt" class="java.lang.String"/>
+    <parameter name="REPORT_LOCALE" class="java.util.Locale" isForPrompting="false"/>
+
+    <queryString><![CDATA[]]></queryString>
+
+    <!-- ── Title Band ── -->
+    <title>
+        <band height="80">
+            <staticText>
+                <reportElement x="0" y="0" width="555" height="30"/>
+                <textElement textAlignment="Center">
+                    <font size="18" isBold="true"/>
+                </textElement>
+                <text><![CDATA[TiiBnTick — Bordereau de Livraison]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="0" y="35" width="555" height="20"/>
+                <textElement textAlignment="Center">
+                    <font size="11"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$P{agencyName}]]></textFieldExpression>
+            </textField>
+            <line>
+                <reportElement x="0" y="60" width="555" height="1"/>
+            </line>
+        </band>
+    </title>
+
+    <!-- ── Summary Band ── -->
+    <summary>
+        <band height="400">
+            <!-- Tracking Code -->
+            <staticText>
+                <reportElement x="0" y="10" width="200" height="20"/>
+                <textElement><font isBold="true"/></textElement>
+                <text><![CDATA[Code de suivi:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="10" width="355" height="20"/>
+                <textFieldExpression><![CDATA[$P{trackingCode}]]></textFieldExpression>
+            </textField>
+
+            <!-- Mission ID -->
+            <staticText>
+                <reportElement x="0" y="35" width="200" height="20"/>
+                <textElement><font isBold="true"/></textElement>
+                <text><![CDATA[Référence mission:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="35" width="355" height="20"/>
+                <textFieldExpression><![CDATA[$P{missionId}]]></textFieldExpression>
+            </textField>
+
+            <!-- Shipper -->
+            <staticText>
+                <reportElement x="0" y="60" width="200" height="20"/>
+                <textElement><font isBold="true"/></textElement>
+                <text><![CDATA[Expéditeur:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="60" width="355" height="20"/>
+                <textFieldExpression><![CDATA[$P{shipperName}]]></textFieldExpression>
+            </textField>
+
+            <!-- Recipient -->
+            <staticText>
+                <reportElement x="0" y="85" width="200" height="20"/>
+                <textElement><font isBold="true"/></textElement>
+                <text><![CDATA[Destinataire:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="85" width="355" height="20"/>
+                <textFieldExpression><![CDATA[$P{recipientName}]]></textFieldExpression>
+            </textField>
+
+            <!-- Delivery Address -->
+            <staticText>
+                <reportElement x="0" y="110" width="200" height="20"/>
+                <textElement><font isBold="true"/></textElement>
+                <text><![CDATA[Adresse de livraison:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="110" width="355" height="40"/>
+                <textFieldExpression><![CDATA[$P{deliveryAddress}]]></textFieldExpression>
+            </textField>
+
+            <!-- Package Description -->
+            <staticText>
+                <reportElement x="0" y="160" width="200" height="20"/>
+                <textElement><font isBold="true"/></textElement>
+                <text><![CDATA[Description du colis:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="160" width="355" height="40"/>
+                <textFieldExpression><![CDATA[$P{packageDescription}]]></textFieldExpression>
+            </textField>
+
+            <!-- Date -->
+            <staticText>
+                <reportElement x="0" y="210" width="200" height="20"/>
+                <textElement><font isBold="true"/></textElement>
+                <text><![CDATA[Date de création:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="210" width="355" height="20"/>
+                <textFieldExpression><![CDATA[$P{createdAt}]]></textFieldExpression>
+            </textField>
+
+            <!-- Footer -->
+            <staticText>
+                <reportElement x="0" y="350" width="555" height="30" forecolor="#888888"/>
+                <textElement textAlignment="Center"><font size="8"/></textElement>
+                <text><![CDATA[TiiBnTick — Plateforme Logistique Africaine — Propulsé par Yowyob]]></text>
+            </staticText>
+        </band>
+    </summary>
+</jasperReport>

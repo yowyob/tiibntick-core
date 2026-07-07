@@ -1,0 +1,7 @@
+package com.yowyob.tiibntick.core.inventory.domain.model;
+public enum MovementType {
+    ENTRY_PURCHASE, ENTRY_RETURN, EXIT_SALE, EXIT_WASTE, EXIT_DONATION,
+    ADJUSTMENT_POSITIVE, ADJUSTMENT_NEGATIVE,
+    TRANSFER_OUT, TRANSFER_IN,
+    RESERVED, RESERVATION_RELEASED
+}

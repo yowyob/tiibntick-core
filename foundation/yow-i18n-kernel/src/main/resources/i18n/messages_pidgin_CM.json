@@ -1,0 +1,33 @@
+{
+  "notification.mission.assigned": "We don give the waka to {{driver_name}}.",
+  "notification.package.delivered": "Boss, I don drop the cargo {{package_id}}.",
+  "notification.package.picked_up": "{{driver_name}} don carry the cargo {{package_id}}.",
+  "notification.package.in_transit": "Your cargo {{package_id}} dey road. Driver na {{driver_name}}.",
+  "notification.package.at_hub": "Your cargo {{package_id}} dey for hub {{hub_name}}, go pick am.",
+  "notification.package.deposit_confirmed": "We don receive the cargo {{package_id}} for hub {{hub_name}}.",
+  "notification.delivery.assigned": "New delivery work dey for cargo {{package_id}}.",
+  "notification.delivery.cancelled": "Dem cancel the delivery for cargo {{package_id}}.",
+  "notification.delivery.rescheduled": "Dem change the time for cargo {{package_id}} delivery.",
+
+  "error.route.unreachable": "Road no dey for this side, rain don spoil am.",
+  "error.hub.full": "Hub {{hub_name}} don full. Make you try another place.",
+  "error.driver.unavailable": "No driver dey your side now.",
+  "error.payment.failed": "Your {{amount}} {{currency}} payment no work. Try again.",
+
+  "billing.cost.estimate": "The waka money na {{amount}} {{currency}}.",
+  "billing.invoice.generated": "Your bill of {{amount}} {{currency}} don ready.",
+  "billing.payment.confirmed": "{{amount}} {{currency}} payment don confirm.",
+  "billing.wallet.credited": "Dem put {{amount}} {{currency}} inside your wallet.",
+
+  "status.hub.deposit": "I don keep the cargo for {{hub_name}}.",
+  "status.hub.retrieved": "Person don collect the cargo from {{hub_name}}.",
+  "status.delivery.pending": "We dey find driver.",
+  "status.delivery.in_progress": "Driver dey road.",
+  "status.delivery.completed": "Delivery don finish.",
+
+  "blockchain.deposit.confirmed": "Cargo {{package_id}} deposit don enter blockchain.",
+  "blockchain.delivery.confirmed": "Cargo {{package_id}} delivery don enter blockchain forever.",
+
+  "account.welcome": "Welcome for TiiBnTick, {{name}}!",
+  "account.otp.sent": "Your code na {{otp}}. E go expire for {{duration}} minutes."
+}

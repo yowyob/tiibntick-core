@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- Author: MANFOUO Braun | tnt-incident-core  — FreelancerOrg responsibility context -->
+
+    <changeSet id="003-add-freelancer-org-context-to-incidents" author="MANFOUO Braun">
+        <comment>
+            Adds FreelancerOrg responsibility context to tnt_incidents ().
+            When an incident occurs on a FreelancerOrg-executed mission, these fields
+            track which org is responsible and what type of org it is.
+            References tnt-organization-core UUID — no physical FK (cross-module boundary).
+        </comment>
+
+        <addColumn tableName="tnt_incidents">
+            <column name="responsible_org_id" type="VARCHAR(255)">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+        <addColumn tableName="tnt_incidents">
+            <column name="responsible_org_type" type="VARCHAR(30)">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+
+        <sql>
+            COMMENT ON COLUMN tnt_incidents.responsible_org_id IS
+            'UUID of the responsible FreelancerOrg or Agency. Null for platform-only incidents. '
+            'References tnt-organization-core UUID — no physical FK.';
+
+            COMMENT ON COLUMN tnt_incidents.responsible_org_type IS
+            'AGENCY or FREELANCER_ORG — type of the responsible organization.';
+        </sql>
+
+        <createIndex tableName="tnt_incidents" indexName="idx_tnt_incidents_responsible_org">
+            <column name="responsible_org_id"/>
+            <column name="tenant_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- NOTE: a changeset adding org_id/org_type to "tnt_incident_participants" was removed here —
+         IncidentParticipant is an embedded value object on the Incident aggregate, never persisted
+         as its own table, so the changeset always failed with "relation does not exist" once it
+         was actually wired into the master changelog. -->
+
+</databaseChangeLog>

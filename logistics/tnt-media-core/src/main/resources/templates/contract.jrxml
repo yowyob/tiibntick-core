@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- TiiBnTick — Contract Template -->
+<!-- Author: MANFOUO Braun -->
+<!DOCTYPE jasperReport PUBLIC "-//JasperReports//DTD Report Design//EN"
+        "http://jasperreports.sourceforge.net/dtds/jasperreport.dtd">
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports
+              http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
+              name="contract"
+              pageWidth="595" pageHeight="842"
+              columnWidth="555" leftMargin="20" rightMargin="20"
+              topMargin="20" bottomMargin="20"
+              uuid="b8c9d0e1-f2a3-4567-1bcd-678901234567">
+
+    <parameter name="contractNumber" class="java.lang.String"/>
+    <parameter name="contractDate" class="java.lang.String"/>
+    <parameter name="partyA" class="java.lang.String"/>
+    <parameter name="partyB" class="java.lang.String"/>
+    <parameter name="contractObject" class="java.lang.String"/>
+    <parameter name="validFrom" class="java.lang.String"/>
+    <parameter name="validUntil" class="java.lang.String"/>
+
+    <queryString><![CDATA[]]></queryString>
+
+    <title>
+        <band height="60">
+            <staticText>
+                <reportElement x="0" y="0" width="555" height="28"/>
+                <textElement textAlignment="Center"><font size="16" isBold="true"/></textElement>
+                <text><![CDATA[CONTRAT DE SERVICE — TiiBnTick]]></text>
+            </staticText>
+            <line><reportElement x="0" y="40" width="555" height="1"/></line>
+        </band>
+    </title>
+
+    <summary>
+        <band height="450">
+            <staticText>
+                <reportElement x="0" y="10" width="200" height="18"/>
+                <textElement><font isBold="true"/></textElement>
+                <text><![CDATA[N° Contrat:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="10" width="355" height="18"/>
+                <textFieldExpression><![CDATA[$P{contractNumber}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="34" width="200" height="18"/>
+                <textElement><font isBold="true"/></textElement>
+                <text><![CDATA[Date:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="34" width="355" height="18"/>
+                <textFieldExpression><![CDATA[$P{contractDate}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="58" width="200" height="18"/>
+                <textElement><font isBold="true"/></textElement>
+                <text><![CDATA[Partie A:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="58" width="355" height="18"/>
+                <textFieldExpression><![CDATA[$P{partyA}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="82" width="200" height="18"/>
+                <textElement><font isBold="true"/></textElement>
+                <text><![CDATA[Partie B:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="82" width="355" height="18"/>
+                <textFieldExpression><![CDATA[$P{partyB}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="110" width="200" height="18"/>
+                <textElement><font isBold="true"/></textElement>
+                <text><![CDATA[Objet du contrat:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="110" width="355" height="60"/>
+                <textFieldExpression><![CDATA[$P{contractObject}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="180" width="200" height="18"/>
+                <textElement><font isBold="true"/></textElement>
+                <text><![CDATA[Valide du:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="180" width="155" height="18"/>
+                <textFieldExpression><![CDATA[$P{validFrom}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="360" y="180" width="50" height="18"/>
+                <textElement><font isBold="true"/></textElement>
+                <text><![CDATA[au:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="415" y="180" width="140" height="18"/>
+                <textFieldExpression><![CDATA[$P{validUntil}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="410" width="555" height="20" forecolor="#888888"/>
+                <textElement textAlignment="Center"><font size="7"/></textElement>
+                <text><![CDATA[TiiBnTick — Contrat généré électroniquement, valeur légale selon droit camerounais]]></text>
+            </staticText>
+        </band>
+    </summary>
+</jasperReport>

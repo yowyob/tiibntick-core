@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- TiiBnTick — Commission Statement Template -->
+<!-- Author: MANFOUO Braun -->
+<!DOCTYPE jasperReport PUBLIC "-//JasperReports//DTD Report Design//EN"
+        "http://jasperreports.sourceforge.net/dtds/jasperreport.dtd">
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports
+              http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
+              name="commission_statement"
+              pageWidth="595"
+              pageHeight="842"
+              columnWidth="555"
+              leftMargin="20"
+              rightMargin="20"
+              topMargin="20"
+              bottomMargin="20"
+              uuid="e5f6a7b8-c9d0-1234-efab-345678901234">
+
+    <parameter name="delivererName" class="java.lang.String"/>
+    <parameter name="period" class="java.lang.String"/>
+    <parameter name="totalDeliveries" class="java.lang.String"/>
+    <parameter name="totalCommission" class="java.lang.String"/>
+    <parameter name="currency" class="java.lang.String"/>
+    <parameter name="generatedAt" class="java.lang.String"/>
+
+    <queryString><![CDATA[]]></queryString>
+
+    <title>
+        <band height="70">
+            <staticText>
+                <reportElement x="0" y="0" width="555" height="28"/>
+                <textElement textAlignment="Center"><font size="17" isBold="true"/></textElement>
+                <text><![CDATA[RELEVÉ DE COMMISSIONS — TiiBnTick]]></text>
+            </staticText>
+            <line><reportElement x="0" y="40" width="555" height="1"/></line>
+        </band>
+    </title>
+
+    <summary>
+        <band height="300">
+            <staticText>
+                <reportElement x="0" y="10" width="200" height="18"/>
+                <textElement><font isBold="true" size="10"/></textElement>
+                <text><![CDATA[Livreur / Freelancer:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="10" width="355" height="18"/>
+                <textElement><font size="10"/></textElement>
+                <textFieldExpression><![CDATA[$P{delivererName}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="34" width="200" height="18"/>
+                <textElement><font isBold="true" size="10"/></textElement>
+                <text><![CDATA[Période:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="34" width="355" height="18"/>
+                <textElement><font size="10"/></textElement>
+                <textFieldExpression><![CDATA[$P{period}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="60" width="200" height="18"/>
+                <textElement><font isBold="true" size="10"/></textElement>
+                <text><![CDATA[Livraisons effectuées:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="60" width="355" height="18"/>
+                <textElement><font size="10"/></textElement>
+                <textFieldExpression><![CDATA[$P{totalDeliveries}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="90" width="200" height="22"/>
+                <textElement><font isBold="true" size="12"/></textElement>
+                <text><![CDATA[Total commissions:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="90" width="355" height="22"/>
+                <textElement><font size="12" isBold="true"/></textElement>
+                <textFieldExpression><![CDATA[$P{totalCommission} + " " + $P{currency}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="260" width="555" height="20" forecolor="#888888"/>
+                <textElement textAlignment="Center"><font size="7"/></textElement>
+                <text><![CDATA[TiiBnTick — Relevé généré automatiquement]]></text>
+            </staticText>
+        </band>
+    </summary>
+</jasperReport>

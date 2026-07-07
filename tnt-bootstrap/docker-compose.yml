@@ -1,0 +1,291 @@
+version: "3.9"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TiiBnTick Core — Development docker-compose
+# Author: MANFOUO Braun — ENSP Yaoundé 2026
+#
+# Usage:
+#   cp .env.example .env                 # First time only — see tnt-bootstrap/.env.example
+#   docker compose up -d                 # Start all infrastructure
+#   docker compose up -d tiibntick-core  # Start core app (after infra is ready)
+#   docker compose logs -f tiibntick-core
+#   docker compose down -v               # Stop and remove volumes
+#
+# This compose file is LOCAL DEV ONLY (disposable Postgres/Redis/Kafka/MinIO
+# containers). Docker Compose auto-loads a `.env` file from this directory to
+# fill the ${VAR:-default} placeholders below — copy .env.example to get one.
+# It is NOT used to reach Yowyob's shared PostgreSQL instance in staging/prod;
+# see .env.prod.example and application.yml's "prod" profile notes for that.
+#
+# Services:
+#   - tiibntick-core  : Spring Boot application (port 8080)
+#   - postgres        : PostgreSQL 18 with PostGIS 3.6 (port 5432)
+#   - redis           : Redis 7 (port 6379)
+#   - kafka           : Apache Kafka + KRaft (port 9092)
+#   - minio           : MinIO S3-compatible (ports 9000, 9001)
+#   - elasticsearch   : Elasticsearch 8 (port 9200)
+#   - prometheus      : Metrics scraping (port 9090)
+#   - grafana         : Dashboards (port 3000)
+#   - zipkin          : Distributed tracing (port 9411)
+# ══════════════════════════════════════════════════════════════════════════════
+
+name: tiibntick-core-dev
+
+networks:
+  tiibntick-net:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  kafka-data:
+  minio-data:
+  elasticsearch-data:
+  grafana-data:
+  prometheus-data:
+
+services:
+
+  # ── PostgreSQL 18 + PostGIS 3.6 ────────────────────────────────────────────
+  postgres:
+    image: postgis/postgis:17-3.5  # PostGIS 3.6 available on PG17; use 18 when image is released
+    container_name: tnt-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-tiibntick_core}
+      POSTGRES_USER: ${DB_USER:-tiibntick}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-tiibntick_pass}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "${DB_PORT:-5433}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
+    networks:
+      - tiibntick-net
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis 7 ────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: tnt-redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - tiibntick-net
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Apache Kafka (KRaft mode — no ZooKeeper) ───────────────────────────────
+  kafka:
+    image: confluentinc/cp-kafka:7.7.0
+    container_name: tnt-kafka
+    restart: unless-stopped
+    ports:
+      - "9092:9092"
+      - "9094:9094"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENERS: PLAINTEXT://kafka:29092,CONTROLLER://kafka:9093,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      CLUSTER_ID: TiiBnTickKafkaClusterLocal01
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 168
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - tiibntick-net
+    healthcheck:
+      test: [ "CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092" ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  # ── MinIO (S3-compatible object storage) ───────────────────────────────────
+  minio:
+    image: minio/minio:RELEASE.2024-10-13T13-34-11Z
+    container_name: tnt-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Web console
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin123}
+    volumes:
+      - minio-data:/data
+    networks:
+      - tiibntick-net
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  # ── Elasticsearch 8 ────────────────────────────────────────────────────────
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    container_name: tnt-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx1g
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - tiibntick-net
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9200/_cluster/health?wait_for_status=yellow" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ── Prometheus ─────────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.54.0
+    container_name: tnt-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - tiibntick-net
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+      - "--web.enable-lifecycle"
+
+  # ── Grafana ────────────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: tnt-grafana
+    restart: unless-stopped
+    ports:
+      - "3100:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-tiibntick_grafana}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - tiibntick-net
+    depends_on:
+      - prometheus
+
+  # ── Zipkin (distributed tracing) ───────────────────────────────────────────
+  zipkin:
+    image: openzipkin/zipkin:3.4
+    container_name: tnt-zipkin
+    restart: unless-stopped
+    ports:
+      - "9411:9411"
+    networks:
+      - tiibntick-net
+
+  # ── TiiBnTick Core Application ─────────────────────────────────────────────
+  tiibntick-core:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tnt-core
+    restart: unless-stopped
+    profiles:
+      - app   # Start with: docker compose --profile app up
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      DB_HOST: postgres          # in-network service name — always "postgres" here, unrelated to host DB_HOST
+      DB_PORT: 5432              # in-network port — always 5432 here, unrelated to host-mapped DB_PORT
+      DB_NAME: ${DB_NAME:-tiibntick_core}
+      DB_USER: ${DB_USER:-tiibntick}
+      DB_PASSWORD: ${DB_PASSWORD:-tiibntick_pass}
+      DB_SSL_MODE: ${DB_SSL_MODE:-disable}
+      DB_POOL_INITIAL_SIZE: ${DB_POOL_INITIAL_SIZE:-2}
+      DB_POOL_MAX_SIZE: ${DB_POOL_MAX_SIZE:-10}
+      DB_POOL_MAX_IDLE_MINUTES: ${DB_POOL_MAX_IDLE_MINUTES:-30}
+      KERNEL_DB_HOST: ${KERNEL_DB_HOST:-postgres}
+      KERNEL_DB_NAME: ${KERNEL_DB_NAME:-tiibntick_core}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP: kafka:29092
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin123}
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-http://localhost:9000}
+      JWT_ISSUER_URI: ${JWT_ISSUER_URI:-http://localhost:9000}
+      JWT_AUTO_GENERATE_KEY_PAIR: ${JWT_AUTO_GENERATE_KEY_PAIR:-true}
+      JWT_KEY_ID: ${JWT_KEY_ID:-tnt-core-key-dev}
+      # tnt-auth-core: security bridge config
+      TNT_AUTH_SERVICE_CODE: ${TNT_AUTH_SERVICE_CODE:-TNT_AGENCY}
+      TNT_AUTH_ACTOR_RESOLUTION: ${TNT_AUTH_ACTOR_RESOLUTION:-true}
+      TNT_AUTH_ALLOW_ANONYMOUS: ${TNT_AUTH_ALLOW_ANONYMOUS:-false}
+      # tnt-roles-core: RBAC provisioning config
+      TNT_SYSTEM_TENANT_ID: ${TNT_SYSTEM_TENANT_ID:-00000000-0000-0000-0000-000000000001}
+      TNT_ROLES_PROVISION_ON_STARTUP: ${TNT_ROLES_PROVISION_ON_STARTUP:-true}
+      TNT_ROLES_AOP_ENABLED: ${TNT_ROLES_AOP_ENABLED:-true}
+      TNT_ROLES_CACHE_TTL: ${TNT_ROLES_CACHE_TTL:-300}
+      QR_HMAC_SECRET: ${QR_HMAC_SECRET:-dev-hmac-secret-change-in-staging-and-prod}
+      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+      SWAGGER_SERVER_URL: ${SWAGGER_SERVER_URL:-http://localhost:8080}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      #grafana:
+      #  condition: service_started
+      #prometheus:
+      #  condition: service_started
+      #zipkin:
+      #  condition: service_started
+    networks:
+      - tiibntick-net
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider",
+              "http://localhost:8080/actuator/health/liveness" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+
+#  FreelancerOrg env vars: TNT_FREELANCER_ORG_MAX_SUB_DELIVERERS, TNT_FREELANCER_ORG_MAX_VEHICLES, TNT_BILLING_DEFAULT_CURRENCY

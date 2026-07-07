@@ -1,0 +1,17 @@
+databaseChangeLog:
+  - changeSet:
+      id: tnt-sync-001-create-sync-tables
+      author: MANFOUO Braun
+      changes:
+        - sqlFile:
+            path: changes/001_create_sync_tables.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+  - changeSet:
+      id: tnt-sync-002-create-entity-version-trigger
+      author: MANFOUO Braun
+      changes:
+        - sqlFile:
+            path: changes/002_create_entity_version_trigger.sql
+            relativeToChangelogFile: true
+            splitStatements: false

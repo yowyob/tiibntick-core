@@ -1,0 +1,360 @@
+databaseChangeLog:
+  - changeSet:
+      id: 001-create-wallet-schema
+      author: MANFOUO Braun
+      comment: "Creates the billing wallet schema: wallet_wallets, wallet_transactions, wallet_payment_intents, wallet_reconciliations"
+
+      changes:
+
+        # ── SCHEMA ────────────────────────────────────────────────────────────
+        - sql:
+            sql: CREATE SCHEMA IF NOT EXISTS billing;
+
+        # ── wallet_wallets ─────────────────────────────────────────────────────
+        - createTable:
+            schemaName: billing
+            tableName: wallet_wallets
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: user_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: tenant_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: balance
+                  type: DECIMAL(19, 2)
+                  defaultValueNumeric: 0.00
+                  constraints:
+                    nullable: false
+              - column:
+                  name: reserved_balance
+                  type: DECIMAL(19, 2)
+                  defaultValueNumeric: 0.00
+                  constraints:
+                    nullable: false
+              - column:
+                  name: currency
+                  type: VARCHAR(3)
+                  defaultValue: XAF
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(20)
+                  defaultValue: ACTIVE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: NOW()
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: NOW()
+                  constraints:
+                    nullable: false
+              - column:
+                  name: version
+                  type: BIGINT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+
+        - addUniqueConstraint:
+            schemaName: billing
+            tableName: wallet_wallets
+            columnNames: user_id, tenant_id
+            constraintName: uq_wallet_user_tenant
+
+        - createIndex:
+            schemaName: billing
+            tableName: wallet_wallets
+            indexName: idx_wallet_user_tenant
+            columns:
+              - column:
+                  name: user_id
+              - column:
+                  name: tenant_id
+
+        # ── wallet_transactions ────────────────────────────────────────────────
+        - createTable:
+            schemaName: billing
+            tableName: wallet_transactions
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: wallet_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: type
+                  type: VARCHAR(30)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: amount
+                  type: DECIMAL(19, 2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: balance_after
+                  type: DECIMAL(19, 2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: currency
+                  type: VARCHAR(3)
+                  defaultValue: XAF
+                  constraints:
+                    nullable: false
+              - column:
+                  name: channel
+                  type: VARCHAR(30)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: reference_id
+                  type: VARCHAR(255)
+              - column:
+                  name: external_ref
+                  type: VARCHAR(255)
+              - column:
+                  name: status
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: description
+                  type: VARCHAR(500)
+              - column:
+                  name: idempotency_key
+                  type: VARCHAR(512)
+              - column:
+                  name: failure_reason
+                  type: VARCHAR(500)
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: NOW()
+                  constraints:
+                    nullable: false
+              - column:
+                  name: processed_at
+                  type: TIMESTAMP
+
+        - addForeignKeyConstraint:
+            baseTableSchemaName: billing
+            baseTableName: wallet_transactions
+            baseColumnNames: wallet_id
+            referencedTableSchemaName: billing
+            referencedTableName: wallet_wallets
+            referencedColumnNames: id
+            constraintName: fk_tx_wallet_id
+
+        - createIndex:
+            schemaName: billing
+            tableName: wallet_transactions
+            indexName: idx_tx_wallet_id_created
+            columns:
+              - column:
+                  name: wallet_id
+              - column:
+                  name: created_at
+                  descending: true
+
+        - createIndex:
+            schemaName: billing
+            tableName: wallet_transactions
+            indexName: idx_tx_idempotency_key
+            unique: true
+            columns:
+              - column:
+                  name: idempotency_key
+            where: idempotency_key IS NOT NULL
+
+        # ── wallet_payment_intents ─────────────────────────────────────────────
+        - createTable:
+            schemaName: billing
+            tableName: wallet_payment_intents
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: wallet_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: invoice_id
+                  type: VARCHAR(255)
+              - column:
+                  name: amount
+                  type: DECIMAL(19, 2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: currency
+                  type: VARCHAR(3)
+                  defaultValue: XAF
+                  constraints:
+                    nullable: false
+              - column:
+                  name: channel
+                  type: VARCHAR(30)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: external_ref
+                  type: VARCHAR(255)
+              - column:
+                  name: idempotency_key
+                  type: VARCHAR(512)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: callback_url
+                  type: VARCHAR(1024)
+              - column:
+                  name: expires_at
+                  type: TIMESTAMP
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: NOW()
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: NOW()
+                  constraints:
+                    nullable: false
+
+        - createIndex:
+            schemaName: billing
+            tableName: wallet_payment_intents
+            indexName: idx_pi_external_ref
+            columns:
+              - column:
+                  name: external_ref
+
+        - createIndex:
+            schemaName: billing
+            tableName: wallet_payment_intents
+            indexName: idx_pi_idempotency_key
+            unique: true
+            columns:
+              - column:
+                  name: idempotency_key
+
+        - createIndex:
+            schemaName: billing
+            tableName: wallet_payment_intents
+            indexName: idx_pi_invoice_id
+            columns:
+              - column:
+                  name: invoice_id
+
+        # ── wallet_reconciliations ─────────────────────────────────────────────
+        - createTable:
+            schemaName: billing
+            tableName: wallet_reconciliations
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: tenant_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: period_year
+                  type: INTEGER
+                  constraints:
+                    nullable: false
+              - column:
+                  name: period_month
+                  type: INTEGER
+                  constraints:
+                    nullable: false
+              - column:
+                  name: wallet_total
+                  type: DECIMAL(19, 2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: bank_statement_total
+                  type: DECIMAL(19, 2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: discrepancy
+                  type: DECIMAL(19, 2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: currency
+                  type: VARCHAR(3)
+                  defaultValue: XAF
+              - column:
+                  name: status
+                  type: VARCHAR(30)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: resolution_note
+                  type: VARCHAR(1000)
+              - column:
+                  name: resolved_at
+                  type: TIMESTAMP
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: NOW()
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: NOW()
+                  constraints:
+                    nullable: false
+
+        - addUniqueConstraint:
+            schemaName: billing
+            tableName: wallet_reconciliations
+            columnNames: tenant_id, period_year, period_month
+            constraintName: uq_reconciliation_tenant_period

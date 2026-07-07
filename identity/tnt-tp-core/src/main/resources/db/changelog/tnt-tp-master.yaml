@@ -1,0 +1,22 @@
+databaseChangeLog:
+  # tnt-tp-core — Liquibase master changelog
+  # Author: MANFOUO Braun
+  # Schema: TiiBnTick Third-Party structures (L2 Identity layer)
+  #
+  # Kernel integration note:
+  #   The `third_party_id UUID NOT NULL` column in all tables is the logical
+  #   integration key referencing RT-comops-tp-core ThirdParty entities.
+  #   No physical FK constraint toward the Kernel database — integration is logical,
+  #   validated at the application layer via KernelThirdPartyPort.
+
+  - include:
+      file: db/changelog/migrations/001_create_tnt_tp_tables.sql
+      relativeToChangelogFile: false
+  - changeSet:
+      id: tnt-tp-002-freelancer-org-provider-links
+      author: MANFOUO Braun
+      changes:
+        - sqlFile:
+            path: migrations/002_add_freelancer_org_provider_links.sql
+            relativeToChangelogFile: true
+            splitStatements: true

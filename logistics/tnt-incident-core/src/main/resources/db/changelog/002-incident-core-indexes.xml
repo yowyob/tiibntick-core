@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- Author: MANFOUO Braun | tnt-incident-core indexes v1.0 -->
+
+    <changeSet id="002-idx-incidents-agency-status" author="MANFOUO Braun">
+        <createIndex indexName="idx_incidents_agency_status"
+                     tableName="tnt_incidents">
+            <column name="agency_id"/>
+            <column name="status"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="002-idx-incidents-mission-id" author="MANFOUO Braun">
+        <createIndex indexName="idx_incidents_mission_id"
+                     tableName="tnt_incidents">
+            <column name="mission_id"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="002-idx-incidents-tenant-status" author="MANFOUO Braun">
+        <createIndex indexName="idx_incidents_tenant_status"
+                     tableName="tnt_incidents">
+            <column name="tenant_id"/>
+            <column name="status"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="002-idx-incidents-platform-tenant" author="MANFOUO Braun">
+        <createIndex indexName="idx_incidents_platform_tenant"
+                     tableName="tnt_incidents">
+            <column name="source_platform"/>
+            <column name="tenant_id"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="002-idx-incidents-reported-at" author="MANFOUO Braun">
+        <createIndex indexName="idx_incidents_reported_at"
+                     tableName="tnt_incidents">
+            <column name="reported_at" descending="true"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="002-idx-incidents-severity-status" author="MANFOUO Braun">
+        <createIndex indexName="idx_incidents_severity_status"
+                     tableName="tnt_incidents">
+            <column name="severity"/>
+            <column name="status"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="002-idx-event-logs-incident" author="MANFOUO Braun">
+        <createIndex indexName="idx_event_logs_incident_occurred"
+                     tableName="tnt_incident_event_logs">
+            <column name="incident_id"/>
+            <column name="occurred_at"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="002-idx-blockchain-chain-index" author="MANFOUO Braun">
+        <createIndex indexName="idx_blockchain_chain_block"
+                     tableName="tnt_incident_blockchain_records">
+            <column name="chain_id"/>
+            <column name="block_index"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="002-idx-cooperation-agency" author="MANFOUO Braun">
+        <createIndex indexName="idx_coop_responding_agency_status"
+                     tableName="tnt_incident_inter_agency_cooperations">
+            <column name="responding_agency_id"/>
+            <column name="status"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="002-idx-evidence-incident" author="MANFOUO Braun">
+        <createIndex indexName="idx_evidence_incident_id"
+                     tableName="tnt_incident_evidences">
+            <column name="incident_id"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="002-idx-replacement-incident" author="MANFOUO Braun">
+        <createIndex indexName="idx_replacement_incident_id"
+                     tableName="tnt_incident_driver_replacements">
+            <column name="incident_id"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

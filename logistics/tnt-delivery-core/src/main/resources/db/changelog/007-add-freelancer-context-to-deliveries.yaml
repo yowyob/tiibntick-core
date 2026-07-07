@@ -1,0 +1,74 @@
+databaseChangeLog:
+  - changeSet:
+      id: 007-add-freelancer-context-to-tnt-deliveries
+      author: MANFOUO Braun
+      comment: >
+        Adds FreelancerOrg context columns to tnt_deliveries ().
+        Enables tnt-delivery-core to track FreelancerOrg assignment, selected vehicle,
+        deployed equipment, and parcel constraint flags for the billing pricing context.
+      changes:
+        - addColumn:
+            tableName: tnt_deliveries
+            columns:
+              - column:
+                  name: assigned_freelancer_org_id
+                  type: VARCHAR(255)
+                  remarks: "UUID of the FreelancerOrg executing this delivery. Null for Agency deliveries. References tnt-organization-core UUID — no physical FK."
+              - column:
+                  name: assigned_freelancer_role
+                  type: VARCHAR(20)
+                  remarks: "OWNER or SUB_DELIVERER role. Null when no FreelancerOrg is assigned."
+              - column:
+                  name: selected_vehicle_id
+                  type: VARCHAR(255)
+                  remarks: "UUID of the selected FreelancerVehicle from tnt-resource-core. Used for per-vehicle fuel cost computation in tnt-billing-cost."
+              - column:
+                  name: active_equipment_ids_json
+                  type: TEXT
+                  defaultValue: "[]"
+                  remarks: "JSON array of FreelancerEquipment IDs deployed in this mission. Used for equipment cost computation."
+              - column:
+                  name: delivery_attempt_number
+                  type: INTEGER
+                  defaultValueNumeric: 1
+                  constraints:
+                    nullable: false
+                  remarks: "Delivery attempt number (1=first, 2=re-delivery). Used as deliveryAttemptNumber DSL variable in billing."
+              - column:
+                  name: requires_refrigeration
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+                  remarks: "Whether active cold chain refrigeration is required. Used as requiresRefrigeration DSL variable in billing."
+              - column:
+                  name: requires_assembly
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+                  remarks: "Whether assembly/installation is required at delivery location. Used as requiresAssembly DSL variable."
+              - column:
+                  name: requires_id_check
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+                  remarks: "Whether recipient identity verification is required. Used as requiresIDCheck DSL variable."
+
+        # Index for FreelancerOrg-scoped delivery queries
+        - createIndex:
+            indexName: idx_tnt_del_freelancer_org
+            tableName: tnt_deliveries
+            columns:
+              - column: { name: tenant_id }
+              - column: { name: assigned_freelancer_org_id }
+            where: assigned_freelancer_org_id IS NOT NULL
+
+        # Index for vehicle assignment tracking (consumed from tnt.vehicle.assigned_to_mission)
+        - createIndex:
+            indexName: idx_tnt_del_selected_vehicle
+            tableName: tnt_deliveries
+            columns:
+              - column: { name: selected_vehicle_id }
+            where: selected_vehicle_id IS NOT NULL

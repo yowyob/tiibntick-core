@@ -1,0 +1,10 @@
+databaseChangeLog:
+  - include:
+      file: db/changelog/migrations/V1__create_tnt_actor_tables.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/migrations/V2__add_incident_tracking_to_actor.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/migrations/V3__add_freelancer_org_link_to_actor.sql
+      relativeToChangelogFile: false

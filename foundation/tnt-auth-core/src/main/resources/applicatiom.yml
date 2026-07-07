@@ -1,0 +1,4 @@
+tnt:
+  auth:
+    kernel:
+      jwks-path: /.well-known/jwks.json

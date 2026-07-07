@@ -1,0 +1,12 @@
+# Liquibase master changelog — tnt-resource-core
+# Author: MANFOUO Braun
+databaseChangeLog:
+  - include:
+      file: db/changelog/001_resource_schema.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/002_incident_integration.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/003_freelancer_resources.sql
+      relativeToChangelogFile: false

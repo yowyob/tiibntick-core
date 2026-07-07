@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- TiiBnTick — Hub Deposit Receipt Template -->
+<!-- Author: MANFOUO Braun -->
+<!DOCTYPE jasperReport PUBLIC "-//JasperReports//DTD Report Design//EN"
+        "http://jasperreports.sourceforge.net/dtds/jasperreport.dtd">
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports
+              http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
+              name="hub_receipt"
+              pageWidth="595"
+              pageHeight="421"
+              columnWidth="555"
+              leftMargin="20"
+              rightMargin="20"
+              topMargin="20"
+              bottomMargin="20"
+              uuid="b2c3d4e5-f6a7-8901-bcde-f12345678901">
+
+    <parameter name="depositId" class="java.lang.String"/>
+    <parameter name="trackingCode" class="java.lang.String"/>
+    <parameter name="hubName" class="java.lang.String"/>
+    <parameter name="shipperName" class="java.lang.String"/>
+    <parameter name="packageDescription" class="java.lang.String"/>
+    <parameter name="depositTime" class="java.lang.String"/>
+    <parameter name="generatedAt" class="java.lang.String"/>
+
+    <queryString><![CDATA[]]></queryString>
+
+    <title>
+        <band height="60">
+            <staticText>
+                <reportElement x="0" y="0" width="555" height="25"/>
+                <textElement textAlignment="Center">
+                    <font size="16" isBold="true"/>
+                </textElement>
+                <text><![CDATA[REÇU DE DÉPÔT — TiiBnTick Point Relais]]></text>
+            </staticText>
+            <line>
+                <reportElement x="0" y="30" width="555" height="1"/>
+            </line>
+        </band>
+    </title>
+
+    <summary>
+        <band height="300">
+            <staticText>
+                <reportElement x="0" y="10" width="200" height="18"/>
+                <textElement><font isBold="true" size="9"/></textElement>
+                <text><![CDATA[N° de dépôt:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="10" width="355" height="18"/>
+                <textElement><font size="9"/></textElement>
+                <textFieldExpression><![CDATA[$P{depositId}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="32" width="200" height="18"/>
+                <textElement><font isBold="true" size="9"/></textElement>
+                <text><![CDATA[Code de suivi:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="32" width="355" height="18"/>
+                <textElement><font size="9" isBold="true"/></textElement>
+                <textFieldExpression><![CDATA[$P{trackingCode}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="54" width="200" height="18"/>
+                <textElement><font isBold="true" size="9"/></textElement>
+                <text><![CDATA[Point relais:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="54" width="355" height="18"/>
+                <textElement><font size="9"/></textElement>
+                <textFieldExpression><![CDATA[$P{hubName}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="76" width="200" height="18"/>
+                <textElement><font isBold="true" size="9"/></textElement>
+                <text><![CDATA[Expéditeur:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="76" width="355" height="18"/>
+                <textElement><font size="9"/></textElement>
+                <textFieldExpression><![CDATA[$P{shipperName}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="98" width="200" height="18"/>
+                <textElement><font isBold="true" size="9"/></textElement>
+                <text><![CDATA[Contenu déclaré:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="98" width="355" height="36"/>
+                <textElement><font size="9"/></textElement>
+                <textFieldExpression><![CDATA[$P{packageDescription}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="140" width="200" height="18"/>
+                <textElement><font isBold="true" size="9"/></textElement>
+                <text><![CDATA[Date et heure de dépôt:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="140" width="355" height="18"/>
+                <textElement><font size="9"/></textElement>
+                <textFieldExpression><![CDATA[$P{depositTime}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="200" width="555" height="40" forecolor="#444444"/>
+                <textElement textAlignment="Center"><font size="8" isItalic="true"/></textElement>
+                <text><![CDATA[Conservez ce reçu comme preuve de dépôt.
+Ce document est généré électroniquement par TiiBnTick.]]></text>
+            </staticText>
+
+            <staticText>
+                <reportElement x="0" y="255" width="555" height="18" forecolor="#888888"/>
+                <textElement textAlignment="Center"><font size="7"/></textElement>
+                <text><![CDATA[TiiBnTick — Logistique de confiance pour l'Afrique]]></text>
+            </staticText>
+        </band>
+    </summary>
+</jasperReport>

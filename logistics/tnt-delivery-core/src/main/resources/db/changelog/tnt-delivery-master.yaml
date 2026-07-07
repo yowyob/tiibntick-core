@@ -1,0 +1,22 @@
+databaseChangeLog:
+  - include:
+      file: db/changelog/001-create-parcels.yaml
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/002-create-delivery-announcements.yaml
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/003-create-announcement-responses.yaml
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/004-create-delivery-persons.yaml
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/005-create-deliveries.yaml
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/006-add-incident-tracking-to-deliveries.yaml
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/007-add-freelancer-context-to-deliveries.yaml
+      relativeToChangelogFile: false

@@ -1,0 +1,15 @@
+# Liquibase master changelog — tnt-sales-core
+# Author: MANFOUO Braun
+databaseChangeLog:
+  - include:
+      file: db/changelog/changes/001-create-sales-schema.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/002-create-orders-tables.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/003-kernel-integration.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/004-add-freelancer-org-provider.sql
+      relativeToChangelogFile: false

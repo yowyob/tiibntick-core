@@ -1,0 +1,15 @@
+databaseChangeLog:
+  - changeSet:
+      id: tnt-billing-invoice-001-create-tables
+      author: MANFOUO Braun
+      changes:
+        - sqlFile:
+            path: migrations/001_create_billing_invoice_tables.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+  - include:
+      file: db/changelog/migrations/002_add_freelancer_org_fields.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/migrations/003_fix_jsonb_columns_to_text.sql
+      relativeToChangelogFile: false

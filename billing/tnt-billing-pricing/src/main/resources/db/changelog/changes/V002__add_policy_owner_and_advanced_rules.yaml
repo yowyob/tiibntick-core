@@ -1,0 +1,39 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: V002-billing-policy-owner-columns
+      author: MANFOUO Braun
+      comment: " — Add policy owner metadata and advanced rule columns for FreelancerOrg,
+                HubPoint, and Link network support."
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE pricing.billing_policy
+                ADD COLUMN IF NOT EXISTS owner_type            VARCHAR(50),
+                ADD COLUMN IF NOT EXISTS owner_actor_id        VARCHAR(255),
+                ADD COLUMN IF NOT EXISTS is_from_template      BOOLEAN NOT NULL DEFAULT FALSE,
+                ADD COLUMN IF NOT EXISTS template_code         VARCHAR(100),
+                ADD COLUMN IF NOT EXISTS dsl_access_level      VARCHAR(20) NOT NULL DEFAULT 'FULL',
+                ADD COLUMN IF NOT EXISTS special_surcharges_json    TEXT,
+                ADD COLUMN IF NOT EXISTS hub_storage_rules_json     TEXT,
+                ADD COLUMN IF NOT EXISTS network_transit_rules_json TEXT,
+                ADD COLUMN IF NOT EXISTS fleet_cost_parameters_json TEXT;
+
+  - changeSet:
+      id: V002-billing-policy-owner-indexes
+      author: MANFOUO Braun
+      comment: " — Indexes for owner-scoped billing policy queries."
+      changes:
+        - sql:
+            sql: |
+              CREATE INDEX IF NOT EXISTS idx_billing_policy_owner_actor
+                ON pricing.billing_policy (owner_actor_id)
+                WHERE owner_actor_id IS NOT NULL;
+
+              CREATE INDEX IF NOT EXISTS idx_billing_policy_owner_type_tenant
+                ON pricing.billing_policy (owner_type, tenant_id, status)
+                WHERE owner_type IS NOT NULL;
+
+              CREATE INDEX IF NOT EXISTS idx_billing_policy_owner_type_actor
+                ON pricing.billing_policy (owner_type, owner_actor_id)
+                WHERE owner_type IS NOT NULL AND owner_actor_id IS NOT NULL;

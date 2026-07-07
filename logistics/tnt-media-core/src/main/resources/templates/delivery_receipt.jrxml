@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- TiiBnTick — Delivery Receipt Template -->
+<!-- Author: MANFOUO Braun -->
+<!DOCTYPE jasperReport PUBLIC "-//JasperReports//DTD Report Design//EN"
+        "http://jasperreports.sourceforge.net/dtds/jasperreport.dtd">
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports
+              http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
+              name="delivery_receipt"
+              pageWidth="595"
+              pageHeight="421"
+              columnWidth="555"
+              leftMargin="20"
+              rightMargin="20"
+              topMargin="20"
+              bottomMargin="20"
+              uuid="d4e5f6a7-b8c9-0123-defa-234567890123">
+
+    <parameter name="missionId" class="java.lang.String"/>
+    <parameter name="trackingCode" class="java.lang.String"/>
+    <parameter name="recipientName" class="java.lang.String"/>
+    <parameter name="delivererName" class="java.lang.String"/>
+    <parameter name="deliveredAt" class="java.lang.String"/>
+    <parameter name="generatedAt" class="java.lang.String"/>
+
+    <queryString><![CDATA[]]></queryString>
+
+    <title>
+        <band height="50">
+            <staticText>
+                <reportElement x="0" y="0" width="555" height="25"/>
+                <textElement textAlignment="Center">
+                    <font size="15" isBold="true"/>
+                </textElement>
+                <text><![CDATA[REÇU DE LIVRAISON — TiiBnTick]]></text>
+            </staticText>
+            <line>
+                <reportElement x="0" y="30" width="555" height="1"/>
+            </line>
+        </band>
+    </title>
+
+    <summary>
+        <band height="320">
+            <staticText>
+                <reportElement x="0" y="10" width="200" height="18"/>
+                <textElement><font isBold="true" size="9"/></textElement>
+                <text><![CDATA[Code de suivi:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="10" width="355" height="18"/>
+                <textElement><font size="9" isBold="true"/></textElement>
+                <textFieldExpression><![CDATA[$P{trackingCode}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="32" width="200" height="18"/>
+                <textElement><font isBold="true" size="9"/></textElement>
+                <text><![CDATA[Destinataire:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="32" width="355" height="18"/>
+                <textElement><font size="9"/></textElement>
+                <textFieldExpression><![CDATA[$P{recipientName}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="54" width="200" height="18"/>
+                <textElement><font isBold="true" size="9"/></textElement>
+                <text><![CDATA[Livreur:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="54" width="355" height="18"/>
+                <textElement><font size="9"/></textElement>
+                <textFieldExpression><![CDATA[$P{delivererName}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="76" width="200" height="18"/>
+                <textElement><font isBold="true" size="9"/></textElement>
+                <text><![CDATA[Date et heure de livraison:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="76" width="355" height="18"/>
+                <textElement><font size="9"/></textElement>
+                <textFieldExpression><![CDATA[$P{deliveredAt}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="220" width="555" height="30" forecolor="#444444"/>
+                <textElement textAlignment="Center"><font size="8" isItalic="true"/></textElement>
+                <text><![CDATA[La livraison a été confirmée par signature numérique du destinataire.
+Ce document est une preuve légale de livraison générée par TiiBnTick.]]></text>
+            </staticText>
+        </band>
+    </summary>
+</jasperReport>

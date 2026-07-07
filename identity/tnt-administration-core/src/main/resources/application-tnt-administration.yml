@@ -1,0 +1,30 @@
+# TiiBnTick Administration Core — Configuration
+# Include this profile when deploying tnt-administration-core.
+# Author: MANFOUO Braun
+
+tnt:
+  kernel:
+    bridge:
+      # Base URL for the Yowyob Kernel API (RT-comops-roles-core + RT-comops-administration-core).
+      # Override via environment variable KERNEL_API_URL in Docker/K8s.
+      base-url: ${KERNEL_API_URL:http://yow-kernel:8080/api}
+      connect-timeout: 3000
+      read-timeout: 5000
+      retry:
+        max-attempts: 3
+        backoff-ms: 200
+
+  # ── tnt-auth-core integration (L1 Foundation) ─────────────────────────────────
+  # TntCurrentUserArgumentResolver reads tenantId/userId from JWT claims.
+  # No additional configuration needed here — inherited from tnt-bootstrap application.yml.
+  auth:
+    service-code: ${TNT_AUTH_SERVICE_CODE:TNT_AGENCY}
+
+  # ── tnt-roles-core integration (L1 Foundation) ────────────────────────────────
+  # TntRoleInitializationService.provisionForTenant() is called during tenant onboarding.
+  # The @RequirePermission AOP aspect is enabled via TntAdministrationCoreConfiguration.
+  roles:
+    # AOP permission enforcement on @RequirePermission annotated service methods.
+    aop-enabled: ${TNT_ROLES_AOP_ENABLED:true}
+    # Cache TTL for resolved permission sets in Redis (seconds).
+    permission-cache-ttl-seconds: ${TNT_ROLES_CACHE_TTL:300}

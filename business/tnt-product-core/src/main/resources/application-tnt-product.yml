@@ -1,0 +1,11 @@
+# TiiBnTick Product Core — KernelBridge configuration
+# Author: MANFOUO Braun
+
+tnt:
+  kernel:
+    bridge:
+      # Base URL for the Yowyob Kernel API (RT-comops-product-core).
+      # Override via environment variable KERNEL_API_URL in Docker/K8s.
+      base-url: ${KERNEL_API_URL:http://yow-kernel:8080/api}
+      connect-timeout: 3000
+      read-timeout: 5000

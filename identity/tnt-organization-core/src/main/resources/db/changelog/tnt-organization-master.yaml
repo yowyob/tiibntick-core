@@ -1,0 +1,42 @@
+databaseChangeLog:
+  # tnt-organization-core — Liquibase master changelog
+  # Author: MANFOUO Braun
+  # Schema: TiiBnTick Organization structures (L2 Identity layer)
+  #
+  # Kernel integration note:
+  #   Each table contains an `organization_id UUID` column as a logical
+  #   reference key to RT-comops-organization-core. No foreign key constraint
+  #   is declared toward the Kernel database — integration is logical, not physical.
+  #
+  # v1.0 — Initial schema: HubRelais, Agency, Branch
+  #  — FreelancerOrganization: FreelancerOrg, SubDeliverers, OperationalZones,
+  #         ServiceZone extended columns on Branch
+
+  - include:
+      file: db/changelog/changes/v0001_create_tnt_hub_relais.sql
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/v0002_create_tnt_agency.sql
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/v0003_create_tnt_branch.sql
+      relativeToChangelogFile: false
+
+  #  — FreelancerOrganization support
+  - include:
+      file: db/changelog/changes/v0004_create_freelancer_organizations.sql
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/v0005_create_freelancer_sub_deliverers.sql
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/v0006_create_freelancer_operational_zones.sql
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/v0007_alter_service_zone_add_columns.sql
+      relativeToChangelogFile: false

@@ -1,0 +1,59 @@
+databaseChangeLog:
+  - changeSet:
+      id: 002-create-tnt-delivery-announcements
+      author: MANFOUO Braun
+      comment: "Creates the tnt_delivery_announcements table"
+      changes:
+        - createTable:
+            tableName: tnt_delivery_announcements
+            columns:
+              - column: { name: id,           type: UUID,              constraints: { primaryKey: true, nullable: false } }
+              - column: { name: tenant_id,     type: UUID,              constraints: { nullable: false } }
+              - column: { name: client_id,     type: UUID,              constraints: { nullable: false } }
+              - column: { name: title,         type: VARCHAR(255),      constraints: { nullable: false } }
+              - column: { name: description,   type: TEXT }
+              - column: { name: offered_amount,type: "NUMERIC(15,2)",     constraints: { nullable: false } }
+              - column: { name: currency,      type: VARCHAR(10),       constraints: { nullable: false } }
+              - column: { name: parcel_id,     type: UUID,              constraints: { nullable: false, foreignKeyName: fk_ann_parcel, references: tnt_parcels(id) } }
+              - column: { name: status,        type: VARCHAR(30),       constraints: { nullable: false } }
+              - column: { name: urgency,       type: VARCHAR(20),       constraints: { nullable: false } }
+              # Pickup address
+              - column: { name: pickup_street,    type: VARCHAR(255) }
+              - column: { name: pickup_landmark,  type: VARCHAR(255) }
+              - column: { name: pickup_district,  type: VARCHAR(100) }
+              - column: { name: pickup_city,      type: VARCHAR(100),  constraints: { nullable: false } }
+              - column: { name: pickup_country,   type: VARCHAR(10),   defaultValue: "CM" }
+              - column: { name: pickup_latitude,  type: DOUBLE PRECISION }
+              - column: { name: pickup_longitude, type: DOUBLE PRECISION }
+              # Delivery address
+              - column: { name: delivery_street,    type: VARCHAR(255) }
+              - column: { name: delivery_landmark,  type: VARCHAR(255) }
+              - column: { name: delivery_district,  type: VARCHAR(100) }
+              - column: { name: delivery_city,      type: VARCHAR(100), constraints: { nullable: false } }
+              - column: { name: delivery_country,   type: VARCHAR(10),  defaultValue: "CM" }
+              - column: { name: delivery_latitude,  type: DOUBLE PRECISION }
+              - column: { name: delivery_longitude, type: DOUBLE PRECISION }
+              # Recipient
+              - column: { name: recipient_name,      type: VARCHAR(150), constraints: { nullable: false } }
+              - column: { name: recipient_phone,     type: VARCHAR(30),  constraints: { nullable: false } }
+              - column: { name: recipient_alt_phone, type: VARCHAR(30) }
+              # Links
+              - column: { name: selected_response_id, type: UUID }
+              - column: { name: created_delivery_id,  type: UUID }
+              - column: { name: created_at,           type: TIMESTAMPTZ, constraints: { nullable: false } }
+              - column: { name: updated_at,           type: TIMESTAMPTZ, constraints: { nullable: false } }
+              - column: { name: version,              type: BIGINT,      defaultValueNumeric: 0, constraints: { nullable: false } }
+
+        - createIndex:
+            indexName: idx_tnt_ann_tenant_client
+            tableName: tnt_delivery_announcements
+            columns:
+              - column: { name: tenant_id }
+              - column: { name: client_id }
+
+        - createIndex:
+            indexName: idx_tnt_ann_tenant_status
+            tableName: tnt_delivery_announcements
+            columns:
+              - column: { name: tenant_id }
+              - column: { name: status }

@@ -1,0 +1,18 @@
+spring:
+  r2dbc:
+    url: r2dbc:tc:postgresql:///tnt_delivery_test?TC_IMAGE_TAG=16-alpine
+    username: test
+    password: test
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/tnt-delivery-master.yaml
+    url: jdbc:tc:postgresql:16-alpine:///tnt_delivery_test
+    user: test
+    password: test
+  kafka:
+    bootstrap-servers: localhost:9092
+
+logging:
+  level:
+    com.yowyob.tiibntick.delivery: DEBUG
+    org.springframework.r2dbc: WARN

@@ -1,0 +1,17 @@
+databaseChangeLog:
+  - changeSet:
+      id: tnt-route-001-kalman-states
+      author: MANFOUO Braun
+      changes:
+        - sqlFile:
+            path: v1.0/01_create_kalman_states.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+  - changeSet:
+      id: tnt-route-002-tours
+      author: MANFOUO Braun
+      changes:
+        - sqlFile:
+            path: v1.0/02_create_tours.sql
+            relativeToChangelogFile: true
+            splitStatements: true

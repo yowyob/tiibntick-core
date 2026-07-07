@@ -1,0 +1,273 @@
+# ════════════════════════════════════════════════════════════════
+# TiiBnTick Core — Multi-module Maven Monorepo
+# Java 21 · Spring Boot · Testcontainers · IntelliJ · VSCode
+# ════════════════════════════════════════════════════════════════
+
+# ===============================================================
+# BUILD — Maven / Java
+# ===============================================================
+
+target/
+build/
+#out/
+
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+*.zip
+*.tar.gz
+*.rar
+
+# Maven wrapper logs
+.maven/wrapper/maven-wrapper.jar
+!/.mvn/wrapper/maven-wrapper.jar
+
+# Maven release plugin
+release.properties
+pom.xml.releaseBackup
+pom.xml.tag
+pom.xml.versionsBackup
+pom.xml.next
+dependency-reduced-pom.xml
+
+# ===============================================================
+# JVM / LOGS / PID
+# ===============================================================
+
+*.log
+logs/
+*.pid
+*.seed
+*.pid.lock
+hs_err_pid*
+replay_pid*
+
+# ===============================================================
+# IDE — IntelliJ IDEA
+# ===============================================================
+
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Keep shared code styles if desired
+!.idea/codeStyles/
+!.idea/inspectionProfiles/
+
+# ===============================================================
+# IDE — VSCode
+# ===============================================================
+
+.vscode/
+.qodo/
+.history/
+
+# ===============================================================
+# IDE — Eclipse / STS
+# ===============================================================
+
+.project
+.classpath
+.settings/
+.springBeans
+.sts4-cache/
+
+# ===============================================================
+# IDE — NetBeans
+# ===============================================================
+
+nbproject/private/
+nbbuild/
+dist/
+nbdist/
+.nb-gradle/
+
+# ===============================================================
+# OS FILES
+# ===============================================================
+
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Linux
+*~
+
+# ===============================================================
+# ENV / SECRETS / LOCAL CONFIG
+# ===============================================================
+
+.env
+.env.*
+!.env.example
+!.env.prod.example
+
+*.pem
+*.key
+*.crt
+*.p12
+*.jks
+*.keystore
+
+secrets/
+credentials/
+
+# GitHub / GitLab tokens
+**/application-local.yml
+**/application-local.yaml
+**/application-secret.yml
+**/application-secret.yaml
+
+# ===============================================================
+# SPRING BOOT CONFIG
+# ===============================================================
+
+# Runtime-generated config
+config/local/
+config/dev/
+
+# ===============================================================
+# TESTCONTAINERS / DOCKER
+# ===============================================================
+
+.testcontainers.properties
+
+# Local docker volumes
+docker-data/
+volumes/
+
+# ===============================================================
+# DATABASES / LOCAL STORAGE
+# ===============================================================
+
+*.db
+*.sqlite
+*.sqlite3
+*.mv.db
+
+# DuckDB local files
+*.duckdb
+*.duckdb.wal
+
+# PostgreSQL dumps
+#*.sql
+*.dump
+*.backup
+
+# ===============================================================
+# LIQUIBASE
+# ===============================================================
+
+liquibase.properties
+
+# ===============================================================
+# REPORTS / COVERAGE
+# ===============================================================
+
+coverage/
+jacoco.exec
+.jacoco/
+
+site/
+reports/
+
+# ===============================================================
+# GENERATED SOURCES
+# ===============================================================
+
+generated/
+generated-sources/
+generated-test-sources/
+
+# Annotation processors
+**/generated/
+
+# ===============================================================
+# TEMP FILES
+# ===============================================================
+
+tmp/
+temp/
+.tmp/
+
+# ===============================================================
+# NODE / FRONTEND (si futur dashboard/admin)
+# ===============================================================
+
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Frontend build
+.next/
+.nuxt/
+dist/
+coverage/
+
+# ===============================================================
+# KAFKA / REDIS / MINIO LOCAL DEV
+# ===============================================================
+
+kafka-logs/
+redis-data/
+minio-data/
+
+# ===============================================================
+# OR-TOOLS / NATIVE
+# ===============================================================
+
+*.so
+*.dll
+*.dylib
+
+# ===============================================================
+# LATEX / DOCUMENTATION
+# ===============================================================
+
+*.aux
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.out
+
+# ===============================================================
+# ARCHIVES / EXPORTS
+# ===============================================================
+
+exports/
+artifacts/
+
+# ===============================================================
+# CLAUDE / AI TOOLS
+# ===============================================================
+
+.claude/
+.cursor/
+.continue/
+
+# ===============================================================
+# LOCAL CI / CACHE
+# ===============================================================
+
+.cache/
+.gradle/
+
+# ===============================================================
+# EXPLODED SPRING BOOT BUILD OUTPUT (accidentally created at repo root)
+# ===============================================================
+
+/BOOT-INF/
+
+# ===============================================================
+# KEEP IMPORTANT EMPTY DIRECTORIES
+# ===============================================================
+
+!.gitkeep

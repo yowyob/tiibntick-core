@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+        TiiBnTick — tnt-organization-core (L2 Identity Layer)
+        ======================================================
+        Manages TiiBnTick-specific organizational structures:
+          - Agency     : top-level legal entity (Kernel org extension)
+          - Branch     : sub-office of an Agency
+          - HubRelais  : geolocated physical relay point (PostGIS)
+          - ServiceZone: polygonal coverage area (WKT)
+
+         changes:
+          - Added tnt-auth-core: ReactiveSecurityContextExtractor available in services
+            for tenant scoping without manual ReactiveSecurityContextHolder access.
+          - Added tnt-roles-core: @RequirePermission declarative enforcement on service
+            methods (agency:*, branch:*, relay:*).
+          - Added spring-boot-starter-aop: required for @RequirePermission AOP aspect.
+
+        Author: MANFOUO Braun
+        Maintainer: PAFE Dilane
+        GitLab: https://gitlab.com/tiibntick-org/tiibntick-core
+    -->
+
+    <parent>
+        <groupId>com.yowyob.tiibntick.core</groupId>
+        <artifactId>tiibntick-core-parent</artifactId>
+        <version>0.0.1</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>tnt-organization-core</artifactId>
+    <name>TiiBnTick — tnt-organization-core (L2 Identity)</name>
+    <description>
+        Agency, branches, polygonal service areas, geolocated relay hubs.
+        Integrates with RT-comops-organization-core via UUID reference — no Java inheritance.
+    </description>
+
+    <dependencies>
+
+        <!-- ─── FOUNDATION — tnt-common-core ─────────────────────────────────── -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-common-core</artifactId>
+        </dependency>
+
+        <!-- ─── FOUNDATION — tnt-auth-core ──────────────────────────────────────
+             Provides ReactiveSecurityContextExtractor for service-layer tenant scoping.
+             Enables @CurrentUser TntUserIdentity if web controllers are added in future.
+             ──────────────────────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-auth-core</artifactId>
+        </dependency>
+
+        <!-- ─── FOUNDATION — tnt-roles-core ─────────────────────────────────────
+             Provides @RequirePermission AOP annotation enforcing:
+               agency:read/write/manage  on AgencyService
+               branch:read/write/manage  on BranchService
+               relay:read/write/operate  on HubRelaisService
+             ──────────────────────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-roles-core</artifactId>
+        </dependency>
+
+        <!-- ─── KERNEL — RT-comops-organization-core ─────────────────────────── -->
+        <dependency>
+            <groupId>yowyob.comops.api</groupId>
+            <artifactId>RT-comops-organization-core</artifactId>
+        </dependency>
+
+        <!-- ─── L0 — Event bus ─────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>yow-event-kernel</artifactId>
+        </dependency>
+
+        <!-- ─── L2 — tnt-actor-core (operator reference) ─────────────────────── -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-actor-core</artifactId>
+        </dependency>
+
+        <!-- ─── SPRING — AOP (required for @RequirePermission aspect) ─────────── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+
+        <!-- ─── SPRING — WebFlux + R2DBC ────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-r2dbc</artifactId>
+        </dependency>
+
+        <!-- ─── DATABASE — R2DBC PostgreSQL driver ──────────────────────────── -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>r2dbc-postgresql</artifactId>
+        </dependency>
+
+        <!-- ─── DATABASE — Liquibase ─────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.liquibase</groupId>
+            <artifactId>liquibase-core</artifactId>
+        </dependency>
+
+        <!-- ─── CODE GENERATION ─────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.mapstruct</groupId>
+            <artifactId>mapstruct</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.mapstruct</groupId>
+            <artifactId>mapstruct-processor</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- ─── TESTS ────────────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

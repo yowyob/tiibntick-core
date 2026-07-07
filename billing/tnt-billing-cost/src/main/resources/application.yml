@@ -1,0 +1,23 @@
+spring:
+  r2dbc:
+    url: ${COST_DB_URL:r2dbc:postgresql://localhost:5432/cost_db}
+    username: ${COST_DB_USER:cost}
+    password: ${COST_DB_PASS:cost}
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/001_fleet_cost_parameters.sql
+    url: ${COST_JDBC_URL:jdbc:postgresql://localhost:5432/cost_db}
+    user: ${COST_DB_USER:cost}
+    password: ${COST_DB_PASS:cost}
+
+cost-engine:
+  default-currency: XAF
+  default-road-type: URBAN_PAVED
+  fleet-params:
+    cache-ttl-seconds: 300
+  route-data:
+    timeout-ms: 2000
+
+springdoc:
+  api-docs:
+    path: /billing/cost/api-docs

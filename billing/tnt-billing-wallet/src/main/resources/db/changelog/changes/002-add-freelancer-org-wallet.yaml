@@ -1,0 +1,116 @@
+databaseChangeLog:
+  - changeSet:
+      id: 002-add-freelancer-org-to-wallet
+      author: MANFOUO Braun
+      comment: >
+        Extends wallet_wallets with FreelancerOrg ownership context ().
+        Creates wallet_payment_splits for mission revenue distribution tracking.
+        Enables: org wallets, revenue split, sub-deliverer commission transfer.
+
+      changes:
+
+        # ── Extend wallet_wallets with owner context ───────────────────────────
+        - addColumn:
+            schemaName: billing
+            tableName: wallet_wallets
+            columns:
+              - column:
+                  name: owner_type
+                  type: VARCHAR(50)
+                  defaultValue: ACTOR
+                  constraints:
+                    nullable: false
+                  remarks: "ACTOR | FREELANCER_ORG | AGENCY — type of entity owning this wallet"
+              - column:
+                  name: owner_id
+                  type: VARCHAR(255)
+                  remarks: >
+                    UUID of the owning entity. For ACTOR = user UUID string.
+                    For FREELANCER_ORG / AGENCY = org UUID string.
+                    References tnt-organization-core UUID — no physical FK (cross-module boundary).
+
+        # Index for org wallet lookup (findByOwnerId)
+        - createIndex:
+            schemaName: billing
+            indexName: idx_wallet_owner_id
+            tableName: wallet_wallets
+            columns:
+              - column: { name: owner_id }
+              - column: { name: tenant_id }
+            unique: false
+
+        # ── CREATE TABLE: wallet_payment_splits ────────────────────────────────
+        - createTable:
+            schemaName: billing
+            tableName: wallet_payment_splits
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints: { primaryKey: true, nullable: false }
+              - column:
+                  name: mission_id
+                  type: VARCHAR(255)
+                  constraints: { nullable: false }
+                  remarks: "Delivery mission ID this split belongs to"
+              - column:
+                  name: total_amount
+                  type: DECIMAL(15,2)
+                  constraints: { nullable: false }
+                  remarks: "Total amount paid by the client (XAF)"
+              - column:
+                  name: currency
+                  type: VARCHAR(10)
+                  defaultValue: XAF
+                  constraints: { nullable: false }
+              - column:
+                  name: platform_commission
+                  type: DECIMAL(15,2)
+                  remarks: "Platform commission (3-5% of totalAmount)"
+              - column:
+                  name: org_revenue
+                  type: DECIMAL(15,2)
+                  remarks: "Amount credited to the FreelancerOrg wallet"
+              - column:
+                  name: freelancer_org_id
+                  type: VARCHAR(255)
+                  remarks: "UUID of the FreelancerOrg receiving org revenue. No physical FK."
+              - column:
+                  name: sub_deliverer_commission
+                  type: DECIMAL(15,2)
+                  remarks: "Commission for sub-deliverer (null if OWNER executes directly)"
+              - column:
+                  name: sub_deliverer_id
+                  type: VARCHAR(255)
+                  remarks: "UUID of the sub-deliverer (tnt-actor-core). Null when role=OWNER."
+              - column:
+                  name: status
+                  type: VARCHAR(50)
+                  defaultValue: PENDING
+                  constraints: { nullable: false }
+                  remarks: "PENDING | CONFIRMED | FAILED"
+              - column:
+                  name: executed_at
+                  type: TIMESTAMP
+                  remarks: "Timestamp when the split was successfully executed"
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: NOW()
+                  constraints: { nullable: false }
+
+        # Indexes for split queries
+        - createIndex:
+            schemaName: billing
+            indexName: idx_payment_splits_mission
+            tableName: wallet_payment_splits
+            columns:
+              - column: { name: mission_id }
+
+        - createIndex:
+            schemaName: billing
+            indexName: idx_payment_splits_org
+            tableName: wallet_payment_splits
+            columns:
+              - column: { name: freelancer_org_id }
+            where: freelancer_org_id IS NOT NULL

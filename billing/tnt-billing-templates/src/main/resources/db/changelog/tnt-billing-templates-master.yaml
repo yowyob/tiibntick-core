@@ -1,0 +1,46 @@
+databaseChangeLog:
+  # ============================================================
+  # TiiBnTick Core — tnt-billing-templates
+  # Liquibase Changelog Master
+  #
+  # Author  : MANFOUO Braun
+  # Module  : tnt-billing-templates (L5 Billing Engine)
+  # Version : 0.0.1
+  # Date    : 2026-05-26
+  # ============================================================
+
+  - changeSet:
+      id: tnt-billing-templates-001-policy-templates
+      author: MANFOUO Braun
+      changes:
+        - sqlFile:
+            path: migrations/v0.0.1/001_create_billing_policy_templates.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+
+  - changeSet:
+      id: tnt-billing-templates-002-applicable-types
+      author: MANFOUO Braun
+      changes:
+        - sqlFile:
+            path: migrations/v0.0.1/002_create_billing_template_applicable_types.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+
+  - changeSet:
+      id: tnt-billing-templates-003-template-parameters
+      author: MANFOUO Braun
+      changes:
+        - sqlFile:
+            path: migrations/v0.0.1/003_create_billing_template_parameters.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+
+  - changeSet:
+      id: tnt-billing-templates-004-custom-policy-templates
+      author: MANFOUO Braun
+      changes:
+        - sqlFile:
+            path: migrations/v0.0.1/004_create_billing_custom_policy_templates.sql
+            relativeToChangelogFile: true
+            splitStatements: true

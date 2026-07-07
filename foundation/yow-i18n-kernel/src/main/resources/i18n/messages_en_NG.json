@@ -1,0 +1,33 @@
+{
+  "notification.mission.assigned": "Delivery mission assigned to {{driver_name}}.",
+  "notification.package.delivered": "Package {{package_id}} delivered successfully.",
+  "notification.package.picked_up": "Package {{package_id}} collected by {{driver_name}}.",
+  "notification.package.in_transit": "Package {{package_id}} is on the move. Driver: {{driver_name}}.",
+  "notification.package.at_hub": "Package {{package_id}} ready for pickup at {{hub_name}}.",
+  "notification.package.deposit_confirmed": "Package {{package_id}} received at hub {{hub_name}}.",
+  "notification.delivery.assigned": "New delivery job for package {{package_id}}.",
+  "notification.delivery.cancelled": "Delivery for package {{package_id}} cancelled.",
+  "notification.delivery.rescheduled": "Delivery for package {{package_id}} rescheduled.",
+
+  "error.route.unreachable": "Route unavailable due to poor road or weather conditions.",
+  "error.hub.full": "Hub {{hub_name}} is at full capacity. Please try another.",
+  "error.driver.unavailable": "No dispatch rider available in your area now.",
+  "error.payment.failed": "Payment of {{amount}} {{currency}} failed. Kindly retry.",
+
+  "billing.cost.estimate": "Estimated delivery cost: {{amount}} {{currency}}.",
+  "billing.invoice.generated": "Invoice of {{amount}} {{currency}} generated.",
+  "billing.payment.confirmed": "{{amount}} {{currency}} payment confirmed.",
+  "billing.wallet.credited": "Wallet credited with {{amount}} {{currency}}.",
+
+  "status.hub.deposit": "Package deposited at hub {{hub_name}}.",
+  "status.hub.retrieved": "Package retrieved from hub {{hub_name}}.",
+  "status.delivery.pending": "Awaiting dispatch rider.",
+  "status.delivery.in_progress": "Delivery in progress.",
+  "status.delivery.completed": "Delivery completed.",
+
+  "blockchain.deposit.confirmed": "Package {{package_id}} deposit confirmed on-chain.",
+  "blockchain.delivery.confirmed": "Package {{package_id}} delivery immutably recorded.",
+
+  "account.welcome": "Welcome to TiiBnTick, {{name}}!",
+  "account.otp.sent": "Your OTP is {{otp}}. Expires in {{duration}} minutes."
+}

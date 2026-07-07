@@ -1,0 +1,22 @@
+databaseChangeLog:
+  - changeSet:
+      id: 003-allow-null-user-id-for-org-wallets
+      author: MANFOUO Braun
+      comment: >
+        Makes user_id nullable in wallet_wallets to support FREELANCER_ORG and AGENCY
+        owned wallets where there is no individual user. For org wallets,
+        owner_id holds the org UUID and user_id is null.
+
+      changes:
+        - dropNotNullConstraint:
+            schemaName: billing
+            tableName: wallet_wallets
+            columnName: user_id
+            columnDataType: UUID
+
+      rollback:
+        - addNotNullConstraint:
+            schemaName: billing
+            tableName: wallet_wallets
+            columnName: user_id
+            columnDataType: UUID

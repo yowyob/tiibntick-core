@@ -1,0 +1,80 @@
+spring:
+  application:
+    name: tnt-billing-wallet
+  kafka:
+    bootstrap-servers=localhost:9092
+
+  r2dbc:
+    url: r2dbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:billing_db}
+    username: ${DB_USER:tiibntick}
+    password: ${DB_PASSWORD:tiibntick}
+    pool:
+      initial-size: 5
+      max-size: 20
+      max-idle-time: 30m
+      validation-query: SELECT 1
+
+  liquibase:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:billing_db}
+    user: ${DB_USER:tiibntick}
+    password: ${DB_PASSWORD:tiibntick}
+    change-log: classpath:db/changelog/tnt-billing-wallet-master.yaml
+    enabled: true
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: 1
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      retries: 3
+      properties:
+        enable.idempotence: true
+    consumer:
+      group-id: tnt-billing-wallet
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+# TiiBnTick wallet-specific properties
+tnt:
+  billing:
+    wallet:
+      mtn:
+        base-url: ${MTN_MOMO_BASE_URL:https://sandbox.momodeveloper.mtn.com}
+        user-id: ${MTN_USER_ID:}
+        api-key: ${MTN_API_KEY:}
+        subscription-key: ${MTN_SUBSCRIPTION_KEY:}
+        environment: ${MTN_ENVIRONMENT:sandbox}
+        webhook-secret: ${MTN_WEBHOOK_SECRET:}
+      orange:
+        base-url: ${ORANGE_BASE_URL:https://api.orange.com/orange-money-webpay/cm/v1}
+        merchant-key: ${ORANGE_MERCHANT_KEY:}
+        return-url: ${ORANGE_RETURN_URL:}
+        cancel-url: ${ORANGE_CANCEL_URL:}
+        notif-url: ${ORANGE_NOTIF_URL:}
+      stripe:
+        secret-key: ${STRIPE_SECRET_KEY:}
+        publishable-key: ${STRIPE_PUBLISHABLE_KEY:}
+        webhook-secret: ${STRIPE_WEBHOOK_SECRET:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized

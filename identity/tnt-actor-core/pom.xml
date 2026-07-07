@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.yowyob.tiibntick.core</groupId>
+        <artifactId>tiibntick-core-parent</artifactId>
+        <version>0.0.1</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>tnt-actor-core</artifactId>
+    <packaging>jar</packaging>
+
+    <name>TiiBnTick — tnt-actor-core</name>
+    <description>
+        TiiBnTick Actor Core — L2 Identity Layer.
+        Extends yowyob.comops (RT-comops) actor kernel with TiiBnTick-specific logistics actor
+        profiles: DelivererProfile, FreelancerProfile, RelayOperatorProfile, ClientProfile.
+        Provides GPS location tracking, KYC management, reputation rating, badge system,
+        and mission assignment for the African informal logistics context.
+        Author: MANFOUO Braun — ENSP Yaoundé 2026.
+    </description>
+
+    <dependencies>
+
+        <!-- ══════════════════════════════════════════════════════════
+             KERNEL YOWYOB (RT-comops) — READ-ONLY
+             ══════════════════════════════════════════════════════════ -->
+
+        <!-- comops-common-core : BaseEntity, ApiResponse, Money, TenantId -->
+        <dependency>
+            <groupId>yowyob.comops.api</groupId>
+            <artifactId>RT-comops-common-core</artifactId>
+        </dependency>
+
+        <!-- comops-actor-core : Actor, BusinessActorProfile, use cases kernel -->
+        <dependency>
+            <groupId>yowyob.comops.api</groupId>
+            <artifactId>RT-comops-actor-core</artifactId>
+        </dependency>
+
+        <!-- comops-kernel-core : ReactiveRequestContextHolder, RequestContext -->
+        <dependency>
+            <groupId>yowyob.comops.api</groupId>
+            <artifactId>RT-comops-kernel-core</artifactId>
+        </dependency>
+
+        <!-- ══════════════════════════════════════════════════════════
+             TIIBNTICK L0 — FOUNDATION (même dépôt)
+             ══════════════════════════════════════════════════════════ -->
+
+        <!-- yow-event-kernel : DomainEvent, EventPublisher, Kafka bus -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>yow-event-kernel</artifactId>
+        </dependency>
+
+        <!-- tnt-common-core : Shared TiiBnTick domain types -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-common-core</artifactId>
+        </dependency>
+
+        <!-- tnt-auth-core : Security bridge — IYowAuthTntAdapter impl, @CurrentUser in controllers -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-auth-core</artifactId>
+        </dependency>
+
+        <!-- tnt-roles-core : RBAC DSL — @RequirePermission on service methods -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-roles-core</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-incident-core</artifactId>
+        </dependency>
+
+        <!-- ══════════════════════════════════════════════════════════
+             SPRING (versions gérées par le BOM parent)
+             ══════════════════════════════════════════════════ -->
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+
+        <!-- spring-boot-starter-aop : Required for @RequirePermission AOP aspect (tnt-roles-core) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-r2dbc</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.projectreactor.kafka</groupId>
+            <artifactId>reactor-kafka</artifactId>
+        </dependency>
+
+        <!-- ══════════════════════════════════════════════════════════
+             R2DBC — PostgreSQL driver réactif
+             ══════════════════════════════════════════════════════════ -->
+
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>r2dbc-postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- ══════════════════════════════════════════════════════════
+             SÉRIALISATION
+             ══════════════════════════════════════════════════════════ -->
+
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+
+        <!-- ══════════════════════════════════════════════════════════
+             DOCUMENTATION API
+             ══════════════════════════════════════════════════════════ -->
+
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- ══════════════════════════════════════════════════════════
+             TESTS
+             ══════════════════════════════════════════════════════════ -->
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>r2dbc</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.awaitility</groupId>
+            <artifactId>awaitility</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

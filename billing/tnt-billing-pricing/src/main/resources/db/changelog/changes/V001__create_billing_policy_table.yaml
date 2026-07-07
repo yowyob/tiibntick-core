@@ -1,0 +1,140 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: V001-pricing-schema
+      author: MANFOUO Braun
+      changes:
+        - sql:
+            sql: "CREATE SCHEMA IF NOT EXISTS pricing;"
+
+  - changeSet:
+      id: V001-billing-policy-table
+      author: MANFOUO Braun
+      comment: "billing_policy aggregate root — all VOs embedded as JSON columns"
+      changes:
+        - createTable:
+            schemaName: pricing
+            tableName: billing_policy
+            columns:
+
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+
+              - column:
+                  name: tenant_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: agency_id
+                  type: UUID
+
+              - column:
+                  name: name
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: description
+                  type: TEXT
+
+              - column:
+                  name: pricing_rules_json
+                  type: TEXT
+                  defaultValue: "[]"
+
+              - column:
+                  name: surcharge_rules_json
+                  type: TEXT
+                  defaultValue: "[]"
+
+              - column:
+                  name: promotions_json
+                  type: TEXT
+                  defaultValue: "[]"
+
+              - column:
+                  name: loyalty_rules_json
+                  type: TEXT
+                  defaultValue: "[]"
+
+              - column:
+                  name: commission_rules_json
+                  type: TEXT
+                  defaultValue: "[]"
+
+              - column:
+                  name: platform_fee_rule_json
+                  type: TEXT
+
+              - column:
+                  name: is_default
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: status
+                  type: VARCHAR(20)
+                  defaultValue: "DRAFT"
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: valid_from
+                  type: DATE
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: valid_to
+                  type: DATE
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMPTZ
+                  defaultValueComputed: NOW()
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: updated_at
+                  type: TIMESTAMPTZ
+                  defaultValueComputed: NOW()
+                  constraints:
+                    nullable: false
+
+        - createIndex:
+            schemaName: pricing
+            tableName: billing_policy
+            indexName: idx_billing_policy_tenant_id
+            columns:
+              - column:
+                  name: tenant_id
+
+        - createIndex:
+            schemaName: pricing
+            tableName: billing_policy
+            indexName: idx_billing_policy_tenant_status
+            columns:
+              - column:
+                  name: tenant_id
+              - column:
+                  name: status
+
+        - createIndex:
+            schemaName: pricing
+            tableName: billing_policy
+            indexName: idx_billing_policy_tenant_default
+            columns:
+              - column:
+                  name: tenant_id
+              - column:
+                  name: is_default

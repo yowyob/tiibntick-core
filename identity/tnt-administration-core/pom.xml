@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.yowyob.tiibntick.core</groupId>
+        <artifactId>tiibntick-core-parent</artifactId>
+        <version>0.0.1</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>tnt-administration-core</artifactId>
+    <packaging>jar</packaging>
+    <name>TiiBnTick — tnt-administration-core</name>
+    <description>
+        Administration and governance module for TiiBnTick.
+        Extends RT-comops-administration-core + RT-comops-roles-core with TiiBnTick-specific:
+        - Extended permission catalog (delivery, blockchain, dispute, freelancer, point-relais)
+        - TiiBnTick platform options (blockchain, freelancer mode, dispute resolution)
+        - Role templates for all TiiBnTick actor types
+        - TntRoleDefinition: persisted link between TNT templates and Kernel roles (kernelRoleId)
+        - TntPermissionEntry: kernelPermissionId reference to Kernel permission catalog
+        - KernelBridge ports + adapters for role/permission lookup via HTTP
+        Layer L2 — Identity. Author: MANFOUO Braun.
+    </description>
+
+    <dependencies>
+
+        <!-- ── TiiBnTick Common Core — provides RT-comops-common-core and ── -->
+        <!-- ── RT-comops-kernel-core by Maven transitivity                 ── -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-common-core</artifactId>
+        </dependency>
+
+        <!-- ── tnt-auth-core: security bridge — @CurrentUser in controllers ── -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-auth-core</artifactId>
+        </dependency>
+
+        <!-- ── tnt-roles-core: RBAC DSL — TntRoleInitializationService.provisionForTenant() ── -->
+        <!-- ── TntPermission.* catalog enrichment, @RequirePermission AOP guards             ── -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-roles-core</artifactId>
+        </dependency>
+
+        <!-- ── spring-boot-starter-aop: required for @RequirePermission AOP (tnt-roles-core) ── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+
+        <!-- ── Kernel Yowyob — Administration (roles, permissions, governance) ── -->
+        <!-- ── groupId MUST be yowyob.comops.api (not yowyob.comops)           ── -->
+        <dependency>
+            <groupId>yowyob.comops.api</groupId>
+            <artifactId>RT-comops-administration-core</artifactId>
+            <version>${yow-comops.version}</version>
+        </dependency>
+
+        <!-- ── Kernel Yowyob — Roles and Permissions (used via UUID integration key) ── -->
+        <dependency>
+            <groupId>yowyob.comops.api</groupId>
+            <artifactId>RT-comops-roles-core</artifactId>
+            <version>${yow-comops.version}</version>
+        </dependency>
+
+        <!-- ── Spring WebFlux (WebClient for KernelBridge + REST controllers) ── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+
+        <!-- ── Spring Data R2DBC ── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-r2dbc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>r2dbc-postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- ── Liquibase ── -->
+        <dependency>
+            <groupId>org.liquibase</groupId>
+            <artifactId>liquibase-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- ── Spring Kafka ── -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+
+        <!-- ── Spring Security ── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
+        <!-- ── Validation ── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- ── Jackson ── -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+
+        <!-- ── Lombok ── -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- ── Test ── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

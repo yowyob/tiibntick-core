@@ -1,0 +1,62 @@
+spring:
+  application:
+    name: tnt-dispute-core
+
+  # ── R2DBC ──────────────────────────────────────────────────────────────────
+  r2dbc:
+    url: r2dbc:postgresql://localhost:5432/tiibntick_db
+    username: tiibntick
+    password: ${DB_PASSWORD:changeme}
+    pool:
+      initial-size: 5
+      max-size: 20
+      max-idle-time: 30m
+      validation-query: SELECT 1
+
+  # ── Liquibase (uses JDBC for migrations, R2DBC for runtime) ───────────────
+  liquibase:
+    change-log: classpath:db/changelog/tnt-dispute-master.yaml
+    url: jdbc:postgresql://localhost:5432/tiibntick_db
+    user: tiibntick
+    password: ${DB_PASSWORD:changeme}
+    enabled: true
+
+  # ── Kafka ──────────────────────────────────────────────────────────────────
+  kafka:
+    bootstrap-servers: ${KAFKA_SERVERS:localhost:9092}
+
+# ── TiiBnTick Dispute Module Properties ──────────────────────────────────────
+tnt:
+  dispute:
+    kafka:
+      consumer:
+        group-id: tnt-dispute-core-group
+    sla:
+      # How often the SLA scheduler runs (cron expression)
+      scheduler-cron: "0 */30 * * * *"
+      # Auto-close disputes older than N days if still in terminal-pending status
+      auto-close-after-days: 30
+
+# ── Logging ────────────────────────────────────────────────────────────────
+logging:
+  level:
+    com.yowyob.tiibntick.core.dispute: DEBUG
+    org.springframework.r2dbc: INFO
+    reactor.kafka: INFO
+
+# ── SpringDoc / Swagger ───────────────────────────────────────────────────
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+# ── Actuator ──────────────────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: always

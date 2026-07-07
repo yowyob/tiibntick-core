@@ -1,0 +1,458 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# TiiBnTick Core — application.yml
+# Author: MANFOUO Braun — ENSP Yaoundé 2026
+# Profiles: default (dev), test, staging, prod
+# ══════════════════════════════════════════════════════════════════════════════
+
+spring:
+  application:
+    name: tiibntick-core
+    version: 0.0.1
+
+  # ── Multi-tenant header passthrough ────────────────────────────────────────
+  webflux:
+    base-path: ""
+
+  # ── R2DBC (reactive PostgreSQL) ────────────────────────────────────────────
+  # NOTE: This starter-managed factory/pool is NOT what the app actually uses at
+  # runtime — TntDataSourceConfig defines its own @Primary ConnectionFactory beans
+  # (the "Database Pyramid"), which takes over connection pooling as well
+  # (see DB_POOL_* below). These properties only matter for tooling that reads
+  # spring.r2dbc.* directly (e.g. some IDE inspections); kept in sync for that reason.
+  r2dbc:
+    url: r2dbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:tiibntick_core}?sslMode=${DB_SSL_MODE:disable}
+    username: ${DB_USER:tiibntick}
+    password: ${DB_PASSWORD:tiibntick_pass}
+    pool:
+      initial-size: 5
+      max-size: 30
+      max-idle-time: 30m
+      validation-query: SELECT 1
+
+  # ── Liquibase (uses blocking JDBC driver for schema migration only) ─────────
+  liquibase:
+    enabled: true
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:tiibntick_core}?sslmode=${DB_SSL_MODE:disable}
+    user: ${DB_USER:tiibntick}
+    password: ${DB_PASSWORD:tiibntick_pass}
+    change-log: classpath:db/changelog/tnt-core-master.yaml
+
+  # ── Kafka ──────────────────────────────────────────────────────────────────
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
+      acks: all
+      retries: 3
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 1
+    consumer:
+      group-id: tiibntick-core
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      properties:
+        isolation.level: read_committed
+    admin:
+      auto-create: true
+
+  # ── Redis ──────────────────────────────────────────────────────────────────
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 5s
+      lettuce:
+        pool:
+          max-active: 20
+          max-idle: 10
+          min-idle: 2
+
+  # ── Security (JWT resource server — validates Kernel-issued JWTs) ─────────────
+  # Only jwk-set-uri is set (no issuer-uri) so Spring Security validates signature
+  # + expiry but NOT the iss claim — required because the Kernel issues iss:"kernel-core"
+  # (not a URL), which Spring Security can't auto-discover via OIDC.
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${JWT_JWK_SET_URI:https://kernel-core.yowyob.com/.well-known/jwks.json}
+
+  # ── Jackson ────────────────────────────────────────────────────────────────
+  jackson:
+    # Jackson 3 removed SerializationFeature.WRITE_DATES_AS_TIMESTAMPS — dates
+    # serialize as ISO-8601 strings by default now, so no property is needed here.
+    deserialization:
+      fail-on-unknown-properties: false
+    default-property-inclusion: non_null
+
+# ── Server ─────────────────────────────────────────────────────────────────
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+  compression:
+    enabled: true
+    min-response-size: 2048
+
+# ── Actuator ───────────────────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,loggers,env,beans,tnt-modules,tnt-kernel
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,r2dbc,redis,kafka
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+    tags:
+      application: ${spring.application.name}
+      profile: ${spring.profiles.active:default}
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING:0.1}
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}
+
+# ── SpringDoc / Swagger UI ─────────────────────────────────────────────────
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    display-request-duration: true
+    groups-order: asc
+    operations-sorter: alpha
+    tags-sorter: alpha
+    try-it-out-enabled: true
+    persist-authorization: true
+    doc-expansion: none
+  api-docs:
+    path: /v3/api-docs
+  show-actuator: false
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TNT — Module-level properties
+# ══════════════════════════════════════════════════════════════════════════════
+
+tnt:
+  # ── Auth Core (tnt-auth-core L1) ───────────────────────────────────────────
+  # Thin security bridge: Kernel JWT → TntSecurityContext.
+  # All cryptographic operations remain in RT-comops-kernel-core / YowAuth0.
+  auth:
+    # Client service code registered in YowAuth0 — identifies this application
+    service-code: ${TNT_AUTH_SERVICE_CODE:TNT_AGENCY}
+    # Token context cache TTL — must be strictly less than JWT expires_in (typically 15 min)
+    token-cache-ttl: ${TNT_AUTH_TOKEN_CACHE_TTL:PT14M}
+    # When true, tnt-actor-core's IYowAuthTntAdapter enriches TntSecurityContext with actor profile
+    actor-resolution-enabled: ${TNT_AUTH_ACTOR_RESOLUTION:true}
+    # When false, all /api/** endpoints require a valid JWT (recommended for production)
+    allow-anonymous-context: ${TNT_AUTH_ALLOW_ANONYMOUS:false}
+
+  # ── FreelancerOrganization configuration () ─────────────────────────────
+  freelancer-org:
+    max-sub-deliverers: 5
+    kyc-basic-required-docs: [NATIONAL_ID_PHOTO]
+    kyc-full-required-docs: [NATIONAL_ID_PHOTO, VEHICLE_REGISTRATION, INSURANCE]
+    max-vehicles-per-org: 3
+    max-equipments-per-org: 10
+    tenant-prefix: "FRL-"
+
+  # ── Billing Templates and DSL Engine () ─────────────────────────────────
+  billing:
+    templates:
+      catalog-refresh-cron: "0 0 4 * * *"
+      default-currency: XAF
+    dsl:
+      max-nesting-level-simplified: 3
+      max-rules-per-policy-simplified: 20
+      max-rules-per-policy-full: 100
+
+  # ── Roles Core (tnt-roles-core L1) ────────────────────────────────────────
+  # TiiBnTick RBAC vocabulary: TntRole enum, TntPermission constants, @RequirePermission AOP.
+  # Delegates all persistence and cache operations to RT-comops-roles-core (Kernel).
+  roles:
+    # Stable UUID for the TiiBnTick system tenant — used to seed global role definitions.
+    # MUST be identical across all environments and deployments.
+    system-tenant-id: ${TNT_SYSTEM_TENANT_ID:00000000-0000-0000-0000-000000000001}
+    # Provision the 9 canonical TntRole definitions in Kernel DB at startup (idempotent).
+    provision-on-startup: ${TNT_ROLES_PROVISION_ON_STARTUP:true}
+    # TTL for the local in-process permission cache (seconds).
+    permission-cache-ttl-seconds: ${TNT_ROLES_CACHE_TTL:300}
+    # Enable @RequirePermission AOP enforcement on all annotated service methods.
+    aop-enabled: ${TNT_ROLES_AOP_ENABLED:true}
+    permission:
+      # LOCAL (default): resolve from local role assignments + TntRoleDefinitionRegistry,
+      # no Kernel dependency. REMOTE: Kernel HTTP only (not yet available — no endpoint).
+      # HYBRID: local first, Kernel fallback. Switching never changes @RequirePermission call sites.
+      mode: ${TNT_ROLES_PERMISSION_MODE:LOCAL}
+
+  # ── Media Core ─────────────────────────────────────────────────────────────
+  media:
+    minio:
+      endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+      access-key: ${MINIO_ACCESS_KEY:minioadmin}
+      secret-key: ${MINIO_SECRET_KEY:minioadmin123}
+      public-endpoint: ${MINIO_PUBLIC_ENDPOINT:http://localhost:9000}
+    hmac-secret: ${QR_HMAC_SECRET:changeme-use-strong-random-256bit-value-in-production}
+    max-upload-bytes: ${MEDIA_MAX_UPLOAD_BYTES:20971520}
+    presigned-ttl-seconds: ${MEDIA_PRESIGNED_TTL:3600}
+    cleanup-cron: "0 0 2 * * *"
+
+  # ── Kafka ──────────────────────────────────────────────────────────────────
+  kafka:
+    partitions: ${KAFKA_PARTITIONS:3}
+    replication-factor: ${KAFKA_REPLICATION:1}
+
+  # ── Security ───────────────────────────────────────────────────────────────
+  security:
+    allowed-origins: >
+      ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001,http://localhost:4200}
+
+  # ── Swagger ────────────────────────────────────────────────────────────────
+  swagger:
+    server-url: ${SWAGGER_SERVER_URL:http://localhost:8080}
+
+# ── Kernel JWT configuration (iwm.security.jwt.*) ─────────────────────────
+# Consumed by RT-comops-kernel-core when present on classpath.
+# In dev mode, auto-generate-key-pair=true creates an in-memory RSA key.
+iwm:
+  security:
+    jwt:
+      # Use auto-generated key pair for local development. Set false for staging/prod.
+      auto-generate-key-pair: ${JWT_AUTO_GENERATE_KEY_PAIR:true}
+      # Path to RSA private key PEM (used when auto-generate-key-pair=false)
+      private-key-path: ${JWT_PRIVATE_KEY_PATH:}
+      # Key ID included in JWT header (kid claim)
+      key-id: ${JWT_KEY_ID:tnt-core-key-dev}
+      # JWT issuer claim — must match spring.security.oauth2.resourceserver.jwt.issuer-uri
+      issuer: ${JWT_ISSUER_URI:http://localhost:9000}
+      # Access token time-to-live
+      access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:PT15M}
+
+# ── Logging ────────────────────────────────────────────────────────────────
+logging:
+  level:
+    root: INFO
+    com.yowyob.tiibntick: DEBUG
+    yowyob.comops: INFO
+    org.springframework.security: INFO
+    org.springframework.r2dbc: INFO
+    io.r2dbc.postgresql: WARN
+    org.apache.kafka: WARN
+    io.minio: INFO
+    tools.jackson: WARN
+    org.springframework.http.codec: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{requestId:-}] [%X{tenantId:-}] %logger{36} - %msg%n"
+
+---
+# ══════════════════════════════════════════════════════════════════════════════
+# PROFILE: test
+# ══════════════════════════════════════════════════════════════════════════════
+spring:
+  config:
+    activate:
+      on-profile: test
+  r2dbc:
+    url: r2dbc:postgresql://localhost:5432/tiibntick_test
+    username: tiibntick_test
+    password: tiibntick_test_pass
+  kafka:
+    bootstrap-servers: localhost:9092
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  liquibase:
+    enabled: true
+    url: jdbc:postgresql://localhost:5432/tiibntick_test
+    user: tiibntick_test
+    password: tiibntick_test_pass
+
+tnt:
+  media:
+    minio:
+      endpoint: http://localhost:9000
+      access-key: minioadmin
+      secret-key: minioadmin123
+    hmac-secret: test-hmac-secret-for-tests-only-not-production
+  auth:
+    service-code: TNT_TEST
+    # No actor-core in isolated unit tests — no DB enrichment needed
+    actor-resolution-enabled: false
+    allow-anonymous-context: true
+  roles:
+    system-tenant-id: 00000000-0000-0000-0000-000000000001
+    # Skip DB seeding during unit/integration tests (avoids Kernel DB dependency)
+    provision-on-startup: false
+    # Disable AOP permission enforcement in test slices — use @MockBean for TntPermissionEvaluator
+    aop-enabled: false
+    permission-cache-ttl-seconds: 0
+
+iwm:
+  security:
+    jwt:
+      # In-memory RSA key for test suite — no external key file needed
+      auto-generate-key-pair: true
+      key-id: tnt-test-key
+      issuer: http://localhost:8080
+      access-token-ttl: PT15M
+
+management:
+  tracing:
+    sampling:
+      probability: 0.0
+
+logging:
+  level:
+    com.yowyob.tiibntick: DEBUG
+
+---
+# ══════════════════════════════════════════════════════════════════════════════
+# PROFILE: staging
+# ══════════════════════════════════════════════════════════════════════════════
+spring:
+  config:
+    activate:
+      on-profile: staging
+
+server:
+  port: 8080
+
+management:
+  endpoint:
+    health:
+      show-details: always
+  tracing:
+    sampling:
+      probability: 0.5
+
+logging:
+  level:
+    root: INFO
+    com.yowyob.tiibntick: INFO
+
+tnt:
+  kafka:
+    partitions: 3
+    replication-factor: 2
+  auth:
+    service-code: TNT_AGENCY
+    token-cache-ttl: PT14M
+    actor-resolution-enabled: true
+    allow-anonymous-context: false
+  roles:
+    provision-on-startup: true
+    aop-enabled: true
+    permission-cache-ttl-seconds: 300
+
+iwm:
+  security:
+    jwt:
+      auto-generate-key-pair: false
+      key-id: tnt-core-key-staging
+      issuer: ${JWT_ISSUER_URI:https://auth-staging.tiibntick.com}
+      access-token-ttl: PT15M
+
+---
+# ══════════════════════════════════════════════════════════════════════════════
+# PROFILE: prod
+#
+# Deploys against Yowyob's shared PostgreSQL instance (one database per product,
+# not a dedicated server). Before first deploy, make sure these env vars are set —
+# see tnt-bootstrap/.env.prod.example:
+#   DB_HOST / DB_PORT / DB_NAME / DB_USER / DB_PASSWORD — TiiBnTick's own database
+#     on the shared instance, provisioned by the Yowyob DBA team (this app has no
+#     CREATEDB/CREATEROLE rights there — see docker/postgres/init.sql for context).
+#   DB_SSL_MODE — set to require/verify-full; the shared instance enforces TLS.
+#   DB_POOL_* — bounded pool sizes; 8 ConnectionFactory beans share the same
+#     instance in monolith mode, so size against the DBA-granted max_connections.
+#   KERNEL_DB_HOST / KERNEL_DB_NAME — MUST be set explicitly to RT-comops's own
+#     database coordinates; they default to TiiBnTick's own DB, which is only
+#     correct for local monolith dev.
+# ══════════════════════════════════════════════════════════════════════════════
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+server:
+  port: 8080
+  ssl:
+    enabled: false  # TLS terminated at Nginx/load balancer level
+
+management:
+  endpoint:
+    health:
+      show-details: when-authorized
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  tracing:
+    sampling:
+      probability: 0.05
+
+springdoc:
+  swagger-ui:
+    enabled: false  # Disable Swagger UI in production
+  api-docs:
+    enabled: false
+
+logging:
+  level:
+    root: WARN
+    com.yowyob.tiibntick: INFO
+    org.springframework: WARN
+
+tnt:
+  kafka:
+    partitions: 6
+    replication-factor: 3
+
+  auth:
+    # Matches the client_id registered in YowAuth0 production instance
+    service-code: ${TNT_AUTH_SERVICE_CODE:TNT_AGENCY}
+    token-cache-ttl: PT14M
+    actor-resolution-enabled: true
+    allow-anonymous-context: false
+
+  roles:
+    system-tenant-id: ${TNT_SYSTEM_TENANT_ID}
+    provision-on-startup: true
+    aop-enabled: true
+    permission-cache-ttl-seconds: 300
+
+  # ── Kernel Bridge ──────────────────────────────────────────────────────────
+  kernel:
+    base-url: ${TNT_KERNEL_BASE_URL:https://kernel-core.yowyob.com}
+    api-key: ${TNT_KERNEL_API_KEY:g79R7a7A8StQia6If-XmMSWj28T4FT9xHfVRsf5et_w}
+    client-id: ${TNT_KERNEL_CLIENT_ID:tibntick-backend}
+
+  # ── Solution ───────────────────────────────────────────────────────────────
+  solution:
+    code: TNT
+
+iwm:
+  security:
+    jwt:
+      # Production: RSA key loaded from Docker secret mount
+      auto-generate-key-pair: false
+      private-key-path: ${JWT_PRIVATE_KEY_PATH:/run/secrets/jwt_private_key.pem}
+      key-id: ${JWT_KEY_ID:tnt-core-key-prod}
+      issuer: ${JWT_ISSUER_URI:https://auth.tiibntick.com}
+      access-token-ttl: PT15M

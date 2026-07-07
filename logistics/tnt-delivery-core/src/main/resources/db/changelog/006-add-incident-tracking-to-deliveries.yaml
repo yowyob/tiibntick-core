@@ -1,0 +1,49 @@
+databaseChangeLog:
+  - changeSet:
+      id: 006-add-incident-tracking-to-tnt-deliveries
+      author: MANFOUO Braun
+      comment: >
+        Adds incident tracking columns to tnt_deliveries for tnt-incident-core integration ().
+        - paused_by_incident_id: UUID of the blocking incident (null when not paused)
+        - previous_status_before_pause: status to restore on incident resolution
+        - platform: operational platform (GO | FREELANCER | POINT | AGENCY)
+        - agency_id: agency UUID (null for freelancer/Go platform deliveries)
+      changes:
+        - addColumn:
+            tableName: tnt_deliveries
+            columns:
+              - column:
+                  name: paused_by_incident_id
+                  type: UUID
+                  remarks: "UUID of the incident blocking this delivery. Null when not paused. Set by IMissionStatusPort.pauseMission()."
+              - column:
+                  name: previous_status_before_pause
+                  type: VARCHAR(40)
+                  remarks: "DeliveryStatus name before PAUSED_BY_INCIDENT. Restored by IMissionStatusPort.resumeMission()."
+              - column:
+                  name: platform
+                  type: VARCHAR(20)
+                  defaultValue: "AGENCY"
+                  constraints:
+                    nullable: false
+                  remarks: "Operational platform: GO | FREELANCER | POINT | AGENCY"
+              - column:
+                  name: agency_id
+                  type: UUID
+                  remarks: "Agency UUID. Null for freelancer/Go platform deliveries."
+
+        # Index for finding deliveries paused by a specific incident
+        - createIndex:
+            indexName: idx_tnt_del_paused_by_incident
+            tableName: tnt_deliveries
+            columns:
+              - column: { name: paused_by_incident_id }
+            where: paused_by_incident_id IS NOT NULL
+
+        # Index for agency-scoped queries (needed by MissionStatusChangedEvent)
+        - createIndex:
+            indexName: idx_tnt_del_agency
+            tableName: tnt_deliveries
+            columns:
+              - column: { name: tenant_id }
+              - column: { name: agency_id }

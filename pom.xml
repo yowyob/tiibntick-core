@@ -1,0 +1,1547 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         IDENTITÉ DU PROJET PARENT
+         Dépôt GitLab : https://gitlab.com/tiibntick-org/tiibntick-core
+         ═══════════════════════════════════════════════════════════════════ -->
+    <groupId>com.yowyob.tiibntick.core</groupId>
+    <artifactId>tiibntick-core-parent</artifactId>
+    <version>0.0.1</version>
+    <packaging>pom</packaging>
+
+    <name>TiiBnTick Core — Parent POM</name>
+    <description>
+        Socle commun TiiBnTick — Modules non-runnables partagés par toutes les plateformes.
+        Couches L0 (Foundation — event + i18n), L2 (Identity), L3 (Logistics),
+        L4 (Business), L5 (Billing Engine) et L6 (Bootstrap).
+        Consomme le Kernel Yowyob (RT-comops) géré par TSAFACK Savio sur GitHub.
+        Auteur / Responsable : MANFOUO Braun — ENSP Yaoundé 2026.
+    </description>
+    <url>https://gitlab.com/tiibntick-org/tiibntick-core</url>
+
+    <developers>
+        <developer>
+            <id>manfouo-braun</id>
+            <name>MANFOUO Braun</name>
+            <roles>
+                <role>Lead Architect — Responsable TiiBnTick</role>
+                <role>L0 (yow-event-kernel) · L3 Logistics · L5 Billing · L6 Bootstrap</role>
+                <role>Trust Base · Trust Event · tnt-trust</role>
+            </roles>
+        </developer>
+        <developer>
+            <id>pafe-dilane</id>
+            <name>PAFE Dilane</name>
+            <roles>
+                <role>Senior Developer</role>
+                <role>L0 (yow-i18n-kernel) · L2 Organization · L3 Logistics · L4 Accounting · L5 Billing</role>
+                <role>tnt-search</role>
+            </roles>
+        </developer>
+        <developer>
+            <id>francois</id>
+            <name>FRANCOIS</name>
+            <roles>
+                <role>Developer</role>
+                <role>L2 Identity (tp, administration) · L4 Business</role>
+            </roles>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:https://gitlab.com/tiibntick-org/tiibntick-core.git</connection>
+        <developerConnection>scm:git:git@gitlab.com:tiibntick-org/tiibntick-core.git</developerConnection>
+        <url>https://gitlab.com/tiibntick-org/tiibntick-core</url>
+    </scm>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         MODULES — ORDRE RESPECTANT LES DÉPENDANCES
+         ═══════════════════════════════════════════════════════════════════ -->
+    <modules>
+
+        <!-- ─── COUCHE L0 — FOUNDATION (dans tiibntick-core pour l'instant) ──
+             Ces deux modules sont développés dans ce dépôt et seront
+             éventuellement migrés dans le kernel Yowyob (RT-comops) plus tard.
+             MANFOUO Braun : yow-event-kernel
+             PAFE Dilane   : yow-i18n-kernel
+             ─────────────────────────────────────────────────────────────── -->
+        <module>foundation/yow-event-kernel</module>
+        <module>foundation/yow-i18n-kernel</module>
+        <module>foundation/tnt-common-core</module>
+        <module>foundation/tnt-auth-core</module>
+        <module>foundation/tnt-roles-core</module> 
+
+        <!-- ─── COUCHE L2 — IDENTITY ───────────────────────────────────────
+             Extensions des modules RT-comops du Kernel Yowyob.
+             MANFOUO : tnt-actor-core
+             PAFE    : tnt-organization-core
+             FRANCOIS: tnt-tp-core, tnt-administration-core
+             ─────────────────────────────────────────────────────────────── -->
+        <module>identity/tnt-actor-core</module>
+        <module>identity/tnt-organization-core</module>
+        <module>identity/tnt-tp-core</module>
+        <module>identity/tnt-administration-core</module>
+
+        <!-- ─── COUCHE L3 — LOGISTICS ──────────────────────────────────────
+             PAFE    : tnt-geo-core, tnt-delivery-core, tnt-notify-core, tnt-media-core
+             MANFOUO : tnt-route-core, tnt-realtime-core, tnt-sync-core, tnt-dispute-core
+             ─────────────────────────────────────────────────────────────── -->
+        <module>logistics/tnt-geo-core</module>
+        <module>logistics/tnt-route-core</module>
+        <module>logistics/tnt-delivery-core</module>
+        <module>logistics/tnt-dispute-core</module>
+        <module>logistics/tnt-incident-core</module>
+        <module>logistics/tnt-realtime-core</module>
+        <module>logistics/tnt-sync-core</module>
+        <module>logistics/tnt-notify-core</module>
+        <module>logistics/tnt-media-core</module>
+
+        <!-- ─── COUCHE L4 — BUSINESS ───────────────────────────────────────
+             FRANCOIS: tnt-resource-core, tnt-product-core, tnt-inventory-core, tnt-sales-core
+             PAFE    : tnt-accounting-core
+             ─────────────────────────────────────────────────────────────── -->
+        <module>business/tnt-resource-core</module>
+        <module>business/tnt-product-core</module>
+        <module>business/tnt-inventory-core</module>
+        <module>business/tnt-sales-core</module>
+        <module>business/tnt-accounting-core</module>
+
+        <!-- ─── COUCHE L5 — BILLING ENGINE ────────────────────────────────
+             MANFOUO : tnt-billing-dsl, tnt-billing-pricing, tnt-billing-wallet
+             PAFE    : tnt-billing-cost, tnt-billing-invoice, tnt-billing-report
+             ─────────────────────────────────────────────────────────────── -->
+        <module>billing/tnt-billing-dsl</module>
+        <module>billing/tnt-billing-pricing</module>
+        <module>billing/tnt-billing-cost</module>
+        <module>billing/tnt-billing-invoice</module>
+        <module>billing/tnt-billing-wallet</module>
+        <module>billing/tnt-billing-report</module>
+        <module>billing/tnt-billing-templates</module>
+
+        <!-- ─── COUCHE L6 — RUNNABLE ───────────────────────────────────────
+             SEUL module @SpringBootApplication. Assemble tout.
+             MANFOUO Braun — déclaré EN DERNIER.
+             ─────────────────────────────────────────────────────────────── -->
+        <module>tnt-bootstrap</module>
+
+    </modules>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         PROPRIÉTÉS GLOBALES
+         ═══════════════════════════════════════════════════════════════════ -->
+    <properties>
+
+        <!-- ── Java ── -->
+        <java.version>21</java.version>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <maven.compiler.release>21</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <spring-framework.version>7.0.8</spring-framework.version>
+        <spring-jcl.version>6.2.19</spring-jcl.version>
+
+        <!-- ── Spring Boot ── -->
+        <spring-boot.version>4.0.6</spring-boot.version>
+        <spring-cloud.version>2024.0.0</spring-cloud.version>
+        <spring-boot-starter-aop.version>3.5.15</spring-boot-starter-aop.version>
+        <!-- <spring-boot-security.version>4.1.0-RC1</spring-boot-security.version>
+        <spring-boot-starter-actuator.version>4.0.6</spring-boot-starter-actuator.version>
+        <spring-boot-starter-kafka.version>4.0.0-M2</spring-boot-starter-kafka.version>
+        <spring-boot-autoconfigure.version>4.1.0-RC1</spring-boot-autoconfigure.version>  -->
+
+        <!-- ── Kernel Yowyob (RT-comops) géré par TSAFACK Savio ── -->
+        <!-- groupId : yowyob.comops  |  packages : yowyob.comops.api.{module}.* -->
+        <yow-comops.version>0.1.0-SNAPSHOT</yow-comops.version>
+
+        <!-- ── Foundation L0 (modules dans ce dépôt — pas encore dans RT-comops) ── -->
+        <!-- Pas de version séparée : héritent de ${project.version} -->
+
+        <!-- ── Base de données ── -->
+        <postgresql-r2dbc-postgresql.version>1.0.5.RELEASE</postgresql-r2dbc-postgresql.version>
+        <io-r2dbc-postgresql.version>0.8.13.RELEASE</io-r2dbc-postgresql.version>
+        <r2dbc-pool.version>1.0.2.RELEASE</r2dbc-pool.version>
+        <postgresql.version>42.7.3</postgresql.version>
+        <liquibase.version>4.29.0</liquibase.version>
+
+        <!-- ── Messaging ── -->
+        <kafka.version>3.7.0</kafka.version>
+        <spring-kafka.version>4.0.6</spring-kafka.version>
+        <avro.version>1.11.3</avro.version>
+        <reactor-kafka.version>1.3.25</reactor-kafka.version>
+
+        <!-- ── Algorithmique ── -->
+        <!-- IMPORTANT : OR-Tools nécessite glibc → image Docker Debian OBLIGATOIRE -->
+        <ortools.version>9.8.3296</ortools.version>
+        <commons-math3.version>3.6.1</commons-math3.version>
+
+        <!-- ── Cache et stockage ── -->
+        <minio.version>8.5.10</minio.version>
+        <duckdb.version>0.10.3</duckdb.version>
+
+        <!-- ── Sérialisation ── -->
+        <jackson.version>2.17.1</jackson.version>
+
+        <!-- ── Génération de code ── -->
+        <mapstruct.version>1.5.5.Final</mapstruct.version>
+        <lombok.version>1.18.46</lombok.version>
+
+        <!-- ── QR Code et Documents ── -->
+        <zxing.version>3.5.3</zxing.version>
+        <jasperreports.version>7.0.1</jasperreports.version>
+
+        <!-- ── Observabilité ── -->
+        <micrometer.version>1.13.0</micrometer.version>
+        <zipkin.version>3.3.0</zipkin.version>
+
+        <!-- ── Blockchain (Trust Base — MANFOUO, en attente de migration vers RT-comops) ── -->
+        <hyperledger-fabric-gateway.version>1.4.0</hyperledger-fabric-gateway.version>
+
+        <!-- ── JWT (validation tokens émis par comops-auth-core) ── -->
+        <nimbus-jose-jwt.version>9.40</nimbus-jose-jwt.version>
+
+        <jjwt.version>0.13.0</jjwt.version>
+
+        <!-- ── API Documentation (3.x targets Spring Boot 4 / Framework 7; 2.x is Boot 3-only) ── -->
+        <springdoc.version>3.0.3</springdoc.version>
+        <!-- Must track the swagger-core-jakarta version springdoc ${springdoc.version} bundles,
+             so modules compiling directly against @Operation/@Parameter/@Tag/@Schema resolve the
+             same classes springdoc puts on the runtime classpath. -->
+        <swagger-annotations-jakarta.version>2.2.47</swagger-annotations-jakarta.version>
+
+        <okhttp.version>5.3.2</okhttp.version>
+        <micrometer-tracing-bridge-otel.version>1.7.0-RC1</micrometer-tracing-bridge-otel.version>
+        <jcl-over-slf4j.version>2.0.18</jcl-over-slf4j.version>
+
+        <!-- ── Tests ── -->
+        <testcontainers.version>1.19.8</testcontainers.version>
+        <testcontainers-redis.version>2.2.2</testcontainers-redis.version>
+        <awaitility.version>4.2.1</awaitility.version>
+        <reactor-test.version>3.8.5</reactor-test.version>
+        <spring-security-test.version>7.1.0-RC1</spring-security-test.version>
+        <mockwebserver.version>5.3.2</mockwebserver.version>
+        <r2dbc-h2.version>1.1.0.RELEASE</r2dbc-h2.version>
+
+        <!-- ── Plugins Maven ── -->
+        <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
+        <maven-surefire-plugin.version>3.2.5</maven-surefire-plugin.version>
+        <maven-failsafe-plugin.version>3.2.5</maven-failsafe-plugin.version>
+        <maven-source-plugin.version>3.4.0</maven-source-plugin.version>
+        <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
+        <jacoco-maven-plugin.version>0.8.12</jacoco-maven-plugin.version>
+        <maven-enforcer-plugin.version>3.5.0</maven-enforcer-plugin.version>
+
+        <!-- ── GitLab CI — project ID pour le Package Registry ── -->
+        <!-- Remplacer par les vrais IDs de projet GitLab après création -->
+        <gitlab.project.id.core>${env.CI_PROJECT_ID}</gitlab.project.id.core>
+
+    </properties>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         REPOSITORIES — Sources des JARs
+         ═══════════════════════════════════════════════════════════════════ -->
+    <repositories>
+
+        <!-- ── Maven Central ── -->
+        <repository>
+            <id>central</id>
+            <name>Maven Central</name>
+            <url>https://repo1.maven.org/maven2</url>
+        </repository>
+
+        <!-- ── Kernel Yowyob (RT-comops) — GitHub de TSAFACK Savio ── -->
+        <!-- groupId: yowyob.comops | Dépôt: https://github.com/Savhel/KSM_Kernel_Layer -->
+        <!-- <repository>
+            <id>github-yowyob-comops</id>
+            <name>Yowyob RT-comops Kernel — GitHub Packages (TSAFACK Savio)</name>
+            <url>https://maven.pkg.github.com/Savhel/KSM_Kernel_Layer</url>
+            <releases>
+                <enabled>true</enabled>
+                <updatePolicy>daily</updatePolicy>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+                <updatePolicy>always</updatePolicy>
+            </snapshots>
+        </repository> -->
+
+        <!-- ── GitLab Package Registry — TiiBnTick Core (ce dépôt) ──
+             Utilisé en CI/CD pour résoudre les JARs publiés par ce projet.
+             En développement local : les JARs sont résolus depuis ~/.m2/repository.
+             ─────────────────────────────────────────────────────────────── -->
+        <!-- <repository>
+            <id>gitlab-tiibntick-core</id>
+            <name>TiiBnTick Core — GitLab Package Registry</name>
+            <url>https://gitlab.com/api/v4/projects/${gitlab.project.id.core}/packages/maven</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository> -->
+
+        <!-- ── Confluent (Avro + Schema Registry) ── -->
+        <repository>
+            <id>confluent</id>
+            <name>Confluent Maven Repository</name>
+            <url>https://packages.confluent.io/maven/</url>
+            <releases><enabled>true</enabled></releases>
+            <snapshots><enabled>false</enabled></snapshots>
+        </repository>
+
+    </repositories>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         DISTRIBUTION — Publication des JARs sur GitLab Package Registry
+         Consommés par tiibntick-platforms (même organisation GitLab).
+         ═══════════════════════════════════════════════════════════════════ -->
+    <distributionManagement>
+        <repository>
+            <id>gitlab-tiibntick-core</id>
+            <name>TiiBnTick Core — GitLab Package Registry (Releases)</name>
+            <url>https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/packages/maven</url>
+        </repository>
+        <snapshotRepository>
+            <id>gitlab-tiibntick-core</id>
+            <name>TiiBnTick Core — GitLab Package Registry (Snapshots)</name>
+            <url>https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/packages/maven</url>
+        </snapshotRepository>
+    </distributionManagement>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         DEPENDENCY MANAGEMENT
+         ═══════════════════════════════════════════════════════════════════ -->
+    <dependencyManagement>
+        <dependencies>
+
+            <!-- ╔══════════════════════════════════════════════════════════╗
+                 ║  BOMS — Bill of Materials                                ║
+                 ╚══════════════════════════════════════════════════════════╝ -->
+
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>testcontainers-bom</artifactId>
+                <version>${testcontainers.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- ╔══════════════════════════════════════════════════════════╗
+                 ║  KERNEL YOWYOB — RT-comops (TSAFACK Savio, GitHub)       ║
+                 ║  groupId   : yowyob.comops                               ║
+                 ║  packages  : yowyob.comops.api.{module}.*                ║
+                 ║  Consommés en READ-ONLY — aucune contribution de         ║
+                 ║  l'équipe TiiBnTick sur ces artefacts.                   ║
+                 ╚══════════════════════════════════════════════════════════╝ -->
+
+            <!-- comops-common-core : types partagés, base entity, TenantId, Money, etc. -->
+            <dependency>
+                <groupId>yowyob.comops.api</groupId>
+                <artifactId>RT-comops-common-core</artifactId>
+                <version>${yow-comops.version}</version>
+            </dependency>
+
+            <!-- comops-actor-core : gestion des acteurs métier (BusinessActor) -->
+            <dependency>
+                <groupId>yowyob.comops.api</groupId>
+                <artifactId>RT-comops-actor-core</artifactId>
+                <version>${yow-comops.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>commons-logging</groupId>
+                        <artifactId>commons-logging</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+
+            <!-- comops-organization-core : organisations, agences, hiérarchie -->
+            <dependency>
+                <groupId>yowyob.comops.api</groupId>
+                <artifactId>RT-comops-organization-core</artifactId>
+                <version>${yow-comops.version}</version>
+            </dependency>
+
+            <!-- comops-auth-core : authentification, JWT, gestion des comptes utilisateurs -->
+            <!-- NOTE : remplace ce qui était incorrectement appelé yow-security-core -->
+            <dependency>
+                <groupId>yowyob.comops.api</groupId>
+                <artifactId>RT-comops-auth-core</artifactId>
+                <version>${yow-comops.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>commons-logging</groupId>
+                        <artifactId>commons-logging</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+
+            <!-- comops-administration-core : gouvernance, RBAC, rôles admin -->
+            <dependency>
+                <groupId>yowyob.comops.api</groupId>
+                <artifactId>RT-comops-administration-core</artifactId>
+                <version>${yow-comops.version}</version>
+            </dependency>
+
+            <!-- comops-roles-core : gestion des rôles et permissions -->
+            <dependency>
+                <groupId>yowyob.comops.api</groupId>
+                <artifactId>RT-comops-roles-core</artifactId>
+                <version>${yow-comops.version}</version>
+            </dependency>
+
+            <!-- comops-settings-core : paramètres applicatifs, séquences -->
+            <dependency>
+                <groupId>yowyob.comops.api</groupId>
+                <artifactId>RT-comops-settings-core</artifactId>
+                <version>${yow-comops.version}</version>
+            </dependency>
+
+            <!-- comops-tp-core : tiers (clients, fournisseurs) - base pour tnt-tp-core -->
+            <dependency>
+                <groupId>yowyob.comops.api</groupId>
+                <artifactId>RT-comops-tp-core</artifactId>
+                <version>${yow-comops.version}</version>
+            </dependency>
+
+            <!-- comops-accounting-core : comptabilité générale - base pour tnt-accounting-core -->
+            <dependency>
+                <groupId>yowyob.comops.api</groupId>
+                <artifactId>RT-comops-accounting-core</artifactId>
+                <version>${yow-comops.version}</version>
+            </dependency>
+
+            <!-- comops-product-core : catalogue produits - base pour tnt-product-core -->
+            <dependency>
+                <groupId>yowyob.comops.api</groupId>
+                <artifactId>RT-comops-product-core</artifactId>
+                <version>${yow-comops.version}</version>
+            </dependency>
+
+            <!-- comops-inventory-core : gestion de stock - base pour tnt-inventory-core -->
+            <dependency>
+                <groupId>yowyob.comops.api</groupId>
+                <artifactId>RT-comops-inventory-core</artifactId>
+                <version>${yow-comops.version}</version>
+            </dependency>
+
+            <!-- comops-sales-core : ventes, commandes - base pour tnt-sales-core -->
+            <dependency>
+                <groupId>yowyob.comops.api</groupId>
+                <artifactId>RT-comops-sales-core</artifactId>
+                <version>${yow-comops.version}</version>
+            </dependency>
+
+            <!-- comops-resource-core : ressources (véhicules, équipements) -->
+            <dependency>
+                <groupId>yowyob.comops.api</groupId>
+                <artifactId>RT-comops-resource-core</artifactId>
+                <version>${yow-comops.version}</version>
+            </dependency>
+
+            <!-- comops-treasury-core : trésorerie, paiements -->
+            <dependency>
+                <groupId>yowyob.comops.api</groupId>
+                <artifactId>RT-comops-treasury-core</artifactId>
+                <version>${yow-comops.version}</version>
+            </dependency>
+
+            <!-- comops-kernel-core : noyau kernel (événements bas niveau, séquenceur) -->
+            <!-- Excludes the non-jakarta swagger-annotations/swagger-models 2.2.22 this Kernel jar
+                 pulls in transitively: they share the io.swagger.v3.oas.models package with the
+                 swagger-*-jakarta 2.2.47 artifacts springdoc 3.x needs, and the older classes
+                 silently shadow the newer ones on the classpath (missing JsonSchema methods). -->
+            <dependency>
+                <groupId>yowyob.comops.api</groupId>
+                <artifactId>RT-comops-kernel-core</artifactId>
+                <version>${yow-comops.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>io.swagger.core.v3</groupId>
+                        <artifactId>swagger-annotations</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>io.swagger.core.v3</groupId>
+                        <artifactId>swagger-models</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+
+            <!-- comops-file-core : gestion de fichiers / stockage objet kernel -->
+            <dependency>
+                <groupId>yowyob.comops.api</groupId>
+                <artifactId>RT-comops-file-core</artifactId>
+                <version>${yow-comops.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>commons-logging</groupId>
+                        <artifactId>commons-logging</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+
+            <!-- ╔══════════════════════════════════════════════════════════╗
+                 ║  TIIBNTICK L0 — FOUNDATION (dans ce dépôt)               ║
+                 ║  yow-event-kernel : bus événementiel (MANFOUO)            ║
+                 ║  yow-i18n-kernel  : internationalisation africaine (PAFE) ║
+                 ║  Migration vers RT-comops envisagée ultérieurement.       ║
+                 ╚══════════════════════════════════════════════════════════╝ -->
+
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>yow-event-kernel</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>yow-i18n-kernel</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-common-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-auth-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-roles-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <!-- ╔══════════════════════════════════════════════════════════╗
+                 ║  TIIBNTICK L2 — IDENTITY                                 ║
+                 ╚══════════════════════════════════════════════════════════╝ -->
+
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-actor-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-organization-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-tp-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-administration-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <!-- ╔══════════════════════════════════════════════════════════╗
+                 ║  TIIBNTICK L3 — LOGISTICS                                ║
+                 ╚══════════════════════════════════════════════════════════╝ -->
+
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-geo-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-route-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-delivery-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-dispute-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-incident-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-realtime-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-sync-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-notify-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-media-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <!-- ╔══════════════════════════════════════════════════════════╗
+                 ║  TIIBNTICK L4 — BUSINESS                                 ║
+                 ╚══════════════════════════════════════════════════════════╝ -->
+
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-resource-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-product-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-inventory-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-sales-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-accounting-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <!-- ╔══════════════════════════════════════════════════════════╗
+                 ║  TIIBNTICK L5 — BILLING ENGINE                           ║
+                 ╚══════════════════════════════════════════════════════════╝ -->
+
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-billing-dsl</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-billing-pricing</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-billing-cost</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-billing-invoice</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-billing-wallet</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-billing-report</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-billing-templates</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <!-- ╔══════════════════════════════════════════════════════════╗
+                 ║  SPRING — Starters et composants                         ║
+                 ╚══════════════════════════════════════════════════════════╝ -->
+
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-webflux</artifactId>
+                <version>${spring-boot.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-data-r2dbc</artifactId>
+                <version>${spring-boot.version}</version>
+            </dependency>
+            <!-- <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-websocket</artifactId>
+                <version>${spring-boot.version}</version>
+            </dependency> -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-actuator</artifactId>
+                <version>${spring-boot.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-health</artifactId>
+                <version>${spring-boot.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-security</artifactId>
+                <version>${spring-boot.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-kafka</artifactId>
+                <version>${spring-boot.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+                <version>${spring-boot.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-data-redis-reactive</artifactId>
+                <version>${spring-boot.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-autoconfigure</artifactId>
+                <version>${spring-boot.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-validation</artifactId>
+                <version>${spring-boot.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-configuration-processor</artifactId>
+                <version>${spring-boot.version}</version>
+                <optional>true</optional>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-aop</artifactId>
+                <version>${spring-boot-starter-aop.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-security</artifactId>
+                <version>${spring-boot.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.springframework</groupId>
+                <artifactId>spring-context</artifactId>
+                <version>${spring-framework.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>commons-logging</groupId>
+                        <artifactId>commons-logging</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework</groupId>
+                <artifactId>spring-messaging</artifactId>
+                <version>${spring-framework.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>commons-logging</groupId>
+                        <artifactId>commons-logging</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework</groupId>
+                <artifactId>spring-core</artifactId>
+                <version>${spring-framework.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>commons-logging</groupId>
+                        <artifactId>commons-logging</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework</groupId>
+                <artifactId>spring-jdbc</artifactId>
+                <version>${spring-framework.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>commons-logging</groupId>
+                        <artifactId>commons-logging</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+
+
+            <dependency>
+                <groupId>io.micrometer</groupId>
+                <artifactId>micrometer-tracing-bridge-otel</artifactId>
+                <version>${micrometer-tracing-bridge-otel.version}</version>
+            </dependency>
+
+            <!-- ╔══════════════════════════════════════════════════════════╗
+                 ║  KAFKA + AVRO                                             ║
+                 ╚══════════════════════════════════════════════════════════╝ -->
+
+            <!-- <dependency>
+                <groupId>org.springframework.kafka</groupId>
+                <artifactId>spring-kafka</artifactId>
+                <version>${kafka.version}</version>
+            </dependency> -->
+            <dependency>
+                <groupId>org.apache.avro</groupId>
+                <artifactId>avro</artifactId>
+                <version>${avro.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>io.projectreactor.kafka</groupId>
+                <artifactId>reactor-kafka</artifactId>
+                <version>${reactor-kafka.version}</version>
+            </dependency>
+
+
+
+            <dependency>
+                <groupId>com.squareup.okhttp3</groupId>
+                <artifactId>okhttp</artifactId>
+                <version>${okhttp.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.squareup.okhttp3</groupId>
+                <artifactId>okhttp-jvm</artifactId>
+                <version>${okhttp.version}</version>
+            </dependency>
+
+            <!-- JWT -->
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-api</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-impl</artifactId>
+                <version>${jjwt.version}</version>
+                <scope>runtime</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-jackson</artifactId>
+                <version>${jjwt.version}</version>
+                <scope>runtime</scope>
+            </dependency>
+
+
+            <!-- ╔══════════════════════════════════════════════════════════╗
+                 ║  BASE DE DONNÉES                                          ║
+                 ╚══════════════════════════════════════════════════════════╝ -->
+
+            <dependency>
+                <groupId>org.postgresql</groupId>
+                <artifactId>r2dbc-postgresql</artifactId>
+                <version>${postgresql-r2dbc-postgresql.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.r2dbc</groupId>
+                <artifactId>r2dbc-postgresql</artifactId>
+                <version>${io-r2dbc-postgresql.version}</version>
+                <scope>provided</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.r2dbc</groupId>
+                <artifactId>r2dbc-pool</artifactId>
+                <version>${r2dbc-pool.version}</version>
+            </dependency>
+            <!-- Driver JDBC PostgreSQL — utilisé UNIQUEMENT par Liquibase -->
+            <dependency>
+                <groupId>org.postgresql</groupId>
+                <artifactId>postgresql</artifactId>
+                <version>${postgresql.version}</version>
+                <scope>runtime</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.liquibase</groupId>
+                <artifactId>liquibase-core</artifactId>
+                <version>${liquibase.version}</version>
+            </dependency>
+            <!-- DuckDB — mode offline-first et sync locale -->
+            <dependency>
+                <groupId>org.duckdb</groupId>
+                <artifactId>duckdb_jdbc</artifactId>
+                <version>${duckdb.version}</version>
+            </dependency>
+
+            <!-- ╔══════════════════════════════════════════════════════════╗
+                 ║  ALGORITHMIQUE — OR-Tools + Commons Math                 ║
+                 ╚══════════════════════════════════════════════════════════╝ -->
+
+            <!-- Google OR-Tools — VRP/CVRP avec fenêtres temporelles et capacités -->
+            <!-- Nécessite glibc → image Docker Debian OBLIGATOIRE pour tnt-bootstrap -->
+            <dependency>
+                <groupId>com.google.ortools</groupId>
+                <artifactId>ortools-java</artifactId>
+                <version>${ortools.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-math3</artifactId>
+                <version>${commons-math3.version}</version>
+            </dependency>
+
+            <!-- ╔══════════════════════════════════════════════════════════╗
+                 ║  STOCKAGE OBJET — MinIO                                   ║
+                 ╚══════════════════════════════════════════════════════════╝ -->
+
+            <dependency>
+                <groupId>io.minio</groupId>
+                <artifactId>minio</artifactId>
+                <version>${minio.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>com.squareup.okhttp3</groupId>
+                        <artifactId>okhttp</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+
+            <!-- ╔══════════════════════════════════════════════════════════╗
+                 ║  QR CODE ET DOCUMENTS PDF                                 ║
+                 ╚══════════════════════════════════════════════════════════╝ -->
+
+            <dependency>
+                <groupId>com.google.zxing</groupId>
+                <artifactId>core</artifactId>
+                <version>${zxing.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.zxing</groupId>
+                <artifactId>javase</artifactId>
+                <version>${zxing.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>net.sf.jasperreports</groupId>
+                <artifactId>jasperreports</artifactId>
+                <version>${jasperreports.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>commons-logging</groupId>
+                        <artifactId>commons-logging</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+
+            <!-- ╔══════════════════════════════════════════════════════════╗
+                 ║  BLOCKCHAIN — Trust Base (MANFOUO)                        ║
+                 ║  En attente de migration vers RT-comops.                  ║
+                 ╚══════════════════════════════════════════════════════════╝ -->
+
+            <dependency>
+                <groupId>org.hyperledger.fabric</groupId>
+                <artifactId>fabric-gateway</artifactId>
+                <version>${hyperledger-fabric-gateway.version}</version>
+            </dependency>
+
+            <!-- ╔══════════════════════════════════════════════════════════╗
+                 ║  JWT — Validation des tokens comops-auth-core             ║
+                 ╚══════════════════════════════════════════════════════════╝ -->
+
+            <dependency>
+                <groupId>com.nimbusds</groupId>
+                <artifactId>nimbus-jose-jwt</artifactId>
+                <version>${nimbus-jose-jwt.version}</version>
+            </dependency>
+
+            <!-- ╔══════════════════════════════════════════════════════════╗
+                 ║  OBSERVABILITÉ                                             ║
+                 ╚══════════════════════════════════════════════════════════╝ -->
+
+            <dependency>
+                <groupId>io.micrometer</groupId>
+                <artifactId>micrometer-core</artifactId>
+                <version>${micrometer.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.micrometer</groupId>
+                <artifactId>micrometer-registry-prometheus</artifactId>
+                <version>${micrometer.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.zipkin.reporter2</groupId>
+                <artifactId>zipkin-reporter-brave</artifactId>
+                <version>${zipkin.version}</version>
+            </dependency>
+
+            <!-- ╔══════════════════════════════════════════════════════════╗
+                 ║  API DOCUMENTATION                                         ║
+                 ╚══════════════════════════════════════════════════════════╝ -->
+
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
+                <version>${springdoc.version}</version>
+            </dependency>
+
+            <!-- ╔══════════════════════════════════════════════════════════╗
+                 ║  GÉNÉRATION DE CODE                                        ║
+                 ╚══════════════════════════════════════════════════════════╝ -->
+
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>${lombok.version}</version>
+                <scope>provided</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.mapstruct</groupId>
+                <artifactId>mapstruct</artifactId>
+                <version>${mapstruct.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.mapstruct</groupId>
+                <artifactId>mapstruct-processor</artifactId>
+                <version>${mapstruct.version}</version>
+                <scope>provided</scope>
+            </dependency>
+
+            <!-- ╔══════════════════════════════════════════════════════════╗
+                 ║  SÉRIALISATION JSON                                        ║
+                 ╚══════════════════════════════════════════════════════════╝ -->
+
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-databind</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.datatype</groupId>
+                <artifactId>jackson-datatype-jsr310</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+
+            <!-- ╔══════════════════════════════════════════════════════════╗
+                 ║  TESTS                                                     ║
+                 ╚══════════════════════════════════════════════════════════╝ -->
+
+            <dependency>
+                <groupId>com.squareup.okhttp3</groupId>
+                <artifactId>mockwebserver</artifactId>
+                <version>${mockwebserver.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-test</artifactId>
+                <version>${spring-boot.version}</version>
+                <scope>test</scope>
+                <exclusions>
+                    <exclusion>
+                        <groupId>commons-logging</groupId>
+                        <artifactId>commons-logging</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
+                <groupId>io.projectreactor</groupId>
+                <artifactId>reactor-test</artifactId>
+                <version>${reactor-test.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.kafka</groupId>
+                <artifactId>spring-kafka-test</artifactId>
+                <version>${spring-kafka.version}</version>
+                <scope>test</scope>
+                <exclusions>
+                    <exclusion>
+                        <groupId>commons-logging</groupId>
+                        <artifactId>commons-logging</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.security</groupId>
+                <artifactId>spring-security-test</artifactId>
+                <version>${spring-security-test.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>postgresql</artifactId>
+                <version>${testcontainers.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>kafka</artifactId>
+                <version>${testcontainers.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>junit-jupiter</artifactId>
+                <version>${testcontainers.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.redis</groupId>
+                <artifactId>testcontainers-redis</artifactId>
+                <version>${testcontainers-redis.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.awaitility</groupId>
+                <artifactId>awaitility</artifactId>
+                <version>${awaitility.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.r2dbc</groupId>
+                <artifactId>r2dbc-h2</artifactId>
+                <version>${r2dbc-h2.version}</version>
+                <scope>test</scope>
+            </dependency>
+
+        </dependencies>
+    </dependencyManagement>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         DÉPENDANCES COMMUNES À TOUS LES MODULES
+         ═══════════════════════════════════════════════════════════════════ -->
+    <dependencies>
+
+        <!-- ══ Pont JCL → fournit org.apache.commons.logging.LogFactory ══
+             Spring Framework embarque son propre bridge JCL (spring-jcl).
+             Ce module est indispensable au runtime car :
+               1. commons-logging:commons-logging est banni (enforcer + exclusions)
+               2. jcl-over-slf4j est limité au scope test
+             Sans lui, SpringApplication.<clinit> échoue avec NoClassDefFoundError. -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-jcl</artifactId>
+            <version>${spring-jcl.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>jcl-over-slf4j</artifactId>
+            <version>${jcl-over-slf4j.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Available to every module so code using @Operation/@Parameter/@Tag/@Schema compiles
+             against the same swagger-annotations classes springdoc puts on the runtime classpath
+             (see swagger-annotations-jakarta.version comment above). -->
+        <dependency>
+            <groupId>io.swagger.core.v3</groupId>
+            <artifactId>swagger-annotations-jakarta</artifactId>
+            <version>${swagger-annotations-jakarta.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>commons-logging</groupId>
+                    <artifactId>commons-logging</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-test</artifactId>
+            <version>${reactor-test.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         BUILD — CONFIGURATION DES PLUGINS
+         ═══════════════════════════════════════════════════════════════════ -->
+    <build>
+        <pluginManagement>
+            <plugins>
+
+                <!-- ── Compilateur Java 21 ── -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>${maven-compiler-plugin.version}</version>
+                    <configuration>
+                        <release>21</release>
+                        <parameters>true</parameters>
+                        <annotationProcessorPaths>
+                            <!-- Lombok AVANT MapStruct (ordre obligatoire) -->
+                            <path>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                                <version>${lombok.version}</version>
+                            </path>
+                            <!-- Mediates Lombok-generated builders/accessors for MapStruct — without
+                                 this, mappers referencing @Builder/@Getter types can compile with
+                                 corrupted bytecode (missing implements clause) under javac's
+                                 multi-round annotation processing. -->
+                            <path>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok-mapstruct-binding</artifactId>
+                                <version>0.2.0</version>
+                            </path>
+                            <path>
+                                <groupId>org.mapstruct</groupId>
+                                <artifactId>mapstruct-processor</artifactId>
+                                <version>${mapstruct.version}</version>
+                            </path>
+                            <path>
+                                <groupId>org.springframework.boot</groupId>
+                                <artifactId>spring-boot-configuration-processor</artifactId>
+                                <version>${spring-boot.version}</version>
+                            </path>
+                        </annotationProcessorPaths>
+                        <compilerArgs>
+                            <arg>-Amapstruct.defaultComponentModel=spring</arg>
+                            <arg>-Amapstruct.unmappedTargetPolicy=WARN</arg>
+                        </compilerArgs>
+                    </configuration>
+                </plugin>
+
+                <!-- ── Tests Unitaires ── -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>${maven-surefire-plugin.version}</version>
+                    <configuration>
+                        <excludedGroups>integration</excludedGroups>
+                        <includes>
+                            <include>**/*Test.java</include>
+                            <include>**/*Tests.java</include>
+                        </includes>
+                        <excludes>
+                            <exclude>**/*IntegrationTest.java</exclude>
+                            <exclude>**/*IT.java</exclude>
+                        </excludes>
+                        <argLine>
+                            ${jacoco.agent.argLine}
+                            -Djava.security.egd=file:/dev/./urandom
+                        </argLine>
+                    </configuration>
+                </plugin>
+
+                <!-- ── Tests d'Intégration (Testcontainers) ── -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-failsafe-plugin</artifactId>
+                    <version>${maven-failsafe-plugin.version}</version>
+                    <configuration>
+                        <includes>
+                            <include>**/*IntegrationTest.java</include>
+                            <include>**/*IT.java</include>
+                        </includes>
+                    </configuration>
+                    <executions>
+                        <execution>
+                            <goals>
+                                <goal>integration-test</goal>
+                                <goal>verify</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+
+                <!-- ── Spring Boot ─────────────────────────────────────────
+                     skip=true par défaut — SEUL tnt-bootstrap met skip=false.
+                     ─────────────────────────────────────────────────────── -->
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <version>${spring-boot.version}</version>
+                    <configuration>
+                        <skip>true</skip>
+                        <excludes>
+                            <exclude>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                            </exclude>
+                        </excludes>
+                    </configuration>
+                </plugin>
+
+                <!-- ── JaCoCo — Couverture de code ── -->
+                <plugin>
+                    <groupId>org.jacoco</groupId>
+                    <artifactId>jacoco-maven-plugin</artifactId>
+                    <version>${jacoco-maven-plugin.version}</version>
+                    <configuration>
+                        <excludes>
+                            <exclude>**/adapter/persistence/entity/**</exclude>
+                            <exclude>**/domain/enums/**</exclude>
+                            <exclude>**/config/**AutoConfiguration*</exclude>
+                        </excludes>
+                    </configuration>
+                    <executions>
+                        <execution>
+                            <id>prepare-agent</id>
+                            <goals><goal>prepare-agent</goal></goals>
+                            <configuration>
+                                <propertyName>jacoco.agent.argLine</propertyName>
+                            </configuration>
+                        </execution>
+                        <execution>
+                            <id>report</id>
+                            <phase>verify</phase>
+                            <goals><goal>report</goal></goals>
+                        </execution>
+                        <!-- <execution>
+                            <id>check</id>
+                            <phase>verify</phase>
+                            <goals><goal>check</goal></goals>
+                            <configuration>
+                                <rules>
+                                    <rule>
+                                        <element>BUNDLE</element>
+                                        <limits>
+                                            <limit>
+                                                <counter>LINE</counter>
+                                                <value>COVEREDRATIO</value>
+                                                <minimum>0.70</minimum>
+                                            </limit>
+                                            <limit>
+                                                <counter>BRANCH</counter>
+                                                <value>COVEREDRATIO</value>
+                                                <minimum>0.60</minimum>
+                                            </limit>
+                                        </limits>
+                                    </rule>
+                                </rules>
+                            </configuration>
+                        </execution> -->
+                    </executions>
+                </plugin>
+
+                <!-- ── Sources et Javadoc ── -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-source-plugin</artifactId>
+                    <version>${maven-source-plugin.version}</version>
+                    <executions>
+                        <execution>
+                            <id>attach-sources</id>
+                            <goals><goal>jar-no-fork</goal></goals>
+                        </execution>
+                    </executions>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-javadoc-plugin</artifactId>
+                    <version>${maven-javadoc-plugin.version}</version>
+                    <configuration>
+                        <doclint>none</doclint>
+                        <quiet>true</quiet>
+                        <encoding>UTF-8</encoding>
+                        <source>21</source>
+                    </configuration>
+                    <executions>
+                        <execution>
+                            <id>attach-javadocs</id>
+                            <goals><goal>jar</goal></goals>
+                        </execution>
+                    </executions>
+                </plugin>
+
+                <!-- ── Enforcer ── -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-enforcer-plugin</artifactId>
+                    <version>${maven-enforcer-plugin.version}</version>
+                    <executions>
+                        <execution>
+                            <id>enforce-rules</id>
+                            <goals><goal>enforce</goal></goals>
+                            <configuration>
+                                <rules>
+                                    <requireJavaVersion>
+                                        <version>[21,)</version>
+                                    </requireJavaVersion>
+                                    <requireMavenVersion>
+                                        <version>[3.9,)</version>
+                                    </requireMavenVersion>
+                                    <!-- <requireReleaseDeps>
+                                        <onlyWhenRelease>true</onlyWhenRelease>
+                                    </requireReleaseDeps> -->
+                                    <bannedDependencies>
+                                        <excludes>
+                                            <exclude>commons-logging:commons-logging</exclude>
+                                            <exclude>log4j:log4j</exclude>
+                                            <!-- Interdire l'import compile du driver JDBC bloquant -->
+                                            <exclude>org.postgresql:postgresql:*:*:compile</exclude>
+                                        </excludes>
+                                        <searchTransitive>true</searchTransitive>
+                                    </bannedDependencies>
+                                    <banDuplicatePomDependencyVersions/>
+                                </rules>
+                                <fail>true</fail>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+
+                <!-- ── Liquibase ── -->
+                <plugin>
+                    <groupId>org.liquibase</groupId>
+                    <artifactId>liquibase-maven-plugin</artifactId>
+                    <version>${liquibase.version}</version>
+                    <configuration>
+                        <changeLogFile>db/changelog/db.changelog-master.yaml</changeLogFile>
+                        <driver>org.postgresql.Driver</driver>
+                        <promptOnNonLocalDatabase>false</promptOnNonLocalDatabase>
+                    </configuration>
+                </plugin>
+
+            </plugins>
+        </pluginManagement>
+
+        <!-- ── Plugins actifs dans tous les modules ── -->
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>${maven-enforcer-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>enforce-rules</id>
+                        <goals><goal>enforce</goal></goals>
+                        <configuration>
+                            <rules>
+                                <requireJavaVersion>
+                                    <version>[21,)</version>
+                                </requireJavaVersion>
+                                <requireMavenVersion>
+                                    <version>[3.9,)</version>
+                                </requireMavenVersion>
+                                <!-- <requireReleaseDeps>
+                                    <onlyWhenRelease>true</onlyWhenRelease>
+                                </requireReleaseDeps> -->
+                                <bannedDependencies>
+                                    <excludes>
+                                        <exclude>commons-logging:commons-logging</exclude>
+                                        <exclude>log4j:log4j</exclude>
+                                        <!-- Interdire l'import compile du driver JDBC bloquant -->
+                                        <exclude>org.postgresql:postgresql:*:*:compile</exclude>
+                                    </excludes>
+                                    <searchTransitive>true</searchTransitive>
+                                </bannedDependencies>
+                                <banDuplicatePomDependencyVersions/>
+                            </rules>
+                            <fail>true</fail>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         PROFILES
+         ═══════════════════════════════════════════════════════════════════ -->
+    <profiles>
+
+        <!-- ── GitLab CI/CD (CI_JOB_TOKEN — zéro configuration auth) ── -->
+        <profile>
+            <id>gitlab-ci</id>
+            <activation>
+                <property>
+                    <name>env.CI_JOB_TOKEN</name>
+                </property>
+            </activation>
+            <repositories>
+                <!-- En CI, les dépendances RT-comops sont résolues avec CI_JOB_TOKEN
+                     si les deux projets sont dans la même instance GitLab,
+                     sinon avec un Deploy Token ou PAT GitHub stocké en CI variable. -->
+            </repositories>
+            <properties>
+                <jacoco.check.haltOnFailure>false</jacoco.check.haltOnFailure>
+            </properties>
+        </profile>
+
+        <!-- ── Release (publication sur GitLab Package Registry) ── -->
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- ── Tests d'Intégration Testcontainers ── -->
+        <profile>
+            <id>integration-tests</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-failsafe-plugin</artifactId>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+    </profiles>
+
+</project>

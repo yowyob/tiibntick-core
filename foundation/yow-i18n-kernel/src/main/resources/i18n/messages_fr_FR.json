@@ -1,0 +1,33 @@
+{
+  "notification.mission.assigned": "Mission attribuée au livreur {{driver_name}}.",
+  "notification.package.delivered": "Le colis {{package_id}} a été livré.",
+  "notification.package.picked_up": "Le colis {{package_id}} a été pris en charge par {{driver_name}}.",
+  "notification.package.in_transit": "Votre colis {{package_id}} est en transit. Livreur : {{driver_name}}.",
+  "notification.package.at_hub": "Votre colis {{package_id}} est disponible au point relais {{hub_name}}.",
+  "notification.package.deposit_confirmed": "Colis {{package_id}} déposé au hub {{hub_name}}.",
+  "notification.delivery.assigned": "Nouvelle mission de livraison pour le colis {{package_id}}.",
+  "notification.delivery.cancelled": "La livraison du colis {{package_id}} a été annulée.",
+  "notification.delivery.rescheduled": "Livraison du colis {{package_id}} replanifiée.",
+
+  "error.route.unreachable": "Zone de livraison inaccessible.",
+  "error.hub.full": "Le hub {{hub_name}} est complet. Veuillez en choisir un autre.",
+  "error.driver.unavailable": "Aucun livreur disponible dans votre secteur.",
+  "error.payment.failed": "Le paiement de {{amount}} {{currency}} a échoué.",
+
+  "billing.cost.estimate": "Coût estimé de la livraison : {{amount}} {{currency}}.",
+  "billing.invoice.generated": "Facture de {{amount}} {{currency}} générée.",
+  "billing.payment.confirmed": "Paiement de {{amount}} {{currency}} confirmé.",
+  "billing.wallet.credited": "Portefeuille crédité de {{amount}} {{currency}}.",
+
+  "status.hub.deposit": "Colis déposé au point relais {{hub_name}}.",
+  "status.hub.retrieved": "Colis récupéré au point relais {{hub_name}}.",
+  "status.delivery.pending": "En attente d'un livreur.",
+  "status.delivery.in_progress": "Livraison en cours.",
+  "status.delivery.completed": "Livraison effectuée.",
+
+  "blockchain.deposit.confirmed": "Dépôt du colis {{package_id}} enregistré sur la blockchain.",
+  "blockchain.delivery.confirmed": "Livraison du colis {{package_id}} certifiée sur la blockchain.",
+
+  "account.welcome": "Bienvenue sur TiiBnTick, {{name}} !",
+  "account.otp.sent": "Votre code de vérification est {{otp}}. Expire dans {{duration}} minutes."
+}

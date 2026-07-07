@@ -1,0 +1,21 @@
+# Liquibase master changelog — tnt-accounting-core
+# Author: MANFOUO Braun
+databaseChangeLog:
+  - include:
+      file: db/changelog/changes/001-create-accounting-schema.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/002-create-accounts-table.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/003-create-journal-entry-tables.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/004-create-accounting-period-table.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/005-kernel-integration.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/006-add-freelancer-org-accounts.sql
+      relativeToChangelogFile: false

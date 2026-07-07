@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: tnt-resource-core-test
+  r2dbc:
+    url: r2dbc:tc:postgresql:///testdb?TC_IMAGE_TAG=15-alpine
+    username: test
+    password: test
+  liquibase:
+    change-log: classpath:db/changelog/tnt-resource-master.yaml
+    enabled: true
+
+tnt:
+  resource:
+    kafka:
+      vehicle-registered-topic: tnt.resource.vehicle.registered
+      vehicle-assigned-topic: tnt.resource.vehicle.assigned
+      vehicle-unassigned-topic: tnt.resource.vehicle.unassigned
+      vehicle-maintenance-topic: tnt.resource.vehicle.maintenance
+      vehicle-retired-topic: tnt.resource.vehicle.retired
+      vehicle-location-topic: tnt.resource.vehicle.location
+      maintenance-alert-topic: tnt.resource.maintenance.alert
+      equipment-assigned-topic: tnt.resource.equipment.assigned
+    redis:
+      vehicle-location-ttl-seconds: 3600
+      vehicle-location-key-prefix: "tnt:vehicle:location:"
+    maintenance:
+      alert-days-before-due: 7
+      alert-km-before-due: 500.0

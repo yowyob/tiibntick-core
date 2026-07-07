@@ -1,0 +1,12 @@
+databaseChangeLog:
+  - changeSet:
+      id: tnt-billing-report-001-create-tables
+      author: MANFOUO Braun
+      changes:
+        - sqlFile:
+            path: migrations/001_create_billing_report_tables.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+  - include:
+      file: db/changelog/migrations/002_add_freelancer_org_report_fields.sql
+      relativeToChangelogFile: false

@@ -1,0 +1,13 @@
+spring:
+  application:
+    name: yow-i18n-kernel
+
+yowyob:
+  i18n:
+    locales:
+      - fr_CM
+      - en_CM
+      - pidgin_CM
+      - en_NG
+      - fr_FR
+    default-language: FR_CM

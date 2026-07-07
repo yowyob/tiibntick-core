@@ -1,0 +1,113 @@
+databaseChangeLog:
+  # ══════════════════════════════════════════════════════════════════════════════
+  # TiiBnTick Core — Master Liquibase Changelog
+  # Author: MANFOUO Braun — ENSP Yaoundé 2026
+  # Order: dependency-respecting (L2 → L3 → L4 → L5)
+  #
+  # Each module owns its own master changelog under db/changelog/<module>-master.yaml.
+  # Filenames are globally unique (not the generic "db.changelog-master.yaml") because
+  # every module JAR ends up on tnt-bootstrap's classpath simultaneously — a generic
+  # name would be ambiguous for Liquibase's classpath resolver across ~20 JARs.
+  # Explicit `include` (not `includeAll`) is used so a missing/renamed module file
+  # fails loudly instead of silently no-oping.
+  # ══════════════════════════════════════════════════════════════════════════════
+
+  # ── L2 — Identity ──────────────────────────────────────────────────────────
+  - include:
+      file: db/changelog/tnt-actor-master.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/tnt-organization-master.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/tnt-tp-master.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/tnt-administration-master.yaml
+      relativeToChangelogFile: false
+
+  # ── L3 — Logistics ─────────────────────────────────────────────────────────
+  - include:
+      file: db/changelog/tnt-geo-master.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/tnt-route-master.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/tnt-delivery-master.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/tnt-dispute-master.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/tnt-incident-master.xml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/tnt-notify-master.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/tnt-media-master.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/tnt-sync-master.yaml
+      relativeToChangelogFile: false
+
+  # ── L4 — Business ──────────────────────────────────────────────────────────
+  - include:
+      file: db/changelog/tnt-resource-master.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/tnt-product-master.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/tnt-inventory-master.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/tnt-sales-master.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/tnt-accounting-master.yaml
+      relativeToChangelogFile: false
+
+  # ── L5 — Billing Engine ────────────────────────────────────────────────────
+  - include:
+      file: db/changelog/tnt-billing-dsl-master.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/tnt-billing-pricing-master.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/tnt-billing-cost-master.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/tnt-billing-invoice-master.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/tnt-billing-wallet-master.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/tnt-billing-report-master.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/tnt-billing-templates-master.yaml
+      relativeToChangelogFile: false

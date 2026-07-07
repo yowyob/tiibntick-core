@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.yowyob.tiibntick.core</groupId>
+        <artifactId>tiibntick-core-parent</artifactId>
+        <version>0.0.1</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>tnt-roles-core</artifactId>
+    <packaging>jar</packaging>
+
+    <name>TiiBnTick — tnt-roles-core (TiiBnTick RBAC Extension)</name>
+    <description>
+        TiiBnTick RBAC extension over RT-comops-roles-core (Kernel).
+        Defines all TiiBnTick-specific business roles (AGENCY_MANAGER, FREELANCER,
+        PERMANENT_DELIVERER, RELAY_OPERATOR, CLIENT...) and granular permission constants.
+        Provides a reactive permission evaluator DSL (can/cannot/assertCan),
+        a @RequirePermission AOP annotation, and a startup role definition registry.
+        Contains NO role-management logic — delegates entirely to the Kernel's
+        RolesPermissionResolver, RoleRepository, and CreateRoleUseCase.
+        Author: MANFOUO Braun
+    </description>
+
+    <developers>
+        <developer>
+            <id>manfouo-braun</id>
+            <name>MANFOUO Braun</name>
+            <roles>
+                <role>Module Owner — tnt-roles-core</role>
+                <role>Lead Architect TiiBnTick</role>
+            </roles>
+        </developer>
+    </developers>
+
+    <dependencies>
+
+        <!-- ═══════════════════════════════════════════════════════
+             KERNEL YOWYOB — RT-comops (READ-ONLY)
+             Roles persistence + permission resolution already here.
+             tnt-roles-core extends, never reimplements.
+             ═══════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>yowyob.comops.api</groupId>
+            <artifactId>RT-comops-kernel-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>yowyob.comops.api</groupId>
+            <artifactId>RT-comops-roles-core</artifactId>
+        </dependency>
+
+        <!-- ═══════════════════════════════════════════════════════
+             TIIBNTICK FOUNDATION
+             ═══════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-common-core</artifactId>
+        </dependency>
+
+        <!-- ═══════════════════════════════════════════════════════
+             SPRING BOOT
+             ═══════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- ═══════════════════════════════════════════════════════
+             REDIS — cache des permissions (TTL 5 min)
+             ReactivePermissionCache from RT-comops-kernel-core
+             uses ReactiveStringRedisTemplate internally
+             ═══════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis-reactive</artifactId>
+        </dependency>
+
+        <!-- ═══════════════════════════════════════════════════════
+             LOCAL PERMISSION RESOLVER — L1 in-process cache + Kafka
+             cache-invalidation listener for role/permission changes
+             ═══════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+
+        <!-- ═══════════════════════════════════════════════════════
+             TESTS
+             ═══════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-test</artifactId>
+            <version>${reactor-test.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

@@ -1,0 +1,33 @@
+{
+  "notification.mission.assigned": "Mission assignée avec succès au livreur {{driver_name}}.",
+  "notification.package.delivered": "Le colis {{package_id}} a été livré avec succès.",
+  "notification.package.picked_up": "Le colis {{package_id}} a été récupéré par {{driver_name}}.",
+  "notification.package.in_transit": "Votre colis {{package_id}} est en route. Livreur: {{driver_name}}.",
+  "notification.package.at_hub": "Votre colis {{package_id}} est disponible au point relais {{hub_name}}.",
+  "notification.package.deposit_confirmed": "Dépôt confirmé. Colis {{package_id}} reçu au hub {{hub_name}}.",
+  "notification.delivery.assigned": "Nouvelle mission de livraison disponible pour {{package_id}}.",
+  "notification.delivery.cancelled": "La livraison du colis {{package_id}} a été annulée.",
+  "notification.delivery.rescheduled": "La livraison du colis {{package_id}} a été replanifiée.",
+
+  "error.route.unreachable": "Zone de livraison inaccessible en raison des conditions météorologiques.",
+  "error.hub.full": "Le hub {{hub_name}} est actuellement plein. Veuillez choisir un autre point.",
+  "error.driver.unavailable": "Aucun livreur disponible dans votre zone pour le moment.",
+  "error.payment.failed": "Le paiement de {{amount}} {{currency}} a échoué. Veuillez réessayer.",
+
+  "billing.cost.estimate": "Le coût estimé de la livraison est de {{amount}} {{currency}}.",
+  "billing.invoice.generated": "Votre facture de {{amount}} {{currency}} a été générée.",
+  "billing.payment.confirmed": "Paiement de {{amount}} {{currency}} confirmé.",
+  "billing.wallet.credited": "Votre portefeuille a été crédité de {{amount}} {{currency}}.",
+
+  "status.hub.deposit": "Colis déposé au point relais {{hub_name}}.",
+  "status.hub.retrieved": "Colis retiré du point relais {{hub_name}}.",
+  "status.delivery.pending": "En attente d'un livreur.",
+  "status.delivery.in_progress": "Livraison en cours.",
+  "status.delivery.completed": "Livraison terminée.",
+
+  "blockchain.deposit.confirmed": "Dépôt du colis {{package_id}} validé sur la blockchain.",
+  "blockchain.delivery.confirmed": "Livraison du colis {{package_id}} enregistrée de façon immuable.",
+
+  "account.welcome": "Bienvenue sur TiiBnTick, {{name}} !",
+  "account.otp.sent": "Votre code de vérification est {{otp}}. Valable {{duration}} minutes."
+}

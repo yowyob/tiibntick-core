@@ -1,0 +1,3 @@
+com.yowyob.tiibntick.core.sync.config.SyncCoreConfig
+com.yowyob.tiibntick.core.sync.config.SyncKafkaConfig
+com.yowyob.tiibntick.core.sync.config.SyncR2dbcConfig

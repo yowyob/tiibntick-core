@@ -1,0 +1,24 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    project: tiibntick-core
+    environment: dev
+
+scrape_configs:
+  - job_name: tiibntick-core
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - tiibntick-core:8080
+    scrape_interval: 15s
+
+  - job_name: kafka
+    static_configs:
+      - targets:
+          - kafka:9092
+
+  - job_name: redis
+    static_configs:
+      - targets:
+          - redis:6379
