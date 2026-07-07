@@ -12,7 +12,7 @@ COPY m2repo/ /root/.m2/repository/
 COPY . .
 # -Dmaven.test.skip=true : saute la COMPILATION des tests (certains tests référencent
 # des signatures du kernel qui ont évolué) ; le code principal, lui, compile.
-RUN mvn -B -q -pl tnt-bootstrap -am -Dmaven.test.skip=true clean package \
+RUN mvn -B -q -pl tnt-bootstrap -am -Dmaven.test.skip=true -Denforcer.skip=true clean package \
     && cp tnt-bootstrap/target/tnt-bootstrap-*.jar /workspace/app.jar
 
 # ── Stage 2: image runtime (Debian JRE pour OR-Tools) ───────────────────────
