@@ -3,6 +3,8 @@ on:
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
+  repository_dispatch:
+    types: [upstream-push]
 concurrency:
   group: mirror-tiibntick-core
   cancel-in-progress: true
