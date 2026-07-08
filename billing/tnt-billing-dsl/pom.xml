@@ -36,16 +36,6 @@
 
     <dependencies>
 
-        <!-- ═══ KERNEL YOWYOB ═══════════════════════════════════════════ -->
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-kernel-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-settings-core</artifactId>
-        </dependency>
-
         <!-- ═══ TIIBNTICK L0 FOUNDATION ════════════════════════════════ -->
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>

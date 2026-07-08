@@ -29,6 +29,8 @@ class ManagePreferencesServiceTest {
 
     private ManagePreferencesService service;
 
+    private static final String TENANT_ID = "5b1f6e2a-0000-4c3a-9a2a-000000000001";
+    private static final String ORGANIZATION_ID = "5b1f6e2a-0000-4c3a-9a2a-000000000002";
     private static final String USER_ID = "user-123";
 
     @BeforeEach
@@ -38,11 +40,11 @@ class ManagePreferencesServiceTest {
 
     @Test
     void getPreferences_shouldCreateDefaults_whenUserHasNone() {
-        when(preferencePort.findByUserId(USER_ID)).thenReturn(Mono.empty());
+        when(preferencePort.findByUserId(TENANT_ID, ORGANIZATION_ID, USER_ID)).thenReturn(Mono.empty());
         when(preferencePort.save(any())).thenAnswer(inv ->
                 Mono.just(inv.getArgument(0, NotificationPreference.class)));
 
-        StepVerifier.create(service.getPreferences(USER_ID))
+        StepVerifier.create(service.getPreferences(TENANT_ID, ORGANIZATION_ID, USER_ID))
                 .expectNextMatches(p -> p.getUserId().equals(USER_ID)
                         && p.areNotificationsEnabled()
                         && !p.getActiveChannels().isEmpty())
@@ -52,12 +54,12 @@ class ManagePreferencesServiceTest {
     @Test
     void disableChannel_shouldRemoveCanalAndSave() {
         NotificationPreference existing = new NotificationPreference(
-                USER_ID, EnumSet.allOf(NotificationChannel.class), "fr_CM");
-        when(preferencePort.findByUserId(USER_ID)).thenReturn(Mono.just(existing));
+                USER_ID, TENANT_ID, ORGANIZATION_ID, EnumSet.allOf(NotificationChannel.class), "fr_CM");
+        when(preferencePort.findByUserId(TENANT_ID, ORGANIZATION_ID, USER_ID)).thenReturn(Mono.just(existing));
         when(preferencePort.save(any())).thenAnswer(inv ->
                 Mono.just(inv.getArgument(0, NotificationPreference.class)));
 
-        StepVerifier.create(service.disableChannel(USER_ID, NotificationChannel.WHATSAPP))
+        StepVerifier.create(service.disableChannel(TENANT_ID, ORGANIZATION_ID, USER_ID, NotificationChannel.WHATSAPP))
                 .expectNextMatches(p -> !p.acceptsChannel(NotificationChannel.WHATSAPP))
                 .verifyComplete();
     }
@@ -65,12 +67,12 @@ class ManagePreferencesServiceTest {
     @Test
     void enableChannel_shouldAddCanalAndSave() {
         NotificationPreference existing = new NotificationPreference(
-                USER_ID, EnumSet.of(NotificationChannel.SMS_LOCAL), "en_CM");
-        when(preferencePort.findByUserId(USER_ID)).thenReturn(Mono.just(existing));
+                USER_ID, TENANT_ID, ORGANIZATION_ID, EnumSet.of(NotificationChannel.SMS_LOCAL), "en_CM");
+        when(preferencePort.findByUserId(TENANT_ID, ORGANIZATION_ID, USER_ID)).thenReturn(Mono.just(existing));
         when(preferencePort.save(any())).thenAnswer(inv ->
                 Mono.just(inv.getArgument(0, NotificationPreference.class)));
 
-        StepVerifier.create(service.enableChannel(USER_ID, NotificationChannel.PUSH_FCM))
+        StepVerifier.create(service.enableChannel(TENANT_ID, ORGANIZATION_ID, USER_ID, NotificationChannel.PUSH_FCM))
                 .expectNextMatches(p -> p.acceptsChannel(NotificationChannel.PUSH_FCM))
                 .verifyComplete();
     }
@@ -78,12 +80,12 @@ class ManagePreferencesServiceTest {
     @Test
     void changeLanguage_shouldUpdateLocaleAndSave() {
         NotificationPreference existing = new NotificationPreference(
-                USER_ID, EnumSet.allOf(NotificationChannel.class), "fr_CM");
-        when(preferencePort.findByUserId(USER_ID)).thenReturn(Mono.just(existing));
+                USER_ID, TENANT_ID, ORGANIZATION_ID, EnumSet.allOf(NotificationChannel.class), "fr_CM");
+        when(preferencePort.findByUserId(TENANT_ID, ORGANIZATION_ID, USER_ID)).thenReturn(Mono.just(existing));
         when(preferencePort.save(any())).thenAnswer(inv ->
                 Mono.just(inv.getArgument(0, NotificationPreference.class)));
 
-        StepVerifier.create(service.changeLanguage(USER_ID, "en_CM"))
+        StepVerifier.create(service.changeLanguage(TENANT_ID, ORGANIZATION_ID, USER_ID, "en_CM"))
                 .expectNextMatches(p -> "en_CM".equals(p.getPreferredLanguage()))
                 .verifyComplete();
     }

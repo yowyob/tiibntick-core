@@ -4,11 +4,6 @@ import com.yowyob.tiibntick.bootstrap.registry.TntExtensionRegistry;
 import com.yowyob.tiibntick.bootstrap.registry.TntRoleRegistrar;
 import com.yowyob.tiibntick.bootstrap.registry.TntSettingsRegistrar;
 import lombok.extern.slf4j.Slf4j;
-//import reactor.core.publisher.Mono;
-//import java.util.UUID;
-//import yowyob.comops.api.kernel.application.port.in.CurrentTenantUseCase;
-//import yowyob.comops.api.kernel.domain.model.TenantContext;
-//import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
@@ -85,16 +80,4 @@ public class TntCoreConfig {
                 .activeProfile(profile)
                 .build();
     }
-
-    /*@Bean
-    @ConditionalOnMissingBean(CurrentTenantUseCase.class)
-    public CurrentTenantUseCase currentTenantUseCase() {
-        return () -> Mono.just(new TenantContext(
-            UUID.fromString("00000000-0000-0000-0000-000000000001"), // tenantId (requis)
-            null, // organizationId
-            null, // agencyId
-            null, // userId
-            null  // actorId
-        ));
-    }*/
 }

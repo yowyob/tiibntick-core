@@ -1,7 +1,5 @@
 package com.yowyob.tiibntick.core.roles.domain.model;
 
-import yowyob.comops.api.roles.domain.model.RoleScopeType;
-
 import java.util.Set;
 
 /**
@@ -12,7 +10,6 @@ import java.util.Set;
  * Used by {@code tnt-administration-core} when bootstrapping roles for a new tenant.
  *
  * <p>Deliberately not a JPA/R2DBC entity — this is a pure domain value object.
- * Persistence is the Kernel's responsibility (via {@code RT-comops-roles-core}).
  *
  * @author MANFOUO Braun
  */

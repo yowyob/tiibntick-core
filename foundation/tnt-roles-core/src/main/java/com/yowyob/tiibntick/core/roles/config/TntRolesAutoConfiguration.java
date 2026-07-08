@@ -9,7 +9,12 @@ import com.yowyob.tiibntick.core.roles.adapter.out.permission.PermissionCache;
 import com.yowyob.tiibntick.core.roles.adapter.out.permission.RemoteReactivePermissionResolver;
 import com.yowyob.tiibntick.core.roles.application.port.in.CheckPermissionUseCase;
 import com.yowyob.tiibntick.core.roles.application.port.in.ResolveUserRolesUseCase;
+import com.yowyob.tiibntick.core.roles.adapter.out.persistence.InMemoryRoleRepository;
+import com.yowyob.tiibntick.core.roles.adapter.out.persistence.InMemoryUserRoleAssignmentRepository;
 import com.yowyob.tiibntick.core.roles.application.port.out.ITntRoleProvisioningPort;
+import com.yowyob.tiibntick.core.roles.application.port.out.ReactivePermissionResolver;
+import com.yowyob.tiibntick.core.roles.application.port.out.RoleRepository;
+import com.yowyob.tiibntick.core.roles.application.port.out.UserRoleAssignmentRepository;
 import com.yowyob.tiibntick.core.roles.application.service.TntPermissionEvaluator;
 import com.yowyob.tiibntick.core.roles.application.service.TntRoleDefinitionRegistry;
 import com.yowyob.tiibntick.core.roles.application.service.TntRoleInitializationService;
@@ -22,17 +27,13 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.beans.factory.annotation.Qualifier;
-import yowyob.comops.api.kernel.application.port.out.ReactivePermissionResolver;
-import yowyob.comops.api.roles.adapter.out.persistence.InMemoryRoleRepository;
-import yowyob.comops.api.roles.adapter.out.persistence.InMemoryUserRoleAssignmentRepository;
-import yowyob.comops.api.roles.application.port.out.RoleRepository;
-import yowyob.comops.api.roles.application.port.out.UserRoleAssignmentRepository;
 
 
 /**
  * Spring Boot auto-configuration for tnt-roles-core.
  *
- * <p>Wires the TiiBnTick RBAC extension on top of the Kernel's RBAC infrastructure.
+ * <p>Wires the TiiBnTick RBAC infrastructure (local by default, with an HTTP-backed
+ * REMOTE/HYBRID strategy calling the Kernel — see {@code RemoteReactivePermissionResolver}).
  * All beans are conditional — modules can override any bean if needed.
  *
  * <p>Bean registration order:
@@ -59,10 +60,9 @@ public class TntRolesAutoConfiguration {
     }
 
     /**
-     * Fallback for {@link UserRoleAssignmentRepository} — the Kernel jar ships this
-     * in-memory implementation but does not auto-register it as a Spring bean.
-     * Real deployments should rely on the Kernel's own persistent adapter once it
-     * exposes one; this only activates when nothing else provides the port.
+     * Fallback for {@link UserRoleAssignmentRepository} — an in-memory, process-lifetime
+     * implementation. Real deployments should provide a persistent adapter (R2DBC or an
+     * HTTP adapter to the Kernel); this only activates when nothing else provides the port.
      */
     @Bean
     @ConditionalOnMissingBean(UserRoleAssignmentRepository.class)
@@ -103,8 +103,9 @@ public class TntRolesAutoConfiguration {
 
     /**
      * Selects the LOCAL / REMOTE / HYBRID strategy per {@code tnt.roles.permission.mode}
-     * (default LOCAL) and wraps it with {@link PermissionCache}. The Kernel exposes no
-     * permission-resolution REST endpoint yet, so LOCAL — resolved from
+     * (default LOCAL) and wraps it with {@link PermissionCache}. The Kernel exposed no
+     * permission-resolution REST endpoint as of the last {@code docs/kernel-api/} refresh,
+     * so LOCAL — resolved from
      * {@link UserRoleAssignmentRepository} + {@link RoleRepository} + {@link TntRoleDefinitionRegistry} —
      * is the only strategy with real data behind it today; REMOTE/HYBRID are forward-compatible
      * and become fully functional the moment that endpoint ships, with no change to

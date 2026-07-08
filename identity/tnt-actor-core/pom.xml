@@ -28,27 +28,6 @@
 
     <dependencies>
 
-        <!-- ══════════════════════════════════════════════════════════
-             KERNEL YOWYOB (RT-comops) — READ-ONLY
-             ══════════════════════════════════════════════════════════ -->
-
-        <!-- comops-common-core : BaseEntity, ApiResponse, Money, TenantId -->
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-common-core</artifactId>
-        </dependency>
-
-        <!-- comops-actor-core : Actor, BusinessActorProfile, use cases kernel -->
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-actor-core</artifactId>
-        </dependency>
-
-        <!-- comops-kernel-core : ReactiveRequestContextHolder, RequestContext -->
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-kernel-core</artifactId>
-        </dependency>
 
         <!-- ══════════════════════════════════════════════════════════
              TIIBNTICK L0 — FOUNDATION (même dépôt)

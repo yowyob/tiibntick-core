@@ -1,1 +1,2 @@
 com.yowyob.tiibntick.core.auth.config.TntAuthAutoConfiguration
+com.yowyob.tiibntick.core.auth.config.TntAuthGatewaySecurityConfig

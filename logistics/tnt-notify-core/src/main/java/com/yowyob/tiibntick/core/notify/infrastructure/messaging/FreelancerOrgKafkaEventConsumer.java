@@ -3,6 +3,7 @@ package com.yowyob.tiibntick.core.notify.infrastructure.messaging;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yowyob.tiibntick.core.notify.application.port.in.ISendNotificationUseCase;
+import com.yowyob.tiibntick.core.notify.config.NotifyProperties;
 import com.yowyob.tiibntick.core.notify.domain.enums.NotificationChannel;
 import com.yowyob.tiibntick.core.notify.domain.enums.NotificationPriority;
 import com.yowyob.tiibntick.core.notify.domain.enums.NotificationType;
@@ -56,11 +57,14 @@ public class FreelancerOrgKafkaEventConsumer {
 
     private final ISendNotificationUseCase notificationUseCase;
     private final ObjectMapper objectMapper;
+    private final NotifyProperties properties;
 
     public FreelancerOrgKafkaEventConsumer(ISendNotificationUseCase notificationUseCase,
-            @Qualifier("tntObjectMapper") ObjectMapper objectMapper) {
+            @Qualifier("tntObjectMapper") ObjectMapper objectMapper,
+            NotifyProperties properties) {
         this.notificationUseCase = notificationUseCase;
         this.objectMapper = objectMapper;
+        this.properties = properties;
     }
 
     // ── KYC Approved (FreelancerOrg verified or level upgraded) ──────────────
@@ -75,6 +79,8 @@ public class FreelancerOrgKafkaEventConsumer {
     public void handleKycApproved(ConsumerRecord<String, String> record) {
         log.info("Received tnt.admin.freelancer_org.kyc_approved key={}", record.key());
         parseAndDispatch(record.value(), (json) -> {
+            String tenantId = resolveTenantId(json);
+            String organizationId = resolveOrganizationId(json);
             String orgId = jsonText(json, "orgId");
             //String ownerActorId = jsonText(json, "adminId"); // admin who approved — target is owner
             String kycLevel = jsonText(json, "KYC_LEVEL");
@@ -95,9 +101,9 @@ public class FreelancerOrgKafkaEventConsumer {
                     NotificationPriority.HIGH);
 
             // Multi-channel: Push + SMS + Email
-            return notificationUseCase.send(orgId, orgId, model, NotificationChannel.PUSH_FCM)
-                    .then(notificationUseCase.send(orgId, orgId, model, NotificationChannel.SMS_LOCAL))
-                    .then(notificationUseCase.send(orgId, orgId, model, NotificationChannel.EMAIL));
+            return notificationUseCase.send(tenantId, organizationId, orgId, orgId, model, NotificationChannel.PUSH_FCM)
+                    .then(notificationUseCase.send(tenantId, organizationId, orgId, orgId, model, NotificationChannel.SMS_LOCAL))
+                    .then(notificationUseCase.send(tenantId, organizationId, orgId, orgId, model, NotificationChannel.EMAIL));
         });
     }
 
@@ -107,15 +113,17 @@ public class FreelancerOrgKafkaEventConsumer {
     public void handleKycRejected(ConsumerRecord<String, String> record) {
         log.info("Received tnt.admin.freelancer_org.kyc_rejected key={}", record.key());
         parseAndDispatch(record.value(), (json) -> {
+            String tenantId = resolveTenantId(json);
+            String organizationId = resolveOrganizationId(json);
             String orgId = jsonText(json, "orgId");
             String reason = jsonText(json, "reason");
             NotificationModel model = new NotificationModel(
                     "notify.freelancer_org.kyc_rejected", "fr",
                     Map.of("orgId", nullSafe(orgId), "reason", nullSafe(reason)),
                     NotificationPriority.HIGH);
-            return notificationUseCase.send(orgId, orgId, model, NotificationChannel.PUSH_FCM)
-                    .then(notificationUseCase.send(orgId, orgId, model, NotificationChannel.SMS_LOCAL))
-                    .then(notificationUseCase.send(orgId, orgId, model, NotificationChannel.EMAIL));
+            return notificationUseCase.send(tenantId, organizationId, orgId, orgId, model, NotificationChannel.PUSH_FCM)
+                    .then(notificationUseCase.send(tenantId, organizationId, orgId, orgId, model, NotificationChannel.SMS_LOCAL))
+                    .then(notificationUseCase.send(tenantId, organizationId, orgId, orgId, model, NotificationChannel.EMAIL));
         });
     }
 
@@ -125,15 +133,17 @@ public class FreelancerOrgKafkaEventConsumer {
     public void handleOrgSuspended(ConsumerRecord<String, String> record) {
         log.info("Received tnt.admin.freelancer_org.suspended key={}", record.key());
         parseAndDispatch(record.value(), (json) -> {
+            String tenantId = resolveTenantId(json);
+            String organizationId = resolveOrganizationId(json);
             String orgId = jsonText(json, "orgId");
             String reason = jsonText(json, "reason");
             NotificationModel model = new NotificationModel(
                     "notify.freelancer_org.suspended", "fr",
                     Map.of("orgId", nullSafe(orgId), "reason", nullSafe(reason)),
                     NotificationPriority.HIGH);
-            return notificationUseCase.send(orgId, orgId, model, NotificationChannel.PUSH_FCM)
-                    .then(notificationUseCase.send(orgId, orgId, model, NotificationChannel.SMS_LOCAL))
-                    .then(notificationUseCase.send(orgId, orgId, model, NotificationChannel.EMAIL));
+            return notificationUseCase.send(tenantId, organizationId, orgId, orgId, model, NotificationChannel.PUSH_FCM)
+                    .then(notificationUseCase.send(tenantId, organizationId, orgId, orgId, model, NotificationChannel.SMS_LOCAL))
+                    .then(notificationUseCase.send(tenantId, organizationId, orgId, orgId, model, NotificationChannel.EMAIL));
         });
     }
 
@@ -143,13 +153,15 @@ public class FreelancerOrgKafkaEventConsumer {
     public void handleOrgUnsuspended(ConsumerRecord<String, String> record) {
         log.info("Received tnt.admin.freelancer_org.unsuspended key={}", record.key());
         parseAndDispatch(record.value(), (json) -> {
+            String tenantId = resolveTenantId(json);
+            String organizationId = resolveOrganizationId(json);
             String orgId = jsonText(json, "orgId");
             NotificationModel model = new NotificationModel(
                     "notify.freelancer_org.unsuspended", "fr",
                     Map.of("orgId", nullSafe(orgId)),
                     NotificationPriority.NORMAL);
-            return notificationUseCase.send(orgId, orgId, model, NotificationChannel.PUSH_FCM)
-                    .then(notificationUseCase.send(orgId, orgId, model, NotificationChannel.SMS_LOCAL));
+            return notificationUseCase.send(tenantId, organizationId, orgId, orgId, model, NotificationChannel.PUSH_FCM)
+                    .then(notificationUseCase.send(tenantId, organizationId, orgId, orgId, model, NotificationChannel.SMS_LOCAL));
         });
     }
 
@@ -163,6 +175,8 @@ public class FreelancerOrgKafkaEventConsumer {
     public void handleFreelancerOrgAssigned(ConsumerRecord<String, String> record) {
         log.info("Received tnt.delivery.freelancer_org.assigned key={}", record.key());
         parseAndDispatch(record.value(), (json) -> {
+            String tenantId = resolveTenantId(json);
+            String organizationId = resolveOrganizationId(json);
             String deliveryId = jsonText(json, "deliveryId");
             String freelancerOrgId = jsonText(json, "freelancerOrgId");
             String freelancerRole = jsonText(json, "freelancerRole");
@@ -175,7 +189,7 @@ public class FreelancerOrgKafkaEventConsumer {
                     NotificationPriority.HIGH);
 
             Mono<?> orgNotif = notificationUseCase.send(
-                    freelancerOrgId, freelancerOrgId, modelOrg, NotificationChannel.PUSH_FCM);
+                    tenantId, organizationId, freelancerOrgId, freelancerOrgId, modelOrg, NotificationChannel.PUSH_FCM);
 
             // If SUB_DELIVERER is assigned, notify them specifically
             if ("SUB_DELIVERER".equals(freelancerRole)) {
@@ -188,9 +202,9 @@ public class FreelancerOrgKafkaEventConsumer {
                             NotificationPriority.HIGH);
                     return orgNotif
                             .then(notificationUseCase.send(
-                                    subDelivererId, subDelivererId, modelSub, NotificationChannel.PUSH_FCM))
+                                    tenantId, organizationId, subDelivererId, subDelivererId, modelSub, NotificationChannel.PUSH_FCM))
                             .then(notificationUseCase.send(
-                                    subDelivererId, subDelivererId, modelSub, NotificationChannel.SMS_LOCAL));
+                                    tenantId, organizationId, subDelivererId, subDelivererId, modelSub, NotificationChannel.SMS_LOCAL));
                 }
             }
             return orgNotif;
@@ -203,6 +217,8 @@ public class FreelancerOrgKafkaEventConsumer {
     public void handleBillingTemplateApplied(ConsumerRecord<String, String> record) {
         log.info("Received tnt.billing.template.applied key={}", record.key());
         parseAndDispatch(record.value(), (json) -> {
+            String tenantId = resolveTenantId(json);
+            String organizationId = resolveOrganizationId(json);
             String actorId = jsonText(json, "actorId");
             String templateCode = jsonText(json, "templateCode");
             String policyId = jsonText(json, "policyId");
@@ -212,7 +228,7 @@ public class FreelancerOrgKafkaEventConsumer {
                             "templateCode", nullSafe(templateCode),
                             "policyId", nullSafe(policyId)),
                     NotificationPriority.NORMAL);
-            return notificationUseCase.send(actorId, actorId, model, NotificationChannel.IN_APP_WEBSOCKET);
+            return notificationUseCase.send(tenantId, organizationId, actorId, actorId, model, NotificationChannel.IN_APP_WEBSOCKET);
         });
     }
 
@@ -244,6 +260,22 @@ public class FreelancerOrgKafkaEventConsumer {
     private String jsonText(JsonNode json, String field) {
         JsonNode node = json.get(field);
         return (node != null && !node.isNull()) ? node.asText() : null;
+    }
+
+    /**
+     * Reads the publishing module's {@code tenantId} field off the event
+     * envelope, falling back to {@code tnt.notify.kernel.default-tenant-id}
+     * when absent — this Kafka consumer has no HTTP request/JWT to read
+     * X-Tenant-Id from, and the Kernel notification engine requires one.
+     */
+    private String resolveTenantId(JsonNode json) {
+        String tenantId = jsonText(json, "tenantId");
+        return tenantId != null ? tenantId : properties.getKernel().getDefaultTenantId();
+    }
+
+    private String resolveOrganizationId(JsonNode json) {
+        String organizationId = jsonText(json, "organizationId");
+        return organizationId != null ? organizationId : properties.getKernel().getDefaultOrganizationId();
     }
 
     private String nullSafe(String val) {

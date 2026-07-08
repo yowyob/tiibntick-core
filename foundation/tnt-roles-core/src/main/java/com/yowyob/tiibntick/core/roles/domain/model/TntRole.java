@@ -1,7 +1,5 @@
 package com.yowyob.tiibntick.core.roles.domain.model;
 
-import yowyob.comops.api.roles.domain.model.RoleScopeType;
-
 import java.util.Set;
 
 import static com.yowyob.tiibntick.core.roles.domain.model.TntPermission.*;

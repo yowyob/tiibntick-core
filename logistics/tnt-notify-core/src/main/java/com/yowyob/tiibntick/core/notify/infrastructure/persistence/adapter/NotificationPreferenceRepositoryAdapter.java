@@ -5,6 +5,7 @@ import com.yowyob.tiibntick.core.notify.domain.enums.NotificationChannel;
 import com.yowyob.tiibntick.core.notify.domain.model.NotificationPreference;
 import com.yowyob.tiibntick.core.notify.infrastructure.persistence.entity.NotificationPreferenceEntity;
 import com.yowyob.tiibntick.core.notify.infrastructure.persistence.repository.NotificationPreferenceR2dbcRepository;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
@@ -16,9 +17,14 @@ import java.util.stream.Collectors;
 /**
  * Adapter implementing INotificationPreferencePort via Spring Data R2DBC.
  *
+ * <p>Only active when {@code tnt.notify.kernel.enabled=false} — by default,
+ * preferences are delegated to the Kernel notification engine instead (see
+ * {@link com.yowyob.tiibntick.core.notify.infrastructure.adapter.kernel.KernelNotificationPreferenceAdapter}).
+ *
  * @author MANFOUO Braun
  */
 @Component
+@ConditionalOnProperty(prefix = "tnt.notify.kernel", name = "enabled", havingValue = "false")
 public class NotificationPreferenceRepositoryAdapter implements INotificationPreferencePort {
 
     private final NotificationPreferenceR2dbcRepository repository;
@@ -28,7 +34,9 @@ public class NotificationPreferenceRepositoryAdapter implements INotificationPre
     }
 
     @Override
-    public Mono<NotificationPreference> findByUserId(String userId) {
+    public Mono<NotificationPreference> findByUserId(String tenantId, String organizationId, String userId) {
+        // Local fallback mode: single global row per user, not scoped by tenant/org
+        // (tenantId/organizationId are still persisted for traceability, see toEntity).
         return repository.findById(userId).map(this::toDomain);
     }
 
@@ -45,6 +53,8 @@ public class NotificationPreferenceRepositoryAdapter implements INotificationPre
                 .collect(Collectors.joining(","));
         return NotificationPreferenceEntity.builder()
                 .userId(p.getUserId())
+                .tenantId(p.getTenantId())
+                .organizationId(p.getOrganizationId())
                 .activeChannelsCsv(csv)
                 .preferredLanguage(p.getPreferredLanguage())
                 .notificationsEnabled(p.areNotificationsEnabled())
@@ -64,6 +74,8 @@ public class NotificationPreferenceRepositoryAdapter implements INotificationPre
         }
         return new NotificationPreference(
                 entity.getUserId(),
+                entity.getTenantId(),
+                entity.getOrganizationId(),
                 channels,
                 entity.getPreferredLanguage(),
                 Boolean.TRUE.equals(entity.getNotificationsEnabled()));

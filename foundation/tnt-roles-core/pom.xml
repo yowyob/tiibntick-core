@@ -18,13 +18,13 @@
 
     <name>TiiBnTick — tnt-roles-core (TiiBnTick RBAC Extension)</name>
     <description>
-        TiiBnTick RBAC extension over RT-comops-roles-core (Kernel).
-        Defines all TiiBnTick-specific business roles (AGENCY_MANAGER, FREELANCER,
-        PERMANENT_DELIVERER, RELAY_OPERATOR, CLIENT...) and granular permission constants.
-        Provides a reactive permission evaluator DSL (can/cannot/assertCan),
-        a @RequirePermission AOP annotation, and a startup role definition registry.
-        Contains NO role-management logic — delegates entirely to the Kernel's
-        RolesPermissionResolver, RoleRepository, and CreateRoleUseCase.
+        TiiBnTick RBAC extension. Defines all TiiBnTick-specific business roles
+        (AGENCY_MANAGER, FREELANCER, PERMANENT_DELIVERER, RELAY_OPERATOR, CLIENT...)
+        and granular permission constants. Provides a reactive permission evaluator DSL
+        (can/cannot/assertCan), a @RequirePermission AOP annotation, and a startup role
+        definition registry. Role/permission persistence is local (in-memory by default,
+        pluggable) with an optional HTTP-backed REMOTE/HYBRID resolution strategy against
+        the Kernel — see RemoteReactivePermissionResolver.
         Author: MANFOUO Braun
     </description>
 
@@ -40,20 +40,6 @@
     </developers>
 
     <dependencies>
-
-        <!-- ═══════════════════════════════════════════════════════
-             KERNEL YOWYOB — RT-comops (READ-ONLY)
-             Roles persistence + permission resolution already here.
-             tnt-roles-core extends, never reimplements.
-             ═══════════════════════════════════════════════════════ -->
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-kernel-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-roles-core</artifactId>
-        </dependency>
 
         <!-- ═══════════════════════════════════════════════════════
              TIIBNTICK FOUNDATION
@@ -109,6 +95,10 @@
         <dependency>
             <groupId>org.springframework.kafka</groupId>
             <artifactId>spring-kafka</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
         </dependency>
 
         <!-- ═══════════════════════════════════════════════════════

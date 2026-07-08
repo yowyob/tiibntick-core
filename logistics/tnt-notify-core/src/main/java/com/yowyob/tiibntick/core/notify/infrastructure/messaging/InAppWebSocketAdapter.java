@@ -49,7 +49,8 @@ public class InAppWebSocketAdapter implements IMessageProviderPort {
      * @param content        the message payload
      */
     @Override
-    public Mono<Void> sendMessage(String recipientId, String content) {
+    public Mono<Void> sendMessage(NotificationChannel channel, String tenantId, String organizationId,
+            String recipientId, String content) {
         log.info("Sending in-app WebSocket notification to user {}", recipientId);
         return Mono.fromRunnable(() -> messagingTemplate.convertAndSendToUser(
                 recipientId,

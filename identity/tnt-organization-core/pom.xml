@@ -68,12 +68,6 @@
             <artifactId>tnt-roles-core</artifactId>
         </dependency>
 
-        <!-- ─── KERNEL — RT-comops-organization-core ─────────────────────────── -->
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-organization-core</artifactId>
-        </dependency>
-
         <!-- ─── L0 — Event bus ─────────────────────────────────────────────── -->
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>

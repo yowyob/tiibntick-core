@@ -65,6 +65,8 @@ public class NotificationRepositoryAdapter implements INotificationRepositoryPor
     private NotificationEntity toEntity(Notification n) {
         return NotificationEntity.builder()
                 .id(n.getId().value())
+                .tenantId(n.getTenantId())
+                .organizationId(n.getOrganizationId())
                 .recipientId(n.getRecipientId())
                 .channel(n.getChannel().name())
                 .content(n.getContent())
@@ -80,6 +82,8 @@ public class NotificationRepositoryAdapter implements INotificationRepositoryPor
     private Notification toDomain(NotificationEntity entity) {
         return new Notification(
                 new NotificationId(entity.getId()),
+                entity.getTenantId(),
+                entity.getOrganizationId(),
                 entity.getRecipientId(),
                 NotificationChannel.valueOf(entity.getChannel()),
                 entity.getContent(),

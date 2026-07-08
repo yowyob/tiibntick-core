@@ -3,7 +3,6 @@ package com.yowyob.tiibntick.core.roles.domain.model;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
-import yowyob.comops.api.roles.domain.model.RoleScopeType;
 
 import java.util.Arrays;
 import java.util.Set;

@@ -11,8 +11,6 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.ComponentScan;
-import org.springframework.context.annotation.ComponentScan.Filter;
-import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.event.EventListener;
 import org.springframework.data.r2dbc.repository.config.EnableR2dbcRepositories;
@@ -42,40 +40,9 @@ import java.net.UnknownHostException;
  * @author MANFOUO Braun
  */
 
-/* 
-@ComponentScan(
-        basePackages = {
-                "com.yowyob.tiibntick",
-                "yowyob.comops.api"
-        },
-        excludeFilters = {
-            @Filter(
-                type = FilterType.ASSIGNABLE_TYPE,
-                classes = {
-                    yowyob.comops.api.kernel.application.service.AuditAspect.class,
-                    yowyob.comops.api.product.application.service.ProductApplicationService.class
-                }
-            )
-        }
-)
-*/
 @Slf4j
 @SpringBootApplication
-@ComponentScan(
-    basePackages = {
-        "com.yowyob.tiibntick" //,
-        //"yowyob.comops.api.kernel.client",      // Clients HTTP vers le Kernel
-        //"yowyob.comops.api.kernel.config",
-        //"yowyob.comops.api.common.util",        // Utilitaires partagés
-        //"yowyob.comops.api.common.config"       // Configs partagées
-    } //,
-    /*excludeFilters = {
-            @Filter(
-                    type = FilterType.ASSIGNABLE_TYPE,
-                    classes = com.yowyob.tiibntick.core.actor.adapter.out.auth.ActorCoreYowAuthTntAdapter.class
-            )
-    }*/
-)
+@ComponentScan(basePackages = "com.yowyob.tiibntick")
 @Import({
         KernelBridgeConfig.class,
         TntCoreConfig.class

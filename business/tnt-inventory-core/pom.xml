@@ -36,22 +36,6 @@
             <artifactId>tnt-common-core</artifactId>
         </dependency>
 
-        <!-- ══ Kernel Yowyob — Inventory domain ═════════════════════════════
-             RT-comops-inventory-core provides the Kernel stock entry concept.
-             tnt-inventory-core does NOT extend Kernel classes: it references
-             them via kernelStockEntryId (nullable UUID) and KernelInventoryPort.
-        ══════════════════════════════════════════════════════════════════════ -->
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-inventory-core</artifactId>
-        </dependency>
-
-        <!-- RT-comops-settings-core: system parameter access (warehouse thresholds) -->
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-settings-core</artifactId>
-        </dependency>
-
         <!-- ══ TiiBnTick L0 — Event bus ═════════════════════════════════════ -->
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>

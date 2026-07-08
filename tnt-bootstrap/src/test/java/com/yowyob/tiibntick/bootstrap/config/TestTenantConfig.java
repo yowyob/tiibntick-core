@@ -1,11 +1,11 @@
 package com.yowyob.tiibntick.bootstrap.config;
 
+import com.yowyob.tiibntick.common.tenant.CurrentTenantUseCase;
+import com.yowyob.tiibntick.common.tenant.TenantContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import reactor.core.publisher.Mono;
-import yowyob.comops.api.kernel.application.port.in.CurrentTenantUseCase;
-import yowyob.comops.api.kernel.domain.model.TenantContext;
 
 import java.util.UUID;
 

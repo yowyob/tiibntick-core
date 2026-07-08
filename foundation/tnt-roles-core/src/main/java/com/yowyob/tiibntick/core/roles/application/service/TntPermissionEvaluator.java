@@ -1,6 +1,7 @@
 package com.yowyob.tiibntick.core.roles.application.service;
 
 import com.yowyob.tiibntick.core.roles.application.port.in.CheckPermissionUseCase;
+import com.yowyob.tiibntick.core.roles.application.port.out.ReactivePermissionResolver;
 import com.yowyob.tiibntick.core.roles.domain.exception.TntRoleException;
 import com.yowyob.tiibntick.core.roles.domain.model.TntPermissionContext;
 import org.slf4j.Logger;
@@ -10,8 +11,6 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.security.core.context.SecurityContext;
 import reactor.core.publisher.Mono;
-import yowyob.comops.api.kernel.application.port.out.ReactivePermissionResolver;
-import yowyob.comops.api.kernel.config.ApiKeyAuthenticationToken;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -36,8 +35,8 @@ import java.util.stream.Collectors;
  * </ul>
  *
  * <p>Also provides direct resolution from the current Spring Security reactive context,
- * reading {@link ApiKeyAuthenticationToken} authorities without an additional DB call
- * when the JWT already carries the permissions (hot path).
+ * reading the JWT-derived authorities (set by {@code TntSecurityConfig.tntJwtAuthenticationConverter})
+ * without an additional DB call when the JWT already carries the permissions (hot path).
  *
  * @author MANFOUO Braun
  */
@@ -100,8 +99,9 @@ public class TntPermissionEvaluator implements CheckPermissionUseCase {
      * Reactive convenience — resolves the current user's permissions from the HTTP security context.
      * Used by the AOP aspect and by services that need permission checks mid-chain.
      *
-     * <p>Extracts directly from the Kernel's {@link ApiKeyAuthenticationToken} authorities (fast path),
-     * then expands any {@code ROLE_*} authorities to their constituent TiiBnTick permissions via
+     * <p>Extracts directly from the JWT-derived authorities set by
+     * {@code TntSecurityConfig.tntJwtAuthenticationConverter} (fast path — no DB call), then
+     * expands any {@code ROLE_*} authorities to their constituent TiiBnTick permissions via
      * {@link TntRoleDefinitionRegistry}. This allows a user carrying {@code ROLE_TNT_ADMIN}
      * (synthesized from a Kernel {@code ROLE_OWNER} JWT) to pass permission checks without needing
      * explicit permission strings in the JWT.
@@ -115,10 +115,24 @@ public class TntPermissionEvaluator implements CheckPermissionUseCase {
                             .map(GrantedAuthority::getAuthority)
                             .collect(Collectors.toUnmodifiableSet());
                     Set<String> expanded = expandWithRolePermissions(rawAuthorities);
-                    UUID agencyId = auth instanceof ApiKeyAuthenticationToken token ? token.agencyId() : null;
+                    UUID agencyId = extractSyntheticUuid(rawAuthorities, "AGENCY_");
                     return Mono.just(matches(expanded, resource, action, agencyId));
                 })
                 .defaultIfEmpty(false);
+    }
+
+    private static UUID extractSyntheticUuid(Set<String> authorities, String prefix) {
+        return authorities.stream()
+                .filter(a -> a.startsWith(prefix))
+                .findFirst()
+                .map(a -> {
+                    try {
+                        return UUID.fromString(a.substring(prefix.length()));
+                    } catch (IllegalArgumentException e) {
+                        return null;
+                    }
+                })
+                .orElse(null);
     }
 
     /**

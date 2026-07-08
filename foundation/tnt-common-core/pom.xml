@@ -15,31 +15,13 @@
     <artifactId>tnt-common-core</artifactId>
     <name>TiiBnTick — tnt-common-core</name>
     <description>
-        TiiBnTick-specific shared types — TNT-exclusive value objects, AOP annotations,
-        utilities, and event metadata. Does NOT duplicate Yowyob Kernel types.
-        Consumers obtain Kernel types (Money, BaseEntity, Address, GeoCoordinates,
-        Result, ApiResponse) transitively via RT-comops-common-core.
+        TiiBnTick-specific shared types — value objects (Money, Address, GeoCoordinates),
+        base entity, Result/ApiResponse envelopes, AOP annotations, utilities, and event
+        metadata. TiiBnTick talks to the Yowyob Kernel over HTTP only — no Kernel Maven
+        dependency, no shared Kernel Spring beans/types.
     </description>
 
     <dependencies>
-
-        <!-- ══════════════════════════════════════════════════════════════
-             YOWYOB KERNEL — re-exported by transitive dependency.
-             Provides: BaseEntity, Money, Address, GeoCoordinates, Result<T>,
-             ApiResponse, IDomainEvent, TenantContext, Outbox, Audit services.
-             TNT Core modules declare ONLY tnt-common-core and get all Kernel
-             types automatically.
-             ══════════════════════════════════════════════════════════════ -->
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-common-core</artifactId>
-            <version>${yow-comops.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-kernel-core</artifactId>
-            <version>${yow-comops.version}</version>
-        </dependency>
 
         <!-- ══════════════════════════════════════════════════════════════
              SPRING — required for AOP annotations and Aspect beans.
@@ -56,6 +38,25 @@
         <dependency>
             <groupId>org.aspectj</groupId>
             <artifactId>aspectjweaver</artifactId>
+        </dependency>
+
+        <!-- ══════════════════════════════════════════════════════════════
+             SPRING WEB — HttpStatus / @ResponseStatus used directly by
+             TntNotFoundException and friends (not a Spring Boot starter,
+             so this must be declared explicitly rather than pulled in
+             transitively by a downstream module).
+             ══════════════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-web</artifactId>
+        </dependency>
+
+        <!-- ══════════════════════════════════════════════════════════════
+             SLF4J — logging facade used directly via Lombok's @Slf4j.
+             ══════════════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
         </dependency>
 
         <!-- ══════════════════════════════════════════════════════════════

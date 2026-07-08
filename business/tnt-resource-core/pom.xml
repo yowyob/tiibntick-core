@@ -70,17 +70,6 @@
             <artifactId>tnt-common-core</artifactId>
         </dependency>
 
-        <!-- ══ Kernel Yowyob — Actor (deliverer assignment validation) ══════
-             RT-comops-actor-core provides the Kernel actor concept.
-             tnt-resource-core does NOT extend Kernel actor classes — it stores
-             assignedDelivererId as a UUID reference (actorId) and validates
-             existence via KernelActorPort before assignment.
-        ══════════════════════════════════════════════════════════════════════ -->
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-actor-core</artifactId>
-        </dependency>
-
         <!-- ══ TiiBnTick L0 — Event bus ═════════════════════════════════════ -->
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>

@@ -29,6 +29,12 @@ docs/
 │   ├── security.md        ← auth/permission requirements per endpoint class
 │   └── errors.md           ← exception → HTTP status mapping per module
 │
+├── kernel-api/                    ← the external Kernel's HTTP surface (not TiiBnTick's own)
+│   ├── README.md                  ← how to refresh, how to use
+│   ├── openapi.json                ← raw spec, source of truth
+│   ├── endpoints.md                 ← generated: every Kernel operation
+│   └── schemas.md                    ← generated: every Kernel DTO schema
+│
 ├── infrastructure/
 │   ├── database.md         ← Liquibase conventions + gotchas (the big one)
 │   ├── kafka.md             ← topic/producer/consumer map

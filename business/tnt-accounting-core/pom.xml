@@ -38,17 +38,6 @@
             <artifactId>tnt-common-core</artifactId>
         </dependency>
 
-        <!-- ══ Kernel Yowyob — Accounting (Invoice, JournalEntry base) ══════
-             RT-comops-accounting-core provides Kernel invoice and journal concepts.
-             tnt-accounting-core does NOT extend Kernel classes — it references
-             them via kernelInvoiceId and kernelJournalEntryId (nullable UUIDs)
-             on JournalEntry, and only accesses the Kernel when needed.
-        ══════════════════════════════════════════════════════════════════════ -->
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-accounting-core</artifactId>
-        </dependency>
-
         <!-- ══ TiiBnTick L0 — Event bus ═════════════════════════════════════ -->
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>

@@ -55,17 +55,6 @@
             <artifactId>yow-i18n-kernel</artifactId>
         </dependency>
 
-        <!-- ── Kernel Yowyob ── -->
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-common-core</artifactId>
-            <version>${yow-comops.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-kernel-core</artifactId>
-        </dependency>
-
         <!-- ── L2 Identity ── -->
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>

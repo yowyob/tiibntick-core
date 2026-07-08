@@ -1,10 +1,10 @@
 package com.yowyob.tiibntick.core.roles.adapter.out.permission;
 
+import com.yowyob.tiibntick.core.roles.application.port.out.ReactivePermissionResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
-import yowyob.comops.api.kernel.application.port.out.ReactivePermissionResolver;
 
 import java.util.Set;
 import java.util.UUID;

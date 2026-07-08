@@ -2,6 +2,7 @@ package com.yowyob.tiibntick.core.notify.infrastructure.adapter.incident;
 
 import com.yowyob.tiibntick.core.incident.port.outbound.INotificationPort;
 import com.yowyob.tiibntick.core.notify.application.port.in.ISendNotificationUseCase;
+import com.yowyob.tiibntick.core.notify.config.NotifyProperties;
 import com.yowyob.tiibntick.core.notify.domain.enums.NotificationChannel;
 import com.yowyob.tiibntick.core.notify.domain.enums.NotificationPriority;
 import com.yowyob.tiibntick.core.notify.domain.vo.NotificationModel;
@@ -38,6 +39,16 @@ import java.util.UUID;
  * {@code INotificationPort} from tnt-incident-core. Assembled in tnt-bootstrap.
  * </p>
  *
+ * <p>
+ * {@code INotificationPort} (owned by tnt-incident-core) does not carry
+ * tenant/organization context, so this adapter falls back to
+ * {@code tnt.notify.kernel.default-tenant-id} / {@code default-organization-id}
+ * (see {@link NotifyProperties.Kernel}) for the Push FCM path, which the
+ * Kernel notification engine requires. Threading real per-incident tenant
+ * context through would require extending {@code INotificationPort} itself —
+ * out of scope here.
+ * </p>
+ *
  * @author MANFOUO Braun
  */
 @Component
@@ -57,9 +68,20 @@ public class IncidentNotificationPortAdapter implements INotificationPort {
             "INCIDENT_CREATED");
 
     private final ISendNotificationUseCase notificationUseCase;
+    private final NotifyProperties properties;
 
-    public IncidentNotificationPortAdapter(ISendNotificationUseCase notificationUseCase) {
+    public IncidentNotificationPortAdapter(ISendNotificationUseCase notificationUseCase,
+            NotifyProperties properties) {
         this.notificationUseCase = notificationUseCase;
+        this.properties = properties;
+    }
+
+    private String defaultTenantId() {
+        return properties.getKernel().getDefaultTenantId();
+    }
+
+    private String defaultOrganizationId() {
+        return properties.getKernel().getDefaultOrganizationId();
     }
 
     /**
@@ -89,7 +111,8 @@ public class IncidentNotificationPortAdapter implements INotificationPort {
         NotificationModel highModele = buildModel(type, params, NotificationPriority.HIGH);
 
         Mono<Void> inApp = notificationUseCase
-                .send(actorId.toString(), actorId.toString(), model, NotificationChannel.IN_APP_WEBSOCKET)
+                .send(defaultTenantId(), defaultOrganizationId(), actorId.toString(), actorId.toString(), model,
+                        NotificationChannel.IN_APP_WEBSOCKET)
                 .onErrorResume(ex -> {
                     log.warn("In-app notification failed for actor={}: {}", actorId, ex.getMessage());
                     return Mono.empty();
@@ -98,7 +121,8 @@ public class IncidentNotificationPortAdapter implements INotificationPort {
 
         if (HIGH_PRIORITY_TYPES.contains(type)) {
             Mono<Void> push = notificationUseCase
-                    .send(actorId.toString(), actorId.toString(), highModele, NotificationChannel.PUSH_FCM)
+                    .send(defaultTenantId(), defaultOrganizationId(), actorId.toString(), actorId.toString(),
+                            highModele, NotificationChannel.PUSH_FCM)
                     .onErrorResume(ex -> {
                         log.warn("Push notification failed for actor={}: {}", actorId, ex.getMessage());
                         return Mono.empty();
@@ -166,7 +190,8 @@ public class IncidentNotificationPortAdapter implements INotificationPort {
         NotificationModel model = buildModel(type, params, NotificationPriority.HIGH);
 
         return notificationUseCase
-                .send(agencyRecipientId, agencyRecipientId, model, NotificationChannel.IN_APP_WEBSOCKET)
+                .send(defaultTenantId(), defaultOrganizationId(), agencyRecipientId, agencyRecipientId, model,
+                        NotificationChannel.IN_APP_WEBSOCKET)
                 .doOnSuccess(n -> log.debug("Agency notification sent agency={} type={}", agencyId, type))
                 .doOnError(ex -> log.error("Failed to notify agency={}: {}", agencyId, ex.getMessage()))
                 .onErrorResume(ex -> Mono.empty())

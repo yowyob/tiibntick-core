@@ -74,18 +74,6 @@
             <artifactId>tnt-roles-core</artifactId>
         </dependency>
 
-        <!-- ─── KERNEL — RT-comops-tp-core ─────────────────────────────────────── -->
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-tp-core</artifactId>
-        </dependency>
-
-        <!-- ─── KERNEL — RT-comops-auth-core ────────────────────────────────────── -->
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-auth-core</artifactId>
-        </dependency>
-
         <!-- ─── L0 — Event bus ─────────────────────────────────────────────────── -->
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>

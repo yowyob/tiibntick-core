@@ -39,13 +39,17 @@ public class NotificationService implements ISendNotificationUseCase {
         }
 
         @Override
-        public Mono<Notification> send(String recipientId,
+        public Mono<Notification> send(String tenantId,
+                        String organizationId,
+                        String recipientId,
                         String targetDestination,
                         NotificationModel model,
                         NotificationChannel channel) {
                 return translationPort.translate(model)
                                 .map(content -> new Notification(
                                                 NotificationId.generate(),
+                                                tenantId,
+                                                organizationId,
                                                 recipientId,
                                                 channel,
                                                 content,
@@ -68,7 +72,8 @@ public class NotificationService implements ISendNotificationUseCase {
                                         .flatMap(n -> eventPort.publishNotificationFailed(n).thenReturn(n));
                 }
 
-                return provider.sendMessage(targetDestination, notification.getContent())
+                return provider.sendMessage(notification.getChannel(), notification.getTenantId(),
+                                notification.getOrganizationId(), targetDestination, notification.getContent())
                                 .then(Mono.defer(() -> {
                                         notification.markAsSent();
                                         return repository.save(notification);

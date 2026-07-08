@@ -10,7 +10,11 @@ import reactor.core.publisher.Mono;
  */
 public interface INotificationPreferencePort {
 
-    Mono<NotificationPreference> findByUserId(String userId);
+    Mono<NotificationPreference> findByUserId(String tenantId, String organizationId, String userId);
 
+    /**
+     * Saves preferences already carrying their own tenantId/organizationId
+     * (see {@link NotificationPreference#getTenantId()}).
+     */
     Mono<NotificationPreference> save(NotificationPreference preferences);
 }

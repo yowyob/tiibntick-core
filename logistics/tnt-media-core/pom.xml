@@ -26,24 +26,6 @@
 
     <dependencies>
 
-        <!-- ── Yowyob Kernel — comops-common-core (base types: TenantId, Money, etc.) ── -->
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-common-core</artifactId>
-        </dependency>
-
-        <!-- ── Yowyob Kernel — comops-file-core (base file/storage kernel) ── -->
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-file-core</artifactId>
-        </dependency>
-
-        <!-- ── Yowyob Kernel — comops-kernel-core (base sequencer, events) ── -->
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-kernel-core</artifactId>
-        </dependency>
-
         <!-- ── TiiBnTick L0 — Event Bus ── -->
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>

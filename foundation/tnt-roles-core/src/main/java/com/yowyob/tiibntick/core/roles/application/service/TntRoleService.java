@@ -1,11 +1,11 @@
 package com.yowyob.tiibntick.core.roles.application.service;
 
 import com.yowyob.tiibntick.core.roles.application.port.in.ResolveUserRolesUseCase;
+import com.yowyob.tiibntick.core.roles.application.port.out.RoleRepository;
+import com.yowyob.tiibntick.core.roles.application.port.out.UserRoleAssignmentRepository;
 import com.yowyob.tiibntick.core.roles.domain.model.TntRole;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import yowyob.comops.api.roles.application.port.out.RoleRepository;
-import yowyob.comops.api.roles.application.port.out.UserRoleAssignmentRepository;
 
 import java.util.Comparator;
 import java.util.UUID;
@@ -13,10 +13,9 @@ import java.util.UUID;
 /**
  * Resolves TiiBnTick business roles assigned to a user via the Kernel's repositories.
  *
- * <p>Wraps {@code UserRoleAssignmentRepository} and {@code RoleRepository} from
- * {@code RT-comops-roles-core} to return strongly-typed {@link TntRole} values.
- * Only recognized TiiBnTick role codes are returned — unrecognized Kernel roles
- * are silently filtered, preserving forward compatibility.
+ * <p>Wraps {@link UserRoleAssignmentRepository} and {@link RoleRepository} to return
+ * strongly-typed {@link TntRole} values. Only recognized TiiBnTick role codes are
+ * returned — unrecognized codes are silently filtered, preserving forward compatibility.
  *
  * @author MANFOUO Braun
  */

@@ -257,6 +257,18 @@ services:
       TNT_ROLES_PROVISION_ON_STARTUP: ${TNT_ROLES_PROVISION_ON_STARTUP:-true}
       TNT_ROLES_AOP_ENABLED: ${TNT_ROLES_AOP_ENABLED:-true}
       TNT_ROLES_CACHE_TTL: ${TNT_ROLES_CACHE_TTL:-300}
+      # Platform → Core gateway (CORE_KERNEL_GATEWAY_SPEC.md) — one X-Client-Id/X-Api-Key
+      # pair per platform backend, set via .env (see .env.example / .env.prod.example)
+      TNT_AGENCY_CLIENT_ID: ${TNT_AGENCY_CLIENT_ID:-}
+      TNT_AGENCY_API_KEY: ${TNT_AGENCY_API_KEY:-}
+      TNT_GO_CLIENT_ID: ${TNT_GO_CLIENT_ID:-}
+      TNT_GO_API_KEY: ${TNT_GO_API_KEY:-}
+      TNT_LINK_CLIENT_ID: ${TNT_LINK_CLIENT_ID:-}
+      TNT_LINK_API_KEY: ${TNT_LINK_API_KEY:-}
+      TNT_MARKET_CLIENT_ID: ${TNT_MARKET_CLIENT_ID:-}
+      TNT_MARKET_API_KEY: ${TNT_MARKET_API_KEY:-}
+      TNT_POINT_RELAIS_CLIENT_ID: ${TNT_POINT_RELAIS_CLIENT_ID:-}
+      TNT_POINT_RELAIS_API_KEY: ${TNT_POINT_RELAIS_API_KEY:-}
       QR_HMAC_SECRET: ${QR_HMAC_SECRET:-dev-hmac-secret-change-in-staging-and-prod}
       ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
       SWAGGER_SERVER_URL: ${SWAGGER_SERVER_URL:-http://localhost:8080}

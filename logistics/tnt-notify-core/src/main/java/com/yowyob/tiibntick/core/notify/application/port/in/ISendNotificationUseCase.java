@@ -17,6 +17,8 @@ public interface ISendNotificationUseCase {
      * Translates a message template and dispatches it to the recipient via the
      * specified channel.
      *
+     * @param tenantId       TiiBnTick tenant the notification belongs to
+     * @param organizationId organization scope within the tenant, may be {@code null}
      * @param recipientId   the actor ID of the recipient
      * @param targetDestination the physical destination (phone number, FCM token,
      *                         email address)
@@ -24,7 +26,9 @@ public interface ISendNotificationUseCase {
      * @param channel            the delivery channel
      * @return the persisted Notification with its final status
      */
-    Mono<Notification> send(String recipientId,
+    Mono<Notification> send(String tenantId,
+            String organizationId,
+            String recipientId,
             String targetDestination,
             NotificationModel model,
             NotificationChannel channel);

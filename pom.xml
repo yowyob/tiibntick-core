@@ -157,11 +157,7 @@
         <spring-boot-starter-kafka.version>4.0.0-M2</spring-boot-starter-kafka.version>
         <spring-boot-autoconfigure.version>4.1.0-RC1</spring-boot-autoconfigure.version>  -->
 
-        <!-- ── Kernel Yowyob (RT-comops) géré par TSAFACK Savio ── -->
-        <!-- groupId : yowyob.comops  |  packages : yowyob.comops.api.{module}.* -->
-        <yow-comops.version>0.1.0-SNAPSHOT</yow-comops.version>
-
-        <!-- ── Foundation L0 (modules dans ce dépôt — pas encore dans RT-comops) ── -->
+        <!-- ── Foundation L0 (modules dans ce dépôt) ── -->
         <!-- Pas de version séparée : héritent de ${project.version} -->
 
         <!-- ── Base de données ── -->
@@ -256,22 +252,6 @@
             <url>https://repo1.maven.org/maven2</url>
         </repository>
 
-        <!-- ── Kernel Yowyob (RT-comops) — GitHub de TSAFACK Savio ── -->
-        <!-- groupId: yowyob.comops | Dépôt: https://github.com/Savhel/KSM_Kernel_Layer -->
-        <!-- <repository>
-            <id>github-yowyob-comops</id>
-            <name>Yowyob RT-comops Kernel — GitHub Packages (TSAFACK Savio)</name>
-            <url>https://maven.pkg.github.com/Savhel/KSM_Kernel_Layer</url>
-            <releases>
-                <enabled>true</enabled>
-                <updatePolicy>daily</updatePolicy>
-            </releases>
-            <snapshots>
-                <enabled>true</enabled>
-                <updatePolicy>always</updatePolicy>
-            </snapshots>
-        </repository> -->
-
         <!-- ── GitLab Package Registry — TiiBnTick Core (ce dépôt) ──
              Utilisé en CI/CD pour résoudre les JARs publiés par ce projet.
              En développement local : les JARs sont résolus depuis ~/.m2/repository.
@@ -351,163 +331,9 @@
             </dependency>
 
             <!-- ╔══════════════════════════════════════════════════════════╗
-                 ║  KERNEL YOWYOB — RT-comops (TSAFACK Savio, GitHub)       ║
-                 ║  groupId   : yowyob.comops                               ║
-                 ║  packages  : yowyob.comops.api.{module}.*                ║
-                 ║  Consommés en READ-ONLY — aucune contribution de         ║
-                 ║  l'équipe TiiBnTick sur ces artefacts.                   ║
-                 ╚══════════════════════════════════════════════════════════╝ -->
-
-            <!-- comops-common-core : types partagés, base entity, TenantId, Money, etc. -->
-            <dependency>
-                <groupId>yowyob.comops.api</groupId>
-                <artifactId>RT-comops-common-core</artifactId>
-                <version>${yow-comops.version}</version>
-            </dependency>
-
-            <!-- comops-actor-core : gestion des acteurs métier (BusinessActor) -->
-            <dependency>
-                <groupId>yowyob.comops.api</groupId>
-                <artifactId>RT-comops-actor-core</artifactId>
-                <version>${yow-comops.version}</version>
-                <exclusions>
-                    <exclusion>
-                        <groupId>commons-logging</groupId>
-                        <artifactId>commons-logging</artifactId>
-                    </exclusion>
-                </exclusions>
-            </dependency>
-
-            <!-- comops-organization-core : organisations, agences, hiérarchie -->
-            <dependency>
-                <groupId>yowyob.comops.api</groupId>
-                <artifactId>RT-comops-organization-core</artifactId>
-                <version>${yow-comops.version}</version>
-            </dependency>
-
-            <!-- comops-auth-core : authentification, JWT, gestion des comptes utilisateurs -->
-            <!-- NOTE : remplace ce qui était incorrectement appelé yow-security-core -->
-            <dependency>
-                <groupId>yowyob.comops.api</groupId>
-                <artifactId>RT-comops-auth-core</artifactId>
-                <version>${yow-comops.version}</version>
-                <exclusions>
-                    <exclusion>
-                        <groupId>commons-logging</groupId>
-                        <artifactId>commons-logging</artifactId>
-                    </exclusion>
-                </exclusions>
-            </dependency>
-
-            <!-- comops-administration-core : gouvernance, RBAC, rôles admin -->
-            <dependency>
-                <groupId>yowyob.comops.api</groupId>
-                <artifactId>RT-comops-administration-core</artifactId>
-                <version>${yow-comops.version}</version>
-            </dependency>
-
-            <!-- comops-roles-core : gestion des rôles et permissions -->
-            <dependency>
-                <groupId>yowyob.comops.api</groupId>
-                <artifactId>RT-comops-roles-core</artifactId>
-                <version>${yow-comops.version}</version>
-            </dependency>
-
-            <!-- comops-settings-core : paramètres applicatifs, séquences -->
-            <dependency>
-                <groupId>yowyob.comops.api</groupId>
-                <artifactId>RT-comops-settings-core</artifactId>
-                <version>${yow-comops.version}</version>
-            </dependency>
-
-            <!-- comops-tp-core : tiers (clients, fournisseurs) - base pour tnt-tp-core -->
-            <dependency>
-                <groupId>yowyob.comops.api</groupId>
-                <artifactId>RT-comops-tp-core</artifactId>
-                <version>${yow-comops.version}</version>
-            </dependency>
-
-            <!-- comops-accounting-core : comptabilité générale - base pour tnt-accounting-core -->
-            <dependency>
-                <groupId>yowyob.comops.api</groupId>
-                <artifactId>RT-comops-accounting-core</artifactId>
-                <version>${yow-comops.version}</version>
-            </dependency>
-
-            <!-- comops-product-core : catalogue produits - base pour tnt-product-core -->
-            <dependency>
-                <groupId>yowyob.comops.api</groupId>
-                <artifactId>RT-comops-product-core</artifactId>
-                <version>${yow-comops.version}</version>
-            </dependency>
-
-            <!-- comops-inventory-core : gestion de stock - base pour tnt-inventory-core -->
-            <dependency>
-                <groupId>yowyob.comops.api</groupId>
-                <artifactId>RT-comops-inventory-core</artifactId>
-                <version>${yow-comops.version}</version>
-            </dependency>
-
-            <!-- comops-sales-core : ventes, commandes - base pour tnt-sales-core -->
-            <dependency>
-                <groupId>yowyob.comops.api</groupId>
-                <artifactId>RT-comops-sales-core</artifactId>
-                <version>${yow-comops.version}</version>
-            </dependency>
-
-            <!-- comops-resource-core : ressources (véhicules, équipements) -->
-            <dependency>
-                <groupId>yowyob.comops.api</groupId>
-                <artifactId>RT-comops-resource-core</artifactId>
-                <version>${yow-comops.version}</version>
-            </dependency>
-
-            <!-- comops-treasury-core : trésorerie, paiements -->
-            <dependency>
-                <groupId>yowyob.comops.api</groupId>
-                <artifactId>RT-comops-treasury-core</artifactId>
-                <version>${yow-comops.version}</version>
-            </dependency>
-
-            <!-- comops-kernel-core : noyau kernel (événements bas niveau, séquenceur) -->
-            <!-- Excludes the non-jakarta swagger-annotations/swagger-models 2.2.22 this Kernel jar
-                 pulls in transitively: they share the io.swagger.v3.oas.models package with the
-                 swagger-*-jakarta 2.2.47 artifacts springdoc 3.x needs, and the older classes
-                 silently shadow the newer ones on the classpath (missing JsonSchema methods). -->
-            <dependency>
-                <groupId>yowyob.comops.api</groupId>
-                <artifactId>RT-comops-kernel-core</artifactId>
-                <version>${yow-comops.version}</version>
-                <exclusions>
-                    <exclusion>
-                        <groupId>io.swagger.core.v3</groupId>
-                        <artifactId>swagger-annotations</artifactId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>io.swagger.core.v3</groupId>
-                        <artifactId>swagger-models</artifactId>
-                    </exclusion>
-                </exclusions>
-            </dependency>
-
-            <!-- comops-file-core : gestion de fichiers / stockage objet kernel -->
-            <dependency>
-                <groupId>yowyob.comops.api</groupId>
-                <artifactId>RT-comops-file-core</artifactId>
-                <version>${yow-comops.version}</version>
-                <exclusions>
-                    <exclusion>
-                        <groupId>commons-logging</groupId>
-                        <artifactId>commons-logging</artifactId>
-                    </exclusion>
-                </exclusions>
-            </dependency>
-
-            <!-- ╔══════════════════════════════════════════════════════════╗
                  ║  TIIBNTICK L0 — FOUNDATION (dans ce dépôt)               ║
                  ║  yow-event-kernel : bus événementiel (MANFOUO)            ║
                  ║  yow-i18n-kernel  : internationalisation africaine (PAFE) ║
-                 ║  Migration vers RT-comops envisagée ultérieurement.       ║
                  ╚══════════════════════════════════════════════════════════╝ -->
 
             <dependency>

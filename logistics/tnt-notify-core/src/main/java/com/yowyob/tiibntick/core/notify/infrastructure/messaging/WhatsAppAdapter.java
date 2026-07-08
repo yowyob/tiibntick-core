@@ -5,6 +5,7 @@ import com.yowyob.tiibntick.core.notify.config.NotifyProperties;
 import com.yowyob.tiibntick.core.notify.domain.enums.NotificationChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -17,9 +18,14 @@ import java.util.Map;
  * Sends text messages via the Meta Graph API.
  * Requires a verified WhatsApp Business account.
  *
+ * <p>Only active when {@code tnt.notify.kernel.enabled=false} — by default,
+ * WhatsApp delivery is delegated to the Kernel notification engine instead
+ * (see {@link com.yowyob.tiibntick.core.notify.infrastructure.adapter.kernel.KernelDeliveryProviderAdapter}).
+ *
  * @author MANFOUO Braun
  */
 @Component
+@ConditionalOnProperty(prefix = "tnt.notify.kernel", name = "enabled", havingValue = "false")
 public class WhatsAppAdapter implements IMessageProviderPort {
 
     private static final Logger log = LoggerFactory.getLogger(WhatsAppAdapter.class);
@@ -41,7 +47,8 @@ public class WhatsAppAdapter implements IMessageProviderPort {
     }
 
     @Override
-    public Mono<Void> sendMessage(String phoneNumber, String content) {
+    public Mono<Void> sendMessage(NotificationChannel channel, String tenantId, String organizationId,
+            String phoneNumber, String content) {
         log.info("Sending WhatsApp message to {}", phoneNumber);
         // Meta Graph API v19.0 — send text message
         Map<String, Object> payload = Map.of(

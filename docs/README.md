@@ -36,6 +36,7 @@ See `development/conventions.md` and `development/coding-style.md`. Headline rul
 | [`architecture/`](architecture/overview.md) | Module map, packages, dependencies, ADRs, project tree |
 | [`domain/`](domain/bounded-contexts.md) | DDD model: bounded contexts, aggregates, entities, VOs, events, workflows |
 | [`api/`](api/rest.md) | REST endpoints, security per endpoint, error handling |
+| [`kernel-api/`](kernel-api/README.md) | External Kernel's own HTTP endpoints/schemas (offline mirror of its Swagger) |
 | [`infrastructure/`](infrastructure/database.md) | DB/Liquibase, Kafka, Redis, Elasticsearch, Docker, monitoring |
 | [`security/`](security/authentication.md) | JWT, RBAC, permissions, roles |
 | [`development/`](development/conventions.md) | Conventions, coding style, testing, roadmap |

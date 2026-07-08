@@ -42,20 +42,6 @@
     <dependencies>
 
         <!-- ═══════════════════════════════════════════════════════
-             KERNEL YOWYOB — RT-comops (READ-ONLY)
-             Auth logic + JWT + Security filter chain already here.
-             tnt-auth-core wraps, never reimplements.
-             ═══════════════════════════════════════════════════════ -->
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-kernel-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-auth-core</artifactId>
-        </dependency>
-
-        <!-- ═══════════════════════════════════════════════════════
              TIIBNTICK FOUNDATION
              ═══════════════════════════════════════════════════════ -->
         <dependency>
@@ -93,6 +79,20 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-configuration-processor</artifactId>
             <optional>true</optional>
+        </dependency>
+
+        <!-- JsonNode/ObjectMapper — used directly by KernelPublicKeyProvider and the
+             Kernel auth gateway (KernelAuthGatewayAdapter, KernelApiEnvelope). -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+
+        <!-- API documentation for PlatformAuthController / PlatformAuthOidcController. -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
+            <version>${springdoc.version}</version>
         </dependency>
 
         <dependency>

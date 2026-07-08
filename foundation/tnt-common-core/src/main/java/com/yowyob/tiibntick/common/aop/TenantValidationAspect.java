@@ -2,6 +2,7 @@ package com.yowyob.tiibntick.common.aop;
 
 import com.yowyob.tiibntick.common.annotation.CurrentTenant;
 import com.yowyob.tiibntick.common.annotation.TenantScoped;
+import com.yowyob.tiibntick.common.tenant.CurrentTenantUseCase;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -10,7 +11,6 @@ import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import yowyob.comops.api.kernel.application.port.in.CurrentTenantUseCase;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
@@ -20,10 +20,9 @@ import java.util.UUID;
  * AOP aspect that enforces tenant context validation for methods annotated
  * with {@link TenantScoped}.
  *
- * <p>Integrates with the Yowyob Kernel's {@link CurrentTenantUseCase} (from
- * {@code RT-comops-kernel-core}) to read the current tenant from the Reactor Context.
- * The Kernel's {@code TenantContextWebFilter} sets the tenant at the HTTP boundary;
- * this aspect validates it is present at the use-case boundary.
+ * <p>Integrates with {@link CurrentTenantUseCase} to read the current tenant from the
+ * Reactor Context. TiiBnTick's own JWT authentication filter sets the tenant at the
+ * HTTP boundary; this aspect validates it is present at the use-case boundary.
  *
  * <p>Responsibilities:
  * <ol>

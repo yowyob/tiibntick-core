@@ -6,6 +6,7 @@ import com.yowyob.tiibntick.core.notify.domain.enums.NotificationChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Component;
@@ -18,7 +19,10 @@ import reactor.core.scheduler.Schedulers;
  * integration.
  *
  * <p>Only registered when a {@link JavaMailSender} bean is configured
- * (e.g. {@code spring-boot-starter-mail} + {@code spring.mail.*} properties).
+ * (e.g. {@code spring-boot-starter-mail} + {@code spring.mail.*} properties)
+ * AND {@code tnt.notify.kernel.enabled=false} — by default, email delivery is
+ * delegated to the Kernel notification engine instead (see
+ * {@link com.yowyob.tiibntick.core.notify.infrastructure.adapter.kernel.KernelDeliveryProviderAdapter}).
  * Without it, {@link com.yowyob.tiibntick.core.notify.application.service.NotificationService}
  * simply receives one fewer {@code IMessageProviderPort} in its injected list.
  *
@@ -26,6 +30,7 @@ import reactor.core.scheduler.Schedulers;
  */
 @Component
 @ConditionalOnBean(JavaMailSender.class)
+@ConditionalOnProperty(prefix = "tnt.notify.kernel", name = "enabled", havingValue = "false")
 public class EmailNotificationAdapter implements IMessageProviderPort {
 
     private static final Logger log = LoggerFactory.getLogger(EmailNotificationAdapter.class);
@@ -44,7 +49,8 @@ public class EmailNotificationAdapter implements IMessageProviderPort {
     }
 
     @Override
-    public Mono<Void> sendMessage(String emailDestinataire, String content) {
+    public Mono<Void> sendMessage(NotificationChannel channel, String tenantId, String organizationId,
+            String emailDestinataire, String content) {
         log.info("Sending email to {}", emailDestinataire);
         return Mono.fromRunnable(() -> {
             SimpleMailMessage message = new SimpleMailMessage();

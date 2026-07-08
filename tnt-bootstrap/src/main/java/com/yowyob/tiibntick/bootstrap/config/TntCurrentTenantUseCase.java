@@ -1,11 +1,11 @@
 package com.yowyob.tiibntick.bootstrap.config;
 
+import com.yowyob.tiibntick.common.tenant.CurrentTenantUseCase;
+import com.yowyob.tiibntick.common.tenant.TenantContext;
 import com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
-import yowyob.comops.api.kernel.application.port.in.CurrentTenantUseCase;
-import yowyob.comops.api.kernel.domain.model.TenantContext;
 
 @Component
 public class TntCurrentTenantUseCase implements CurrentTenantUseCase {
@@ -36,44 +36,3 @@ public class TntCurrentTenantUseCase implements CurrentTenantUseCase {
                 "No TntSecurityContext available — tenant cannot be resolved")));
     }
 }
-
-
-/*
-
-@Override
-public Mono<TenantContext> currentTenant() {
-    return ReactiveSecurityContextHolder.getContext()
-        .flatMap(ctx -> {
-            var auth = ctx.getAuthentication();
-            if (auth == null) return Mono.empty();
-
-            // Essayer principal d'abord
-            if (auth.getPrincipal() instanceof TntSecurityContext tntCtx) {
-                return toTenantContext(tntCtx);
-            }
-
-            // Fallback sur details
-            if (auth.getDetails() instanceof TntSecurityContext tntCtx) {
-                return toTenantContext(tntCtx);
-            }
-
-            return Mono.empty();
-        })
-        .switchIfEmpty(Mono.error(
-            new IllegalStateException("No TntSecurityContext available")));
-}
-
-private Mono<TenantContext> toTenantContext(TntSecurityContext ctx) {
-    if (ctx.tenantId() == null) {
-        return Mono.error(new IllegalStateException("tenantId is required"));
-    }
-    return Mono.just(new TenantContext(
-        ctx.tenantId(),
-        ctx.organizationId(),
-        ctx.agencyId(),
-        ctx.userId(),
-        ctx.actorId()
-    ));
-}
-
-*/

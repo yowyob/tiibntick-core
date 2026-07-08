@@ -43,9 +43,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import com.yowyob.tiibntick.common.api.ApiResponse;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import yowyob.comops.api.common.domain.model.ApiResponse;
 
 import java.util.List;
 import java.util.UUID;
@@ -122,7 +122,7 @@ public class FreelancerController {
         })
         .map(FreelancerProfileResponse::from)
         .map(r -> ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(r, "Freelancer profile created.")));
+                .body(ApiResponse.success(r)));
     }
 
     @GetMapping("/me")
@@ -132,7 +132,7 @@ public class FreelancerController {
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
         return findUseCase.findByActorId(currentUser.tenantId(), currentUser.userId())
                 .map(FreelancerProfileResponse::from)
-                .map(r -> ResponseEntity.ok(ApiResponse.success(r, "Freelancer profile retrieved.")));
+                .map(r -> ResponseEntity.ok(ApiResponse.success(r)));
     }
 
     @GetMapping("/zone/{zoneId}/available")
@@ -164,7 +164,7 @@ public class FreelancerController {
         return associateUseCase.associate(
                 new AssociateFreelancerCommand(currentUser.tenantId(), currentUser.userId(), agencyId))
                 .map(FreelancerProfileResponse::from)
-                .map(r -> ResponseEntity.ok(ApiResponse.success(r, "Associated with agency.")));
+                .map(r -> ResponseEntity.ok(ApiResponse.success(r)));
     }
 
     @DeleteMapping("/me/agencies/{agencyId}")
@@ -178,7 +178,7 @@ public class FreelancerController {
                 new DissociateFreelancerCommand(currentUser.tenantId(), currentUser.userId(),
                         agencyId, reason))
                 .map(FreelancerProfileResponse::from)
-                .map(r -> ResponseEntity.ok(ApiResponse.success(r, "Dissociated from agency.")));
+                .map(r -> ResponseEntity.ok(ApiResponse.success(r)));
     }
 
     @PatchMapping("/me/location")
@@ -255,7 +255,7 @@ public class FreelancerController {
         })
         .map(FreelancerProfileResponse::from)
         .map(r -> ResponseEntity.ok(
-                ApiResponse.success(r, "Linked to FreelancerOrganization.")));
+                ApiResponse.success(r)));
     }
 
     /**
@@ -278,7 +278,7 @@ public class FreelancerController {
         return linkOrgUseCase.unlinkFromFreelancerOrg(cmd)
                 .map(FreelancerProfileResponse::from)
                 .map(r -> ResponseEntity.ok(
-                        ApiResponse.success(r, "Unlinked from FreelancerOrganization.")));
+                        ApiResponse.success(r)));
     }
 
     /**
@@ -293,7 +293,7 @@ public class FreelancerController {
         return findByOrgUseCase.findOwnerByOrg(orgId)
                 .map(FreelancerProfileResponse::from)
                 .map(r -> ResponseEntity.ok(
-                        ApiResponse.success(r, "FreelancerOrg owner retrieved.")));
+                        ApiResponse.success(r)));
     }
 
     /**

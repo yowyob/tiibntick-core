@@ -33,14 +33,6 @@
             <artifactId>tnt-common-core</artifactId>
         </dependency>
 
-        <!-- ── Kernel Yowyob — Product catalog (groupId MUST be yowyob.comops.api)  ── -->
-        <!-- ── Referenced by catalogProductId UUID — no Java inheritance.            ── -->
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-product-core</artifactId>
-            <version>${yow-comops.version}</version>
-        </dependency>
-
         <!-- ── Spring Boot (non-runnable library module) ── -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

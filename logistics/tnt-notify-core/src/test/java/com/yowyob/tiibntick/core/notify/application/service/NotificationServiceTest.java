@@ -41,6 +41,8 @@ class NotificationServiceTest {
 
     private NotificationService service;
 
+    private static final String TENANT_ID      = "5b1f6e2a-0000-4c3a-9a2a-000000000001";
+    private static final String ORGANIZATION_ID = "5b1f6e2a-0000-4c3a-9a2a-000000000002";
     private static final String RECIPIENT_ID  = "user-42";
     private static final String PHONE_NUMBER     = "+237691000001";
     private static final String TRANSLATED_MSG   = "Package PKG-99 has been delivered.";
@@ -59,13 +61,13 @@ class NotificationServiceTest {
                 Map.of("package_id", "PKG-99"));
 
         Notification persisted = new Notification(
-                NotificationId.generate(), RECIPIENT_ID,
+                NotificationId.generate(), TENANT_ID, ORGANIZATION_ID, RECIPIENT_ID,
                 NotificationChannel.SMS_LOCAL, TRANSLATED_MSG,
                 NotificationPriority.NORMAL, DeliveryStatus.PENDING,
                 Instant.now(), null, null, 0);
 
         Notification sent = new Notification(
-                persisted.getId(), RECIPIENT_ID,
+                persisted.getId(), TENANT_ID, ORGANIZATION_ID, RECIPIENT_ID,
                 NotificationChannel.SMS_LOCAL, TRANSLATED_MSG,
                 NotificationPriority.NORMAL, DeliveryStatus.SENT,
                 Instant.now(), Instant.now(), null, 0);
@@ -73,12 +75,12 @@ class NotificationServiceTest {
         when(translationPort.translate(model)).thenReturn(Mono.just(TRANSLATED_MSG));
         when(repository.save(any())).thenReturn(Mono.just(persisted)).thenReturn(Mono.just(sent));
         when(smsProvider.supports(NotificationChannel.SMS_LOCAL)).thenReturn(true);
-        when(smsProvider.sendMessage(anyString(), anyString())).thenReturn(Mono.empty());
+        when(smsProvider.sendMessage(any(), anyString(), anyString(), anyString(), anyString())).thenReturn(Mono.empty());
         when(eventPort.publishNotificationSent(any())).thenReturn(Mono.empty());
 
         // when / then
         Mono<Notification> result = service.send(
-                RECIPIENT_ID, PHONE_NUMBER, model, NotificationChannel.SMS_LOCAL);
+                TENANT_ID, ORGANIZATION_ID, RECIPIENT_ID, PHONE_NUMBER, model, NotificationChannel.SMS_LOCAL);
         StepVerifier.create(result)
                 .expectNextMatches(n -> n.getStatus() == DeliveryStatus.SENT)
                 .verifyComplete();
@@ -91,13 +93,13 @@ class NotificationServiceTest {
                 "notification.package.delivered", "fr_CM", Map.of());
 
         Notification persisted = new Notification(
-                NotificationId.generate(), RECIPIENT_ID,
+                NotificationId.generate(), TENANT_ID, ORGANIZATION_ID, RECIPIENT_ID,
                 NotificationChannel.EMAIL, TRANSLATED_MSG,
                 NotificationPriority.NORMAL, DeliveryStatus.PENDING,
                 Instant.now(), null, null, 0);
 
         Notification failed = new Notification(
-                persisted.getId(), RECIPIENT_ID,
+                persisted.getId(), TENANT_ID, ORGANIZATION_ID, RECIPIENT_ID,
                 NotificationChannel.EMAIL, TRANSLATED_MSG,
                 NotificationPriority.NORMAL, DeliveryStatus.FAILED,
                 Instant.now(), null, "No provider configured for channel: EMAIL", 1);
@@ -110,7 +112,7 @@ class NotificationServiceTest {
 
         // when / then
         Mono<Notification> result = service.send(
-                RECIPIENT_ID, "user@example.com", model, NotificationChannel.EMAIL);
+                TENANT_ID, ORGANIZATION_ID, RECIPIENT_ID, "user@example.com", model, NotificationChannel.EMAIL);
         StepVerifier.create(result)
                 .expectNextMatches(n -> n.getStatus() == DeliveryStatus.FAILED)
                 .verifyComplete();
@@ -123,13 +125,13 @@ class NotificationServiceTest {
                 "notification.package.delivered", "fr_CM", Map.of());
 
         Notification persisted = new Notification(
-                NotificationId.generate(), RECIPIENT_ID,
+                NotificationId.generate(), TENANT_ID, ORGANIZATION_ID, RECIPIENT_ID,
                 NotificationChannel.SMS_LOCAL, TRANSLATED_MSG,
                 NotificationPriority.NORMAL, DeliveryStatus.PENDING,
                 Instant.now(), null, null, 0);
 
         Notification failed = new Notification(
-                persisted.getId(), RECIPIENT_ID,
+                persisted.getId(), TENANT_ID, ORGANIZATION_ID, RECIPIENT_ID,
                 NotificationChannel.SMS_LOCAL, TRANSLATED_MSG,
                 NotificationPriority.HIGH, DeliveryStatus.FAILED,
                 Instant.now(), null, "SMS gateway timeout", 1);
@@ -137,13 +139,13 @@ class NotificationServiceTest {
         when(translationPort.translate(model)).thenReturn(Mono.just(TRANSLATED_MSG));
         when(repository.save(any())).thenReturn(Mono.just(persisted)).thenReturn(Mono.just(failed));
         when(smsProvider.supports(NotificationChannel.SMS_LOCAL)).thenReturn(true);
-        when(smsProvider.sendMessage(anyString(), anyString()))
+        when(smsProvider.sendMessage(any(), anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(Mono.error(new RuntimeException("SMS gateway timeout")));
         when(eventPort.publishNotificationFailed(any())).thenReturn(Mono.empty());
 
         // when / then
         Mono<Notification> result = service.send(
-                RECIPIENT_ID, PHONE_NUMBER, model, NotificationChannel.SMS_LOCAL);
+                TENANT_ID, ORGANIZATION_ID, RECIPIENT_ID, PHONE_NUMBER, model, NotificationChannel.SMS_LOCAL);
         StepVerifier.create(result)
                 .expectNextMatches(n -> n.getStatus() == DeliveryStatus.FAILED)
                 .verifyComplete();

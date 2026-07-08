@@ -14,7 +14,7 @@ public interface IManageNotificationPreferencesUseCase {
     /**
      * Returns current preferences for a user, creating defaults if absent.
      */
-    Mono<NotificationPreference> getPreferences(String userId);
+    Mono<NotificationPreference> getPreferences(String tenantId, String organizationId, String userId);
 
     /**
      * Saves or updates preferences for a user.
@@ -24,15 +24,18 @@ public interface IManageNotificationPreferencesUseCase {
     /**
      * Disables a specific notification channel for a user.
      */
-    Mono<NotificationPreference> disableChannel(String userId, NotificationChannel channel);
+    Mono<NotificationPreference> disableChannel(String tenantId, String organizationId, String userId,
+            NotificationChannel channel);
 
     /**
      * Enables a specific notification channel for a user.
      */
-    Mono<NotificationPreference> enableChannel(String userId, NotificationChannel channel);
+    Mono<NotificationPreference> enableChannel(String tenantId, String organizationId, String userId,
+            NotificationChannel channel);
 
     /**
      * Changes the preferred locale for a user's notifications.
      */
-    Mono<NotificationPreference> changeLanguage(String userId, String localeTag);
+    Mono<NotificationPreference> changeLanguage(String tenantId, String organizationId, String userId,
+            String localeTag);
 }

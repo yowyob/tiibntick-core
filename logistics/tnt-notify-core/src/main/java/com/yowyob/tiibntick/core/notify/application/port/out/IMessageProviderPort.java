@@ -19,8 +19,15 @@ public interface IMessageProviderPort {
     /**
      * Sends the message content to the physical destination.
      *
-     * @param destination the target address (phone, FCM token, email)
-     * @param content     the ready-to-send message string
+     * @param channel        the delivery channel this message is being sent on —
+     *                       relevant to providers (like the Kernel bridge) that
+     *                       {@link #supports(NotificationChannel)} more than one channel
+     * @param tenantId       TiiBnTick tenant the notification belongs to — required by
+     *                       providers that call out to multi-tenant infrastructure (Kernel)
+     * @param organizationId organization scope within the tenant, may be {@code null}
+     * @param destination    the target address (phone, FCM token, email)
+     * @param content        the ready-to-send message string
      */
-    Mono<Void> sendMessage(String destination, String content);
+    Mono<Void> sendMessage(NotificationChannel channel, String tenantId, String organizationId,
+            String destination, String content);
 }

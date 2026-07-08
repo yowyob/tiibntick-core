@@ -15,13 +15,17 @@ import java.util.Set;
 public class NotificationPreference {
 
     private final String userId;
+    private final String tenantId;
+    private final String organizationId;
     private final Set<NotificationChannel> activeChannels;
     private String preferredLanguage; // Locale tag, e.g., "fr_CM"
     private boolean notificationsEnabled;
 
-    public NotificationPreference(String userId, Set<NotificationChannel> activeChannels,
-            String preferredLanguage) {
+    public NotificationPreference(String userId, String tenantId, String organizationId,
+            Set<NotificationChannel> activeChannels, String preferredLanguage) {
         this.userId = userId;
+        this.tenantId = tenantId;
+        this.organizationId = organizationId;
         Set<NotificationChannel> ch = (activeChannels == null || activeChannels.isEmpty())
                 ? EnumSet.allOf(NotificationChannel.class) : activeChannels;
         this.activeChannels = EnumSet.copyOf(ch);
@@ -33,10 +37,14 @@ public class NotificationPreference {
      * Full reconstitution constructor.
      */
     public NotificationPreference(String userId,
+            String tenantId,
+            String organizationId,
             Set<NotificationChannel> activeChannels,
             String preferredLanguage,
             boolean notificationsEnabled) {
         this.userId = userId;
+        this.tenantId = tenantId;
+        this.organizationId = organizationId;
         Set<NotificationChannel> ch2 = (activeChannels == null || activeChannels.isEmpty())
                 ? EnumSet.allOf(NotificationChannel.class) : activeChannels;
         this.activeChannels = EnumSet.copyOf(ch2);
@@ -58,6 +66,14 @@ public class NotificationPreference {
 
     public String getUserId() {
         return userId;
+    }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    public String getOrganizationId() {
+        return organizationId;
     }
 
     public Set<NotificationChannel> getActiveChannels() {

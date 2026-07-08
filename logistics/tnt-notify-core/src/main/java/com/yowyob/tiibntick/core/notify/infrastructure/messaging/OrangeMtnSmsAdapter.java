@@ -5,6 +5,7 @@ import com.yowyob.tiibntick.core.notify.domain.enums.NotificationChannel;
 import com.yowyob.tiibntick.core.notify.config.NotifyProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -13,10 +14,15 @@ import reactor.core.publisher.Mono;
  * SMS adapter for MTN Mobile Money and Orange Cameroun APIs.
  * Sends transactional SMS notifications for delivery status updates.
  *
+ * <p>Only active when {@code tnt.notify.kernel.enabled=false} — by default,
+ * SMS delivery is delegated to the Kernel notification engine instead (see
+ * {@link com.yowyob.tiibntick.core.notify.infrastructure.adapter.kernel.KernelDeliveryProviderAdapter}).
+ *
  * @author Dilane PAFE
  * @author MANFOUO Braun
  */
 @Component
+@ConditionalOnProperty(prefix = "tnt.notify.kernel", name = "enabled", havingValue = "false")
 public class OrangeMtnSmsAdapter implements IMessageProviderPort {
 
     private static final Logger log = LoggerFactory.getLogger(OrangeMtnSmsAdapter.class);
@@ -38,7 +44,8 @@ public class OrangeMtnSmsAdapter implements IMessageProviderPort {
     }
 
     @Override
-    public Mono<Void> sendMessage(String destination, String content) {
+    public Mono<Void> sendMessage(NotificationChannel channel, String tenantId, String organizationId,
+            String destination, String content) {
         log.info("Sending SMS to {}", destination);
         // Production: POST to MTN/Orange API endpoint
         // Using a structured request body matching their SMS gateway API

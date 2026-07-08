@@ -69,7 +69,17 @@ public class TntSecurityConfig {
             "/v3/api-docs/**",
             "/webjars/**",
             "/ws/**",
-            "/.well-known/**"
+            // OIDC discovery + OAuth2 token/introspect/userinfo (PlatformAuthOidcController):
+            // standards-compliant passthrough to the Kernel — must stay callable by any
+            // OIDC/OAuth2 client library without TiiBnTick-specific headers.
+            "/.well-known/**",
+            "/oauth2/**"
+            // NOTE: /api/v1/auth/** and /api/v1/sso/** (platform → Core gateway) are NOT
+            // listed here — they're handled by tnt-auth-core's own
+            // TntAuthGatewaySecurityConfig.platformGatewaySecurityWebFilterChain (@Order(10)),
+            // which enforces X-Client-Id/X-Api-Key via PlatformApiKeyWebFilter. Adding them to
+            // this @Order(5) fully-public chain would short-circuit that check entirely — see
+            // CORE_KERNEL_GATEWAY_SPEC.md §10.
     };
 
     @Value("${tnt.security.allowed-origins:http://localhost:3000,http://localhost:3001}")

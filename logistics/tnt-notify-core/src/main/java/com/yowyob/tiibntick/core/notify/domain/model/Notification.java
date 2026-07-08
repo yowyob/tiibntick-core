@@ -19,6 +19,8 @@ import java.time.Instant;
 public class Notification {
 
     private final NotificationId id;
+    private final String tenantId;
+    private final String organizationId;
     private final String recipientId;
     private final NotificationChannel channel;
     private final String content;
@@ -33,21 +35,27 @@ public class Notification {
      * Creation constructor — sets default status and priority.
      */
     public Notification(NotificationId id,
+            String tenantId,
+            String organizationId,
             String recipientId,
             NotificationChannel channel,
             String content) {
-        this(id, recipientId, channel, content, NotificationPriority.NORMAL);
+        this(id, tenantId, organizationId, recipientId, channel, content, NotificationPriority.NORMAL);
     }
 
     /**
      * Creation constructor with explicit priority.
      */
     public Notification(NotificationId id,
+            String tenantId,
+            String organizationId,
             String recipientId,
             NotificationChannel channel,
             String content,
             NotificationPriority priority) {
         this.id = id;
+        this.tenantId = tenantId;
+        this.organizationId = organizationId;
         this.recipientId = recipientId;
         this.channel = channel;
         this.content = content;
@@ -61,6 +69,8 @@ public class Notification {
      * Full reconstitution constructor (from persistence).
      */
     public Notification(NotificationId id,
+            String tenantId,
+            String organizationId,
             String recipientId,
             NotificationChannel channel,
             String content,
@@ -71,6 +81,8 @@ public class Notification {
             String errorMessage,
             int attempts) {
         this.id = id;
+        this.tenantId = tenantId;
+        this.organizationId = organizationId;
         this.recipientId = recipientId;
         this.channel = channel;
         this.content = content;

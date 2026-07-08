@@ -25,6 +25,10 @@ public class NotificationEntity {
 
     @Id
     private String id;
+    @Column("tenant_id")
+    private String tenantId;
+    @Column("organization_id")
+    private String organizationId;
     @Column("destinataire_id")
     private String recipientId;
     @Column("canal")

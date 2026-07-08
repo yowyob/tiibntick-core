@@ -24,6 +24,10 @@ public class NotificationPreferenceEntity {
     @Id
     @Column("utilisateur_id")
     private String userId;
+    @Column("tenant_id")
+    private String tenantId;
+    @Column("organization_id")
+    private String organizationId;
     @Column("canals_actifs_csv")
     private String activeChannelsCsv;
     @Column("langue_preferee")

@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.core.roles.application.service;
 
+import com.yowyob.tiibntick.core.roles.application.port.out.ReactivePermissionResolver;
 import com.yowyob.tiibntick.core.roles.domain.exception.TntRoleException;
 import com.yowyob.tiibntick.core.roles.domain.model.TntPermission;
 import com.yowyob.tiibntick.core.roles.domain.model.TntPermissionContext;
@@ -14,7 +15,6 @@ import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.security.core.context.SecurityContextImpl;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
-import yowyob.comops.api.kernel.application.port.out.ReactivePermissionResolver;
 
 import java.util.List;
 import java.util.Set;

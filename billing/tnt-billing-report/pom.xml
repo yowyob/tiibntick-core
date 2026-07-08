@@ -25,12 +25,6 @@
 
     <dependencies>
 
-        <!-- ── Yowyob Kernel — Common types ── -->
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-common-core</artifactId>
-        </dependency>
-
         <!-- ── TiiBnTick L0 — Event bus ── -->
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>

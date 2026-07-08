@@ -30,22 +30,6 @@
             <artifactId>tnt-billing-dsl</artifactId>
             <version>${project.version}</version>
         </dependency>
-
-        <!-- ═══════════════════════════════════════════════════
-             Yowyob Kernel
-             ═══════════════════════════════════════════════════ -->
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-common-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-kernel-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-settings-core</artifactId>
-        </dependency>
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>
             <artifactId>yow-event-kernel</artifactId>

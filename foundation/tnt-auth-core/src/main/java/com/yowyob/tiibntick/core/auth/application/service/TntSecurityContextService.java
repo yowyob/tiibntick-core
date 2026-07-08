@@ -13,7 +13,6 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.security.core.context.SecurityContext;
 import reactor.core.publisher.Mono;
-import yowyob.comops.api.kernel.config.ApiKeyAuthenticationToken;
 
 import java.util.Optional;
 import java.util.Set;
@@ -24,13 +23,15 @@ import java.util.stream.Collectors;
  * Core application service for tnt-auth-core.
  * Implements both {@link ResolveCurrentUserUseCase} and {@link ValidateTokenUseCase}.
  *
- * <p>Reads the Kernel's {@link ApiKeyAuthenticationToken} from the reactive security
- * context (populated by the Kernel's filter chain) and maps it to {@link TntSecurityContext}.
- * Optionally enriches the context with actor data via {@link IYowAuthTntAdapter} when
- * the adapter implementation is available (injected by tnt-actor-core at runtime).
+ * <p>Reads the {@code JwtAuthenticationToken} set by {@code TntSecurityConfig}'s OAuth2
+ * resource server chain (synthetic {@code ACTOR_}/{@code TENANT_}/{@code AGENCY_}/{@code ORG_}
+ * authorities plus {@code ROLE_*}/raw permission authorities from the Kernel-issued JWT) and
+ * maps it to {@link TntSecurityContext}. Optionally enriches the context with actor data via
+ * {@link IYowAuthTntAdapter} when the adapter implementation is available (injected by
+ * tnt-actor-core at runtime).
  *
  * <p>Contains NO authentication logic — all JWT validation is delegated to
- * the Kernel's {@link UserSessionTokenService}.
+ * {@link TntJwtValidator}.
  *
  * <h3>Authority splitting (v1.1 — tnt-roles-core integration)</h3>
  * <p>Uses {@link TntRole#isKnownRole(String)} to accurately split JWT authorities:
@@ -92,65 +93,9 @@ public class TntSecurityContextService implements ResolveCurrentUserUseCase, Val
     }
 
     private Mono<TntSecurityContext> buildContext(Authentication authentication) {
-        if (authentication instanceof ApiKeyAuthenticationToken token) {
-            return buildContextFromApiKeyToken(token);
-        }
-        // Bearer JWT path: tntJwtAuthenticationConverter already extracted
+        // tntJwtAuthenticationConverter already extracted
         // ACTOR_<uuid>, TENANT_<uuid>, AGENCY_<uuid>, ORG_<uuid> as synthetic authorities.
         return buildContextFromAuthorities(authentication);
-    }
-
-    private Mono<TntSecurityContext> buildContextFromApiKeyToken(ApiKeyAuthenticationToken token) {
-        Set<String> allAuthorities = token.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .collect(Collectors.toUnmodifiableSet());
-
-        Set<String> roles = allAuthorities.stream()
-                .filter(a -> a.startsWith("ROLE_") || TntRole.isKnownRole(a.replace("ROLE_", "")))
-                .map(a -> a.startsWith("ROLE_") ? a : "ROLE_" + a)
-                .collect(Collectors.toUnmodifiableSet());
-
-        Set<String> permissions = allAuthorities.stream()
-                .filter(a -> !a.startsWith("ROLE_") && !TntRole.isKnownRole(a))
-                .collect(Collectors.toUnmodifiableSet());
-
-        UUID userId = token.userId();
-        UUID tenantId = token.tenantId();
-        UUID actorId = token.actorId();
-        UUID organizationId = token.organizationId();
-        UUID agencyId = token.agencyId();
-        String clientAppId = token.clientApplicationId() != null
-                ? token.clientApplicationId().toString()
-                : null;
-
-        TntSecurityContext.Builder base = TntSecurityContext.builder()
-                .userId(userId)
-                .tenantId(tenantId)
-                .actorId(actorId)
-                .organizationId(organizationId)
-                .agencyId(agencyId)
-                .roles(roles)
-                .permissions(permissions)
-                .authenticated(true)
-                .clientApplicationId(clientAppId);
-
-        if (actorId == null && userId != null && tenantId != null) {
-            return yowAuthTntAdapter.resolveActorId(userId, tenantId)
-                    .flatMap(optActorId -> {
-                        UUID resolvedActorId = optActorId.orElse(null);
-                        if (resolvedActorId == null) {
-                            return Mono.just(base.build());
-                        }
-                        return enrichWithActorData(base, resolvedActorId, tenantId, agencyId);
-                    })
-                    .onErrorResume(e -> Mono.just(base.build()));
-        }
-
-        if (actorId != null && tenantId != null) {
-            return enrichWithActorData(base, actorId, tenantId, agencyId);
-        }
-
-        return Mono.just(base.build());
     }
 
     /**

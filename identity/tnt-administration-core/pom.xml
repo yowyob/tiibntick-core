@@ -18,23 +18,29 @@
     <name>TiiBnTick — tnt-administration-core</name>
     <description>
         Administration and governance module for TiiBnTick.
-        Extends RT-comops-administration-core + RT-comops-roles-core with TiiBnTick-specific:
-        - Extended permission catalog (delivery, blockchain, dispute, freelancer, point-relais)
-        - TiiBnTick platform options (blockchain, freelancer mode, dispute resolution)
-        - Role templates for all TiiBnTick actor types
-        - TntRoleDefinition: persisted link between TNT templates and Kernel roles (kernelRoleId)
-        - TntPermissionEntry: kernelPermissionId reference to Kernel permission catalog
-        - KernelBridge ports + adapters for role/permission lookup via HTTP
+        Extended permission catalog (delivery, blockchain, dispute, freelancer, point-relais),
+        TiiBnTick platform options (blockchain, freelancer mode, dispute resolution),
+        role templates for all TiiBnTick actor types, TntRoleDefinition (persisted link
+        between TNT templates and Kernel roles via kernelRoleId), TntPermissionEntry
+        (kernelPermissionId reference to Kernel permission catalog), KernelBridge ports +
+        adapters for role/permission lookup via HTTP, and the platform → Core agency
+        onboarding orchestration gateway (kernel-identity/provision/approve — see
+        CORE_KERNEL_GATEWAY_SPEC.md Bloc C).
         Layer L2 — Identity. Author: MANFOUO Braun.
     </description>
 
     <dependencies>
 
-        <!-- ── TiiBnTick Common Core — provides RT-comops-common-core and ── -->
-        <!-- ── RT-comops-kernel-core by Maven transitivity                 ── -->
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>
             <artifactId>tnt-common-core</artifactId>
+        </dependency>
+
+        <!-- ── tnt-organization-core: ManageAgencyUseCase — Agency TNT creation step ── -->
+        <!-- ── of the agency onboarding orchestration (Bloc C).                       ── -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-organization-core</artifactId>
         </dependency>
 
         <!-- ── tnt-auth-core: security bridge — @CurrentUser in controllers ── -->
@@ -54,21 +60,6 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-aop</artifactId>
-        </dependency>
-
-        <!-- ── Kernel Yowyob — Administration (roles, permissions, governance) ── -->
-        <!-- ── groupId MUST be yowyob.comops.api (not yowyob.comops)           ── -->
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-administration-core</artifactId>
-            <version>${yow-comops.version}</version>
-        </dependency>
-
-        <!-- ── Kernel Yowyob — Roles and Permissions (used via UUID integration key) ── -->
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-roles-core</artifactId>
-            <version>${yow-comops.version}</version>
         </dependency>
 
         <!-- ── Spring WebFlux (WebClient for KernelBridge + REST controllers) ── -->

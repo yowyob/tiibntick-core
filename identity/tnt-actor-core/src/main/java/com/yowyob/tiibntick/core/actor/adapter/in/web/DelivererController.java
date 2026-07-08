@@ -35,9 +35,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import com.yowyob.tiibntick.common.api.ApiResponse;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import yowyob.comops.api.common.domain.model.ApiResponse;
 
 import java.util.UUID;
 
@@ -102,7 +102,7 @@ public class DelivererController {
                         req.contractId())))
                 .map(DelivererProfileResponse::from)
                 .map(r -> ResponseEntity.status(HttpStatus.CREATED)
-                        .body(ApiResponse.success(r, "Deliverer profile created.")));
+                        .body(ApiResponse.success(r)));
     }
 
     @GetMapping("/me")
@@ -112,7 +112,7 @@ public class DelivererController {
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
         return findUseCase.findByActorId(currentUser.tenantId(), currentUser.userId())
                 .map(DelivererProfileResponse::from)
-                .map(r -> ResponseEntity.ok(ApiResponse.success(r, "Deliverer profile retrieved.")));
+                .map(r -> ResponseEntity.ok(ApiResponse.success(r)));
     }
 
     @GetMapping("/agency/{agencyId}")
@@ -177,7 +177,7 @@ public class DelivererController {
         return assignMissionUseCase.assignMission(
                 new AssignMissionCommand(currentUser.tenantId(), actorId, missionId))
                 .map(DelivererProfileResponse::from)
-                .map(r -> ResponseEntity.ok(ApiResponse.success(r, "Mission assigned.")));
+                .map(r -> ResponseEntity.ok(ApiResponse.success(r)));
     }
 
     @PostMapping("/{actorId}/missions/{missionId}/release")
@@ -190,7 +190,7 @@ public class DelivererController {
         return releaseMissionUseCase.releaseMission(
                 new ReleaseMissionCommand(currentUser.tenantId(), actorId, missionId))
                 .map(DelivererProfileResponse::from)
-                .map(r -> ResponseEntity.ok(ApiResponse.success(r, "Mission released.")));
+                .map(r -> ResponseEntity.ok(ApiResponse.success(r)));
     }
 
     @PostMapping("/{actorId}/rate")

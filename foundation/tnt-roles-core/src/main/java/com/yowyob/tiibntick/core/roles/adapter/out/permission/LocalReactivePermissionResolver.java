@@ -1,15 +1,15 @@
 package com.yowyob.tiibntick.core.roles.adapter.out.permission;
 
+import com.yowyob.tiibntick.core.roles.application.port.out.ReactivePermissionResolver;
+import com.yowyob.tiibntick.core.roles.application.port.out.RoleRepository;
+import com.yowyob.tiibntick.core.roles.application.port.out.UserRoleAssignmentRepository;
 import com.yowyob.tiibntick.core.roles.application.service.TntRoleDefinitionRegistry;
+import com.yowyob.tiibntick.core.roles.domain.model.Role;
+import com.yowyob.tiibntick.core.roles.domain.model.UserRoleAssignment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import yowyob.comops.api.kernel.application.port.out.ReactivePermissionResolver;
-import yowyob.comops.api.roles.application.port.out.RoleRepository;
-import yowyob.comops.api.roles.application.port.out.UserRoleAssignmentRepository;
-import yowyob.comops.api.roles.domain.model.Role;
-import yowyob.comops.api.roles.domain.model.UserRoleAssignment;
 
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -18,8 +18,8 @@ import java.util.UUID;
 /**
  * Resolves a user's effective permissions entirely from local data — no Kernel HTTP call.
  *
- * <p>Algorithm (mirrors the Kernel's own {@code RolesPermissionResolver} shape, so swapping
- * to {@link RemoteReactivePermissionResolver} later changes nothing for callers):
+ * <p>Algorithm (swapping to {@link RemoteReactivePermissionResolver} later changes
+ * nothing for callers):
  * <ol>
  *   <li>Look up the user's role assignments via {@link UserRoleAssignmentRepository}.</li>
  *   <li>For each assignment, resolve the {@link Role} via {@link RoleRepository} and take its

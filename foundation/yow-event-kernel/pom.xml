@@ -34,16 +34,6 @@
 
     <dependencies>
 
-        <!-- Kernel RT-comops — types communs (TenantId, Money, BaseEntity) -->
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-common-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-kernel-core</artifactId>
-        </dependency>
-
         <!-- Spring autoconfiguration (module non-runnable) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

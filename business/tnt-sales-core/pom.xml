@@ -37,16 +37,6 @@
             <artifactId>tnt-common-core</artifactId>
         </dependency>
 
-        <!-- ══ Kernel Yowyob — Sales domain ═════════════════════════════════
-             RT-comops-sales-core provides the Kernel SalesOrder base concept.
-             tnt-sales-core does NOT extend Kernel classes — it references them
-             via kernelSalesOrderId (nullable UUID) and KernelSalesOrderPort.
-        ══════════════════════════════════════════════════════════════════════ -->
-        <dependency>
-            <groupId>yowyob.comops.api</groupId>
-            <artifactId>RT-comops-sales-core</artifactId>
-        </dependency>
-
         <!-- ══ TiiBnTick L0 — Event bus ═════════════════════════════════════ -->
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>
