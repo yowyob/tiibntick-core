@@ -40,9 +40,19 @@ services:
       JWT_JWK_SET_URI: "https://kernel-core.yowyob.com/.well-known/jwks.json"
       JWT_AUTO_GENERATE_KEY_PAIR: "true"
       QR_HMAC_SECRET: "${TNT_CORE_QR_HMAC_SECRET:?TNT_CORE_QR_HMAC_SECRET requis dans .env}"
-      # ── Relais vers kernel-core (client tibntick-backend, clé bakée dans l'app) ──
+      # ── Relais vers kernel-core (client dédié, cf. .env.prod.example) ──
       TNT_KERNEL_BASE_URL: "https://kernel-core.yowyob.com"
+      TNT_KERNEL_CLIENT_ID: "tibntick-backend"
+      TNT_KERNEL_API_KEY: "${TNT_KERNEL_API_KEY:?TNT_KERNEL_API_KEY requis dans .env}"
       TNT_SYSTEM_TENANT_ID: "00000000-0000-0000-0000-000000000001"
+      # ── Variables applicatives reprises de tnt-bootstrap/.env.prod.example ──
+      # (les endpoints d'infra restent nos sidecars ; on n'active PAS le profil prod
+      #  car il désactive Swagger et exige Postgres TLS + clé JWT montée, non dispo ici.)
+      TNT_AUTH_SERVICE_CODE: "TNT_AGENCY"
+      JWT_KEY_ID: "tnt-core-key-prod"
+      DB_POOL_INITIAL_SIZE: "2"
+      DB_POOL_MAX_SIZE: "10"
+      DB_POOL_MAX_IDLE_MINUTES: "30"
     healthcheck:
       test: ["CMD-SHELL", "curl -s -o /dev/null http://localhost:8080/actuator/health || exit 1"]
       interval: 20s
