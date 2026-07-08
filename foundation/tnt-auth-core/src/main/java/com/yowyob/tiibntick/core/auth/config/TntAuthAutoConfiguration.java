@@ -57,7 +57,7 @@ public class TntAuthAutoConfiguration {
     @Bean("tntAuthObjectMapper")
     @ConditionalOnMissingBean(name = "tntAuthObjectMapper")
     public ObjectMapper tntAuthObjectMapper() {
-        return new ObjectMapper();
+        return new ObjectMapper().findAndRegisterModules();
     }
 
     @Bean

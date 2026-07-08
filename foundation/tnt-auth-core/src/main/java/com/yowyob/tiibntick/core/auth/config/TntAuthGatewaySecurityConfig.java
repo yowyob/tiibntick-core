@@ -53,11 +53,18 @@ public class TntAuthGatewaySecurityConfig {
         return new PlatformClientRegistry(properties);
     }
 
-    @Bean
-    @ConditionalOnMissingBean(PlatformApiKeyWebFilter.class)
-    public PlatformApiKeyWebFilter platformApiKeyWebFilter(
+    // NOTE: intentionally NOT a @Bean. Spring Boot's WebFlux auto-configuration
+    // registers every ApplicationContext bean assignable to `WebFilter` as a GLOBAL
+    // filter applied to every request, regardless of the declared factory-method
+    // return type. A previous version of this class exposed this as a `@Bean`
+    // purely so it could be `.addFilterBefore()`'d into the chain below — but that
+    // also made it run on every path handled by the whole app (swagger-ui,
+    // actuator, ...), rejecting them with 401 for missing X-Client-Id/X-Api-Key.
+    // Keeping it a plain object built inside the chain method scopes it to this
+    // chain's own securityMatcher only.
+    private PlatformApiKeyWebFilter platformApiKeyWebFilter(
             PlatformClientRegistry registry,
-            @Qualifier("tntAuthObjectMapper") ObjectMapper objectMapper) {
+            ObjectMapper objectMapper) {
         return new PlatformApiKeyWebFilter(registry, objectMapper);
     }
 
@@ -65,7 +72,8 @@ public class TntAuthGatewaySecurityConfig {
     @Order(10)
     public SecurityWebFilterChain platformGatewaySecurityWebFilterChain(
             ServerHttpSecurity http,
-            PlatformApiKeyWebFilter platformApiKeyWebFilter,
+            PlatformClientRegistry platformClientRegistry,
+            @Qualifier("tntAuthObjectMapper") ObjectMapper objectMapper,
             CorsConfigurationSource corsConfigurationSource) {
         return http
                 .securityMatcher(ServerWebExchangeMatchers.pathMatchers(
@@ -74,7 +82,8 @@ public class TntAuthGatewaySecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .securityContextRepository(NoOpServerSecurityContextRepository.getInstance())
                 .authorizeExchange(ex -> ex.anyExchange().permitAll())
-                .addFilterBefore(platformApiKeyWebFilter, SecurityWebFiltersOrder.AUTHENTICATION)
+                .addFilterBefore(platformApiKeyWebFilter(platformClientRegistry, objectMapper),
+                        SecurityWebFiltersOrder.AUTHENTICATION)
                 .build();
     }
 }
