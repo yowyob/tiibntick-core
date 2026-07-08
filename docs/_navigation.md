@@ -47,7 +47,8 @@ docs/
 │   ├── authentication.md   ← JWT → TntSecurityContext
 │   ├── authorization.md     ← @RequirePermission / TntPermissionAspect mechanics
 │   ├── permissions.md       ← ReactivePermissionResolver LOCAL/REMOTE/HYBRID architecture
-│   └── roles.md              ← the 9 TntRole values
+│   ├── roles.md              ← the 9 TntRole values
+│   └── platform-gateway-credentials.md ← issuing/rotating X-Client-Id/X-Api-Key per platform
 │
 ├── development/
 │   ├── conventions.md       ← naming, Kernel boundary, multi-tenancy pattern choice

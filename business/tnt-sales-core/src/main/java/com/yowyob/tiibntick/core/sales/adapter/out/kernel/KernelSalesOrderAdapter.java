@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.core.sales.adapter.out.kernel;
 
+import com.yowyob.tiibntick.common.kernel.KernelResponses;
 import com.yowyob.tiibntick.core.sales.application.port.out.KernelSalesOrderPort;
 import com.yowyob.tiibntick.core.sales.domain.model.KernelSalesOrderDto;
 import org.slf4j.Logger;
@@ -7,9 +8,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -49,52 +50,44 @@ public class KernelSalesOrderAdapter implements KernelSalesOrderPort {
     /**
      * {@inheritDoc}
      *
-     * <p>GET /sales/orders/{kernelSalesOrderId}</p>
+     * <p>GET /api/sales/orders/{kernelSalesOrderId}. Unused today (no caller) but kept —
+     * unlike {@code tnt-inventory-core}'s equivalent (see ADR-011), this one has a real
+     * backing Kernel resource.</p>
      */
     @Override
     public Mono<KernelSalesOrderDto> findByKernelSalesOrderId(UUID kernelSalesOrderId) {
-        return kernelWebClient.get()
-                .uri("/sales/orders/{id}", kernelSalesOrderId)
-                .retrieve()
-                .bodyToMono(KernelSalesOrderDto.class)
-                .onErrorResume(WebClientResponseException.NotFound.class, ex -> {
-                    log.debug("Kernel sales order not found: {}", kernelSalesOrderId);
-                    return Mono.empty();
-                })
-                .onErrorResume(Exception.class, ex -> {
-                    log.warn("Kernel sales bridge error for orderId={}: {}",
-                            kernelSalesOrderId, ex.getMessage());
-                    return Mono.empty();
-                });
+        var responseSpec = kernelWebClient.get()
+                .uri("/api/sales/orders/{id}", kernelSalesOrderId)
+                .retrieve();
+        return KernelResponses.unwrapObject(responseSpec, KernelSalesOrderDto.class, log,
+                "findByKernelSalesOrderId " + kernelSalesOrderId);
     }
 
     /**
      * {@inheritDoc}
      *
-     * <p>GET /sales/orders?tenantId=...&clientThirdPartyId=...&organizationId=...&latest=true</p>
+     * <p>GET /api/sales/orders?organizationId=... — the only filter the Kernel actually
+     * supports (see {@code sales-order-controller} in docs/kernel-api/endpoints.md; there is
+     * no {@code clientThirdPartyId}/{@code tenantId}/{@code latest} query support). Filters
+     * client-side for the requested client + tenant. "Latest" can't be honored precisely —
+     * the Kernel's {@code SalesOrderResponse} carries no timestamp — so this takes the last
+     * matching entry in Kernel's returned order as a best-effort approximation.</p>
      */
     @Override
     public Mono<KernelSalesOrderDto> findByClientAndOrganization(UUID tenantId,
                                                                    UUID clientThirdPartyId,
                                                                    UUID organizationId) {
-        return kernelWebClient.get()
+        var responseSpec = kernelWebClient.get()
                 .uri(uriBuilder -> uriBuilder
-                        .path("/sales/orders")
-                        .queryParam("tenantId", tenantId)
-                        .queryParam("clientThirdPartyId", clientThirdPartyId)
+                        .path("/api/sales/orders")
                         .queryParam("organizationId", organizationId)
-                        .queryParam("latest", true)
                         .build())
-                .retrieve()
-                .bodyToMono(KernelSalesOrderDto.class)
-                .onErrorResume(WebClientResponseException.NotFound.class, ex -> {
-                    log.debug("No Kernel sales order for client={} org={}", clientThirdPartyId, organizationId);
-                    return Mono.empty();
-                })
-                .onErrorResume(Exception.class, ex -> {
-                    log.warn("Kernel sales bridge error for client={} org={}: {}",
-                            clientThirdPartyId, organizationId, ex.getMessage());
-                    return Mono.empty();
-                });
+                .retrieve();
+        return KernelResponses.unwrapList(responseSpec, KernelSalesOrderDto.class, log,
+                        "findByClientAndOrganization client=" + clientThirdPartyId + " org=" + organizationId)
+                .filter(dto -> Objects.equals(dto.tenantId(), tenantId)
+                        && Objects.equals(dto.clientThirdPartyId(), clientThirdPartyId))
+                .takeLast(1)
+                .next();
     }
 }

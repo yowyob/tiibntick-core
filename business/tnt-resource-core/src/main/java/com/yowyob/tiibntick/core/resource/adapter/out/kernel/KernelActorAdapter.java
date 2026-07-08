@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.core.resource.adapter.out.kernel;
 
+import com.yowyob.tiibntick.common.kernel.KernelResponses;
 import com.yowyob.tiibntick.core.resource.application.port.out.KernelActorPort;
 import com.yowyob.tiibntick.core.resource.domain.model.KernelActorDto;
 import org.slf4j.Logger;
@@ -7,7 +8,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
@@ -46,25 +46,23 @@ public class KernelActorAdapter implements KernelActorPort {
     /**
      * {@inheritDoc}
      *
-     * <p>GET /actors/{actorId}?tenantId={tenantId}</p>
+     * <p>GET /api/actors/{actorId}?tenantId={tenantId}. Note: as of the 2026-07-08 Kernel
+     * OpenAPI spec, {@code actor-controller} does not document a single-actor-by-id GET
+     * endpoint (only {@code POST /api/actors}, {@code GET/PUT /api/actors/me},
+     * {@code PUT /api/actors/{actorId}}) — this call may 404 until the Kernel adds one.
+     * The fail-open design below means that gap degrades to "treat as not found" rather
+     * than breaking vehicle/equipment assignment. See {@code docs/knowledge/known-issues.md}.</p>
      */
     @Override
     public Mono<KernelActorDto> findActorById(UUID actorId, UUID tenantId) {
-        return kernelWebClient.get()
+        var responseSpec = kernelWebClient.get()
                 .uri(uriBuilder -> uriBuilder
-                        .path("/actors/{id}")
+                        .path("/api/actors/{id}")
                         .queryParam("tenantId", tenantId)
                         .build(actorId))
-                .retrieve()
-                .bodyToMono(KernelActorDto.class)
-                .onErrorResume(WebClientResponseException.NotFound.class, ex -> {
-                    log.debug("Kernel actor not found: actorId={} tenant={}", actorId, tenantId);
-                    return Mono.empty();
-                })
-                .onErrorResume(Exception.class, ex -> {
-                    log.warn("Kernel actor bridge error for actorId={}: {}", actorId, ex.getMessage());
-                    return Mono.empty();
-                });
+                .retrieve();
+        return KernelResponses.unwrapObject(responseSpec, KernelActorDto.class, log,
+                "findActorById actorId=" + actorId + " tenant=" + tenantId);
     }
 
     /**

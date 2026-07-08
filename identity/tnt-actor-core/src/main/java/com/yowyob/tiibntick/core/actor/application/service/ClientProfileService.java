@@ -3,7 +3,10 @@ package com.yowyob.tiibntick.core.actor.application.service;
 import com.yowyob.tiibntick.core.actor.application.command.CreateClientProfileCommand;
 import com.yowyob.tiibntick.core.actor.application.port.in.ICreateClientProfileUseCase;
 import com.yowyob.tiibntick.core.actor.application.port.out.IClientProfileRepository;
+import com.yowyob.tiibntick.core.actor.application.port.out.IKernelActorPort;
 import com.yowyob.tiibntick.core.actor.domain.model.ClientProfile;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
@@ -13,10 +16,15 @@ import java.util.UUID;
 @Service
 public class ClientProfileService implements ICreateClientProfileUseCase {
 
-    private final IClientProfileRepository clientProfileRepository;
+    private static final Logger log = LoggerFactory.getLogger(ClientProfileService.class);
 
-    public ClientProfileService(IClientProfileRepository clientProfileRepository) {
+    private final IClientProfileRepository clientProfileRepository;
+    private final IKernelActorPort kernelActorPort;
+
+    public ClientProfileService(IClientProfileRepository clientProfileRepository,
+                                 IKernelActorPort kernelActorPort) {
         this.clientProfileRepository = clientProfileRepository;
+        this.kernelActorPort = kernelActorPort;
     }
 
     @Override
@@ -27,8 +35,17 @@ public class ClientProfileService implements ICreateClientProfileUseCase {
                     if (exists) {
                         return clientProfileRepository.findByActorId(command.tenantId(), command.actorId());
                     }
-                    ClientProfile profile = ClientProfile.create(command.tenantId(), command.actorId());
-                    return clientProfileRepository.save(profile);
+                    return kernelActorPort.exists(command.actorId())
+                            .doOnNext(found -> {
+                                if (!found) {
+                                    log.warn("Kernel actor {} not found or unreachable — " +
+                                            "creating client profile without Kernel validation", command.actorId());
+                                }
+                            })
+                            .then(Mono.defer(() -> {
+                                ClientProfile profile = ClientProfile.create(command.tenantId(), command.actorId());
+                                return clientProfileRepository.save(profile);
+                            }));
                 });
     }
 

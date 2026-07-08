@@ -1,12 +1,12 @@
 package com.yowyob.tiibntick.core.product.adapter.out.kernel;
 
+import com.yowyob.tiibntick.common.kernel.KernelResponses;
 import com.yowyob.tiibntick.core.product.application.port.out.KernelProductPort;
 import com.yowyob.tiibntick.core.product.domain.model.KernelProductDto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
@@ -27,8 +27,8 @@ public class KernelProductAdapter implements KernelProductPort {
 
     private static final Logger log = LoggerFactory.getLogger(KernelProductAdapter.class);
 
-    /** Base path for the Kernel product catalog endpoint. */
-    private static final String PRODUCTS_BASE_PATH = "/products";
+    /** Base path for the Kernel product catalog endpoint (see {@code product-controller} in docs/kernel-api/endpoints.md). */
+    private static final String PRODUCTS_BASE_PATH = "/api/products";
 
     private final WebClient kernelWebClient;
 
@@ -38,18 +38,11 @@ public class KernelProductAdapter implements KernelProductPort {
 
     @Override
     public Mono<KernelProductDto> findByCatalogProductId(UUID catalogProductId) {
-        return kernelWebClient.get()
+        var responseSpec = kernelWebClient.get()
                 .uri(PRODUCTS_BASE_PATH + "/{productId}", catalogProductId)
-                .retrieve()
-                .bodyToMono(KernelProductDto.class)
-                .onErrorResume(WebClientResponseException.NotFound.class, e -> {
-                    log.debug("Kernel product not found: {}", catalogProductId);
-                    return Mono.empty();
-                })
-                .onErrorResume(Exception.class, e -> {
-                    log.warn("Failed to fetch Kernel product {}: {}", catalogProductId, e.getMessage());
-                    return Mono.empty();
-                });
+                .retrieve();
+        return KernelResponses.unwrapObject(responseSpec, KernelProductDto.class, log,
+                "findByCatalogProductId " + catalogProductId);
     }
 
     @Override

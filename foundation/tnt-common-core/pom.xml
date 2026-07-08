@@ -52,6 +52,24 @@
         </dependency>
 
         <!-- ══════════════════════════════════════════════════════════════
+             SPRING WEBFLUX — WebClient, used by KernelResponses to centralize
+             unwrapping of the Kernel's {success,data,message,errorCode,timestamp}
+             envelope for every Kernel*Adapter in the codebase (see ADR-012).
+             ══════════════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-webflux</artifactId>
+        </dependency>
+
+        <!-- ══════════════════════════════════════════════════════════════
+             JACKSON ANNOTATIONS — @JsonIgnoreProperties on KernelEnvelope.
+             ══════════════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+        </dependency>
+
+        <!-- ══════════════════════════════════════════════════════════════
              SLF4J — logging facade used directly via Lombok's @Slf4j.
              ══════════════════════════════════════════════════════════════ -->
         <dependency>

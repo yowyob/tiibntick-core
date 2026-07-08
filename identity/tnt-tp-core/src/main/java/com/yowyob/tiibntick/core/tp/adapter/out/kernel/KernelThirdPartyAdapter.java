@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.core.tp.adapter.out.kernel;
 
+import com.yowyob.tiibntick.common.kernel.KernelResponses;
 import com.yowyob.tiibntick.core.tp.application.port.out.KernelThirdPartyPort;
 import com.yowyob.tiibntick.core.tp.domain.model.KernelThirdPartyDto;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -52,10 +53,10 @@ public class KernelThirdPartyAdapter implements KernelThirdPartyPort {
      */
     @Override
     public Mono<KernelThirdPartyDto> findById(UUID thirdPartyId) {
-        return kernelTpWebClient.get()
+        var responseSpec = kernelTpWebClient.get()
                 .uri(FIND_BY_ID_PATH, thirdPartyId)
-                .retrieve()
-                .bodyToMono(KernelThirdPartyDto.class)
+                .retrieve();
+        return KernelResponses.unwrapObjectOrPropagate(responseSpec, KernelThirdPartyDto.class)
                 .onErrorResume(WebClientResponseException.NotFound.class, ex -> Mono.empty())
                 .onErrorResume(WebClientResponseException.Unauthorized.class, ex ->
                     // Kernel returned 401 — JWT propagation may have failed; assume valid for non-blocking flow

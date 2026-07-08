@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.core.roles.adapter.out.kernel;
 
+import com.yowyob.tiibntick.common.kernel.KernelResponses;
 import com.yowyob.tiibntick.core.roles.application.port.out.ITntRoleProvisioningPort;
 import com.yowyob.tiibntick.core.roles.domain.exception.TntRoleException;
 import com.yowyob.tiibntick.core.roles.domain.model.TntRoleDefinition;
@@ -8,7 +9,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
-import org.springframework.core.ParameterizedTypeReference;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -69,13 +69,12 @@ public class KernelRoleProvisioningAdapter implements ITntRoleProvisioningPort {
     public Mono<Boolean> roleExists(UUID tenantId, String roleCode) {
         // The Kernel does not expose a /roles/exists?code= endpoint.
         // Instead, fetch the full role list and test whether the code is present.
-        return kernelWebClient
+        var responseSpec = kernelWebClient
                 .get()
                 .uri("/api/roles")
                 .header("X-Tenant-Id", tenantId.toString())
-                .retrieve()
-                .bodyToMono(new ParameterizedTypeReference<List<KernelRoleResponse>>() {})
-                .flatMapMany(Flux::fromIterable)
+                .retrieve();
+        return KernelResponses.unwrapList(responseSpec, KernelRoleResponse.class, log, "roleExists " + roleCode)
                 .any(r -> roleCode.equals(r.code()))
                 .onErrorResume(WebClientResponseException.class, e -> {
                     log.warn("Could not check role existence for '{}': HTTP {} — assuming not found",

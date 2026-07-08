@@ -1,17 +1,15 @@
 package com.yowyob.tiibntick.core.administration.adapter.out.kernel;
 
+import com.yowyob.tiibntick.common.kernel.KernelResponses;
 import com.yowyob.tiibntick.core.administration.application.port.out.KernelRolePort;
 import com.yowyob.tiibntick.core.administration.domain.model.KernelRoleDto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.List;
 import java.util.UUID;
 
 /**
@@ -42,18 +40,11 @@ public class KernelRoleAdapter implements KernelRolePort {
 
     @Override
     public Mono<KernelRoleDto> findByRoleId(UUID kernelRoleId) {
-        return kernelWebClient.get()
+        var responseSpec = kernelWebClient.get()
                 .uri(ROLES_BASE_PATH + "/{roleId}", kernelRoleId)
-                .retrieve()
-                .bodyToMono(KernelRoleDto.class)
-                .onErrorResume(WebClientResponseException.NotFound.class, e -> {
-                    log.debug("Kernel role not found: {}", kernelRoleId);
-                    return Mono.empty();
-                })
-                .onErrorResume(Exception.class, e -> {
-                    log.warn("Failed to fetch Kernel role {}: {}", kernelRoleId, e.getMessage());
-                    return Mono.empty();
-                });
+                .retrieve();
+        return KernelResponses.unwrapObject(responseSpec, KernelRoleDto.class, log,
+                "findByRoleId " + kernelRoleId);
     }
 
     @Override
@@ -83,15 +74,11 @@ public class KernelRoleAdapter implements KernelRolePort {
     @Override
     public Flux<KernelRoleDto> findAllByTenant(UUID tenantId) {
         // GET /api/roles — tenant is identified by the X-Tenant-Id header.
-        return kernelWebClient.get()
+        var responseSpec = kernelWebClient.get()
                 .uri(ROLES_BASE_PATH)
                 .header("X-Tenant-Id", tenantId.toString())
-                .retrieve()
-                .bodyToMono(new ParameterizedTypeReference<List<KernelRoleDto>>() {})
-                .flatMapMany(Flux::fromIterable)
-                .onErrorResume(Exception.class, e -> {
-                    log.warn("Failed to list Kernel roles for tenant {}: {}", tenantId, e.getMessage());
-                    return Flux.empty();
-                });
+                .retrieve();
+        return KernelResponses.unwrapList(responseSpec, KernelRoleDto.class, log,
+                "findAllByTenant " + tenantId);
     }
 }

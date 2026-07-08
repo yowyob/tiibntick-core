@@ -1,16 +1,15 @@
 package com.yowyob.tiibntick.core.administration.adapter.out.kernel;
 
+import com.yowyob.tiibntick.common.kernel.KernelResponses;
 import com.yowyob.tiibntick.core.administration.application.port.out.KernelPermissionPort;
 import com.yowyob.tiibntick.core.administration.domain.model.KernelPermissionDto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.List;
 import java.util.UUID;
 
 /**
@@ -78,14 +77,9 @@ public class KernelPermissionAdapter implements KernelPermissionPort {
 
     @Override
     public Flux<KernelPermissionDto> listAll() {
-        return kernelWebClient.get()
+        var responseSpec = kernelWebClient.get()
                 .uri(PERMISSIONS_BASE_PATH)
-                .retrieve()
-                .bodyToMono(new ParameterizedTypeReference<List<KernelPermissionDto>>() {})
-                .flatMapMany(Flux::fromIterable)
-                .onErrorResume(Exception.class, e -> {
-                    log.warn("Failed to list Kernel permissions: {}", e.getMessage());
-                    return Flux.empty();
-                });
+                .retrieve();
+        return KernelResponses.unwrapList(responseSpec, KernelPermissionDto.class, log, "listAll permissions");
     }
 }

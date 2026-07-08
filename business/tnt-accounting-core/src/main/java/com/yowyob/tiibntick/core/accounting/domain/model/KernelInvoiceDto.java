@@ -1,5 +1,8 @@
 package com.yowyob.tiibntick.core.accounting.domain.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -12,6 +15,11 @@ import java.util.UUID;
  * for enrichment and optional cross-referencing when a TiiBnTick journal entry
  * is generated from a billing event that has a corresponding Kernel invoice.</p>
  *
+ * <p>Field names below are aliased with {@link JsonProperty} to the Kernel's real
+ * {@code InvoiceResponse} JSON keys ({@code id}, {@code customerThirdPartyId}) — see
+ * {@code docs/kernel-api/schemas.md}. {@code issuedAt} has no Kernel-side equivalent
+ * ({@code InvoiceResponse} carries no date field) — always {@code null}.</p>
+ *
  * @param kernelInvoiceId   UUID of the invoice in the Kernel database
  * @param tenantId          tenant owning this invoice in the Kernel
  * @param organizationId    Kernel organization UUID
@@ -20,15 +28,16 @@ import java.util.UUID;
  * @param totalAmount       gross invoice amount
  * @param currency          ISO 4217 currency code (e.g. XAF)
  * @param status            invoice status as text (DRAFT, SENT, PAID, CANCELLED)
- * @param issuedAt          invoice emission date
+ * @param issuedAt          no Kernel equivalent — always {@code null}
  *
  * @author MANFOUO Braun
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record KernelInvoiceDto(
-        UUID kernelInvoiceId,
+        @JsonProperty("id") UUID kernelInvoiceId,
         UUID tenantId,
         UUID organizationId,
-        UUID clientThirdPartyId,
+        @JsonProperty("customerThirdPartyId") UUID clientThirdPartyId,
         String invoiceNumber,
         BigDecimal totalAmount,
         String currency,

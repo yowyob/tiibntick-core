@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.core.organization.infrastructure.adapter.out.kernel;
 
+import com.yowyob.tiibntick.common.kernel.KernelResponses;
 import com.yowyob.tiibntick.core.organization.application.port.out.KernelOrganizationPort;
 import com.yowyob.tiibntick.core.organization.domain.model.KernelOrganizationDto;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -30,7 +31,7 @@ import java.util.UUID;
 public class KernelOrganizationAdapter implements KernelOrganizationPort {
 
     /** Path template for Kernel Organization lookup by UUID. */
-    private static final String FIND_BY_ID_PATH = "/api/v1/organizations/{organizationId}";
+    private static final String FIND_BY_ID_PATH = "/api/organizations/{organizationId}";
 
     /** WebClient configured with the Kernel API base URL and authentication headers. */
     private final WebClient kernelWebClient;
@@ -47,15 +48,15 @@ public class KernelOrganizationAdapter implements KernelOrganizationPort {
     /**
      * {@inheritDoc}
      *
-     * <p>Calls {@code GET /api/v1/organizations/{organizationId}} on the Kernel API.
+     * <p>Calls {@code GET /api/organizations/{organizationId}} on the Kernel API.
      * Returns an empty {@link Mono} on HTTP 404.
      */
     @Override
     public Mono<KernelOrganizationDto> findById(UUID organizationId) {
-        return kernelWebClient.get()
+        var responseSpec = kernelWebClient.get()
                 .uri(FIND_BY_ID_PATH, organizationId)
-                .retrieve()
-                .bodyToMono(KernelOrganizationDto.class)
+                .retrieve();
+        return KernelResponses.unwrapObjectOrPropagate(responseSpec, KernelOrganizationDto.class)
                 .onErrorResume(WebClientResponseException.class,
                         ex -> ex.getStatusCode().is4xxClientError() ? Mono.empty() : Mono.error(ex));
     }

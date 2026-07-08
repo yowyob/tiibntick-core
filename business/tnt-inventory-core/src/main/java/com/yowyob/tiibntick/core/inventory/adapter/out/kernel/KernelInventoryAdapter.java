@@ -36,13 +36,6 @@ public class KernelInventoryAdapter implements KernelInventoryPort {
 
     private static final Logger log = LoggerFactory.getLogger(KernelInventoryAdapter.class);
 
-    /** Path template to fetch a stock entry by its Kernel UUID. */
-    private static final String STOCK_ENTRY_BY_ID_PATH = "/inventory/stock-entries/{id}";
-
-    /** Path template to query a stock entry by product + warehouse + tenant. */
-    //private static final String STOCK_ENTRY_BY_PRODUCT_PATH =
-    //        "/inventory/stock-entries?productId={productId}&warehouseId={warehouseId}&tenantId={tenantId}";
-
     private final WebClient kernelWebClient;
 
     /**
@@ -56,29 +49,17 @@ public class KernelInventoryAdapter implements KernelInventoryPort {
     /**
      * {@inheritDoc}
      *
-     * <p>GET /inventory/stock-entries/{kernelStockEntryId}</p>
-     */
-    @Override
-    public Mono<KernelStockEntryDto> findByKernelStockEntryId(UUID kernelStockEntryId) {
-        return kernelWebClient.get()
-                .uri(STOCK_ENTRY_BY_ID_PATH, kernelStockEntryId)
-                .retrieve()
-                .bodyToMono(KernelStockEntryDto.class)
-                .onErrorResume(WebClientResponseException.NotFound.class, ex -> {
-                    log.debug("Kernel stock entry not found: {}", kernelStockEntryId);
-                    return Mono.empty();
-                })
-                .onErrorResume(Exception.class, ex -> {
-                    log.warn("Kernel inventory bridge error for stockEntryId={}: {}",
-                            kernelStockEntryId, ex.getMessage());
-                    return Mono.empty();
-                });
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * <p>GET /inventory/stock-entries?productId=...&warehouseId=...&tenantId=...</p>
+     * <p><b>Known gap</b> (see {@code docs/architecture/decisions.md} ADR-011 and
+     * {@code docs/knowledge/known-issues.md} #11): the Kernel's inventory API has no
+     * "stock entry by id" resource at all — stock is a live balance computed from a
+     * movement ledger (see {@code inventory-movement-controller}), not a persisted
+     * record with its own stable id. The closest Kernel equivalent is
+     * {@code GET /api/inventory/movements/balance?organizationId&agencyId&productId},
+     * which needs a Kernel {@code organizationId}/{@code agencyId} that this module's
+     * {@code warehouseId}/{@code tenantId} don't currently resolve to (no {@code Warehouse}
+     * domain concept exists locally to bridge them). Deliberately left unfixed rather than
+     * wired to the wrong identifiers — always resolves empty (fail-open), same net behavior
+     * as before this review.</p>
      */
     @Override
     public Mono<KernelStockEntryDto> findByProductAndWarehouse(UUID productId,

@@ -7,6 +7,7 @@ import com.yowyob.tiibntick.core.actor.adapter.in.web.FreelancerController;
 import com.yowyob.tiibntick.core.actor.adapter.in.web.ActorKycController;
 import com.yowyob.tiibntick.core.actor.adapter.out.auth.ActorCoreYowAuthTntAdapter;
 import com.yowyob.tiibntick.core.actor.adapter.out.incident.ActorReputationPortAdapter;
+import com.yowyob.tiibntick.core.actor.adapter.out.kernel.KernelActorAdapter;
 import com.yowyob.tiibntick.core.actor.adapter.out.messaging.KafkaActorEventPublisher;
 import com.yowyob.tiibntick.core.actor.adapter.out.persistence.ClientProfileR2dbcRepositoryAdapter;
 import com.yowyob.tiibntick.core.actor.adapter.out.persistence.DelivererR2dbcRepositoryAdapter;
@@ -71,6 +72,8 @@ import java.util.Map;
         ActorCoreYowAuthTntAdapter.class,
         // ── tnt-incident-core outbound adapter ─────────────────────────────────
         ActorReputationPortAdapter.class,
+        // ── Kernel outbound adapter ─────────────────────────────────────────────
+        KernelActorAdapter.class,
         // ── Kafka publisher ─────────────────────────────────────────────────────
         KafkaActorEventPublisher.class,
         // ── Kafka consumers ─────────────────────────────────────────────────────

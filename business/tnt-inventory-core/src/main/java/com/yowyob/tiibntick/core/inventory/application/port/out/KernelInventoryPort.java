@@ -24,17 +24,6 @@ import java.util.UUID;
 public interface KernelInventoryPort {
 
     /**
-     * Fetches a stock entry from the Kernel by its UUID.
-     *
-     * <p>Returns {@code Mono.empty()} if the stock entry does not exist in the Kernel,
-     * rather than throwing an exception — allowing callers to treat the reference as optional.</p>
-     *
-     * @param kernelStockEntryId the Kernel stock entry UUID
-     * @return the kernel stock entry data, or {@code Mono.empty()} if not found
-     */
-    Mono<KernelStockEntryDto> findByKernelStockEntryId(UUID kernelStockEntryId);
-
-    /**
      * Checks whether a stock entry exists in the Kernel for the given product and warehouse.
      *
      * <p>Used by the application service to optionally resolve a {@code kernelStockEntryId}

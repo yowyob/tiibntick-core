@@ -1,5 +1,8 @@
 package com.yowyob.tiibntick.core.sales.domain.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.math.BigDecimal;
 import java.util.UUID;
 
@@ -13,6 +16,12 @@ import java.util.UUID;
  * <p>Integration pattern: optional coupling — a TiiBnTick SalesOrder can exist without
  * a Kernel counterpart (informal transactions, cash-on-delivery in rural areas).</p>
  *
+ * <p>Field names below are aliased with {@link JsonProperty} to the Kernel's real
+ * {@code SalesOrderResponse} JSON keys ({@code id}, {@code customerThirdPartyId}) — see
+ * {@code docs/kernel-api/schemas.md}. {@code isActive} has no Kernel-side equivalent
+ * (the Kernel models order lifecycle via {@code status}, not a boolean flag) — always
+ * {@code false} and currently unused by any caller.</p>
+ *
  * @param kernelSalesOrderId UUID of the sales order in the Kernel database
  * @param tenantId           tenant owning this sales order in the Kernel
  * @param clientThirdPartyId Kernel third-party UUID of the client
@@ -20,14 +29,15 @@ import java.util.UUID;
  * @param totalAmount        Total amount as recorded in the Kernel
  * @param currency           ISO 4217 currency code (e.g. XAF, NGN)
  * @param status             Order status as text from the Kernel lifecycle
- * @param isActive           Whether the Kernel sales order is active
+ * @param isActive           No Kernel equivalent — always {@code false}, kept for API stability
  *
  * @author MANFOUO Braun
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record KernelSalesOrderDto(
-        UUID kernelSalesOrderId,
+        @JsonProperty("id") UUID kernelSalesOrderId,
         UUID tenantId,
-        UUID clientThirdPartyId,
+        @JsonProperty("customerThirdPartyId") UUID clientThirdPartyId,
         UUID organizationId,
         BigDecimal totalAmount,
         String currency,
