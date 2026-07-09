@@ -75,7 +75,8 @@
         <module>foundation/yow-i18n-kernel</module>
         <module>foundation/tnt-common-core</module>
         <module>foundation/tnt-auth-core</module>
-        <module>foundation/tnt-roles-core</module> 
+        <module>foundation/tnt-roles-core</module>
+        <module>foundation/tnt-platform-gateway-core</module>
 
         <!-- ─── COUCHE L2 — IDENTITY ───────────────────────────────────────
              Extensions des modules RT-comops du Kernel Yowyob.
@@ -359,6 +360,11 @@
             <dependency>
                 <groupId>com.yowyob.tiibntick.core</groupId>
                 <artifactId>tnt-roles-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-platform-gateway-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
 

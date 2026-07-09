@@ -15,7 +15,7 @@ Monolithe modulaire DDD — Spring Boot 4 · WebFlux · R2DBC · Kafka · PostGI
 `tiibntick-core` est la **bibliothèque Maven multi-modules** de la plateforme TiiBnTick. Elle regroupe l'ensemble de la logique métier — identité, logistique, commerce et facturation — dans un monolithe modulaire suivant les principes DDD et l'architecture hexagonale. Le seul module exécutable est [`tnt-bootstrap`](tnt-bootstrap/README.md).
 
 ```
-31 modules  ·  48 contrôleurs REST  ·  ~334 endpoints  ·  6 couches architecturales
+32 modules  ·  6 couches architecturales
 ```
 
 ---
@@ -49,7 +49,8 @@ L0  foundation/
 │   ├── yow-i18n-kernel         i18n FR/EN/Pidgin, devises XAF/NGN
 │   ├── tnt-common-core         Types partagés, constantes
 │   ├── tnt-auth-core           Bridge JWT → TntSecurityContext
-│   └── tnt-roles-core          @RequirePermission, cache RBAC
+│   ├── tnt-roles-core          @RequirePermission, cache RBAC
+│   └── tnt-platform-gateway-core  Client-ID/API-Key plateforme, scopes, proxy Kernel auth/SSO
 │
 L2  identity/
 │   ├── tnt-actor-core          Profils Livreur, Freelancer, GPS temps réel
@@ -313,6 +314,8 @@ Chaque requête transite par `TntSecurityContext` (module `tnt-auth-core`), popu
 - **RBAC** : annotation `@RequirePermission` via AOP (`TntPermissionAspect` dans `tnt-roles-core`)
 - **9 rôles canoniques** provisionnés au démarrage : `TNT_ADMIN`, `AGENCY_MANAGER`, `BRANCH_MANAGER`, `PERMANENT_DELIVERER`, `FREELANCER`, `FREELANCER_OWNER`, `RELAY_OPERATOR`, `CLIENT`, `SUPPORT_AGENT`
 - **Cache permissions** : Redis, TTL configurable via `tnt.roles.cache-ttl`
+
+Les plateformes clientes (Agency, Go, Link, Market, Point Relais) s'authentifient séparément via `X-Client-Id`/`X-Api-Key` (module `tnt-platform-gateway-core`) — Client-ID/API-Key persistants (hash BCrypt, rotation, révocation), scopes `resource:action` à deux niveaux (blocs gateway + futurs proxies métier curés). Administration exclusivement via `/api/v1/admin/platform-clients/**` (rôle `TNT_ADMIN`). Conception : `docs/auth/platform-client-management-design.md` — guide opérationnel : `docs/auth/platform-client-onboarding-guide.md`.
 
 ---
 

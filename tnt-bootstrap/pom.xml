@@ -51,6 +51,11 @@
             <groupId>com.yowyob.tiibntick.core</groupId>
             <artifactId>tnt-roles-core</artifactId>
         </dependency>
+        <!-- Platform-to-Core gateway: Client-ID/API-Key auth, scope model, Bloc A/B/C proxy -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-platform-gateway-core</artifactId>
+        </dependency>
 
         <!-- ══════════════════════════════════════════════════════
              COUCHE L2 — Identity
@@ -295,6 +300,14 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- @AutoConfigureWebTestClient — split out of spring-boot-starter-test in Boot 4's
+             modularized test-support jars; needed to hit the real running server in
+             PublicPathsSecurityTest. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-webtestclient</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

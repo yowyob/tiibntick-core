@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.core.roles.application.service;
 
+import com.yowyob.tiibntick.common.security.PermissionMatcher;
 import com.yowyob.tiibntick.core.roles.application.port.in.CheckPermissionUseCase;
 import com.yowyob.tiibntick.core.roles.application.port.out.ReactivePermissionResolver;
 import com.yowyob.tiibntick.core.roles.domain.exception.TntRoleException;
@@ -184,17 +185,16 @@ public class TntPermissionEvaluator implements CheckPermissionUseCase {
 
     /**
      * Core permission matching logic with TiiBnTick scope-suffix semantics.
+     *
+     * <p>Delegates the base exact/{@code resource:*}/{@code *} match to the shared
+     * {@link PermissionMatcher} (also used by {@code tnt-platform-gateway-core}'s
+     * platform-client scopes) — this method only adds the {@code #SCOPE}-suffix
+     * (agency/system/tenant) semantics specific to human/JWT-carrying user RBAC.
      */
     private boolean matches(Set<String> permissions, String resource, String action, UUID agencyId) {
-        String exact = resource + ":" + action;
-        String wildcardAction = resource + ":*";
-
         for (String perm : permissions) {
-            if (perm.equals("*")) {
-                return true;
-            }
             String base = perm.contains("#") ? perm.substring(0, perm.indexOf('#')) : perm;
-            if (base.equals(exact) || base.equals(wildcardAction)) {
+            if (PermissionMatcher.matchesBase(base, resource, action)) {
                 if (!perm.contains("#")) {
                     return true;
                 }

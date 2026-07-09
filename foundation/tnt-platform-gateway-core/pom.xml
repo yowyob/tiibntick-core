@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.yowyob.tiibntick.core</groupId>
+        <artifactId>tiibntick-core-parent</artifactId>
+        <version>0.0.1</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>tnt-platform-gateway-core</artifactId>
+    <packaging>jar</packaging>
+
+    <name>TiiBnTick — tnt-platform-gateway-core</name>
+    <description>
+        TiiBnTick platform-to-Core gateway: authenticates platform backends (Agency, Go,
+        Link, Market, Point Relais, ...) via a persistent, admin-managed Client-ID/API-Key
+        system (see docs/auth/platform-client-management-design.md), authorizes them with a
+        two-level resource:action scope model (gateway blocks + curated business-module
+        proxies), and proxies the Kernel's auth/OIDC/SSO HTTP surface plus agency onboarding
+        orchestration entry points. Split out of tnt-auth-core (2026-07-09) once this surface
+        grew into its own bounded context distinct from tnt-auth-core's narrower job
+        (Kernel JWT to TntSecurityContext translation).
+        Author: MANFOUO Braun — ENSP Yaoundé 2026.
+    </description>
+
+    <developers>
+        <developer>
+            <id>manfouo-braun</id>
+            <name>MANFOUO Braun</name>
+            <roles>
+                <role>Module Owner — tnt-platform-gateway-core</role>
+                <role>Lead Architect TiiBnTick</role>
+            </roles>
+        </developer>
+    </developers>
+
+    <dependencies>
+
+        <!-- ═══════════════════════════════════════════════════════
+             TIIBNTICK FOUNDATION
+             ═══════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-common-core</artifactId>
+        </dependency>
+
+        <!-- ═══════════════════════════════════════════════════════
+             tnt-auth-core + tnt-roles-core — NOT needed by the platform-gateway
+             M2M scope mechanism itself (deliberately decoupled, §2.0), but the
+             admin API is a human/JWT-authenticated surface: it needs @CurrentUser
+             (createdBy/grantedBy actor ids) from tnt-auth-core and @RequirePermission
+             (TNT_ADMIN-exclusive gating) from tnt-roles-core, exactly like any other
+             admin-facing controller in the app.
+             ═══════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-auth-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-roles-core</artifactId>
+        </dependency>
+
+        <!-- ═══════════════════════════════════════════════════════
+             SPRING BOOT — WebFlux + Security (reactive) + AOP
+             ═══════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- ═══════════════════════════════════════════════════════
+             DATABASE — R2DBC (runtime) + Liquibase (JDBC, schema-only)
+             First L1/foundation module with its own persistence — see
+             docs/auth/platform-client-management-design.md §2.0/§3.
+             ═══════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-r2dbc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>r2dbc-postgresql</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.liquibase</groupId>
+            <artifactId>liquibase-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- ═══════════════════════════════════════════════════════
+             CACHE — short-TTL in-process cache for API-key lookups
+             (avoids a DB round-trip on every platform-gateway request)
+             ═══════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+
+        <!-- JsonNode/ObjectMapper — used by KernelSsoGatewayService, KernelApiEnvelope,
+             and the admin controllers' response DTOs. -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+
+        <!-- API documentation for the platform-gateway and admin controllers. -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
+            <version>${springdoc.version}</version>
+        </dependency>
+
+        <!-- ═══════════════════════════════════════════════════════
+             TESTS
+             ═══════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-test</artifactId>
+            <version>${reactor-test.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

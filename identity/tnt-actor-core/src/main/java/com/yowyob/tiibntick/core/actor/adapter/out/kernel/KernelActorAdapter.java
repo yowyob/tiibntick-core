@@ -33,9 +33,17 @@ import java.util.UUID;
  *
  * <p>WebClient bean provided by {@code KernelBridgeConfig} (tnt-bootstrap).</p>
  *
+ * <p><b>Explicit bean name required</b>: {@code business/tnt-resource-core} has its own,
+ * unrelated {@code KernelActorAdapter} class (implementing a different port,
+ * {@code KernelActorPort}). Both modules are assembled into the same tnt-bootstrap
+ * ApplicationContext, and Spring's default annotation-based bean naming decapitalizes
+ * only the simple class name — so two {@code @Component}-annotated classes named
+ * {@code KernelActorAdapter} in different packages collide on the same bean name
+ * ({@code ConflictingBeanDefinitionException} at context startup) unless disambiguated.
+ *
  * @author MANFOUO Braun
  */
-@Component
+@Component("actorCoreKernelActorAdapter")
 public class KernelActorAdapter implements IKernelActorPort {
 
     private static final Logger log = LoggerFactory.getLogger(KernelActorAdapter.class);

@@ -25,6 +25,9 @@
         IYowAuthTntAdapter out-port for actor-profile resolution.
         Also imports tnt-roles-core (RECOMMENDED) to split JWT authorities into
         well-typed TiiBnTick roles vs raw permission strings.
+        Scope narrowed 2026-07-09: the platform-to-Core gateway (client registry,
+        API-key filter, Bloc A/B/C proxy controllers) moved to the sibling module
+        tnt-platform-gateway-core — see docs/auth/platform-client-management-design.md.
         Author: MANFOUO Braun
     </description>
 
@@ -81,18 +84,10 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- JsonNode/ObjectMapper — used directly by KernelPublicKeyProvider and the
-             Kernel auth gateway (KernelAuthGatewayAdapter, KernelApiEnvelope). -->
+        <!-- JsonNode/ObjectMapper — used directly by KernelPublicKeyProvider (JWKS parsing). -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-        </dependency>
-
-        <!-- API documentation for PlatformAuthController / PlatformAuthOidcController. -->
-        <dependency>
-            <groupId>org.springdoc</groupId>
-            <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
-            <version>${springdoc.version}</version>
         </dependency>
 
         <dependency>

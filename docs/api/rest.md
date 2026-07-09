@@ -2,7 +2,7 @@
 REST endpoint index across all modules — base paths, key endpoints, and where to find each controller. Full live spec is always at `/swagger-ui.html` (springdoc 3.x, see `knowledge/known-issues.md` for the version history) — this doc is the offline, grep-fast version.
 
 # Summary
-38 `@RestController` classes, **217 endpoints** total (87 GET, 103 POST, 8 PUT, 8 DELETE, 11 PATCH — verified via `grep -rE "@(Get|Post|Put|Delete|Patch)Mapping" --include=*.java`, excludes class-level `@RequestMapping` base-path declarations). Three multi-tenancy conventions coexist (path variable, header, JWT-derived) — see `# Multi-tenancy patterns` below before adding a new controller.
+65 `@RestController` classes, **392 endpoints** total (155 GET, 199 POST, 10 PUT, 12 DELETE, 16 PATCH — re-verified 2026-07-09 via the same `grep -rE "@(Get|Post|Put|Delete|Patch)Mapping"` methodology, excludes class-level `@RequestMapping` base-path declarations; the previous count here was stale by a wide margin, predating several rounds of feature work). Three multi-tenancy conventions coexist (path variable, header, JWT-derived) — see `# Multi-tenancy patterns` below before adding a new controller.
 
 # Details
 
@@ -10,6 +10,7 @@ REST endpoint index across all modules — base paths, key endpoints, and where 
 
 | Module | Base path(s) | Controller(s) |
 |---|---|---|
+| tnt-platform-gateway-core | `/api/v1/auth`, `/api/v1/sso`, `/.well-known/*`, `/oauth2/*` (platform-key auth); `/api/v1/admin/platform-clients`, `/api/v1/admin/api-keys`, `/api/v1/admin/scope-registry` (TNT_ADMIN-only) | `PlatformAuthController`, `PlatformAuthOidcController`, `PlatformSsoController`, `PlatformClientAdminController`, `ApiKeyAdminController`, `ScopeRegistryController` |
 | tnt-administration-core | `/api/v1/admin` | `TntAdministrationController` |
 | tnt-actor-core | `/api/v1/deliverers`, `/api/v1/freelancers`, `/api/v1/actors/kyc` | `DelivererController`, `FreelancerController`, `ActorKycController` |
 | tnt-tp-core | `/api/v1/tnt-tp/{kyc,clients,loyalty,ratings}` | `TpKycController`, `TntClientProfileController`, `LoyaltyController`, `RatingController` |
@@ -29,6 +30,8 @@ REST endpoint index across all modules — base paths, key endpoints, and where 
 | tnt-billing-templates | `/api/v1/billing/templates` | `PolicyTemplateController` |
 
 ## Notable endpoint groups (full detail: Swagger UI)
+
+**Platform Gateway** (`PlatformAuthController`/`PlatformAuthOidcController`/`PlatformSsoController`) — authenticated via `X-Client-Id`/`X-Api-Key`, NOT a TiiBnTick JWT; see `docs/auth/platform-client-management-design.md`. Admin CRUD for platform clients/API keys/scopes/audit (`PlatformClientAdminController`, `ApiKeyAdminController`, `ScopeRegistryController`) sits behind the normal JWT chain instead, gated to `TNT_ADMIN` only.
 
 **Delivery** (`DeliveryController`) — public tracking endpoint exists: `GET /track/{trackingCode}` (no auth). Lifecycle endpoints (`/pickup`, `/transit/start`, `/relay/{id}/deposit`, `/relay/resume`, `/location`, `/complete`, `/fail`, `/cancel`) map to the state machine in `domain/workflows.md`.
 

@@ -12,6 +12,13 @@ databaseChangeLog:
   # fails loudly instead of silently no-oping.
   # ══════════════════════════════════════════════════════════════════════════════
 
+  # ── L1 — Foundation ─────────────────────────────────────────────────────────
+  # First L1/foundation module with its own schema — see
+  # docs/auth/platform-client-management-design.md §2.0/§3.
+  - include:
+      file: db/changelog/tnt-platform-gateway-master.yaml
+      relativeToChangelogFile: false
+
   # ── L2 — Identity ──────────────────────────────────────────────────────────
   - include:
       file: db/changelog/tnt-actor-master.yaml

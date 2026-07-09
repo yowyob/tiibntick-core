@@ -37,7 +37,7 @@
 
 ```
 tiibntick-core/
-├── foundation/                  ← L0 (yow-event-kernel, yow-i18n-kernel)
+├── foundation/                  ← L0 (yow-event-kernel, yow-i18n-kernel, tnt-common-core, tnt-auth-core, tnt-roles-core, tnt-platform-gateway-core)
 ├── identity/                    ← L2 (tnt-actor-core, tnt-organization-core, ...)
 ├── logistics/                   ← L3 (tnt-delivery-core, tnt-media-core, ...)
 ├── business/                    ← L4 (tnt-resource-core, tnt-product-core, ...)
@@ -197,7 +197,7 @@ docker run -d \
 | `SPRING_PROFILES_ACTIVE` | `default` | Profil actif (`dev`, `test`, `staging`, `prod`) |
 | `SERVER_PORT` | `8080` | Port d'écoute HTTP |
 | `DB_HOST` | `localhost` | Hôte PostgreSQL |
-| `DB_PORT` | `5432` | Port PostgreSQL |
+| `DB_PORT` | `5433` | Port PostgreSQL (mappé sur 5432 dans le conteneur — évite un conflit avec un Postgres local) |
 | `DB_NAME` | `tiibntick_core` | Nom de la base de données |
 | `DB_USER` | `tiibntick` | Utilisateur PostgreSQL |
 | `DB_PASSWORD` | `tiibntick_pass` | Mot de passe PostgreSQL |
@@ -230,12 +230,16 @@ docker run -d \
 
 ## Modules assemblés
 
-`tnt-bootstrap` importe **25 modules** répartis sur 6 couches :
+`tnt-bootstrap` importe **31 modules** répartis sur 6 couches (32 modules au total dans le repo, `tnt-bootstrap` lui-même exclu) :
 
 | Couche | Module | Rôle |
 |--------|--------|------|
 | **L0** | `yow-event-kernel` | Bus événementiel Kafka + Outbox Pattern |
 | **L0** | `yow-i18n-kernel` | i18n FR/EN/Pidgin, devises XAF/NGN/KES |
+| **L0** | `tnt-common-core` | Types partagés (Money, Address, GeoCoordinates), ApiResponse/PagedResult, AOP audit |
+| **L0** | `tnt-auth-core` | Bridge JWT Kernel → TntSecurityContext, `@CurrentUser` |
+| **L0** | `tnt-roles-core` | RBAC — `TntRole`, `TntPermission`, `@RequirePermission` |
+| **L0** | `tnt-platform-gateway-core` | Client-ID/API-Key plateformes, scopes, proxy Kernel auth/SSO/onboarding |
 | **L2** | `tnt-actor-core` | Profils Livreur, Freelancer, GPS temps réel |
 | **L2** | `tnt-organization-core` | Agences, Antennes, Zones, Hubs |
 | **L2** | `tnt-tp-core` | Tiers, Fidélité clients, KYC |
@@ -244,6 +248,7 @@ docker run -d \
 | **L3** | `tnt-route-core` | A\*, VRP OR-Tools 9.8, Kalman ETA |
 | **L3** | `tnt-delivery-core` | Mission, Package, SLA, Hub Dépôt, Preuve |
 | **L3** | `tnt-dispute-core` | Litiges, Preuves, Remboursements |
+| **L3** | `tnt-incident-core` | Incidents, Triage, Escalades, Preuves blockchain |
 | **L3** | `tnt-realtime-core` | WebSocket STOMP, GPS Stream, Présence |
 | **L3** | `tnt-sync-core` | Offline-First, DuckDB-Wasm, Delta Sync |
 | **L3** | `tnt-notify-core` | FCM, MTN SMS, Orange SMS, WhatsApp, Email |
@@ -259,6 +264,7 @@ docker run -d \
 | **L5** | `tnt-billing-invoice` | Factures, TVA multi-pays, cycle de vie |
 | **L5** | `tnt-billing-wallet` | MTN MoMo, Orange Money, Stripe |
 | **L5** | `tnt-billing-report` | Revenus, Commissions, KPIs, Export CSV |
+| **L5** | `tnt-billing-templates` | Templates de politique de prix |
 
 ---
 
@@ -270,16 +276,21 @@ docker run -d \
 GET /swagger-ui.html
 ```
 
-L'UI agrège tous les modules en groupes sélectionnables via le dropdown :
+L'UI agrège tous les modules en groupes sélectionnables via le dropdown (voir `TntOpenApiConfig`) :
 - `00-all` — Tous les endpoints
+- `01-platform-gateway` — Client-ID/API-Key plateformes + admin (`/api/v1/admin/platform-clients/**`)
 - `02-actor-core` — Acteurs et livreurs
 - `02-organization-core` — Agences et branches
+- `02-administration-core` — RBAC, rôles, provisioning tenant
 - `03-delivery-core` — Missions et colis
+- `03-incident-core` — Incidents, triage, escalades
+- `03-dispute-core` — Litiges
 - `03-geo-core` — Géolocalisation et POI
+- `03-route-core` — VRP et ETA
 - `03-media-core` — QR Code, PDF, Fichiers
 - `03-notify-core` — Notifications
-- `03-route-core` — VRP et ETA
-- `03-dispute-core` — Litiges
+- `03-realtime-sync` — WebSocket, GPS, Offline
+- `04-staff-fleet` — Véhicules, Équipements, Ressources
 - `05-billing-engine` — Facturation
 
 ### Actuator / Health
@@ -337,15 +348,21 @@ Métriques exposées : JVM, Spring MVC, R2DBC connection pool, Kafka consumer la
 
 ### Schémas PostgreSQL créés par Liquibase
 
-| Schéma | Module |
+Seuls certains modules créent un vrai schéma Postgres (`CREATE SCHEMA`) ; les autres migrent des tables préfixées (`tnt_*`) dans le schéma `public` par défaut — les deux approches coexistent.
+
+| Schéma dédié | Module |
 |--------|--------|
 | `tnt_media` | tnt-media-core |
-| `tnt_delivery` | tnt-delivery-core |
-| `tnt_geo` | tnt-geo-core |
+| `tnt_geography` | tnt-geo-core |
+| `tnt_route` | tnt-route-core |
 | `tnt_actor` | tnt-actor-core |
-| `tnt_organization` | tnt-organization-core |
-| `tnt_billing` | tnt-billing-* |
-| `tnt_notify` | tnt-notify-core |
+| `administration` | tnt-administration-core |
+| `accounting` | tnt-accounting-core |
+| `sales` | tnt-sales-core |
+| `billing` | tnt-billing-dsl, tnt-billing-wallet |
+| `pricing` | tnt-billing-pricing |
+
+Autres modules (`tnt-delivery-core`, `tnt-dispute-core`, `tnt-organization-core`, `tnt-notify-core`, `tnt-platform-gateway-core`, ...) : pas de schéma dédié, tables préfixées `tnt_*` dans `public`.
 
 ---
 
@@ -384,7 +401,7 @@ docker build -t tiibntick/tnt-core:0.0.1 tnt-bootstrap/
 open tnt-bootstrap/target/site/jacoco/index.html
 ```
 
-**Couverture minimale requise :** 70% lignes, 60% branches (configuré dans le parent POM).
+**Rapport de couverture JaCoCo :** généré à chaque `verify` (`target/site/jacoco/index.html`). Un seuil (70% lignes / 60% branches) est défini dans le parent POM mais son exécution (`goal check`) est **actuellement commentée** — le build n'échoue pas encore en dessous du seuil.
 
 ---
 

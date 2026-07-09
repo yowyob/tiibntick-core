@@ -2,17 +2,11 @@ package com.yowyob.tiibntick.core.auth.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yowyob.tiibntick.core.auth.adapter.in.web.ReactiveSecurityContextExtractor;
-import com.yowyob.tiibntick.core.auth.adapter.out.kernel.KernelAuthGatewayAdapter;
 import com.yowyob.tiibntick.core.auth.adapter.out.kernel.NoOpYowAuthTntAdapter;
-import com.yowyob.tiibntick.core.auth.application.port.in.ProxyKernelAuthUseCase;
-import com.yowyob.tiibntick.core.auth.application.port.in.ProxyKernelSsoUseCase;
 import com.yowyob.tiibntick.core.auth.application.port.in.ResolveCurrentUserUseCase;
 import com.yowyob.tiibntick.core.auth.application.port.in.ValidateTokenUseCase;
-import com.yowyob.tiibntick.core.auth.application.port.out.IKernelAuthGatewayPort;
 import com.yowyob.tiibntick.core.auth.application.port.out.IYowAuthTntAdapter;
-import com.yowyob.tiibntick.core.auth.application.service.KernelAuthGatewayService;
 import com.yowyob.tiibntick.core.auth.application.service.KernelPublicKeyProvider;
-import com.yowyob.tiibntick.core.auth.application.service.KernelSsoGatewayService;
 import com.yowyob.tiibntick.core.auth.application.service.TntJwtValidator;
 import com.yowyob.tiibntick.core.auth.application.service.TntSecurityContextService;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -28,8 +22,11 @@ import org.springframework.web.reactive.function.client.WebClient;
 /**
  * Spring Boot auto-configuration for tnt-auth-core.
  *
- * <p>REFACTORED (2026-06-15): No longer depends on UserSessionTokenService
- * from the Kernel. JWT validation is now performed locally.
+ * <p>Scope narrowed 2026-07-09: the platform-gateway surface (client registry, API-key
+ * filter, Bloc A/B/C proxy controllers and their Kernel-auth gateway beans) moved to
+ * {@code tnt-platform-gateway-core} — see
+ * {@code docs/auth/platform-client-management-design.md} §2.0. This module is back to
+ * its original, narrower job: translating a Kernel-issued JWT into {@code TntSecurityContext}.
  *
  * @author MANFOUO Braun
  */
@@ -91,38 +88,5 @@ public class TntAuthAutoConfiguration {
     public ReactiveSecurityContextExtractor reactiveSecurityContextExtractor(
             ResolveCurrentUserUseCase resolveCurrentUserUseCase) {
         return new ReactiveSecurityContextExtractor(resolveCurrentUserUseCase);
-    }
-
-    /**
-     * Gateway to the Kernel's {@code auth-controller}/{@code auth-oidc-controller} HTTP
-     * surface, so platform backends (Agency, Go, ...) can authenticate against TiiBnTick
-     * Core only — see {@code PlatformAuthController}/{@code PlatformAuthOidcController}.
-     * Uses the single shared {@code kernelWebClient} bean (defined in tnt-bootstrap's
-     * {@code KernelBridgeConfig}) — never a Kernel Spring bean/type.
-     */
-    @Bean
-    @ConditionalOnMissingBean(IKernelAuthGatewayPort.class)
-    public KernelAuthGatewayAdapter kernelAuthGatewayAdapter(@Qualifier("kernelWebClient") WebClient kernelWebClient) {
-        return new KernelAuthGatewayAdapter(kernelWebClient);
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(ProxyKernelAuthUseCase.class)
-    public KernelAuthGatewayService kernelAuthGatewayService(IKernelAuthGatewayPort kernelAuthGatewayPort) {
-        return new KernelAuthGatewayService(kernelAuthGatewayPort);
-    }
-
-    /**
-     * YowYob SSO handshake orchestration for platform backends — see
-     * {@code PlatformSsoController}. Built on top of {@link ProxyKernelAuthUseCase#callOidc},
-     * not a new Kernel client.
-     */
-    @Bean
-    @ConditionalOnMissingBean(ProxyKernelSsoUseCase.class)
-    public KernelSsoGatewayService kernelSsoGatewayService(
-            ProxyKernelAuthUseCase kernelAuthUseCase,
-            @Qualifier("tntAuthObjectMapper") ObjectMapper objectMapper,
-            TntPlatformGatewayProperties platformGatewayProperties) {
-        return new KernelSsoGatewayService(kernelAuthUseCase, objectMapper, platformGatewayProperties);
     }
 }

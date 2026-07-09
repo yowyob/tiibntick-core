@@ -162,34 +162,23 @@ tnt:
     # When false, all /api/** endpoints require a valid JWT (recommended for production)
     allow-anonymous-context: ${TNT_AUTH_ALLOW_ANONYMOUS:false}
 
-    # ── Platform → Core gateway (CORE_KERNEL_GATEWAY_SPEC.md) ────────────────
-    # Registry of platform backends allowed to call /api/v1/auth/**, /api/v1/sso/**,
-    # /api/v1/onboarding/** — each platform gets its OWN X-Client-Id/X-Api-Key pair,
-    # distinct from tnt.kernel.* (Core's single identity toward the Kernel itself).
-    # Add one entry per platform; leave client-id/api-key unset (empty string) to
-    # effectively disable a platform without removing its config block.
-    platform-gateway:
-      clients:
-        - platform-code: AGENCY
-          client-id: ${TNT_AGENCY_CLIENT_ID:}
-          api-key: ${TNT_AGENCY_API_KEY:}
-        - platform-code: GO
-          client-id: ${TNT_GO_CLIENT_ID:}
-          api-key: ${TNT_GO_API_KEY:}
-        - platform-code: LINK
-          client-id: ${TNT_LINK_CLIENT_ID:}
-          api-key: ${TNT_LINK_API_KEY:}
-        - platform-code: MARKET
-          client-id: ${TNT_MARKET_CLIENT_ID:}
-          api-key: ${TNT_MARKET_API_KEY:}
-        - platform-code: POINT_RELAIS
-          client-id: ${TNT_POINT_RELAIS_CLIENT_ID:}
-          api-key: ${TNT_POINT_RELAIS_API_KEY:}
-      # app code -> SSO redirect base URL, used by POST /api/v1/sso/yowyob/launch
-      sso-app-redirect-urls: {}
-      # Example:
-      # sso-app-redirect-urls:
-      #   HRM: https://hrm.yowyob.com/sso/callback
+  # ── Platform Gateway (tnt-platform-gateway-core L1) ─────────────────────────
+  # Client-ID/API-Key auth + two-level resource:action scope model for platform
+  # backends calling /api/v1/auth/**, /api/v1/sso/**, /api/v1/onboarding/**. See
+  # docs/auth/platform-client-management-design.md.
+  #
+  # Entirely DB-backed (no static per-platform client-id/api-key list here) — manage
+  # platform clients via the admin API (/api/v1/admin/platform-clients, TNT_ADMIN only).
+  # (A migration-only .env fallback existed briefly during design but was removed
+  # 2026-07-09 before any platform ever consumed it — nothing to migrate away from.)
+  platform-gateway:
+    # app code -> SSO redirect base URL, used by POST /api/v1/sso/yowyob/launch
+    sso-app-redirect-urls: {}
+    # Example:
+    # sso-app-redirect-urls:
+    #   HRM: https://hrm.yowyob.com/sso/callback
+    # Short-TTL cache for the DB-backed client/scope lookup (decided 2026-07-08: TTL-only, no active invalidation broadcast)
+    client-cache-ttl: ${TNT_PLATFORM_GATEWAY_CACHE_TTL:PT45S}
 
   # ── FreelancerOrganization configuration () ─────────────────────────────
   freelancer-org:
@@ -455,9 +444,9 @@ management:
 
 springdoc:
   swagger-ui:
-    enabled: false  # Disable Swagger UI in production
+    enabled: true  # We will need to disable Swagger UI in production
   api-docs:
-    enabled: false
+    enabled: true
 
 logging:
   level:

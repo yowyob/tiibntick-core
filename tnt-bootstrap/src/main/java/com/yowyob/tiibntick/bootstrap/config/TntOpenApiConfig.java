@@ -71,7 +71,21 @@ public class TntOpenApiConfig {
                                 .type(SecurityScheme.Type.OAUTH2)
                                 .flows(new OAuthFlows().authorizationCode(new OAuthFlow()
                                         .authorizationUrl(issuerUri + "/oauth2/authorize")
-                                        .tokenUrl(issuerUri + "/oauth2/token")))))
+                                        .tokenUrl(issuerUri + "/oauth2/token"))))
+                        // Platform-gateway credentials (tnt-platform-gateway-core) — X-Client-Id/X-Api-Key,
+                        // NOT a JWT. Applied per-operation on PlatformAuthController/PlatformAuthOidcController/
+                        // PlatformSsoController via @SecurityRequirement, which overrides the global bearerAuth
+                        // requirement below for those operations only — see docs/auth/platform-client-management-design.md.
+                        .addSecuritySchemes("ClientIdAuth", new SecurityScheme()
+                                .type(SecurityScheme.Type.APIKEY)
+                                .in(SecurityScheme.In.HEADER)
+                                .name("X-Client-Id")
+                                .description("Platform backend Client-ID (public identifier, issued by a TNT_ADMIN via POST /api/v1/admin/platform-clients)"))
+                        .addSecuritySchemes("ApiKeyAuth", new SecurityScheme()
+                                .type(SecurityScheme.Type.APIKEY)
+                                .in(SecurityScheme.In.HEADER)
+                                .name("X-Api-Key")
+                                .description("Platform backend API Key secret — shown once at issuance/rotation, format tnt_<base64>")))
                 .addSecurityItem(new SecurityRequirement().addList("bearerAuth"));
     }
 
@@ -83,6 +97,21 @@ public class TntOpenApiConfig {
                 .group("00-all")
                 .displayName("All Endpoints")
                 .pathsToMatch("/api/**")
+                .build();
+    }
+
+    /**
+     * Platform Gateway group: platform backend authentication proxy (Bloc A/B, X-Client-Id/
+     * X-Api-Key) plus the TNT_ADMIN-only platform-client management API.
+     */
+    @Bean
+    public GroupedOpenApi platformGatewayApi() {
+        return GroupedOpenApi.builder()
+                .group("01-platform-gateway")
+                .displayName("L1 — Platform Gateway (Client-ID/API-Key, Admin)")
+                .pathsToMatch("/api/v1/auth/**", "/api/v1/sso/**",
+                              "/api/v1/admin/platform-clients/**", "/api/v1/admin/api-keys/**",
+                              "/api/v1/admin/scope-registry/**")
                 .build();
     }
 

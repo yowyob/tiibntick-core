@@ -132,6 +132,17 @@ public final class TntPermission {
     public static final String ADMIN_GOVERN      = "admin:govern";
 
     // ─────────────────────────────────────────────────────────────
+    // PLATFORM — Platform-client identity management (tnt-platform-gateway-core
+    // admin API). Deliberately NOT granted to any TntRole's defaultPermissions
+    // below (unlike ADMIN_ROLES/ADMIN_USERS/ADMIN_AUDIT, which AGENCY_MANAGER and
+    // ORG_ADMIN also carry) — only TNT_ADMIN's "*" wildcard satisfies this, making
+    // it exclusive to the system administrator by construction. See
+    // docs/auth/platform-client-management-design.md §4.
+    // ─────────────────────────────────────────────────────────────
+
+    public static final String PLATFORM_CLIENTS_MANAGE = "platform:clients";
+
+    // ─────────────────────────────────────────────────────────────
     // DISPUTE — Delivery dispute management
     // ─────────────────────────────────────────────────────────────
 

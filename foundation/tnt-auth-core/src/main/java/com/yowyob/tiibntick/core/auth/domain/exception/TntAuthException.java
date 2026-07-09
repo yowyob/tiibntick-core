@@ -56,20 +56,4 @@ public class TntAuthException extends RuntimeException {
                 "No TiiBnTick actor profile is linked to userId=" + userId
         );
     }
-
-    public static TntAuthException ssoContextNotFound(String kernelOrganizationId) {
-        return new TntAuthException(
-                "SSO_CONTEXT_NOT_FOUND",
-                "No SSO context found matching kernelOrganizationId=" + kernelOrganizationId
-        );
-    }
-
-    public static TntAuthException ssoTokenExchangeFailed(String detail) {
-        return new TntAuthException("SSO_TOKEN_EXCHANGE_FAILED", "SSO token exchange failed: " + detail);
-    }
-
-    public static TntAuthException ssoAppNotConfigured(String app) {
-        return new TntAuthException("SSO_APP_NOT_CONFIGURED",
-                "No redirect URL configured for SSO app '" + app + "' (tnt.auth.platform-gateway.sso-app-redirect-urls)");
-    }
 }

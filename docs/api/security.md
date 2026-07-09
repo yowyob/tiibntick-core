@@ -13,6 +13,8 @@ Every endpoint except explicitly-public ones (tracking by code, announcement bro
 | Standard authenticated | `Authorization: Bearer <JWT>` issued by Kernel (YowAuth0) |
 | Webhook callbacks | Provider-specific signature/secret (MTN MoMo, Orange Money, Stripe) — NOT JWT |
 | Permission-gated | JWT + `@RequirePermission(resource, action)` passes |
+| Platform gateway | `X-Client-Id`/`X-Api-Key` (NOT a JWT) — `/api/v1/auth/**`, `/api/v1/sso/**`, `/api/v1/onboarding/**`, `/api/v1/platform/**`; scope-gated via `PlatformScopeAuthorizationManager`/`@RequirePlatformScope`, see `docs/auth/platform-client-management-design.md` |
+| Platform admin | JWT + `@RequirePermission(resource="platform", action="clients")` — `/api/v1/admin/platform-clients/**`, `/api/v1/admin/api-keys/**`, `/api/v1/admin/scope-registry` (TNT_ADMIN only) |
 
 ## Representative `@RequirePermission` values by resource (non-exhaustive — see `security/permissions.md` for the canonical catalog)
 | Resource | Actions seen | Typical roles |
@@ -25,6 +27,7 @@ Every endpoint except explicitly-public ones (tracking by code, announcement bro
 | `report` | `read`, `export` | `AGENCY_MANAGER`, `SUPPORT_AGENT` |
 | `administration:*` | `permissions:read`, `roles:read/write`, `settings:read/write` | `TNT_ADMIN`, `ORG_ADMIN` |
 | `accounting`, `sales` | `read`, `write` | `ORG_ADMIN`, `tnt:platform:admin` fallback |
+| `platform` | `clients` (platform-client CRUD/rotate/revoke/scopes/audit) | `TNT_ADMIN` only (not granted to any other role's defaults) |
 
 ## Required headers by module (multi-tenancy — see `api/rest.md` for the full pattern table)
 `X-Tenant-Id` — sync, realtime SSE, billing-invoice, wallet, billing-report, disputes.

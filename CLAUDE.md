@@ -55,7 +55,7 @@ Default ports: app 8080, Postgres 5432, Redis 6379, Kafka 9092, MinIO 9000/9001,
 
 ```
 L0  foundation/yow-event-kernel, yow-i18n-kernel      — event bus, i18n (candidates for future migration into the Kernel)
-L1  foundation/tnt-common-core, tnt-auth-core, tnt-roles-core   — shared types, JWT security bridge, RBAC
+L1  foundation/tnt-common-core, tnt-auth-core, tnt-roles-core, tnt-platform-gateway-core   — shared types, JWT security bridge, RBAC, platform-client gateway
 L2  identity/   tnt-actor-core, tnt-organization-core, tnt-tp-core, tnt-administration-core
 L3  logistics/  tnt-geo-core, tnt-route-core, tnt-delivery-core, tnt-dispute-core, tnt-incident-core,
                 tnt-realtime-core, tnt-sync-core, tnt-notify-core, tnt-media-core
@@ -72,6 +72,8 @@ Each module's `groupId:artifactId` is pinned in the root `<dependencyManagement>
 Modules under `groupId yowyob.comops.api` (artifacts like `RT-comops-common-core`, `RT-comops-auth-core`, `RT-comops-kernel-core`, etc.) are an **external, read-only dependency** owned by a different team/repo (managed by TSAFACK Savio). TiiBnTick Core extends and consumes these — never modify or vendor them, and don't expect to find their sources in this repo. They provide base entities, `TenantId`, `Money`, JWT/auth primitives, RBAC persistence, kernel events, and file storage that the `com.yowyob.tiibntick.core.*` modules build on top of.
 
 `tnt-auth-core` and `tnt-roles-core` are described as "thin bridges": they define the TiiBnTick-facing vocabulary (`TntSecurityContext`, `TntRole`, `@RequirePermission`) but delegate actual crypto/persistence/caching to the Kernel.
+
+`tnt-platform-gateway-core` is the entry point for platform *backends* (Agency, Go, Link, Market, Point Relais, ...) calling TiiBnTick Core — as opposed to `tnt-auth-core`, which is about human/service-account end users. It owns: the persistent, admin-managed Client-ID/API-Key system (`platform_clients`/`api_keys`/`client_permissions`/`api_key_rotation_history`/`client_audit_logs` tables — this module's own R2DBC + Liquibase, the first L1 module with a schema), the two-level `resource:action` scope model (gateway blocks `AUTH`/`SSO`/`ONBOARDING` today, extensible to curated business-module proxies), and the Kernel auth/OIDC/SSO proxy controllers (`/api/v1/auth/**`, `/api/v1/sso/**`) plus the admin API (`/api/v1/admin/platform-clients/**`, TNT_ADMIN-only). See `docs/auth/platform-client-management-design.md` for the full design. Agency onboarding orchestration (`/api/v1/onboarding/**`) is implemented in `tnt-administration-core`, but its security perimeter is defined in this module's `TntPlatformGatewaySecurityConfig`.
 
 ### Hexagonal/clean architecture per module
 
@@ -105,6 +107,8 @@ When changing a module's Kafka/bean configuration, check whether `tnt-bootstrap`
 ### Multi-tenancy & security
 
 Every request flows through `TntSecurityContext` (from `tnt-auth-core`), populated from a Kernel-issued JWT (`iwm.security.jwt.*` config) and exposing tenant/org/agency/actor IDs reactively. `tnt.roles.*` config controls `@RequirePermission` AOP enforcement (`tnt-roles-core`'s `TntPermissionAspect`), permission cache TTL, and one-time RBAC provisioning of the 9 canonical `TntRole`s into the Kernel DB at startup. In tests, set `tnt.roles.aop-enabled=false` / `tnt.auth.allow-anonymous-context=true` (see the `test` profile in `application.yml`) rather than mocking the Kernel.
+
+A second, parallel principal type exists for platform *backends* (not human users): `PlatformClientAuthenticationToken` (from `tnt-platform-gateway-core`), populated from `X-Client-Id`/`X-Api-Key` headers on `/api/v1/auth/**`/`/api/v1/sso/**`/`/api/v1/onboarding/**`/`/api/v1/platform/**` only (its own `@Order(10)` security chain, separate from the JWT catch-all at `@Order(20)`). Its scopes are checked via the shared `PermissionMatcher` (`tnt-common-core`) — never Spring's native `hasAuthority()`, which doesn't understand the `resource:*`/`*` wildcards this scope format uses. Don't confuse the two: a platform client authenticates the *calling backend*, not the end user making the request through it.
 
 ### Billing DSL
 
