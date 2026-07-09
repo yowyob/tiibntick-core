@@ -475,8 +475,8 @@ tnt:
   # ── Kernel Bridge ──────────────────────────────────────────────────────────
   kernel:
     base-url: ${TNT_KERNEL_BASE_URL:https://kernel-core.yowyob.com}
-    api-key: ${TNT_KERNEL_API_KEY:g79R7a7A8StQia6If-XmMSWj28T4FT9xHfVRsf5et_w}
-    client-id: ${TNT_KERNEL_CLIENT_ID:tibntick-backend}
+    api-key: ${TNT_KERNEL_API_KEY:}
+    client-id: ${TNT_KERNEL_CLIENT_ID:}
 
   # ── Solution ───────────────────────────────────────────────────────────────
   solution:

@@ -19,7 +19,7 @@ Ran the mandated "Core as Kernel facade/BFF" migration process (`docs/kernel-api
 ## 2026-07-01 — Single KernelBridge consolidation + 217-endpoint test campaign
 - Consolidated all Kernel WebClient beans into a **single KernelBridge** (`KernelBridgeConfig` in `tnt-bootstrap`):
   - Added `X-Client-Id: tibntick-backend` header to all Kernel HTTP calls
-  - Added real API key (`g79R7a7A8StQia6If-XmMSWj28T4FT9xHfVRsf5et_w`) as default in `application.yml`
+  - Added real API key as default in `application.yml` (removed 2026-07-09 — Kernel devops now manages this credential out-of-band)
   - Added `kernelOrganizationWebClient` and `kernelTpWebClient` beans to `KernelBridgeConfig` (previously missing auth headers)
   - Added `tnt.kernel.client-id` property to `application.yml` and `YowyobKernelBridge`
   - Removed dead `@Bean kernelWebClient` definitions from `KernelWebClientConfig`, `TntAdministrationCoreConfiguration`, `ProductCoreAutoConfiguration`
