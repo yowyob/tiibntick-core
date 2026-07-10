@@ -40,16 +40,8 @@
             <name>PAFE Dilane</name>
             <roles>
                 <role>Senior Developer</role>
-                <role>L0 (yow-i18n-kernel) · L2 Organization · L3 Logistics · L4 Accounting · L5 Billing</role>
+                <role>L0 (yow-i18n-kernel)</role>
                 <role>tnt-search</role>
-            </roles>
-        </developer>
-        <developer>
-            <id>francois</id>
-            <name>FRANCOIS</name>
-            <roles>
-                <role>Developer</role>
-                <role>L2 Identity (tp, administration) · L4 Business</role>
             </roles>
         </developer>
     </developers>

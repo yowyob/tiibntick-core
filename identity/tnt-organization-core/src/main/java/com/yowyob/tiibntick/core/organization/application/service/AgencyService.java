@@ -55,7 +55,7 @@ public class AgencyService implements ManageAgencyUseCase {
      * {@inheritDoc}
      *
      * <p>Validates that the referenced Kernel organization exists and is active before
-     * creating the Agency. Throws an {@link IllegalArgumentException} wrapped in the
+     * creating the Agency. Emits a {@link ResponseStatusException} (404) in the
      * reactive pipeline if the Kernel organization is not found or inactive.
      * Requires permission: {@code agency:write}.
      */

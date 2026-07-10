@@ -88,7 +88,22 @@ Incident log — real bugs found and fixed, with root cause and symptom, so the 
 ## 14. `TntClientProfileServiceTest` (tnt-tp-core) expects the wrong exception types — pre-existing, unrelated to the Kernel-facade work
 **Symptom**: `register_shouldFail_whenKernelTpNotFound`, `register_shouldFail_whenKernelPortReturnsEmptyMono`, `register_shouldFail_whenProfileAlreadyExists` all fail.
 **Root cause**: the test expects `IllegalArgumentException`/`IllegalStateException`; `TntClientProfileService.register()` actually throws `ResponseStatusException(NOT_FOUND/CONFLICT)` — an application-service layer throwing a web-layer exception type, and test/implementation have drifted apart. Confirmed unrelated to ADR-012/015: the test mocks `KernelThirdPartyPort` directly, never exercising `KernelThirdPartyAdapter`.
-**Fix**: not applied — out of scope for the Kernel-facade migration; flagged here so it isn't mistaken for a regression from this work.
+**Fix**: applied 2026-07-10 — updated the 3 assertions to expect `ResponseStatusException` with the right `HttpStatus` instead of `IllegalArgumentException`/`IllegalStateException`. Same drift pattern found and fixed the same day in `tnt-organization-core` (`AgencyServiceTest`, `FreelancerOrgServiceTest`, `HubRelaisServiceTest`).
+
+## 15. `KernelNotificationBridgeTest` (tnt-notify-core) WireMock stubs missing the `KernelEnvelope` wrapper
+**Symptom**: `sendMessage_*`, `save_shouldUpsertOneKernelRowPerChannel_*`, `findByUserId_shouldMergePerChannelKernelRows_*` all fail with a Jackson `MismatchedInputException`/`DecodingException` on `KernelEnvelope["success"]` (null into primitive `boolean`); a 5th test (`findByUserId_shouldReturnEmpty_whenKernelHasNoRowsYet`) passed vacuously because `KernelResponses.unwrapList`'s fail-open `onErrorResume` silently swallowed the same decoding error.
+**Root cause**: `KernelNotificationClient` already calls `KernelResponses.unwrapObjectOrPropagate`/`unwrapList` (expects `{success, data, ...}` per ADR-012), but the WireMock stubs in the test still return the bare flat DTO JSON from before that migration — this module wasn't one of the 10 mandated modules in the 2026-07-08 Kernel-facade pass, so its test went stale unnoticed.
+**Fix**: applied 2026-07-10 — wrapped every stub body in `{"success": true, "data": ...}` (including the `[]`/empty-list one, so it now genuinely exercises the empty path instead of masking a decode error).
+
+## 16. `DeliveryLifecycleServiceTest` (tnt-delivery-core) NPE from an unstubbed Mockito call
+**Symptom**: `shouldConfirmPickup`/`shouldStartTransit` fail with `NullPointerException` inside `resolveDeliveryPersonId` — `Mono.map()` called on a `null` returned by the `deliveryPersonRepository.findByActorId(...)` mock.
+**Root cause**: `DeliveryLifecycleService.resolveDeliveryPersonId` (actor-ID → delivery-person-ID resolution) calls `deliveryPersonRepository.findByActorId`, but the test never stubbed it — Mockito's default answer for an unstubbed method returning an object is `null`, not `Mono.empty()`, so the reactive chain NPEs instead of erroring cleanly.
+**Fix**: applied 2026-07-10 — added `when(deliveryPersonRepository.findByActorId(any(), any())).thenReturn(Mono.empty())` to both tests.
+
+## 17. `TiiBnTickApplicationTest` (tnt-bootstrap) needs a local Postgres role that doesn't ship with a fresh dev machine
+**Symptom**: `mvn test` on `tnt-bootstrap` fails at Liquibase/context-refresh with `password authentication failed for user "tiibntick_test"`, even though a local Postgres is reachable on `5432`.
+**Root cause**: the `test` Spring profile in `application.yml` hardcodes `localhost:5432` with role `tiibntick_test`/`tiibntick_test_pass` — provisioned automatically only inside the docker-compose Postgres container (`tnt-bootstrap/docker/postgres/init.sql`, which runs once against `tnt-postgres` on port `5433`), never against a machine's own system-level Postgres on `5432`.
+**Fix**: not a code fix — run `docker/postgres/init.sql`'s `tiibntick_test` role/database/extension block manually via `sudo -u postgres psql` against whichever Postgres actually listens on `5432` on that machine. Not automated because it requires interactive superuser credentials this assistant doesn't have access to.
 
 # Links
 - `infrastructure/database.md`, `development/coding-style.md`, `development/testing.md`

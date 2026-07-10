@@ -15,6 +15,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
@@ -100,8 +102,9 @@ class TntClientProfileServiceTest {
         // When / Then
         StepVerifier.create(profileService.register(command))
                 .expectErrorMatches(ex ->
-                        ex instanceof IllegalArgumentException &&
-                        ex.getMessage().contains(THIRD_PARTY_ID.toString()))
+                        ex instanceof ResponseStatusException rse &&
+                        rse.getStatusCode() == HttpStatus.NOT_FOUND &&
+                        rse.getReason() != null && rse.getReason().contains(THIRD_PARTY_ID.toString()))
                 .verify();
 
         // Verify that persistence was never called when Kernel check fails
@@ -120,7 +123,7 @@ class TntClientProfileServiceTest {
 
         // When / Then
         StepVerifier.create(profileService.register(command))
-                .expectError(IllegalArgumentException.class)
+                .expectError(ResponseStatusException.class)
                 .verify();
 
         verify(profileRepository, never()).save(any());
@@ -139,8 +142,9 @@ class TntClientProfileServiceTest {
         // When / Then
         StepVerifier.create(profileService.register(command))
                 .expectErrorMatches(ex ->
-                        ex instanceof IllegalStateException &&
-                        ex.getMessage().contains(THIRD_PARTY_ID.toString()))
+                        ex instanceof ResponseStatusException rse &&
+                        rse.getStatusCode() == HttpStatus.CONFLICT &&
+                        rse.getReason() != null && rse.getReason().contains(THIRD_PARTY_ID.toString()))
                 .verify();
 
         verify(profileRepository, never()).save(any());

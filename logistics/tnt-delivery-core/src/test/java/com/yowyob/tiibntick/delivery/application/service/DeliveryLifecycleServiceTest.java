@@ -91,6 +91,7 @@ class DeliveryLifecycleServiceTest {
         when(deliveryRepository.findById(TENANT_ID, DELIVERY_ID)).thenReturn(Mono.just(deliveryCreated));
         when(deliveryRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
         when(eventPublisher.publishAll(any())).thenReturn(Mono.empty());
+        when(deliveryPersonRepository.findByActorId(any(), any())).thenReturn(Mono.empty());
 
         ConfirmPickupCommand cmd = new ConfirmPickupCommand(TENANT_ID, DELIVERY_ID, DELIVERY_PERSON_ID);
 
@@ -122,6 +123,7 @@ class DeliveryLifecycleServiceTest {
         when(deliveryRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
         when(eventPublisher.publishAll(any())).thenReturn(Mono.empty());
         when(etaComputationPort.computeInitial(any(), any(), anyDouble())).thenReturn(Mono.just(eta));
+        when(deliveryPersonRepository.findByActorId(any(), any())).thenReturn(Mono.empty());
 
         StartTransitCommand cmd = new StartTransitCommand(TENANT_ID, DELIVERY_ID,
                 DELIVERY_PERSON_ID, new GeoCoordinates(3.87, 11.516));

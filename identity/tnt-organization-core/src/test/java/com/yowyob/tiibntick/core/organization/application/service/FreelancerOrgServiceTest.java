@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
@@ -67,8 +69,9 @@ class FreelancerOrgServiceTest {
         when(repository.existsByTradeName(anyString())).thenReturn(Mono.just(true));
 
         StepVerifier.create(service.registerFreelancerOrg(null, UUID.randomUUID(), "Existing Org"))
-                .expectErrorMatches(e -> e instanceof IllegalArgumentException
-                        && e.getMessage().contains("already exists"))
+                .expectErrorMatches(e -> e instanceof ResponseStatusException rse
+                        && rse.getStatusCode() == HttpStatus.CONFLICT
+                        && rse.getReason() != null && rse.getReason().contains("already exists"))
                 .verify();
     }
 
@@ -118,8 +121,9 @@ class FreelancerOrgServiceTest {
         when(repository.findById(id)).thenReturn(Mono.empty());
 
         StepVerifier.create(service.upgradeKycToBasic(id))
-                .expectErrorMatches(e -> e instanceof IllegalArgumentException
-                        && e.getMessage().contains("not found"))
+                .expectErrorMatches(e -> e instanceof ResponseStatusException rse
+                        && rse.getStatusCode() == HttpStatus.NOT_FOUND
+                        && rse.getReason() != null && rse.getReason().contains("not found"))
                 .verify();
     }
 }

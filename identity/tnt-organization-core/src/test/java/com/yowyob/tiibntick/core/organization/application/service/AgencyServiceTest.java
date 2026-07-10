@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
@@ -73,8 +75,9 @@ class AgencyServiceTest {
         StepVerifier.create(
                 agencyService.createAgency(KERNEL_ORG_ID, TENANT_ID, "Agency X", null, null))
                 .expectErrorMatches(ex ->
-                        ex instanceof IllegalArgumentException &&
-                        ex.getMessage().contains(KERNEL_ORG_ID.toString()))
+                        ex instanceof ResponseStatusException rse &&
+                        rse.getStatusCode() == HttpStatus.NOT_FOUND &&
+                        rse.getReason() != null && rse.getReason().contains(KERNEL_ORG_ID.toString()))
                 .verify();
     }
 
@@ -87,7 +90,7 @@ class AgencyServiceTest {
         // When / Then
         StepVerifier.create(
                 agencyService.createAgency(KERNEL_ORG_ID, TENANT_ID, "Ghost Agency", null, null))
-                .expectError(IllegalArgumentException.class)
+                .expectError(ResponseStatusException.class)
                 .verify();
     }
 

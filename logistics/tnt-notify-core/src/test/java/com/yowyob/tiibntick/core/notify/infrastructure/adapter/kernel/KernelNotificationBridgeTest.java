@@ -70,11 +70,14 @@ class KernelNotificationBridgeTest {
                         .withHeader("Content-Type", "application/json")
                         .withBody("""
                                 {
-                                  "id": "5b1f6e2a-1111-4c3a-9a2a-000000000001",
-                                  "channel": "EMAIL",
-                                  "status": "SENT",
-                                  "recipientAddress": "user@example.com",
-                                  "body": "hello"
+                                  "success": true,
+                                  "data": {
+                                    "id": "5b1f6e2a-1111-4c3a-9a2a-000000000001",
+                                    "channel": "EMAIL",
+                                    "status": "SENT",
+                                    "recipientAddress": "user@example.com",
+                                    "body": "hello"
+                                  }
                                 }
                                 """)));
 
@@ -98,7 +101,7 @@ class KernelNotificationBridgeTest {
                 .willReturn(aResponse().withStatus(200)
                         .withHeader("Content-Type", "application/json")
                         .withBody("""
-                                {"id": "5b1f6e2a-1111-4c3a-9a2a-000000000002", "status": "SENT"}
+                                {"success": true, "data": {"id": "5b1f6e2a-1111-4c3a-9a2a-000000000002", "status": "SENT"}}
                                 """)));
         KernelDeliveryProviderAdapter adapter = new KernelDeliveryProviderAdapter(client);
 
@@ -127,11 +130,11 @@ class KernelNotificationBridgeTest {
                 .willReturn(aResponse().withStatus(200)
                         .withHeader("Content-Type", "application/json")
                         .withBody("""
-                                [
+                                {"success": true, "data": [
                                   {"userId": "%s", "channel": "EMAIL", "enabled": true,  "locale": "fr_CM"},
                                   {"userId": "%s", "channel": "SMS",   "enabled": false, "locale": "fr_CM"},
                                   {"userId": "%s", "channel": "WHATSAPP", "enabled": true, "locale": "en_CM"}
-                                ]
+                                ]}
                                 """.formatted(userId, userId, userId))));
 
         KernelNotificationPreferenceAdapter adapter = new KernelNotificationPreferenceAdapter(client);
@@ -157,7 +160,9 @@ class KernelNotificationBridgeTest {
         wireMock.stubFor(get(urlPathEqualTo("/api/notifications/preferences/users/" + userId))
                 .willReturn(aResponse().withStatus(200)
                         .withHeader("Content-Type", "application/json")
-                        .withBody("[]")));
+                        .withBody("""
+                                {"success": true, "data": []}
+                                """)));
 
         KernelNotificationPreferenceAdapter adapter = new KernelNotificationPreferenceAdapter(client);
 
@@ -171,13 +176,13 @@ class KernelNotificationBridgeTest {
                 .willReturn(aResponse().withStatus(200)
                         .withHeader("Content-Type", "application/json")
                         .withBody("""
-                                {"userId": "%s", "channel": "EMAIL", "enabled": true, "locale": "fr_CM"}
+                                {"success": true, "data": {"userId": "%s", "channel": "EMAIL", "enabled": true, "locale": "fr_CM"}}
                                 """.formatted(userId))));
         wireMock.stubFor(get(urlPathEqualTo("/api/notifications/preferences/users/" + userId))
                 .willReturn(aResponse().withStatus(200)
                         .withHeader("Content-Type", "application/json")
                         .withBody("""
-                                [{"userId": "%s", "channel": "EMAIL", "enabled": true, "locale": "fr_CM"}]
+                                {"success": true, "data": [{"userId": "%s", "channel": "EMAIL", "enabled": true, "locale": "fr_CM"}]}
                                 """.formatted(userId))));
 
         KernelNotificationPreferenceAdapter adapter = new KernelNotificationPreferenceAdapter(client);
