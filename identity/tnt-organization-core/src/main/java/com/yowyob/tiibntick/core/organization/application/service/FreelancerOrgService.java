@@ -1,6 +1,8 @@
 package com.yowyob.tiibntick.core.organization.application.service;
 
 import com.yowyob.tiibntick.core.organization.application.port.in.ManageFreelancerOrgUseCase;
+import com.yowyob.tiibntick.core.organization.application.port.out.FreelancerOrgDidAnchorPayload;
+import com.yowyob.tiibntick.core.organization.application.port.out.FreelancerOrgDidAnchorPort;
 import com.yowyob.tiibntick.core.organization.application.port.out.FreelancerOrgEventPublisherPort;
 import com.yowyob.tiibntick.core.organization.application.port.out.FreelancerOrgRepositoryPort;
 import com.yowyob.tiibntick.core.organization.domain.enums.KycLevel;
@@ -16,6 +18,8 @@ import com.yowyob.tiibntick.core.organization.domain.vo.FreelancerCapabilities;
 import com.yowyob.tiibntick.core.organization.domain.vo.OrganizationId;
 import com.yowyob.tiibntick.core.organization.domain.vo.ServiceZone;
 import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Flux;
@@ -47,8 +51,11 @@ import java.util.UUID;
  */
 public class FreelancerOrgService implements ManageFreelancerOrgUseCase {
 
+    private static final Logger log = LoggerFactory.getLogger(FreelancerOrgService.class);
+
     private final FreelancerOrgRepositoryPort repository;
     private final FreelancerOrgEventPublisherPort eventPublisher;
+    private final FreelancerOrgDidAnchorPort didAnchorPort;
 
     /**
      * Constructor injection — no field injection to keep the class testable
@@ -56,11 +63,15 @@ public class FreelancerOrgService implements ManageFreelancerOrgUseCase {
      *
      * @param repository     persistence port for FreelancerOrganization aggregates
      * @param eventPublisher outbound event publishing port
+     * @param didAnchorPort  outbound port for anchoring the org's blockchain DID
+     *                       (implemented by {@code tnt-trust-core})
      */
     public FreelancerOrgService(FreelancerOrgRepositoryPort repository,
-                                 FreelancerOrgEventPublisherPort eventPublisher) {
+                                 FreelancerOrgEventPublisherPort eventPublisher,
+                                 FreelancerOrgDidAnchorPort didAnchorPort) {
         this.repository = repository;
         this.eventPublisher = eventPublisher;
+        this.didAnchorPort = didAnchorPort;
     }
 
     // ─── Registration ─────────────────────────────────────────────────────────
@@ -169,6 +180,29 @@ public class FreelancerOrgService implements ManageFreelancerOrgUseCase {
                                             saved.getOwnerActorId(), saved.getKycLevel(),
                                             adminActorId))
                                     .thenReturn(saved));
+                })
+                .flatMap(this::anchorDidIfAbsent);
+    }
+
+    /**
+     * Issues the organization's blockchain DID if it does not already have one.
+     * Best-effort: a failure here must never fail the verification flow.
+     */
+    private Mono<FreelancerOrganization> anchorDidIfAbsent(FreelancerOrganization org) {
+        if (org.getBlockchainDid() != null) {
+            return Mono.just(org);
+        }
+        final var payload = new FreelancerOrgDidAnchorPayload(
+                org.getId().value(), org.getTenantId(), org.getTradeName());
+        return didAnchorPort.issueDid(payload)
+                .flatMap(did -> {
+                    org.assignBlockchainDid(did);
+                    return repository.save(org);
+                })
+                .onErrorResume(e -> {
+                    log.warn("Failed to anchor blockchain DID for FreelancerOrg {}: {}",
+                            org.getId(), e.getMessage());
+                    return Mono.just(org);
                 });
     }
 

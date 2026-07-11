@@ -25,9 +25,10 @@ public final class ClientProfile extends TntActorProfile {
             Instant updatedAt,
             List<UUID> favoriteAddressIds,
             int loyaltyScore,
-            String preferredPaymentMethod) {
+            String preferredPaymentMethod,
+            String blockchainDid) {
         super(id, tenantId, actorId, ActorType.CLIENT, actorStatus, kycStatus,
-                currentLocation, rating, badges, createdAt, updatedAt);
+                currentLocation, rating, badges, createdAt, updatedAt, blockchainDid);
         this.favoriteAddressIds = favoriteAddressIds != null ? List.copyOf(favoriteAddressIds) : List.of();
         this.loyaltyScore = Math.max(0, loyaltyScore);
         this.preferredPaymentMethod = preferredPaymentMethod;
@@ -39,7 +40,7 @@ public final class ClientProfile extends TntActorProfile {
                 ActorStatus.ACTIVE, KycStatus.PENDING,
                 null, ActorRating.zero(), Set.of(),
                 Instant.now(), Instant.now(),
-                List.of(), 0, null);
+                List.of(), 0, null, null);
     }
 
     public static ClientProfile rehydrate(
@@ -52,7 +53,8 @@ public final class ClientProfile extends TntActorProfile {
             Instant createdAt, Instant updatedAt,
             List<UUID> favoriteAddressIds,
             int loyaltyScore,
-            String preferredPaymentMethod) {
+            String preferredPaymentMethod,
+            String blockchainDid) {
         ActorLocation location = (locationLat != null && locationLng != null)
                 ? ActorLocation.of(locationLat, locationLng, locationAccuracy,
                         locationTimestamp != null ? locationTimestamp : Instant.now(),
@@ -65,7 +67,7 @@ public final class ClientProfile extends TntActorProfile {
                 id, tenantId, actorId,
                 ActorStatus.from(actorStatus), KycStatus.from(kycStatus),
                 location, rating, badges, createdAt, updatedAt,
-                favoriteAddressIds, loyaltyScore, preferredPaymentMethod);
+                favoriteAddressIds, loyaltyScore, preferredPaymentMethod, blockchainDid);
     }
 
     public ClientProfile addFavoriteAddress(UUID addressId) {
@@ -75,25 +77,25 @@ public final class ClientProfile extends TntActorProfile {
         }
         return new ClientProfile(id(), tenantId(), actorId(), actorStatus(), kycStatus(),
                 currentLocation(), rating(), badges(), createdAt(), Instant.now(),
-                updated, loyaltyScore, preferredPaymentMethod);
+                updated, loyaltyScore, preferredPaymentMethod, blockchainDid());
     }
 
     public ClientProfile addLoyaltyPoints(int points) {
         return new ClientProfile(id(), tenantId(), actorId(), actorStatus(), kycStatus(),
                 currentLocation(), rating(), badges(), createdAt(), Instant.now(),
-                favoriteAddressIds, loyaltyScore + points, preferredPaymentMethod);
+                favoriteAddressIds, loyaltyScore + points, preferredPaymentMethod, blockchainDid());
     }
 
     public ClientProfile withRating(ActorRating rating) {
         return new ClientProfile(id(), tenantId(), actorId(), actorStatus(), kycStatus(),
                 currentLocation(), rating, badges(), createdAt(), Instant.now(),
-                favoriteAddressIds, loyaltyScore, preferredPaymentMethod);
+                favoriteAddressIds, loyaltyScore, preferredPaymentMethod, blockchainDid());
     }
 
     public ClientProfile withKycStatus(KycStatus kycStatus) {
         return new ClientProfile(id(), tenantId(), actorId(), actorStatus(), kycStatus,
                 currentLocation(), rating(), badges(), createdAt(), Instant.now(),
-                favoriteAddressIds, loyaltyScore, preferredPaymentMethod);
+                favoriteAddressIds, loyaltyScore, preferredPaymentMethod, blockchainDid());
     }
 
     public ClientProfile withBadge(Badge badge) {
@@ -101,7 +103,7 @@ public final class ClientProfile extends TntActorProfile {
         updatedBadges.add(badge);
         return new ClientProfile(id(), tenantId(), actorId(), actorStatus(), kycStatus(),
                 currentLocation(), rating(), updatedBadges, createdAt(), Instant.now(),
-                favoriteAddressIds, loyaltyScore, preferredPaymentMethod);
+                favoriteAddressIds, loyaltyScore, preferredPaymentMethod, blockchainDid());
     }
 
     public List<UUID> favoriteAddressIds() {

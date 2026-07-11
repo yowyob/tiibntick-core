@@ -123,6 +123,10 @@
             <groupId>com.yowyob.tiibntick.core</groupId>
             <artifactId>tnt-media-core</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-trust-core</artifactId>
+        </dependency>
 
         <!-- ══════════════════════════════════════════════════════
              COUCHE L4 — Business
@@ -146,6 +150,10 @@
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>
             <artifactId>tnt-accounting-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-hrm-core</artifactId>
         </dependency>
 
         <!-- ══════════════════════════════════════════════════════

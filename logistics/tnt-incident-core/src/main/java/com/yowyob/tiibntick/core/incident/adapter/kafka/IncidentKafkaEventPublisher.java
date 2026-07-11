@@ -3,7 +3,6 @@ package com.yowyob.tiibntick.core.incident.adapter.kafka;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yowyob.tiibntick.core.incident.domain.event.IncidentDomainEvents.*;
 import com.yowyob.tiibntick.core.incident.port.outbound.IIncidentEventPublisher;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -23,13 +22,17 @@ import reactor.core.scheduler.Schedulers;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class IncidentKafkaEventPublisher implements IIncidentEventPublisher {
 
-    @Qualifier("incidentKafkaTemplate")
     private final KafkaTemplate<String, String> kafkaTemplate;
-    @Qualifier("incidentObjectMapper")
     private final ObjectMapper objectMapper;
+
+    public IncidentKafkaEventPublisher(
+            @Qualifier("incidentKafkaTemplate") KafkaTemplate<String, String> kafkaTemplate,
+            @Qualifier("incidentObjectMapper") ObjectMapper objectMapper) {
+        this.kafkaTemplate = kafkaTemplate;
+        this.objectMapper = objectMapper;
+    }
 
     private static final String TOPIC_CREATED          = "tnt.incident.created";
     private static final String TOPIC_STATUS_CHANGED   = "tnt.incident.status.changed";

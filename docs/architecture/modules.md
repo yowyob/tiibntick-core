@@ -1,10 +1,11 @@
 # Purpose
-Authoritative list of all 31 Maven modules: layer, folder, owner, package root, and whether each follows the standard hexagonal layout. Source of truth: root `pom.xml` `<modules>` (with inline ownership comments) and `<developers>`.
+Authoritative list of all 33 Maven modules: layer, folder, owner, package root, and whether each follows the standard hexagonal layout. Source of truth: root `pom.xml` `<modules>` (with inline ownership comments) and `<developers>`.
 
 # Summary
-- 31 modules: 5 foundation (L0/L1) + 4 identity (L2) + 9 logistics (L3) + 5 business (L4) + 7 billing (L5) + 1 bootstrap (L6).
-- Build order in root `pom.xml` **is** the dependency order — earlier layers never depend on later ones.
+- 33 modules: 6 foundation (L0/L1) + 4 identity (L2) + 9 logistics (L3) + 5 business (L4) + 7 billing (L5) + 1 trust (L6) + 1 bootstrap (L7).
+- Build order in root `pom.xml` **is** the dependency order — earlier layers never depend on later ones. Strict rule: a module must never declare a Maven dependency on a module in a strictly higher-numbered layer, even if the resulting graph is acyclic (see `tnt-trust-core` below for why it isn't L3).
 - Two modules deliberately deviate from the standard `adapter/application/domain` hexagonal package shape: `tnt-billing-dsl` and `tnt-accounting-core` (both use `infrastructure/{adapter,config,persistence}` instead — see `architecture/packages.md`).
+- `tnt-trust-core` (L6, `trust/` folder — not `logistics/`) is a cross-cutting exception to the "earlier layers never depend on later ones" rule above: it depends *down* into whichever module owns an outbound port it implements (delivery, incident, billing-pricing, billing-wallet, actor-core so far — spanning L2 through L5), but no calling module ever depends back on it. That consumption pattern is exactly why it can't be L3 — a module legitimately depending on L2–L5 modules must itself sit above L5.
 
 # Details
 
@@ -17,6 +18,7 @@ Authoritative list of all 31 Maven modules: layer, folder, owner, package root, 
 | tnt-common-core | L1 | foundation/ | shared | `com.yowyob.tiibntick.common` |
 | tnt-auth-core | L1 | foundation/ | shared | `com.yowyob.tiibntick.core.auth` |
 | tnt-roles-core | L1 | foundation/ | shared | `com.yowyob.tiibntick.core.roles` |
+| tnt-platform-gateway-core | L1 | foundation/ | shared | `com.yowyob.tiibntick.core.platformgateway` |
 | tnt-actor-core | L2 | identity/ | MANFOUO Braun | `com.yowyob.tiibntick.core.actor` |
 | tnt-organization-core | L2 | identity/ | PAFE Dilane | `com.yowyob.tiibntick.core.organization` |
 | tnt-tp-core | L2 | identity/ | FRANCOIS | `com.yowyob.tiibntick.core.tp` |
@@ -42,7 +44,8 @@ Authoritative list of all 31 Maven modules: layer, folder, owner, package root, 
 | tnt-billing-wallet | L5 | billing/ | MANFOUO Braun | `com.yowyob.tiibntick.core.billing.wallet` |
 | tnt-billing-report | L5 | billing/ | PAFE Dilane | `com.yowyob.tiibntick.core.billing.report` |
 | tnt-billing-templates | L5 | billing/ | (unattributed) | `com.yowyob.tiibntick.core.billing.templates` |
-| tnt-bootstrap | L6 | root | MANFOUO Braun | `com.yowyob.tiibntick.bootstrap` |
+| tnt-trust-core | L6 | trust/ | MANFOUO Braun | `com.yowyob.tiibntick.core.trust` |
+| tnt-bootstrap | L7 | root | MANFOUO Braun | `com.yowyob.tiibntick.bootstrap` |
 
 ## One-line purpose per module
 
@@ -53,6 +56,7 @@ Authoritative list of all 31 Maven modules: layer, folder, owner, package root, 
 | tnt-common-core | Shared types/utilities used by every other module |
 | tnt-auth-core | JWT (Kernel-issued) → `TntSecurityContext` bridge |
 | tnt-roles-core | RBAC vocabulary: `TntRole`, `TntPermission`, `@RequirePermission` AOP |
+| tnt-platform-gateway-core | Client-ID/API-Key auth for platform backends, resource:action scopes, Kernel auth/SSO proxy |
 | tnt-actor-core | Deliverer/Freelancer/RelayOperator/ClientProfile identity profiles |
 | tnt-organization-core | Agency, Branch, Hub, ServiceZone |
 | tnt-tp-core | Third-party extension: KYC, loyalty, ratings, client profiles |
@@ -78,6 +82,7 @@ Authoritative list of all 31 Maven modules: layer, folder, owner, package root, 
 | tnt-billing-wallet | Wallet balance, prepaid, MTN/Orange/Stripe payment webhooks |
 | tnt-billing-report | Revenue/commission/margin reports, CSV export |
 | tnt-billing-templates | Pre-built billing policy templates |
+| tnt-trust-core | Cross-cutting blockchain anchoring toward the yow-trust-event Kernel — DeliveryProof/CustodyTransfer/DID/PoL/Badge/BillingPolicy/Payment, incident blockchain chain (`IBlockchainAuditPort`); consumes L2→L5 modules, nothing depends back on it |
 | tnt-bootstrap | The only runnable module — assembles and starts everything |
 
 # Links

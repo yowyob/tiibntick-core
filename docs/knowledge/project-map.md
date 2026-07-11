@@ -42,6 +42,7 @@ Universal path pattern (applies to ~27/31 modules, see `architecture/packages.md
 | tnt-sync-core | `SyncController` | (module config not separately profiled) | |
 | tnt-notify-core | (REST controller exists, name not separately confirmed) | `NotifyCoreAutoConfiguration` | |
 | tnt-media-core | — (consumed via ports) | `MediaCoreConfig` | MinIO client bean here — see `infrastructure/redis.md`-adjacent, actually MinIO not Redis |
+| tnt-trust-core | `TrustApiController` | `TntTrustAutoConfiguration`, `KafkaProducerConfig` | L6 (trust/, transversal — not L3 logistics, see `architecture/modules.md`). Standard `application/{port,service}` layout. Implements outbound ports owned by every calling module (delivery/incident/billing-pricing/billing-wallet/actor-core so far) via adapters under `adapter/out/<module>/`, and depends on each of those modules directly (one-directional, no calling module ever depends back) |
 | tnt-resource-core | — | | Vehicle/equipment domain — richest event set (11 events) |
 | tnt-product-core | — | | |
 | tnt-inventory-core | — | | |

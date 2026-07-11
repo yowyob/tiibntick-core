@@ -2,9 +2,10 @@
 Visual + tabular map of which TiiBnTick module depends on which — for impact analysis ("if I change X, what could break?") and for understanding build order.
 
 # Summary
-- Build order = dependency order (root `pom.xml` `<modules>` list, L0→L6).
+- Build order = dependency order (root `pom.xml` `<modules>` list, L0→L7).
 - Almost every module depends on `tnt-common-core` (shared types) — omitted from the diagram below for readability.
 - Kernel (`yowyob.comops.api:RT-comops-*`) dependencies are read-only/external — see `architecture/overview.md` for the boundary rule.
+- `tnt-trust-core` (L6, `trust/`) is the one module that depends on modules across several other layers (L2 actor, L3 delivery/incident, L5 billing-pricing/billing-wallet so far) — always one-directionally, always down into whichever module owns the port it implements. No calling module ever depends back on trust. See `architecture/modules.md` for why this puts trust above L5, not in L3 logistics where it physically used to live.
 
 # Details
 
@@ -42,10 +43,19 @@ flowchart LR
     billing_invoice[tnt-billing-invoice] --> tp[tnt-tp-core]
     billing_report[tnt-billing-report] --> accounting
 
+    trust[tnt-trust-core] --> auth
+    trust --> roles
+    trust -->|"IBadgeAnchorPort"| actor
+    trust -->|"DeliveryProofAnchorPort"| delivery
+    trust -->|"IBlockchainAuditPort"| incident
+    trust -->|"BillingPolicyAnchorPort"| billing_pricing
+    trust -->|"IPaymentAnchorPort"| billing_wallet[tnt-billing-wallet]
+
     bootstrap[tnt-bootstrap] -.assembles.-> actor
     bootstrap -.assembles.-> delivery
     bootstrap -.assembles.-> billing_invoice
     bootstrap -.assembles.-> accounting
+    bootstrap -.assembles.-> trust
 ```
 
 ## Module → Kernel dependency table
@@ -83,6 +93,11 @@ flowchart LR
 | tnt-incident-core → tnt-media-core | `IMediaStoragePort` | Evidence archival (MinIO) — see `knowledge/known-issues.md` for the tenant-bucket fix |
 | all modules → tnt-notify-core | `IPublishNotificationEventPort` | Event-driven notifications |
 | tnt-roles-core → Kernel (HTTP) | `kernelWebClient` | Role provisioning, permission resolution (REMOTE/HYBRID mode) |
+| tnt-delivery-core → tnt-trust-core | `DeliveryProofAnchorPort` | Blockchain-anchor delivery proof on completion. Port owned by delivery, implemented in trust — Maven dependency is inverted (`trust → delivery`), never `delivery → trust` |
+| tnt-incident-core → tnt-trust-core | `IBlockchainAuditPort` | Incident-chain blockchain anchoring. Port owned by incident, implemented in trust — Maven dependency inverted, same as above |
+| tnt-billing-pricing → tnt-trust-core | `BillingPolicyAnchorPort` | Anchor billing policy activation on-chain. Port owned by billing-pricing, implemented in trust — Maven dependency inverted |
+| tnt-billing-wallet → tnt-trust-core | `IPaymentAnchorPort` | Anchor committed wallet payments on-chain. Port owned by billing-wallet, implemented in trust — Maven dependency inverted |
+| tnt-actor-core → tnt-trust-core | `IBadgeAnchorPort` | Anchor earned badges on-chain, returns tx hash persisted back onto `Badge.blockchainTxHash`. Port owned by actor-core, implemented in trust — Maven dependency inverted |
 
 ## `tnt-bootstrap` assembly
 `tnt-bootstrap`'s `TntCoreConfig` `@Import`s every module's `@Configuration` class — see `architecture/modules.md` for the full module list and `infrastructure/monitoring.md` for the custom actuator endpoints that expose this wiring at runtime (`/actuator/tnt-modules`).

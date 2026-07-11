@@ -58,6 +58,7 @@ public class WalletService implements IWalletUseCase {
     private final IIdempotencyStore idempotencyStore;
     private final IWalletEventPublisher eventPublisher;
     private final IWalletNotificationPort notificationPort;
+    private final IPaymentAnchorPort paymentAnchorPort;
 
     @Override
     @RequirePermission(resource = "wallet", action = "read")
@@ -416,10 +417,29 @@ public class WalletService implements IWalletUseCase {
                                     wallet.getUserId(), wallet.getTenantId(),
                                     intent.getInvoiceId(), intent.getAmount(),
                                     intent.getChannel(), financialTransactionId)))
+                            .then(anchorPaymentCommit(intent, wallet, financialTransactionId))
                             .then(notificationPort.sendPaymentConfirmed(
                                     wallet.getUserId(),
                                     String.format("✅ Paiement %s confirmé.", intent.getAmount())))
                             .thenReturn(intent);
+                });
+    }
+
+    /**
+     * Anchors the committed payment on the blockchain via {@code tnt-trust-core}, best-effort.
+     * A trust-anchoring failure must never fail payment confirmation.
+     */
+    private Mono<Void> anchorPaymentCommit(PaymentIntent intent, Wallet wallet, String financialTransactionId) {
+        PaymentAnchorPayload payload = new PaymentAnchorPayload(
+                wallet.getTenantId(), intent.getId().value(), wallet.getId().value(),
+                wallet.getUserId(), intent.getInvoiceId(), intent.getAmount().amount(),
+                intent.getAmount().currencyCode(), intent.getChannel().name(),
+                financialTransactionId, java.time.Instant.now());
+        return paymentAnchorPort.anchor(payload)
+                .onErrorResume(e -> {
+                    log.warn("Failed to anchor payment commit on-chain — paymentIntentId={}: {}",
+                            intent.getId().value(), e.getMessage());
+                    return Mono.empty();
                 });
     }
 

@@ -11,7 +11,7 @@
 ## The one-sentence pitch
 A reactive, multi-tenant, hexagonal-architecture logistics platform (delivery, dispatch, incidents, disputes, real-time tracking) with an integrated billing/invoicing/wallet engine, assembled from 30 independently-versioned library modules into a single deployable Spring Boot application.
 
-## Layered build (L0→L6) — see `architecture/modules.md` for the full table
+## Layered build (L0→L7) — see `architecture/modules.md` for the full table
 ```mermaid
 flowchart TB
     L0["L0 — foundation kernels<br/>(event bus, i18n)"] --> L1["L1 — common, auth, roles"]
@@ -19,9 +19,10 @@ flowchart TB
     L2 --> L3["L3 — logistics<br/>(geo, route, delivery, dispute, incident,<br/>realtime, sync, notify, media)"]
     L3 --> L4["L4 — business<br/>(resource, product, inventory, sales, accounting)"]
     L4 --> L5["L5 — billing<br/>(dsl, pricing, cost, invoice, wallet, report, templates)"]
-    L5 --> L6["L6 — tnt-bootstrap<br/>(the only runnable module)"]
+    L5 --> L6["L6 — trust<br/>(tnt-trust-core, cross-cutting blockchain anchoring)"]
+    L6 --> L7["L7 — tnt-bootstrap<br/>(the only runnable module)"]
 ```
-Each layer only depends on layers above it — `pom.xml` `<modules>` order **is** the build/dependency order.
+Each layer only depends on layers before it — `pom.xml` `<modules>` order **is** the build/dependency order. `tnt-trust-core` (L6) is the one deliberate exception in shape, not in rule: it depends *down* into L2–L5 modules to implement outbound ports they each own, so it must sit above all of them — but the rule itself ("never depend on a strictly higher layer") is never broken.
 
 ## The Yowyob Kernel boundary
 Everything under groupId `yowyob.comops.api` (`RT-comops-*`) is an **external, read-only** dependency from a different team/repo. TiiBnTick Core consumes it for: base entities, `TenantId`, `Money`, JWT/auth primitives, RBAC persistence, kernel domain events, file storage SPI. **Never modify, vendor, or expect to find Kernel sources in this repo.**

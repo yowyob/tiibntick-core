@@ -156,7 +156,8 @@ public final class DisputePersistenceMapper {
                 e.isVerified(),
                 e.getVerifiedAt(),
                 e.getVerifiedByMediatorId(),
-                e.getBlockchainRef());
+                e.getBlockchainRef(),
+                e.getEvidenceHash());
     }
 
     /**
@@ -181,6 +182,7 @@ public final class DisputePersistenceMapper {
         e.setVerifiedByMediatorId(evidence.getVerifiedByMediatorId());
         e.setBlockchainRef(evidence.getBlockchainRef());
         e.setTenantId(tenantId);
+        e.setEvidenceHash(evidence.getEvidenceHash());
         return e;
     }
 

@@ -23,5 +23,7 @@ public record ClientProfileEntity(
         Instant updatedAt,
         String favoriteAddressIdsJson,
         int loyaltyScore,
-        String preferredPaymentMethod) {
+        String preferredPaymentMethod,
+        /** Blockchain DID anchored via tnt-trust. Nullable — not currently issued for clients. */
+        String blockchainDid) {
 }

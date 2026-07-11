@@ -1,6 +1,7 @@
 package com.yowyob.tiibntick.core.realtime.config;
 
 import com.yowyob.tiibntick.core.realtime.application.port.out.IActorLocationUpdater;
+import com.yowyob.tiibntick.core.realtime.application.port.out.IGeofenceAnchorPort;
 import com.yowyob.tiibntick.core.realtime.application.port.out.IGeofenceZoneRepository;
 import com.yowyob.tiibntick.core.realtime.application.port.out.IKalmanEtaUpdater;
 import com.yowyob.tiibntick.core.realtime.application.port.out.IPresenceRepository;
@@ -51,8 +52,9 @@ public class RealtimeCoreConfig {
     @Bean
     public GeofenceMonitorService geofenceMonitorService(IGeofenceZoneRepository geofenceZoneRepository,
                                                          IWebSocketBroadcaster broadcaster,
-                                                         IRealtimeEventPublisher eventPublisher) {
-        return new GeofenceMonitorService(geofenceZoneRepository, broadcaster, eventPublisher);
+                                                         IRealtimeEventPublisher eventPublisher,
+                                                         IGeofenceAnchorPort geofenceAnchorPort) {
+        return new GeofenceMonitorService(geofenceZoneRepository, broadcaster, eventPublisher, geofenceAnchorPort);
     }
 
     @Bean

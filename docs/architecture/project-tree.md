@@ -2,13 +2,13 @@
 Physical directory tree of the repo (excludes `target/`, `.idea/`, `.git/`, `node_modules/`) — for quick visual orientation.
 
 # Summary
-31 modules under 5 plain grouping folders + 1 runnable module at root. Each module's `src/main/java` follows the shape documented in `architecture/packages.md`.
+33 modules under 6 plain grouping folders + 1 runnable module at root. Each module's `src/main/java` follows the shape documented in `architecture/packages.md`.
 
 # Details
 
 ```
 tiibntick-core/
-├── pom.xml                              ← root parent, defines all 31 modules + dependencyManagement
+├── pom.xml                              ← root parent, defines all 33 modules + dependencyManagement
 ├── CLAUDE.md                            ← authoritative project instructions
 ├── docs/                                ← this documentation tree
 │
@@ -17,8 +17,9 @@ tiibntick-core/
 │   ├── yow-i18n-kernel/                 [L0] i18n (fr_CM/en_CM/pidgin_CM) — com.yowyob.kernel.i18n
 │   ├── tnt-common-core/                 [L1] shared types/utilities
 │   ├── tnt-auth-core/                   [L1] JWT → TntSecurityContext bridge
-│   └── tnt-roles-core/                  [L1] RBAC: TntRole, @RequirePermission, ReactivePermissionResolver
-│       └── src/main/java/.../roles/{adapter,application,domain,config}/
+│   ├── tnt-roles-core/                  [L1] RBAC: TntRole, @RequirePermission, ReactivePermissionResolver
+│   │   └── src/main/java/.../roles/{adapter,application,domain,config}/
+│   └── tnt-platform-gateway-core/       [L1] Client-ID/API-Key platform auth, resource:action scopes, Kernel auth/SSO proxy
 │
 ├── identity/
 │   ├── tnt-actor-core/                  [L2] Deliverer/Freelancer/RelayOperator/ClientProfile
@@ -55,7 +56,13 @@ tiibntick-core/
 │   ├── tnt-billing-report/              [L5] Revenue/commission/margin reports
 │   └── tnt-billing-templates/           [L5] Reusable billing policy templates
 │
-└── tnt-bootstrap/                       [L6] THE ONLY RUNNABLE MODULE
+├── trust/
+│   └── tnt-trust-core/                  [L6] Cross-cutting blockchain anchoring — DeliveryProof/CustodyTransfer/
+│                                              DID/Badge/BillingPolicy/Payment, incident blockchain chain.
+│                                              Depends down into L2→L5 modules that own its outbound ports;
+│                                              nothing depends back on it.
+│
+└── tnt-bootstrap/                       [L7] THE ONLY RUNNABLE MODULE
     ├── docker-compose.yml               ← local dev infra (postgres/redis/kafka/minio/es/prometheus/grafana/zipkin)
     ├── Dockerfile
     └── src/main/

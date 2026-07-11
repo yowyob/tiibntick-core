@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.core.realtime.domain.service;
 
+import com.yowyob.tiibntick.core.realtime.application.port.out.IGeofenceAnchorPort;
 import com.yowyob.tiibntick.core.realtime.application.port.out.IGeofenceZoneRepository;
 import com.yowyob.tiibntick.core.realtime.application.port.out.IRealtimeEventPublisher;
 import com.yowyob.tiibntick.core.realtime.application.port.out.IWebSocketBroadcaster;
@@ -40,6 +41,7 @@ class GeofenceMonitorServiceTest {
     @Mock private IGeofenceZoneRepository zoneRepository;
     @Mock private IWebSocketBroadcaster broadcaster;
     @Mock private IRealtimeEventPublisher eventPublisher;
+    @Mock private IGeofenceAnchorPort geofenceAnchorPort;
 
     private GeofenceMonitorService monitorService;
 
@@ -54,7 +56,7 @@ class GeofenceMonitorServiceTest {
 
     @BeforeEach
     void setUp() {
-        monitorService = new GeofenceMonitorService(zoneRepository, broadcaster, eventPublisher);
+        monitorService = new GeofenceMonitorService(zoneRepository, broadcaster, eventPublisher, geofenceAnchorPort);
 
         relayHubZone = GeofenceZone.builder()
                 .id("zone-hub-1")
@@ -81,6 +83,7 @@ class GeofenceMonitorServiceTest {
         when(zoneRepository.findActiveByTenant(TENANT_ID)).thenReturn(Flux.just(relayHubZone));
         when(broadcaster.broadcast(any(), any())).thenReturn(Mono.empty());
         when(eventPublisher.publish(any())).thenReturn(Mono.empty());
+        when(geofenceAnchorPort.anchor(any())).thenReturn(Mono.empty());
 
         // Position inside the hub zone (same as center)
         GPSStreamEntry pingInside = pingAt(HUB_CENTER);
@@ -103,6 +106,7 @@ class GeofenceMonitorServiceTest {
         when(zoneRepository.findActiveByTenant(TENANT_ID)).thenReturn(Flux.just(relayHubZone));
         when(broadcaster.broadcast(any(), any())).thenReturn(Mono.empty());
         when(eventPublisher.publish(any())).thenReturn(Mono.empty());
+        when(geofenceAnchorPort.anchor(any())).thenReturn(Mono.empty());
 
         // First ping: inside the zone
         monitorService.checkGeofences(pingAt(HUB_CENTER)).block();
@@ -135,6 +139,7 @@ class GeofenceMonitorServiceTest {
         when(zoneRepository.findActiveByTenant(TENANT_ID)).thenReturn(Flux.just(relayHubZone));
         when(broadcaster.broadcast(any(), any())).thenReturn(Mono.empty());
         when(eventPublisher.publish(any())).thenReturn(Mono.empty());
+        when(geofenceAnchorPort.anchor(any())).thenReturn(Mono.empty());
 
         // First ping: enter
         monitorService.checkGeofences(pingAt(HUB_CENTER)).block();
@@ -150,6 +155,7 @@ class GeofenceMonitorServiceTest {
         when(zoneRepository.findActiveByTenant(TENANT_ID)).thenReturn(Flux.just(relayHubZone));
         when(broadcaster.broadcast(any(), any())).thenReturn(Mono.empty());
         when(eventPublisher.publish(any())).thenReturn(Mono.empty());
+        when(geofenceAnchorPort.anchor(any())).thenReturn(Mono.empty());
 
         // Enter zone
         monitorService.checkGeofences(pingAt(HUB_CENTER)).block();

@@ -8,3 +8,6 @@ databaseChangeLog:
   - include:
       file: db/changelog/migrations/V3__add_freelancer_org_link_to_actor.sql
       relativeToChangelogFile: false
+  - include:
+      file: db/changelog/migrations/V4__add_blockchain_did_to_actor_profiles.sql
+      relativeToChangelogFile: false

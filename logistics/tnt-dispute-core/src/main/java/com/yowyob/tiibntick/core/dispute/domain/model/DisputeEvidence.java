@@ -31,6 +31,7 @@ public final class DisputeEvidence {
     private LocalDateTime verifiedAt;
     private String verifiedByMediatorId;
     private String blockchainRef;
+    private final String evidenceHash;
 
     private DisputeEvidence(
             final EvidenceId id,
@@ -44,7 +45,8 @@ public final class DisputeEvidence {
             final boolean isVerified,
             final LocalDateTime verifiedAt,
             final String verifiedByMediatorId,
-            final String blockchainRef) {
+            final String blockchainRef,
+            final String evidenceHash) {
         this.id = Objects.requireNonNull(id, "EvidenceId must not be null");
         this.disputeId = Objects.requireNonNull(disputeId, "DisputeId must not be null");
         this.submittedBy = Objects.requireNonNull(submittedBy, "submittedBy must not be null");
@@ -57,6 +59,7 @@ public final class DisputeEvidence {
         this.verifiedAt = verifiedAt;
         this.verifiedByMediatorId = verifiedByMediatorId;
         this.blockchainRef = blockchainRef;
+        this.evidenceHash = evidenceHash;
     }
 
     /**
@@ -68,6 +71,10 @@ public final class DisputeEvidence {
      * @param type          nature of the evidence
      * @param fileKey       MinIO object key for the file (nullable for non-file evidence)
      * @param description   human-readable description of the evidence
+     * @param evidenceHash  SHA-256 hash of the evidence content, client-supplied (nullable —
+     *                      typically computed by whatever service drove the MinIO upload,
+     *                      e.g. tnt-media-core), enabling real cryptographic verification
+     *                      of the anchored proof later via {@code IBlockchainProofPort.verifyProof}
      * @return a new {@code DisputeEvidence}
      */
     public static DisputeEvidence create(
@@ -76,10 +83,11 @@ public final class DisputeEvidence {
             final EvidenceSubmitterType submitterType,
             final EvidenceType type,
             final String fileKey,
-            final String description) {
+            final String description,
+            final String evidenceHash) {
         return new DisputeEvidence(
                 EvidenceId.generate(), disputeId, submittedBy, submitterType,
-                type, fileKey, description, LocalDateTime.now(), false, null, null, null);
+                type, fileKey, description, LocalDateTime.now(), false, null, null, null, evidenceHash);
     }
 
     /**
@@ -97,9 +105,11 @@ public final class DisputeEvidence {
             final boolean isVerified,
             final LocalDateTime verifiedAt,
             final String verifiedByMediatorId,
-            final String blockchainRef) {
+            final String blockchainRef,
+            final String evidenceHash) {
         return new DisputeEvidence(id, disputeId, submittedBy, submitterType, type, fileKey,
-                description, submittedAt, isVerified, verifiedAt, verifiedByMediatorId, blockchainRef);
+                description, submittedAt, isVerified, verifiedAt, verifiedByMediatorId, blockchainRef,
+                evidenceHash);
     }
 
     /**
@@ -146,6 +156,7 @@ public final class DisputeEvidence {
     public LocalDateTime getVerifiedAt() { return verifiedAt; }
     public String getVerifiedByMediatorId() { return verifiedByMediatorId; }
     public String getBlockchainRef() { return blockchainRef; }
+    public String getEvidenceHash() { return evidenceHash; }
 
     @Override
     public boolean equals(final Object o) {

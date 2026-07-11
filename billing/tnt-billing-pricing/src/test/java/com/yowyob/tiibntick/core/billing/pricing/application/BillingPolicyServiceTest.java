@@ -1,18 +1,24 @@
 package com.yowyob.tiibntick.core.billing.pricing.application;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.yowyob.tiibntick.core.billing.pricing.application.service.BillingPolicyService;
 import com.yowyob.tiibntick.core.billing.pricing.domain.exception.BillingPolicyNotFoundException;
 import com.yowyob.tiibntick.core.billing.pricing.domain.exception.InvalidPolicyException;
 import com.yowyob.tiibntick.core.billing.pricing.domain.model.BillingPolicy;
 import com.yowyob.tiibntick.core.billing.pricing.domain.model.PricingRule;
 import com.yowyob.tiibntick.core.billing.pricing.domain.model.enums.PolicyStatus;
+import com.yowyob.tiibntick.core.billing.pricing.domain.port.out.BillingPolicyAnchorPayload;
+import com.yowyob.tiibntick.core.billing.pricing.domain.port.out.BillingPolicyAnchorPort;
 import com.yowyob.tiibntick.core.billing.pricing.domain.port.out.IBillingPolicyRepository;
 import com.yowyob.tiibntick.core.billing.dsl.domain.model.Money;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -22,7 +28,9 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -31,6 +39,12 @@ class BillingPolicyServiceTest {
 
     @Mock
     private IBillingPolicyRepository policyRepository;
+
+    @Mock
+    private BillingPolicyAnchorPort billingPolicyAnchorPort;
+
+    @Spy
+    private ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
     @InjectMocks
     private BillingPolicyService policyService;
@@ -100,6 +114,46 @@ class BillingPolicyServiceTest {
 
         when(policyRepository.findById(POLICY_ID)).thenReturn(Mono.just(draftPolicy));
         when(policyRepository.save(any())).thenReturn(Mono.just(activePolicy));
+        when(billingPolicyAnchorPort.anchor(any())).thenReturn(Mono.empty());
+
+        StepVerifier.create(policyService.activatePolicy(POLICY_ID))
+                .expectNextMatches(p -> p.getStatus() == PolicyStatus.ACTIVE)
+                .verifyComplete();
+    }
+
+    @Test
+    @DisplayName("activatePolicy should anchor the activation on-chain with the policy's identifiers")
+    void testActivatePolicyAnchorsOnChain() {
+        BillingPolicy draftPolicy = samplePolicy().toBuilder().ownerActorId("agency-42").build();
+        BillingPolicy activePolicy = draftPolicy.activate();
+
+        when(policyRepository.findById(POLICY_ID)).thenReturn(Mono.just(draftPolicy));
+        when(policyRepository.save(any())).thenReturn(Mono.just(activePolicy));
+        when(billingPolicyAnchorPort.anchor(any())).thenReturn(Mono.empty());
+
+        StepVerifier.create(policyService.activatePolicy(POLICY_ID))
+                .expectNextCount(1)
+                .verifyComplete();
+
+        ArgumentCaptor<BillingPolicyAnchorPayload> captor = ArgumentCaptor.forClass(BillingPolicyAnchorPayload.class);
+        verify(billingPolicyAnchorPort).anchor(captor.capture());
+        BillingPolicyAnchorPayload payload = captor.getValue();
+
+        assertThat(payload.tenantId()).isEqualTo(TENANT_ID);
+        assertThat(payload.policyId()).isEqualTo(POLICY_ID);
+        assertThat(payload.ownerActorId()).isEqualTo("agency-42");
+        assertThat(payload.policySummaryJson()).contains("\"pricingRuleCount\":1");
+    }
+
+    @Test
+    @DisplayName("activatePolicy should still succeed when on-chain anchoring fails")
+    void testActivatePolicySucceedsWhenAnchoringFails() {
+        BillingPolicy draftPolicy = samplePolicy();
+        BillingPolicy activePolicy = draftPolicy.activate();
+
+        when(policyRepository.findById(POLICY_ID)).thenReturn(Mono.just(draftPolicy));
+        when(policyRepository.save(any())).thenReturn(Mono.just(activePolicy));
+        when(billingPolicyAnchorPort.anchor(any())).thenReturn(Mono.error(new RuntimeException("trust unavailable")));
 
         StepVerifier.create(policyService.activatePolicy(POLICY_ID))
                 .expectNextMatches(p -> p.getStatus() == PolicyStatus.ACTIVE)

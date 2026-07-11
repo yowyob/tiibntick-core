@@ -54,6 +54,9 @@ public class DisputeEvidenceEntity {
     @Column("tenant_id")
     private String tenantId;
 
+    @Column("evidence_hash")
+    private String evidenceHash;
+
     public DisputeEvidenceEntity() {}
 
     public String getId() { return id; }
@@ -82,4 +85,6 @@ public class DisputeEvidenceEntity {
     public void setBlockchainRef(String blockchainRef) { this.blockchainRef = blockchainRef; }
     public String getTenantId() { return tenantId; }
     public void setTenantId(String tenantId) { this.tenantId = tenantId; }
+    public String getEvidenceHash() { return evidenceHash; }
+    public void setEvidenceHash(String evidenceHash) { this.evidenceHash = evidenceHash; }
 }

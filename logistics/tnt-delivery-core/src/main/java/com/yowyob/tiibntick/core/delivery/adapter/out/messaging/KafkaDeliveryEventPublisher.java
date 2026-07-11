@@ -6,7 +6,6 @@ import com.yowyob.tiibntick.core.delivery.application.port.out.DeliveryEventPubl
 import com.yowyob.tiibntick.core.delivery.domain.event.DeliveryDomainEvent;
 import com.yowyob.tiibntick.core.delivery.domain.event.FreelancerOrgAssignedEvent;
 import com.yowyob.tiibntick.core.delivery.domain.event.MissionStatusChangedEvent;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -27,7 +26,6 @@ import java.util.List;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class KafkaDeliveryEventPublisher implements DeliveryEventPublisher {
 
     static final String DELIVERY_EVENTS_TOPIC = "tnt.delivery.events";
@@ -36,10 +34,15 @@ public class KafkaDeliveryEventPublisher implements DeliveryEventPublisher {
     /** Topic for FreelancerOrg assignment events (). */
     static final String FREELANCER_ORG_ASSIGNED_TOPIC = "tnt.delivery.freelancer_org.assigned";
 
-    @Qualifier("deliveryKafkaProducer")
     private final KafkaTemplate<String, String> kafkaTemplate;
-    @Qualifier("deliveryObjectMapper")
     private final ObjectMapper objectMapper;
+
+    public KafkaDeliveryEventPublisher(
+            @Qualifier("deliveryKafkaProducer") KafkaTemplate<String, String> kafkaTemplate,
+            @Qualifier("deliveryObjectMapper") ObjectMapper objectMapper) {
+        this.kafkaTemplate = kafkaTemplate;
+        this.objectMapper = objectMapper;
+    }
 
     @Override
     public Mono<Void> publish(DeliveryDomainEvent event) {

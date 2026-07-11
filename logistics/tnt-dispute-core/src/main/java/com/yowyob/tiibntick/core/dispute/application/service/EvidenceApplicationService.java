@@ -55,7 +55,7 @@ public class EvidenceApplicationService implements IEvidenceUseCase {
                 .flatMap(dispute -> {
                     final DisputeEvidence evidence = DisputeEvidence.create(
                             cmd.disputeId(), cmd.submittedBy(), cmd.submitterType(),
-                            cmd.evidenceType(), cmd.fileKey(), cmd.description());
+                            cmd.evidenceType(), cmd.fileKey(), cmd.description(), cmd.evidenceHash());
                     dispute.addEvidence(evidence);
                     return anchorOnBlockchainIfNeeded(evidence, dispute)
                             .thenReturn(dispute);
@@ -121,7 +121,8 @@ public class EvidenceApplicationService implements IEvidenceUseCase {
                         evidence.getId().getValue(),
                         evidence.getFileKey(),
                         dispute.getId().getValue(),
-                        dispute.getTenantId())
+                        dispute.getTenantId(),
+                        evidence.getEvidenceHash())
                 .doOnNext(evidence::attachBlockchainRef)
                 .then();
     }

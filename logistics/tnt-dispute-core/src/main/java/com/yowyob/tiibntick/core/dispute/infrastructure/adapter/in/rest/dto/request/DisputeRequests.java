@@ -29,7 +29,8 @@ public final class DisputeRequests {
             String submitterType,
             String evidenceType,
             String fileKey,
-            String description) {}
+            String description,
+            String evidenceHash) {}
 
     public record RequestEvidenceRequest(
             String requestedFrom,

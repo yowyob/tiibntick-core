@@ -67,9 +67,10 @@ public final class DelivererProfile extends TntActorProfile {
             UUID contractId,
             DelivererType delivererType,
             int incidentHistoryCount,
-            UUID fraudFlaggedByIncidentId) {
+            UUID fraudFlaggedByIncidentId,
+            String blockchainDid) {
         super(id, tenantId, actorId, ActorType.PERMANENT_DELIVERER, actorStatus, kycStatus,
-                currentLocation, rating, badges, createdAt, updatedAt);
+                currentLocation, rating, badges, createdAt, updatedAt, blockchainDid);
         this.agencyId = Objects.requireNonNull(agencyId, "agencyId must not be null");
         this.branchId = Objects.requireNonNull(branchId, "branchId must not be null");
         this.vehicleId = vehicleId;
@@ -99,7 +100,7 @@ public final class DelivererProfile extends TntActorProfile {
                 null, ActorRating.zero(), Set.of(),
                 Instant.now(), Instant.now(),
                 agencyId, branchId, null, null, capacityKg, null, delivererType,
-                0, null);
+                0, null, null);
     }
 
     public static DelivererProfile rehydrate(
@@ -112,7 +113,7 @@ public final class DelivererProfile extends TntActorProfile {
             Instant createdAt, Instant updatedAt,
             UUID agencyId, UUID branchId, UUID vehicleId, UUID missionActiveId,
             double capacityKg, UUID contractId, String delivererType,
-            int incidentHistoryCount, UUID fraudFlaggedByIncidentId) {
+            int incidentHistoryCount, UUID fraudFlaggedByIncidentId, String blockchainDid) {
         ActorLocation location = (locationLat != null && locationLng != null)
                 ? ActorLocation.of(locationLat, locationLng, locationAccuracy,
                         locationTimestamp != null ? locationTimestamp : Instant.now(),
@@ -127,7 +128,7 @@ public final class DelivererProfile extends TntActorProfile {
                 location, rating, badges, createdAt, updatedAt,
                 agencyId, branchId, vehicleId, missionActiveId,
                 capacityKg, contractId, DelivererType.from(delivererType),
-                incidentHistoryCount, fraudFlaggedByIncidentId);
+                incidentHistoryCount, fraudFlaggedByIncidentId, blockchainDid);
     }
 
     // ── Domain mutations ───────────────────────────────────────────────────────
@@ -136,14 +137,14 @@ public final class DelivererProfile extends TntActorProfile {
         return new DelivererProfile(id(), tenantId(), actorId(), actorStatus(), kycStatus(),
                 location, rating(), badges(), createdAt(), Instant.now(),
                 agencyId, branchId, vehicleId, missionActiveId, capacityKg, contractId,
-                delivererType, incidentHistoryCount, fraudFlaggedByIncidentId);
+                delivererType, incidentHistoryCount, fraudFlaggedByIncidentId, blockchainDid());
     }
 
     public DelivererProfile withRating(ActorRating rating) {
         return new DelivererProfile(id(), tenantId(), actorId(), actorStatus(), kycStatus(),
                 currentLocation(), rating, badges(), createdAt(), Instant.now(),
                 agencyId, branchId, vehicleId, missionActiveId, capacityKg, contractId,
-                delivererType, incidentHistoryCount, fraudFlaggedByIncidentId);
+                delivererType, incidentHistoryCount, fraudFlaggedByIncidentId, blockchainDid());
     }
 
     public DelivererProfile activate() {
@@ -162,14 +163,14 @@ public final class DelivererProfile extends TntActorProfile {
         return new DelivererProfile(id(), tenantId(), actorId(), status, kycStatus(),
                 currentLocation(), rating(), badges(), createdAt(), Instant.now(),
                 agencyId, branchId, vehicleId, missionActiveId, capacityKg, contractId,
-                delivererType, incidentHistoryCount, fraudFlaggedByIncidentId);
+                delivererType, incidentHistoryCount, fraudFlaggedByIncidentId, blockchainDid());
     }
 
     public DelivererProfile withKycStatus(KycStatus kycStatus) {
         return new DelivererProfile(id(), tenantId(), actorId(), actorStatus(), kycStatus,
                 currentLocation(), rating(), badges(), createdAt(), Instant.now(),
                 agencyId, branchId, vehicleId, missionActiveId, capacityKg, contractId,
-                delivererType, incidentHistoryCount, fraudFlaggedByIncidentId);
+                delivererType, incidentHistoryCount, fraudFlaggedByIncidentId, blockchainDid());
     }
 
     public DelivererProfile assignMission(UUID missionId) {
@@ -179,21 +180,21 @@ public final class DelivererProfile extends TntActorProfile {
         return new DelivererProfile(id(), tenantId(), actorId(), actorStatus(), kycStatus(),
                 currentLocation(), rating(), badges(), createdAt(), Instant.now(),
                 agencyId, branchId, vehicleId, missionId, capacityKg, contractId,
-                delivererType, incidentHistoryCount, fraudFlaggedByIncidentId);
+                delivererType, incidentHistoryCount, fraudFlaggedByIncidentId, blockchainDid());
     }
 
     public DelivererProfile releaseMission() {
         return new DelivererProfile(id(), tenantId(), actorId(), actorStatus(), kycStatus(),
                 currentLocation(), rating(), badges(), createdAt(), Instant.now(),
                 agencyId, branchId, vehicleId, null, capacityKg, contractId,
-                delivererType, incidentHistoryCount, fraudFlaggedByIncidentId);
+                delivererType, incidentHistoryCount, fraudFlaggedByIncidentId, blockchainDid());
     }
 
     public DelivererProfile assignVehicle(UUID newVehicleId) {
         return new DelivererProfile(id(), tenantId(), actorId(), actorStatus(), kycStatus(),
                 currentLocation(), rating(), badges(), createdAt(), Instant.now(),
                 agencyId, branchId, newVehicleId, missionActiveId, capacityKg, contractId,
-                delivererType, incidentHistoryCount, fraudFlaggedByIncidentId);
+                delivererType, incidentHistoryCount, fraudFlaggedByIncidentId, blockchainDid());
     }
 
     public DelivererProfile withBadge(Badge badge) {
@@ -202,7 +203,7 @@ public final class DelivererProfile extends TntActorProfile {
         return new DelivererProfile(id(), tenantId(), actorId(), actorStatus(), kycStatus(),
                 currentLocation(), rating(), updatedBadges, createdAt(), Instant.now(),
                 agencyId, branchId, vehicleId, missionActiveId, capacityKg, contractId,
-                delivererType, incidentHistoryCount, fraudFlaggedByIncidentId);
+                delivererType, incidentHistoryCount, fraudFlaggedByIncidentId, blockchainDid());
     }
 
     // ── Incident-related mutations (tnt-incident-core integration) ─────────────
@@ -218,7 +219,7 @@ public final class DelivererProfile extends TntActorProfile {
         return new DelivererProfile(id(), tenantId(), actorId(), actorStatus(), kycStatus(),
                 currentLocation(), rating(), badges(), createdAt(), Instant.now(),
                 agencyId, branchId, vehicleId, missionActiveId, capacityKg, contractId,
-                delivererType, incidentHistoryCount + 1, fraudFlaggedByIncidentId);
+                delivererType, incidentHistoryCount + 1, fraudFlaggedByIncidentId, blockchainDid());
     }
 
     /**
@@ -235,7 +236,7 @@ public final class DelivererProfile extends TntActorProfile {
                 ActorStatus.SUSPENDED, KycStatus.FLAGGED,
                 currentLocation(), rating(), badges(), createdAt(), Instant.now(),
                 agencyId, branchId, vehicleId, missionActiveId, capacityKg, contractId,
-                delivererType, incidentHistoryCount, incidentId);
+                delivererType, incidentHistoryCount, incidentId, blockchainDid());
     }
 
     /**
@@ -249,7 +250,19 @@ public final class DelivererProfile extends TntActorProfile {
                 ActorStatus.INACTIVE, KycStatus.VERIFIED,
                 currentLocation(), rating(), badges(), createdAt(), Instant.now(),
                 agencyId, branchId, vehicleId, missionActiveId, capacityKg, contractId,
-                delivererType, incidentHistoryCount, null);
+                delivererType, incidentHistoryCount, null, blockchainDid());
+    }
+
+    /**
+     * Records the blockchain DID issued by tnt-trust after KYC verification.
+     *
+     * @param did the blockchain Decentralized Identifier string
+     */
+    public DelivererProfile withBlockchainDid(String did) {
+        return new DelivererProfile(id(), tenantId(), actorId(), actorStatus(), kycStatus(),
+                currentLocation(), rating(), badges(), createdAt(), Instant.now(),
+                agencyId, branchId, vehicleId, missionActiveId, capacityKg, contractId,
+                delivererType, incidentHistoryCount, fraudFlaggedByIncidentId, did);
     }
 
     // ── Queries ────────────────────────────────────────────────────────────────

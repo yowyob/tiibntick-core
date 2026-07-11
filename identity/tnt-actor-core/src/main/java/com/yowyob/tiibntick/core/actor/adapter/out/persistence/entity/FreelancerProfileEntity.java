@@ -54,5 +54,7 @@ public record FreelancerProfileEntity(
         /** Role within the org: "OWNER" or "SUB_DELIVERER". Nullable. Added in . */
         String roleInOrg,
         /** Cached org verification status. Added in . */
-        boolean isOrgVerified) {
+        boolean isOrgVerified,
+        /** Blockchain DID anchored via tnt-trust after KYC verification. Nullable. */
+        String blockchainDid) {
 }

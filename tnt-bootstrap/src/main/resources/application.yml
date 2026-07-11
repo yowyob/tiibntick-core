@@ -113,6 +113,10 @@ management:
       group:
         liveness:
           include: livenessState
+        # trustEventGateway deliberately excluded: a down yow-trust-event must
+        # degrade tnt-trust-core to best-effort/retry-queue mode, never take
+        # tnt-bootstrap out of the Kubernetes readiness rotation (§15.6 of
+        # TNT_CORE_Connexion_Trust_Module.md).
         readiness:
           include: readinessState,r2dbc,redis,kafka
   prometheus:
@@ -143,6 +147,43 @@ springdoc:
   api-docs:
     path: /v3/api-docs
   show-actuator: false
+
+# ── Resilience4j ───────────────────────────────────────────────────────────
+# tnt-trust-core's gateway toward yow-trust-event (§15.3 of
+# TNT_CORE_Connexion_Trust_Module.md). Two independent circuit breakers:
+#   trustEventGatewayWrite — publish() to yow.trust.events. Kafka decouples
+#     producer from consumer, so this only trips on a broken Kafka broker
+#     itself, not on yow-trust-event being down (see LogisticEventPublisherService).
+#   trustEventGatewayRead  — verifyProof()/getAuditHistory() REST calls
+#     (TrustEventRestClientAdapter). The only path genuinely coupled to
+#     yow-trust-event's own availability.
+resilience4j:
+  circuitbreaker:
+    instances:
+      trustEventGatewayWrite:
+        register-health-indicator: true
+        sliding-window-size: 20
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 5
+        automatic-transition-from-open-to-half-open-enabled: true
+      trustEventGatewayRead:
+        register-health-indicator: true
+        sliding-window-size: 10
+        failure-rate-threshold: 40
+        wait-duration-in-open-state: 20s
+        permitted-number-of-calls-in-half-open-state: 3
+  timelimiter:
+    instances:
+      trustEventGatewayWrite:
+        timeout-duration: 3s
+      trustEventGatewayRead:
+        timeout-duration: 2s
+  retry:
+    instances:
+      trustEventGatewayWrite:
+        max-attempts: 2
+        wait-duration: 500ms
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TNT — Module-level properties
@@ -246,6 +287,24 @@ tnt:
       # tenant/org actually subscribed to the Kernel's NOTIFICATION service.
       default-tenant-id: ${TNT_NOTIFY_KERNEL_DEFAULT_TENANT_ID:}
       default-organization-id: ${TNT_NOTIFY_KERNEL_DEFAULT_ORGANIZATION_ID:}
+
+  # ── Trust Core (tnt-trust-core L3) ──────────────────────────────────────────
+  # DeliveryProof/CustodyTransfer/DID/PoL/Badge anchoring toward the yow-trust-event
+  # Kernel microservice. Local cache tables live in the dedicated `tnt_trust` schema
+  # (created by the module's own Liquibase changelog) inside the shared database.
+  trust:
+    # false in environments without a Kernel Trust stack — see the caveat on
+    # TntTrustAutoConfiguration about calling modules requiring the port beans.
+    enabled: ${TNT_TRUST_ENABLED:false}
+    trust-event-base-url: ${YOW_TRUST_EVENT_BASE_URL:http://yow-trust-event:8085}
+    kafka-trust-events-topic: ${TNT_TRUST_KAFKA_EVENTS_TOPIC:yow.trust.events}
+    kafka-committed-topic: ${TNT_TRUST_KAFKA_COMMITTED_TOPIC:yow.trust.events.committed}
+    fabric-default-channel: ${TNT_TRUST_FABRIC_CHANNEL:yowyob-logistics-channel}
+    rest-client-timeout-ms: ${TNT_TRUST_REST_CLIENT_TIMEOUT_MS:10000}
+    # Resilience (§15 of TNT_CORE_Connexion_Trust_Module.md)
+    health-poll-interval-ms: ${TNT_TRUST_HEALTH_POLL_INTERVAL_MS:30000}
+    retry-drain-interval-ms: ${TNT_TRUST_RETRY_DRAIN_INTERVAL_MS:60000}
+    retry-drain-batch-size: ${TNT_TRUST_RETRY_DRAIN_BATCH_SIZE:100}
 
   # ── Kafka ──────────────────────────────────────────────────────────────────
   kafka:

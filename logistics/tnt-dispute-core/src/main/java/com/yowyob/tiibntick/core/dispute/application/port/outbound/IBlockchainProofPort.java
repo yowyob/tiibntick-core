@@ -28,15 +28,20 @@ public interface IBlockchainProofPort {
      * @param fileKey      the MinIO object key of the evidence file
      * @param disputeId    the dispute ID for context
      * @param tenantId     the tenant scope
+     * @param evidenceHash SHA-256 hash of the evidence content, nullable — enables real
+     *                     cryptographic verification later via {@link #verifyProof}
      * @return the blockchain transaction hash
      */
-    Mono<String> anchorEvidence(String evidenceId, String fileKey, String disputeId, String tenantId);
+    Mono<String> anchorEvidence(String evidenceId, String fileKey, String disputeId, String tenantId,
+                                 String evidenceHash);
 
     /**
-     * Verifies the integrity of a previously anchored evidence record.
+     * Verifies the integrity of a previously anchored evidence record by comparing
+     * an independently recomputed data hash against what was anchored on-chain.
      *
      * @param blockchainRef the blockchain transaction hash to verify
-     * @return {@code true} if the hash is valid and the record is intact
+     * @param expectedHash  the SHA-256 evidence hash expected to match the anchored record
+     * @return {@code true} if the hash matches and the record is intact
      */
-    Mono<Boolean> verifyProof(String blockchainRef);
+    Mono<Boolean> verifyProof(String blockchainRef, String expectedHash);
 }

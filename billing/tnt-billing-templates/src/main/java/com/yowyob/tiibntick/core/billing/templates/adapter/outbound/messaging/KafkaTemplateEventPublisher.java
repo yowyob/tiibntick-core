@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yowyob.tiibntick.core.billing.templates.domain.event.CustomTemplateSavedEvent;
 import com.yowyob.tiibntick.core.billing.templates.domain.event.TemplateAppliedEvent;
 import com.yowyob.tiibntick.core.billing.templates.port.outbound.ITemplateEventPublisher;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -28,13 +27,17 @@ import reactor.core.scheduler.Schedulers;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class KafkaTemplateEventPublisher implements ITemplateEventPublisher {
 
-    @Qualifier("tntKafkaTemplate")
     private final KafkaTemplate<String, String> kafkaTemplate;
-    @Qualifier("billingTemplatesObjectMapper")
     private final ObjectMapper objectMapper;
+
+    public KafkaTemplateEventPublisher(
+            @Qualifier("tntKafkaTemplate") KafkaTemplate<String, String> kafkaTemplate,
+            @Qualifier("billingTemplatesObjectMapper") ObjectMapper objectMapper) {
+        this.kafkaTemplate = kafkaTemplate;
+        this.objectMapper = objectMapper;
+    }
 
     /**
      * {@inheritDoc}

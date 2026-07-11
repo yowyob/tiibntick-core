@@ -62,10 +62,15 @@ L3  logistics/  tnt-geo-core, tnt-route-core, tnt-delivery-core, tnt-dispute-cor
 L4  business/   tnt-resource-core, tnt-product-core, tnt-inventory-core, tnt-sales-core, tnt-accounting-core
 L5  billing/    tnt-billing-dsl, tnt-billing-pricing, tnt-billing-cost, tnt-billing-invoice,
                 tnt-billing-wallet, tnt-billing-report, tnt-billing-templates
-L6  tnt-bootstrap   — the only runnable module; wires everything together
+L6  trust/      tnt-trust-core   — cross-cutting blockchain anchoring (Kernel yow-trust-event)
+L7  tnt-bootstrap   — the only runnable module; wires everything together
 ```
 
+`tnt-trust-core` sits above L5 billing, not among the L3 logistics modules — it is consumed by (potentially) every layer from L2 up through L5, but no module ever depends back on it (each calling module owns its own outbound port; `tnt-trust-core` depends *down* into that module to implement the adapter). That makes it structurally a cross-cutting layer, not L3 logistics: a module that legitimately depends on L2–L5 modules cannot itself be L3 without violating the "never depend on a higher layer" rule below.
+
 Each module's `groupId:artifactId` is pinned in the root `<dependencyManagement>` at `${project.version}` — when adding a new module, register it both in `<modules>` and in `<dependencyManagement>`.
+
+**Layering rule (strict):** a module must never declare a Maven dependency on another module in a strictly higher-numbered layer above, even if the resulting graph is acyclic. When module A needs a capability from module B in a higher layer, the *higher*-layer module must own the dependency edge instead — either B depends down into A directly (if B legitimately sits above A), or, when a lower-layer module needs to call up into a higher-layer capability, the lower module owns an outbound port and the higher-layer module provides the implementing adapter (see `tnt-trust-core`'s pattern above: every calling module owns its own port, `tnt-trust-core` implements it and depends down into that module — never the reverse).
 
 ### The Yowyob Kernel (RT-comops) boundary
 
@@ -119,4 +124,4 @@ A second, parallel principal type exists for platform *backends* (not human user
 - Java package root is `com.yowyob.tiibntick.core.<module>` for business modules, `com.yowyob.kernel.<module>` for the two foundation kernel modules (`yow-event-kernel`, `yow-i18n-kernel`), and `com.yowyob.tiibntick.bootstrap` for the app.
 - Most module-level beans/classes are prefixed `Tnt` (e.g. `TntKafkaConfig`, `TntRoleService`) to disambiguate from Kernel/`comops` types of the same concept.
 - Commit messages follow Conventional Commits style: `feat:`, `fix:`, `refactor:`, `chore(deps):`, optionally scoped (`feat(dispute): ...`).
-- Authors/ownership by layer (see root `pom.xml` `<developers>`): MANFOUO Braun — L0 event kernel, L3 logistics, L5 billing, L6 bootstrap; PAFE Dilane — L0 i18n, L2 organization, L3 logistics, L4 accounting, L5 billing; FRANCOIS — L2 identity (tp/administration), L4 business.
+- Authors/ownership by layer (see root `pom.xml` `<developers>`): MANFOUO Braun — L0 event kernel, L3 logistics, L5 billing, L6 trust, L7 bootstrap; PAFE Dilane — L0 i18n, L2 organization, L3 logistics, L4 accounting, L5 billing; FRANCOIS — L2 identity (tp/administration), L4 business.

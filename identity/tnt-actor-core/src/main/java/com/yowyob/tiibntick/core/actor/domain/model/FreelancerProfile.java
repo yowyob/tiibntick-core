@@ -94,9 +94,10 @@ public final class FreelancerProfile extends TntActorProfile {
             int incidentHistoryCount,
             UUID freelancerOrgId,
             FreelancerRole roleInOrg,
-            boolean isOrgVerified) {
+            boolean isOrgVerified,
+            String blockchainDid) {
         super(id, tenantId, actorId, ActorType.FREELANCER, actorStatus, kycStatus,
-                currentLocation, rating, badges, createdAt, updatedAt);
+                currentLocation, rating, badges, createdAt, updatedAt, blockchainDid);
         this.serviceZoneIds = serviceZoneIds != null ? List.copyOf(serviceZoneIds) : List.of();
         this.availabilitySlots = availabilitySlots != null
                 ? List.copyOf(availabilitySlots) : List.of();
@@ -125,7 +126,7 @@ public final class FreelancerProfile extends TntActorProfile {
                 null, ActorRating.zero(), Set.of(),
                 Instant.now(), Instant.now(),
                 serviceZoneIds, availabilitySlots, null, Set.of(),
-                0, null, null, false);
+                0, null, null, false, null);
     }
 
     /**
@@ -148,7 +149,8 @@ public final class FreelancerProfile extends TntActorProfile {
             int incidentHistoryCount,
             UUID freelancerOrgId,
             String roleInOrg,
-            boolean isOrgVerified) {
+            boolean isOrgVerified,
+            String blockchainDid) {
         ActorLocation location = (locationLat != null && locationLng != null)
                 ? ActorLocation.of(locationLat, locationLng, locationAccuracy,
                         locationTimestamp != null ? locationTimestamp : Instant.now(),
@@ -165,7 +167,7 @@ public final class FreelancerProfile extends TntActorProfile {
                 incidentHistoryCount,
                 freelancerOrgId,
                 FreelancerRole.from(roleInOrg),
-                isOrgVerified);
+                isOrgVerified, blockchainDid);
     }
 
     // ── Domain mutations ───────────────────────────────────────────────────────
@@ -174,21 +176,21 @@ public final class FreelancerProfile extends TntActorProfile {
         return new FreelancerProfile(id(), tenantId(), actorId(), actorStatus(), kycStatus(),
                 location, rating(), badges(), createdAt(), Instant.now(),
                 serviceZoneIds, availabilitySlots, pricingPolicyId, associatedAgencyIds,
-                incidentHistoryCount, freelancerOrgId, roleInOrg, isOrgVerified);
+                incidentHistoryCount, freelancerOrgId, roleInOrg, isOrgVerified, blockchainDid());
     }
 
     public FreelancerProfile withRating(ActorRating rating) {
         return new FreelancerProfile(id(), tenantId(), actorId(), actorStatus(), kycStatus(),
                 currentLocation(), rating, badges(), createdAt(), Instant.now(),
                 serviceZoneIds, availabilitySlots, pricingPolicyId, associatedAgencyIds,
-                incidentHistoryCount, freelancerOrgId, roleInOrg, isOrgVerified);
+                incidentHistoryCount, freelancerOrgId, roleInOrg, isOrgVerified, blockchainDid());
     }
 
     public FreelancerProfile withKycStatus(KycStatus kycStatus) {
         return new FreelancerProfile(id(), tenantId(), actorId(), actorStatus(), kycStatus,
                 currentLocation(), rating(), badges(), createdAt(), Instant.now(),
                 serviceZoneIds, availabilitySlots, pricingPolicyId, associatedAgencyIds,
-                incidentHistoryCount, freelancerOrgId, roleInOrg, isOrgVerified);
+                incidentHistoryCount, freelancerOrgId, roleInOrg, isOrgVerified, blockchainDid());
     }
 
     public FreelancerProfile activate() { return withStatus(ActorStatus.ACTIVE); }
@@ -208,7 +210,7 @@ public final class FreelancerProfile extends TntActorProfile {
         return new FreelancerProfile(id(), tenantId(), actorId(), status, kycStatus(),
                 currentLocation(), rating(), badges(), createdAt(), Instant.now(),
                 serviceZoneIds, availabilitySlots, pricingPolicyId, associatedAgencyIds,
-                incidentHistoryCount, freelancerOrgId, roleInOrg, isOrgVerified);
+                incidentHistoryCount, freelancerOrgId, roleInOrg, isOrgVerified, blockchainDid());
     }
 
     public FreelancerProfile withBadge(Badge badge) {
@@ -217,7 +219,7 @@ public final class FreelancerProfile extends TntActorProfile {
         return new FreelancerProfile(id(), tenantId(), actorId(), actorStatus(), kycStatus(),
                 currentLocation(), rating(), updatedBadges, createdAt(), Instant.now(),
                 serviceZoneIds, availabilitySlots, pricingPolicyId, associatedAgencyIds,
-                incidentHistoryCount, freelancerOrgId, roleInOrg, isOrgVerified);
+                incidentHistoryCount, freelancerOrgId, roleInOrg, isOrgVerified, blockchainDid());
     }
 
     public FreelancerProfile associateWithAgency(UUID agencyId) {
@@ -227,7 +229,7 @@ public final class FreelancerProfile extends TntActorProfile {
         return new FreelancerProfile(id(), tenantId(), actorId(), actorStatus(), kycStatus(),
                 currentLocation(), rating(), badges(), createdAt(), Instant.now(),
                 serviceZoneIds, availabilitySlots, pricingPolicyId, Set.copyOf(updated),
-                incidentHistoryCount, freelancerOrgId, roleInOrg, isOrgVerified);
+                incidentHistoryCount, freelancerOrgId, roleInOrg, isOrgVerified, blockchainDid());
     }
 
     public FreelancerProfile dissociateFromAgency(UUID agencyId) {
@@ -237,21 +239,21 @@ public final class FreelancerProfile extends TntActorProfile {
         return new FreelancerProfile(id(), tenantId(), actorId(), actorStatus(), kycStatus(),
                 currentLocation(), rating(), badges(), createdAt(), Instant.now(),
                 serviceZoneIds, availabilitySlots, pricingPolicyId, Set.copyOf(updated),
-                incidentHistoryCount, freelancerOrgId, roleInOrg, isOrgVerified);
+                incidentHistoryCount, freelancerOrgId, roleInOrg, isOrgVerified, blockchainDid());
     }
 
     public FreelancerProfile withAvailabilitySlots(List<AvailabilitySlot> slots) {
         return new FreelancerProfile(id(), tenantId(), actorId(), actorStatus(), kycStatus(),
                 currentLocation(), rating(), badges(), createdAt(), Instant.now(),
                 serviceZoneIds, slots, pricingPolicyId, associatedAgencyIds,
-                incidentHistoryCount, freelancerOrgId, roleInOrg, isOrgVerified);
+                incidentHistoryCount, freelancerOrgId, roleInOrg, isOrgVerified, blockchainDid());
     }
 
     public FreelancerProfile withServiceZones(List<ServiceZoneId> zones) {
         return new FreelancerProfile(id(), tenantId(), actorId(), actorStatus(), kycStatus(),
                 currentLocation(), rating(), badges(), createdAt(), Instant.now(),
                 zones, availabilitySlots, pricingPolicyId, associatedAgencyIds,
-                incidentHistoryCount, freelancerOrgId, roleInOrg, isOrgVerified);
+                incidentHistoryCount, freelancerOrgId, roleInOrg, isOrgVerified, blockchainDid());
     }
 
     /**
@@ -263,7 +265,7 @@ public final class FreelancerProfile extends TntActorProfile {
         return new FreelancerProfile(id(), tenantId(), actorId(), actorStatus(), kycStatus(),
                 currentLocation(), rating(), badges(), createdAt(), Instant.now(),
                 serviceZoneIds, availabilitySlots, pricingPolicyId, associatedAgencyIds,
-                incidentHistoryCount + 1, freelancerOrgId, roleInOrg, isOrgVerified);
+                incidentHistoryCount + 1, freelancerOrgId, roleInOrg, isOrgVerified, blockchainDid());
     }
 
     // FreelancerOrganization link mutations ───────────────────────────
@@ -290,7 +292,7 @@ public final class FreelancerProfile extends TntActorProfile {
         return new FreelancerProfile(id(), tenantId(), actorId(), actorStatus(), kycStatus(),
                 currentLocation(), rating(), badges(), createdAt(), Instant.now(),
                 serviceZoneIds, availabilitySlots, pricingPolicyId, associatedAgencyIds,
-                incidentHistoryCount, orgId, role, orgVerified);
+                incidentHistoryCount, orgId, role, orgVerified, blockchainDid());
     }
 
     /**
@@ -311,7 +313,7 @@ public final class FreelancerProfile extends TntActorProfile {
         return new FreelancerProfile(id(), tenantId(), actorId(), actorStatus(), kycStatus(),
                 currentLocation(), rating(), badges(), createdAt(), Instant.now(),
                 serviceZoneIds, availabilitySlots, pricingPolicyId, associatedAgencyIds,
-                incidentHistoryCount, freelancerOrgId, roleInOrg, verified);
+                incidentHistoryCount, freelancerOrgId, roleInOrg, verified, blockchainDid());
     }
 
     /**
@@ -330,7 +332,19 @@ public final class FreelancerProfile extends TntActorProfile {
         return new FreelancerProfile(id(), tenantId(), actorId(), actorStatus(), kycStatus(),
                 currentLocation(), rating(), badges(), createdAt(), Instant.now(),
                 serviceZoneIds, availabilitySlots, pricingPolicyId, associatedAgencyIds,
-                incidentHistoryCount, null, null, false);
+                incidentHistoryCount, null, null, false, blockchainDid());
+    }
+
+    /**
+     * Records the blockchain DID issued by tnt-trust after KYC verification.
+     *
+     * @param did the blockchain Decentralized Identifier string
+     */
+    public FreelancerProfile withBlockchainDid(String did) {
+        return new FreelancerProfile(id(), tenantId(), actorId(), actorStatus(), kycStatus(),
+                currentLocation(), rating(), badges(), createdAt(), Instant.now(),
+                serviceZoneIds, availabilitySlots, pricingPolicyId, associatedAgencyIds,
+                incidentHistoryCount, freelancerOrgId, roleInOrg, isOrgVerified, did);
     }
 
     // ── Queries ────────────────────────────────────────────────────────────────

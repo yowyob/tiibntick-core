@@ -1,5 +1,7 @@
 package com.yowyob.tiibntick.core.realtime.domain.service;
 
+import com.yowyob.tiibntick.core.realtime.application.port.out.GeofenceAnchorPayload;
+import com.yowyob.tiibntick.core.realtime.application.port.out.IGeofenceAnchorPort;
 import com.yowyob.tiibntick.core.realtime.application.port.out.IGeofenceZoneRepository;
 import com.yowyob.tiibntick.core.realtime.application.port.out.IRealtimeEventPublisher;
 import com.yowyob.tiibntick.core.realtime.application.port.out.IWebSocketBroadcaster;
@@ -43,13 +45,16 @@ public class GeofenceMonitorService {
     private final IGeofenceZoneRepository zoneRepository;
     private final IWebSocketBroadcaster broadcaster;
     private final IRealtimeEventPublisher eventPublisher;
+    private final IGeofenceAnchorPort geofenceAnchorPort;
 
     public GeofenceMonitorService(IGeofenceZoneRepository zoneRepository,
                                   IWebSocketBroadcaster broadcaster,
-                                  IRealtimeEventPublisher eventPublisher) {
+                                  IRealtimeEventPublisher eventPublisher,
+                                  IGeofenceAnchorPort geofenceAnchorPort) {
         this.zoneRepository = zoneRepository;
         this.broadcaster = broadcaster;
         this.eventPublisher = eventPublisher;
+        this.geofenceAnchorPort = geofenceAnchorPort;
     }
 
     /**
@@ -133,6 +138,12 @@ public class GeofenceMonitorService {
 
         BroadcastTopic geofenceTopic = BroadcastTopic.forGeofence(trigger.tenantId());
         GeofenceTriggerEvent event = new GeofenceTriggerEvent(trigger.tenantId(), trigger);
+        GeofenceAnchorPayload anchorPayload = new GeofenceAnchorPayload(
+                trigger.tenantId(), trigger.actorId(), trigger.zoneId(), trigger.zoneName(),
+                trigger.zoneType() != null ? trigger.zoneType().name() : null,
+                trigger.direction().name(),
+                trigger.coordinates().latitude(), trigger.coordinates().longitude(),
+                trigger.missionId(), trigger.triggeredAt());
 
         return Mono.when(
                 broadcaster.broadcast(geofenceTopic, trigger)
@@ -144,7 +155,13 @@ public class GeofenceMonitorService {
                               .onErrorResume(ex -> {
                                   log.warn("Failed to publish geofence event to Kafka: {}", ex.getMessage());
                                   return Mono.empty();
-                              })
+                              }),
+                geofenceAnchorPort.anchor(anchorPayload)
+                                  .onErrorResume(ex -> {
+                                      log.warn("Failed to anchor geofence crossing on blockchain: {}",
+                                              ex.getMessage());
+                                      return Mono.empty();
+                                  })
         );
     }
 }

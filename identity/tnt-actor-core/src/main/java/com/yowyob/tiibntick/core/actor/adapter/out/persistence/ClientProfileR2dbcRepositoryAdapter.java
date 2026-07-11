@@ -53,7 +53,7 @@ public class ClientProfileR2dbcRepositoryAdapter implements IClientProfileReposi
                 p.createdAt(), p.updatedAt(),
                 ActorJsonMapper.favoriteAddressIdsToJson(p.favoriteAddressIds()),
                 p.loyaltyScore(),
-                p.preferredPaymentMethod());
+                p.preferredPaymentMethod(), p.blockchainDid());
     }
 
     private ClientProfile toDomain(ClientProfileEntity e) {
@@ -67,6 +67,6 @@ public class ClientProfileR2dbcRepositoryAdapter implements IClientProfileReposi
                 e.createdAt(), e.updatedAt(),
                 ActorJsonMapper.favoriteAddressIdsFromJson(e.favoriteAddressIdsJson()),
                 e.loyaltyScore(),
-                e.preferredPaymentMethod());
+                e.preferredPaymentMethod(), e.blockchainDid());
     }
 }

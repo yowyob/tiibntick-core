@@ -11,6 +11,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.event.EventListener;
 import org.springframework.data.r2dbc.repository.config.EnableR2dbcRepositories;
@@ -42,7 +43,19 @@ import java.net.UnknownHostException;
 
 @Slf4j
 @SpringBootApplication
-@ComponentScan(basePackages = "com.yowyob.tiibntick")
+@ComponentScan(
+        basePackages = "com.yowyob.tiibntick",
+        // tnt-trust-core owns its own conditional component scan inside
+        // TntTrustAutoConfiguration (gated by tnt.trust.enabled — see
+        // TNT_CORE_Connexion_Trust_Module.md §15.1). This blanket scan must
+        // exclude it, otherwise it re-discovers every @Component in that
+        // package unconditionally, defeating the toggle entirely: trust beans
+        // (e.g. ActorDidAnchorAdapter) would still get registered even with
+        // tnt.trust.enabled=false, and TrustNoOpFallbackConfig's
+        // @ConditionalOnMissingBean fallbacks would never activate.
+        excludeFilters = @ComponentScan.Filter(
+                type = FilterType.REGEX,
+                pattern = "com\\.yowyob\\.tiibntick\\.core\\.trust\\..*"))
 @Import({
         KernelBridgeConfig.class,
         TntCoreConfig.class

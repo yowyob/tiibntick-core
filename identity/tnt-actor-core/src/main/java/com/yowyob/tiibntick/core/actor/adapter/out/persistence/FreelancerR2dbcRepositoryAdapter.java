@@ -141,7 +141,7 @@ public class FreelancerR2dbcRepositoryAdapter implements IFreelancerRepository {
                 //  — org link fields
                 p.freelancerOrgId(),
                 p.roleInOrg() != null ? p.roleInOrg().name() : null,
-                p.isOrgVerified());
+                p.isOrgVerified(), p.blockchainDid());
     }
 
     /**
@@ -168,6 +168,6 @@ public class FreelancerR2dbcRepositoryAdapter implements IFreelancerRepository {
                 //  — org link fields (nullable — safe for old rows)
                 e.freelancerOrgId(),
                 e.roleInOrg(),
-                e.isOrgVerified());
+                e.isOrgVerified(), e.blockchainDid());
     }
 }

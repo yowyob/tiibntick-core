@@ -2,6 +2,7 @@ package com.yowyob.tiibntick.core.delivery.application.service;
 
 import com.yowyob.tiibntick.core.delivery.application.port.in.DeliveryLifecycleUseCase;
 import com.yowyob.tiibntick.core.delivery.application.port.in.command.*;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import com.yowyob.tiibntick.core.delivery.application.port.out.*;
@@ -32,6 +33,7 @@ public class DeliveryLifecycleService implements DeliveryLifecycleUseCase {
     private final DeliveryPersonRepository deliveryPersonRepository;
     private final EtaComputationPort etaComputationPort;
     private final DeliveryEventPublisher eventPublisher;
+    private final DeliveryProofAnchorPort deliveryProofAnchorPort;
 
     @Override
     @RequirePermission(resource = "delivery", action = "confirm")
@@ -147,6 +149,7 @@ public class DeliveryLifecycleService implements DeliveryLifecycleUseCase {
                             delivery.complete(finalCost);
 
                             return saveAndPublish(delivery)
+                                    .flatMap(saved -> anchorProofIfAvailable(cmd, saved).thenReturn(saved))
                                     .flatMap(saved -> deliveryPersonRepository
                                             .findById(cmd.tenantId(), dpId)
                                             .flatMap(dp -> {
@@ -155,6 +158,26 @@ public class DeliveryLifecycleService implements DeliveryLifecycleUseCase {
                                             })
                                             .thenReturn(saved));
                         }));
+    }
+
+    /**
+     * Anchors the delivery proof on the blockchain via tnt-trust-core, only when the
+     * caller supplied real proof data (photo hash + GPS) — see {@link CompleteDeliveryCommand}.
+     * Best-effort: a trust-anchoring failure is logged and swallowed, never fails delivery completion.
+     */
+    private Mono<Void> anchorProofIfAvailable(CompleteDeliveryCommand cmd, Delivery delivery) {
+        if (cmd.photoHash() == null || cmd.gpsLat() == null || cmd.gpsLng() == null) {
+            return Mono.empty();
+        }
+        final var payload = new DeliveryProofAnchorPayload(
+                cmd.tenantId(), delivery.getId(), delivery.getParcel().getId(), cmd.deliveryPersonId(),
+                cmd.photoHash(), cmd.signatureHash(), cmd.gpsLat(), cmd.gpsLng(), Instant.now());
+        return deliveryProofAnchorPort.anchor(payload)
+                .onErrorResume(e -> {
+                    log.warn("Trust anchoring failed for delivery={}, continuing anyway",
+                            cmd.deliveryId(), e);
+                    return Mono.empty();
+                });
     }
 
     @Override

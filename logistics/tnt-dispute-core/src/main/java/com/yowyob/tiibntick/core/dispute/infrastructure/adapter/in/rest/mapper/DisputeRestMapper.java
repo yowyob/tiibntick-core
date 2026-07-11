@@ -43,7 +43,8 @@ public final class DisputeRestMapper {
                 EvidenceSubmitterType.valueOf(req.submitterType()),
                 EvidenceType.valueOf(req.evidenceType()),
                 req.fileKey(),
-                req.description());
+                req.description(),
+                req.evidenceHash());
     }
 
     public static RequestEvidenceCommand toCommand(DisputeRequests.RequestEvidenceRequest req, String disputeId, String tenantId, String requestedBy) {
@@ -172,7 +173,8 @@ public final class DisputeRestMapper {
                 e.isVerified(),
                 e.getVerifiedAt(),
                 e.getVerifiedByMediatorId(),
-                e.getBlockchainRef());
+                e.getBlockchainRef(),
+                e.getEvidenceHash());
     }
 
     // =========================================================================

@@ -15,7 +15,7 @@ Monolithe modulaire DDD — Spring Boot 4 · WebFlux · R2DBC · Kafka · PostGI
 `tiibntick-core` est la **bibliothèque Maven multi-modules** de la plateforme TiiBnTick. Elle regroupe l'ensemble de la logique métier — identité, logistique, commerce et facturation — dans un monolithe modulaire suivant les principes DDD et l'architecture hexagonale. Le seul module exécutable est [`tnt-bootstrap`](tnt-bootstrap/README.md).
 
 ```
-32 modules  ·  6 couches architecturales
+33 modules  ·  7 couches architecturales
 ```
 
 ---
@@ -85,8 +85,12 @@ L5  billing/
 │   ├── tnt-billing-report      Revenus, Commissions, KPIs, Export CSV
 │   └── tnt-billing-templates   Templates de politique de prix
 │
-L6  tnt-bootstrap/              ← Unique module exécutable ⭐
-    @SpringBootApplication — assemble L0→L5, port 8080
+L6  trust/
+│   └── tnt-trust-core          Ancrage blockchain transversal (DeliveryProof, CustodyTransfer,
+│                                DID, Badges, BillingPolicy, Payment) — dépend de L2→L5, jamais l'inverse
+│
+L7  tnt-bootstrap/              ← Unique module exécutable ⭐
+    @SpringBootApplication — assemble L0→L6, port 8080
 ```
 
 Chaque module suit l'architecture hexagonale :
@@ -388,7 +392,7 @@ lsof -ti:8080 | xargs kill -9
 
 | Couches | Auteur | Contact |
 |---------|--------|---------|
-| L0 event kernel · L3 logistics · L5 billing · L6 bootstrap | **MANFOUO Braun** | mkbraun256@gmail.com |
+| L0 event kernel · L3 logistics · L5 billing · L6 trust · L7 bootstrap | **MANFOUO Braun** | mkbraun256@gmail.com |
 | L0 i18n · L2 organization · L3 logistics · L4 accounting · L5 billing | **MANFOUO Braun** | — |
 | L2 identity (tp/administration) · L4 business | **MANFOUO Braun** | — |
 

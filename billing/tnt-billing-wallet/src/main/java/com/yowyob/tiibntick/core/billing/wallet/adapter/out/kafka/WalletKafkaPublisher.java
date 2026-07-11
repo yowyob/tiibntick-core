@@ -4,7 +4,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yowyob.tiibntick.core.billing.wallet.application.port.out.IWalletEventPublisher;
 import com.yowyob.tiibntick.core.billing.wallet.domain.event.*;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -21,7 +20,6 @@ import reactor.core.publisher.Mono;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class WalletKafkaPublisher implements IWalletEventPublisher {
 
     private static final String TOPIC_PAYMENT_INITIATED = "tnt.billing.wallet.payment-initiated";
@@ -31,8 +29,15 @@ public class WalletKafkaPublisher implements IWalletEventPublisher {
     private static final String TOPIC_WALLET_DEBITED = "tnt.billing.wallet.wallet-debited";
     private static final String TOPIC_COMMISSION_CALCULATED = "tnt.billing.wallet.commission-calculated";
 
-    private final @Qualifier("walletKafkaTemplate") KafkaTemplate<String, String> kafkaTemplate;
-    private final @Qualifier("walletObjectMapper") ObjectMapper objectMapper;
+    private final KafkaTemplate<String, String> kafkaTemplate;
+    private final ObjectMapper objectMapper;
+
+    public WalletKafkaPublisher(
+            @Qualifier("walletKafkaTemplate") KafkaTemplate<String, String> kafkaTemplate,
+            @Qualifier("walletObjectMapper") ObjectMapper objectMapper) {
+        this.kafkaTemplate = kafkaTemplate;
+        this.objectMapper = objectMapper;
+    }
 
     @Override
     public Mono<Void> publish(PaymentInitiated event) {

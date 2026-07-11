@@ -162,7 +162,7 @@ class DisputeTest {
             DisputeEvidence evidence = DisputeEvidence.create(
                     dispute.getId(), CLAIMANT_ID,
                     EvidenceSubmitterType.CLAIMANT, EvidenceType.PHOTO,
-                    "minio/photos/dmg-001.jpg", "Front view of damaged corner");
+                    "minio/photos/dmg-001.jpg", "Front view of damaged corner", null);
 
             dispute.addEvidence(evidence);
 

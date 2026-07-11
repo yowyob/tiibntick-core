@@ -82,7 +82,8 @@ public final class DisputeResponses {
             boolean verified,
             LocalDateTime verifiedAt,
             String verifiedByMediatorId,
-            String blockchainRef) {}
+            String blockchainRef,
+            String evidenceHash) {}
 
     public record SlaResponse(
             int responseHours,

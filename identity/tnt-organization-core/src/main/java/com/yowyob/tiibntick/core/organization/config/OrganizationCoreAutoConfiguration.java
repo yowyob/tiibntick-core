@@ -7,6 +7,7 @@ import com.yowyob.tiibntick.core.organization.application.port.in.ManageFreelanc
 import com.yowyob.tiibntick.core.organization.application.port.in.ManageHubUseCase;
 import com.yowyob.tiibntick.core.organization.application.port.out.AgencyRepositoryPort;
 import com.yowyob.tiibntick.core.organization.application.port.out.BranchRepositoryPort;
+import com.yowyob.tiibntick.core.organization.application.port.out.FreelancerOrgDidAnchorPort;
 import com.yowyob.tiibntick.core.organization.application.port.out.FreelancerOrgEventPublisherPort;
 import com.yowyob.tiibntick.core.organization.application.port.out.FreelancerOrgRepositoryPort;
 import com.yowyob.tiibntick.core.organization.application.port.out.HubRepositoryPort;
@@ -183,13 +184,16 @@ public class OrganizationCoreAutoConfiguration {
      *
      * @param repository     persistence port for FreelancerOrganization aggregates
      * @param eventPublisher messaging port for domain events
+     * @param didAnchorPort  outbound port for anchoring the org's blockchain DID,
+     *                       implemented by {@code tnt-trust-core}
      * @return the {@link ManageFreelancerOrgUseCase} implementation
      */
     @Bean
     @ConditionalOnMissingBean
     public ManageFreelancerOrgUseCase manageFreelancerOrgUseCase(
             FreelancerOrgRepositoryPort repository,
-            FreelancerOrgEventPublisherPort eventPublisher) {
-        return new FreelancerOrgService(repository, eventPublisher);
+            FreelancerOrgEventPublisherPort eventPublisher,
+            FreelancerOrgDidAnchorPort didAnchorPort) {
+        return new FreelancerOrgService(repository, eventPublisher, didAnchorPort);
     }
 }

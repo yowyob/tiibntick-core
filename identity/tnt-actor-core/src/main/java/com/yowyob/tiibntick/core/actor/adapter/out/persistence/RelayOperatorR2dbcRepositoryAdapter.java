@@ -72,7 +72,7 @@ public class RelayOperatorR2dbcRepositoryAdapter implements IRelayOperatorReposi
                 p.createdAt(), p.updatedAt(),
                 p.hubId(),
                 ActorJsonMapper.availabilitySlotsToJson(p.openingHours()),
-                p.declaredCapacityParcels());
+                p.declaredCapacityParcels(), p.blockchainDid());
     }
 
     private RelayOperatorProfile toDomain(RelayOperatorProfileEntity e) {
@@ -86,6 +86,6 @@ public class RelayOperatorR2dbcRepositoryAdapter implements IRelayOperatorReposi
                 e.createdAt(), e.updatedAt(),
                 e.hubId(),
                 ActorJsonMapper.availabilitySlotsFromJson(e.openingHoursJson()),
-                e.declaredCapacityParcels());
+                e.declaredCapacityParcels(), e.blockchainDid());
     }
 }

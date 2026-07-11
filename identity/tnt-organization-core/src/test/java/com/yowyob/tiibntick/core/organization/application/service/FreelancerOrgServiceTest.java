@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.core.organization.application.service;
 
+import com.yowyob.tiibntick.core.organization.application.port.out.FreelancerOrgDidAnchorPort;
 import com.yowyob.tiibntick.core.organization.application.port.out.FreelancerOrgEventPublisherPort;
 import com.yowyob.tiibntick.core.organization.application.port.out.FreelancerOrgRepositoryPort;
 import com.yowyob.tiibntick.core.organization.domain.model.FreelancerOrganization;
@@ -38,11 +39,14 @@ class FreelancerOrgServiceTest {
     @Mock
     private FreelancerOrgEventPublisherPort eventPublisher;
 
+    @Mock
+    private FreelancerOrgDidAnchorPort didAnchorPort;
+
     private FreelancerOrgService service;
 
     @BeforeEach
     void setUp() {
-        service = new FreelancerOrgService(repository, eventPublisher);
+        service = new FreelancerOrgService(repository, eventPublisher, didAnchorPort);
     }
 
     @Test
@@ -125,5 +129,42 @@ class FreelancerOrgServiceTest {
                         && rse.getStatusCode() == HttpStatus.NOT_FOUND
                         && rse.getReason() != null && rse.getReason().contains("not found"))
                 .verify();
+    }
+
+    @Test
+    @DisplayName("verifyFreelancerOrg() — anchors blockchain DID after verification")
+    void verifyFreelancerOrg_anchorsBlockchainDid() {
+        UUID ownerActorId = UUID.randomUUID();
+        UUID adminActorId = UUID.randomUUID();
+        FreelancerOrganization org = FreelancerOrganization.register(null, ownerActorId, "DID Org");
+        OrganizationId id = org.getId();
+        String expectedDid = "did:tiibntick:" + org.getTenantId() + ":org:" + id.value();
+
+        when(repository.findById(id)).thenReturn(Mono.just(org));
+        when(repository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(eventPublisher.publishFreelancerOrgVerified(any())).thenReturn(Mono.empty());
+        when(didAnchorPort.issueDid(any())).thenReturn(Mono.just(expectedDid));
+
+        StepVerifier.create(service.verifyFreelancerOrg(id, adminActorId))
+                .expectNextMatches(updated -> expectedDid.equals(updated.getBlockchainDid()))
+                .verifyComplete();
+    }
+
+    @Test
+    @DisplayName("verifyFreelancerOrg() — swallows DID anchoring failure (best-effort)")
+    void verifyFreelancerOrg_swallowsAnchorFailure() {
+        UUID ownerActorId = UUID.randomUUID();
+        UUID adminActorId = UUID.randomUUID();
+        FreelancerOrganization org = FreelancerOrganization.register(null, ownerActorId, "Resilient Org");
+        OrganizationId id = org.getId();
+
+        when(repository.findById(id)).thenReturn(Mono.just(org));
+        when(repository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(eventPublisher.publishFreelancerOrgVerified(any())).thenReturn(Mono.empty());
+        when(didAnchorPort.issueDid(any())).thenReturn(Mono.error(new RuntimeException("Fabric unavailable")));
+
+        StepVerifier.create(service.verifyFreelancerOrg(id, adminActorId))
+                .expectNextMatches(updated -> updated.getBlockchainDid() == null)
+                .verifyComplete();
     }
 }

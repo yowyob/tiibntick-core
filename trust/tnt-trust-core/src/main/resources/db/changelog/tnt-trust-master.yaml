@@ -1,0 +1,35 @@
+databaseChangeLog:
+  # ============================================================
+  # tnt-trust — Liquibase Master Changelog
+  # Database: tnt_trust_db — Schema: tnt_trust
+  # Author: MANFOUO Braun
+  # ============================================================
+  - include:
+      file: db/changelog/001-create-tnt-trust-schema.sql
+  - include:
+      file: db/changelog/002-create-did-documents.sql
+  - include:
+      file: db/changelog/003-create-delivery-proofs.sql
+  - include:
+      file: db/changelog/004-create-custody-transfers.sql
+  - include:
+      file: db/changelog/005-create-actor-badges.sql
+  - include:
+      file: db/changelog/006-create-indexes.sql
+  # v1.1 — Incident blockchain chain support (IBlockchainAuditPort)
+  - include:
+      file: db/changelog/007-create-incident-blockchain-records.sql
+  - include:
+      file: db/changelog/008-create-incident-blockchain-indexes.sql
+  - include:
+      file: db/changelog/009-freelancer-org-trust-extensions.sql
+      relativeToChangelogFile: false
+  # v1.2 — Chain of Custody enhancements (GPS, PoC hash, custody hash chain)
+  - include:
+      file: db/changelog/010-custody-chain-enhancements.sql
+      relativeToChangelogFile: false
+  # v1.3 — Resilience: yow-trust-event gateway retry queue (§15 of
+  # TNT_CORE_Connexion_Trust_Module.md)
+  - include:
+      file: db/changelog/011-create-trust-retry-queue.sql
+      relativeToChangelogFile: false

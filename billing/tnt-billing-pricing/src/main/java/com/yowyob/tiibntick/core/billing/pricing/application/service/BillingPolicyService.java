@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.core.billing.pricing.application.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yowyob.tiibntick.core.billing.pricing.domain.exception.BillingPolicyNotFoundException;
 import com.yowyob.tiibntick.core.billing.pricing.domain.exception.InvalidPolicyException;
 import com.yowyob.tiibntick.core.billing.pricing.domain.model.BillingPolicy;
@@ -7,6 +8,8 @@ import com.yowyob.tiibntick.core.billing.pricing.domain.model.FleetCostParameter
 import com.yowyob.tiibntick.core.billing.pricing.domain.model.enums.PolicyOwnerType;
 import com.yowyob.tiibntick.core.billing.pricing.domain.model.enums.PolicyStatus;
 import com.yowyob.tiibntick.core.billing.pricing.domain.port.in.IBillingPolicyUseCase;
+import com.yowyob.tiibntick.core.billing.pricing.domain.port.out.BillingPolicyAnchorPayload;
+import com.yowyob.tiibntick.core.billing.pricing.domain.port.out.BillingPolicyAnchorPort;
 import com.yowyob.tiibntick.core.billing.pricing.domain.port.out.IBillingPolicyRepository;
 import com.yowyob.tiibntick.core.billing.dsl.domain.model.DslAccessLevel;
 import com.yowyob.tiibntick.core.billing.dsl.domain.model.PricingContext;
@@ -19,6 +22,7 @@ import reactor.core.publisher.Mono;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -42,6 +46,8 @@ import java.util.UUID;
 public class BillingPolicyService implements IBillingPolicyUseCase {
 
     private final IBillingPolicyRepository policyRepository;
+    private final BillingPolicyAnchorPort billingPolicyAnchorPort;
+    private final ObjectMapper objectMapper;
 
     @Override
     public Mono<BillingPolicy> createPolicy(BillingPolicy policy) {
@@ -90,7 +96,44 @@ public class BillingPolicyService implements IBillingPolicyUseCase {
     public Mono<BillingPolicy> activatePolicy(UUID policyId) {
         return policyRepository.findById(policyId)
                 .switchIfEmpty(Mono.error(new BillingPolicyNotFoundException(policyId)))
-                .flatMap(policy -> policyRepository.save(policy.activate()));
+                .flatMap(policy -> policyRepository.save(policy.activate()))
+                .flatMap(activated -> anchorActivation(activated).thenReturn(activated));
+    }
+
+    /**
+     * Anchors a policy activation on the blockchain via {@code tnt-trust-core}, best-effort.
+     * A trust-anchoring failure must never fail policy activation.
+     */
+    private Mono<Void> anchorActivation(BillingPolicy policy) {
+        final String summaryJson = buildPolicySummaryJson(policy);
+        final BillingPolicyAnchorPayload payload = new BillingPolicyAnchorPayload(
+                policy.getTenantId(), policy.getId(),
+                policy.getOwnerActorId() != null
+                        ? policy.getOwnerActorId()
+                        : policy.getAgencyId() != null ? policy.getAgencyId().toString() : null,
+                summaryJson, Instant.now());
+        return billingPolicyAnchorPort.anchor(payload)
+                .onErrorResume(e -> {
+                    log.warn("Failed to anchor billing policy activation on-chain — policyId={}: {}",
+                            policy.getId(), e.getMessage());
+                    return Mono.empty();
+                });
+    }
+
+    /** Builds a compact JSON summary of the activated policy's metadata for on-chain anchoring. */
+    private String buildPolicySummaryJson(BillingPolicy policy) {
+        final Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("name", policy.getName());
+        summary.put("ownerType", policy.getOwnerType());
+        summary.put("status", policy.getStatus());
+        summary.put("validFrom", policy.getValidFrom());
+        summary.put("pricingRuleCount", policy.getPricingRules() != null ? policy.getPricingRules().size() : 0);
+        try {
+            return objectMapper.writeValueAsString(summary);
+        } catch (Exception e) {
+            log.warn("Failed to serialize policy summary for policyId={}: {}", policy.getId(), e.getMessage());
+            return "{}";
+        }
     }
 
     @Override

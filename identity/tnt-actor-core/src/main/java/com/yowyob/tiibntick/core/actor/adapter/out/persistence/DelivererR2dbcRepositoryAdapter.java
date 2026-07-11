@@ -127,7 +127,7 @@ public class DelivererR2dbcRepositoryAdapter implements IDelivererRepository {
                 p.createdAt(), p.updatedAt(),
                 p.agencyId(), p.branchId(), p.vehicleId(), p.missionActiveId(),
                 p.capacityKg(), p.contractId(), p.delivererType().name(),
-                p.incidentHistoryCount(), p.fraudFlaggedByIncidentId());
+                p.incidentHistoryCount(), p.fraudFlaggedByIncidentId(), p.blockchainDid());
     }
 
     private DelivererProfile toDomain(DelivererProfileEntity e) {
@@ -141,6 +141,6 @@ public class DelivererR2dbcRepositoryAdapter implements IDelivererRepository {
                 e.createdAt(), e.updatedAt(),
                 e.agencyId(), e.branchId(), e.vehicleId(), e.missionActiveId(),
                 e.capacityKg(), e.contractId(), e.delivererType(),
-                e.incidentHistoryCount(), e.fraudFlaggedByIncidentId());
+                e.incidentHistoryCount(), e.fraudFlaggedByIncidentId(), e.blockchainDid());
     }
 }

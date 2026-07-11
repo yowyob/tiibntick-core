@@ -46,5 +46,7 @@ public record DelivererProfileEntity(
         /** Number of incidents in which this deliverer was involved. Added in . */
         int incidentHistoryCount,
         /** UUID of the incident that triggered a fraud flag. Null when not flagged. Added in . */
-        UUID fraudFlaggedByIncidentId) {
+        UUID fraudFlaggedByIncidentId,
+        /** Blockchain DID anchored via tnt-trust after KYC verification. Nullable. */
+        String blockchainDid) {
 }

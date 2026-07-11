@@ -33,7 +33,7 @@
 
 ## Vue d'ensemble
 
-`tnt-bootstrap` est le **point d'entrée unique** de TiiBnTick Core. Il n'implémente aucune logique métier — son unique rôle est d'**assembler** tous les modules L0 à L5 dans un seul contexte Spring Boot et d'exposer leurs endpoints REST, WebSocket et Actuator.
+`tnt-bootstrap` est le **point d'entrée unique** de TiiBnTick Core. Il n'implémente aucune logique métier — son unique rôle est d'**assembler** tous les modules L0 à L6 dans un seul contexte Spring Boot et d'exposer leurs endpoints REST, WebSocket et Actuator.
 
 ```
 tiibntick-core/
@@ -42,7 +42,8 @@ tiibntick-core/
 ├── logistics/                   ← L3 (tnt-delivery-core, tnt-media-core, ...)
 ├── business/                    ← L4 (tnt-resource-core, tnt-product-core, ...)
 ├── billing/                     ← L5 (tnt-billing-*, 6 modules)
-└── tnt-bootstrap/               ← L6 ← VOUS ÊTES ICI ⭐
+├── trust/                       ← L6 (tnt-trust-core — cross-cutting blockchain anchoring)
+└── tnt-bootstrap/               ← L7 ← VOUS ÊTES ICI ⭐
     ├── Dockerfile               ← Image Debian (glibc pour OR-Tools JNI)
     ├── docker-compose.yml       ← Stack de développement complète
     ├── pom.xml                  ← spring-boot-maven-plugin skip=false (unique)
@@ -68,7 +69,7 @@ tiibntick-core/
                     │  └──────────┘  └──────────────────┘  │
                     │                                        │
                     │  ┌────────────────────────────────┐   │
-                    │  │   Modules L0 → L5 (31 modules) │   │
+                    │  │   Modules L0 → L5 (32 modules) │   │
                     │  │   auto-configurés via Spring    │   │
                     │  └────────────────────────────────┘   │
                     └──────────────────────────────────────┘
@@ -230,7 +231,7 @@ docker run -d \
 
 ## Modules assemblés
 
-`tnt-bootstrap` importe **31 modules** répartis sur 6 couches (32 modules au total dans le repo, `tnt-bootstrap` lui-même exclu) :
+`tnt-bootstrap` importe **32 modules** répartis sur 6 couches (33 modules au total dans le repo, `tnt-bootstrap` lui-même exclu) :
 
 | Couche | Module | Rôle |
 |--------|--------|------|
@@ -265,6 +266,7 @@ docker run -d \
 | **L5** | `tnt-billing-wallet` | MTN MoMo, Orange Money, Stripe |
 | **L5** | `tnt-billing-report` | Revenus, Commissions, KPIs, Export CSV |
 | **L5** | `tnt-billing-templates` | Templates de politique de prix |
+| **L6** | `tnt-trust-core` | Ancrage blockchain transversal — DeliveryProof, CustodyTransfer, DID, Badges, BillingPolicy, Payment, Preuves blockchain incident (consomme L2→L5, jamais l'inverse) |
 
 ---
 
@@ -361,6 +363,7 @@ Seuls certains modules créent un vrai schéma Postgres (`CREATE SCHEMA`) ; les 
 | `sales` | tnt-sales-core |
 | `billing` | tnt-billing-dsl, tnt-billing-wallet |
 | `pricing` | tnt-billing-pricing |
+| `tnt_trust` | tnt-trust-core |
 
 Autres modules (`tnt-delivery-core`, `tnt-dispute-core`, `tnt-organization-core`, `tnt-notify-core`, `tnt-platform-gateway-core`, ...) : pas de schéma dédié, tables préfixées `tnt_*` dans `public`.
 

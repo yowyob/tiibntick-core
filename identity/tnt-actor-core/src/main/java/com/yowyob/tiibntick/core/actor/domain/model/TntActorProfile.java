@@ -21,6 +21,7 @@ public abstract sealed class TntActorProfile
     private final Set<Badge> badges;
     private final Instant createdAt;
     private final Instant updatedAt;
+    private final String blockchainDid;
 
     protected TntActorProfile(
             UUID id,
@@ -33,7 +34,8 @@ public abstract sealed class TntActorProfile
             ActorRating rating,
             Set<Badge> badges,
             Instant createdAt,
-            Instant updatedAt) {
+            Instant updatedAt,
+            String blockchainDid) {
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.tenantId = Objects.requireNonNull(tenantId, "tenantId must not be null");
         this.actorId = Objects.requireNonNull(actorId, "actorId must not be null");
@@ -45,6 +47,7 @@ public abstract sealed class TntActorProfile
         this.badges = badges != null ? Set.copyOf(badges) : Set.of();
         this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
         this.updatedAt = Objects.requireNonNull(updatedAt, "updatedAt must not be null");
+        this.blockchainDid = blockchainDid;
     }
 
     public UUID id() {
@@ -91,12 +94,21 @@ public abstract sealed class TntActorProfile
         return updatedAt;
     }
 
+    /** Blockchain Decentralized Identifier anchored via tnt-trust, or null if not yet issued. */
+    public String blockchainDid() {
+        return blockchainDid;
+    }
+
     public boolean isActive() {
         return actorStatus == ActorStatus.ACTIVE;
     }
 
     public boolean isKycVerified() {
         return kycStatus == KycStatus.VERIFIED;
+    }
+
+    public boolean hasBlockchainDid() {
+        return blockchainDid != null;
     }
 
     public boolean hasLocation() {

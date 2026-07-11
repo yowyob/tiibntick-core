@@ -26,5 +26,7 @@ public record RelayOperatorProfileEntity(
         Instant updatedAt,
         UUID hubId,
         String openingHoursJson,
-        int declaredCapacityParcels) {
+        int declaredCapacityParcels,
+        /** Blockchain DID anchored via tnt-trust after KYC verification. Nullable. */
+        String blockchainDid) {
 }

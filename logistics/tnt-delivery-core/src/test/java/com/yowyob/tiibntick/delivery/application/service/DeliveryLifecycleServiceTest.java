@@ -1,6 +1,7 @@
 package com.yowyob.tiibntick.delivery.application.service;
 
 import com.yowyob.tiibntick.core.delivery.application.port.in.command.CancelDeliveryCommand;
+import com.yowyob.tiibntick.core.delivery.application.port.in.command.CompleteDeliveryCommand;
 import com.yowyob.tiibntick.core.delivery.application.port.in.command.ConfirmPickupCommand;
 import com.yowyob.tiibntick.core.delivery.application.port.in.command.StartTransitCommand;
 import com.yowyob.tiibntick.core.delivery.application.port.out.*;
@@ -29,6 +30,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
 /**
@@ -49,6 +51,8 @@ class DeliveryLifecycleServiceTest {
     DeliveryCostComputationPort costComputationPort;
     @Mock
     DeliveryEventPublisher eventPublisher;
+    @Mock
+    DeliveryProofAnchorPort deliveryProofAnchorPort;
 
     @InjectMocks
     DeliveryLifecycleService service;
@@ -59,6 +63,7 @@ class DeliveryLifecycleServiceTest {
 
     private Delivery deliveryCreated;
     private Delivery deliveryPickedUp;
+    private Delivery deliveryInTransit;
     private DeliveryPerson deliveryPerson;
 
     @BeforeEach
@@ -78,6 +83,15 @@ class DeliveryLifecycleServiceTest {
         deliveryPickedUp.assignDeliveryPerson(DELIVERY_PERSON_ID, null, 5.0,
                 Instant.now().plusSeconds(3600));
         deliveryPickedUp.confirmPickup();
+
+        deliveryInTransit = Delivery.create(TENANT_ID, null, UUID.randomUUID(), parcel,
+                addr("Mokolo"), addr("Bastos"),
+                new RecipientInfo("Test User", "+237690000001", null),
+                DeliveryUrgency.STANDARD, null, null);
+        deliveryInTransit.assignDeliveryPerson(DELIVERY_PERSON_ID, null, 5.0,
+                Instant.now().plusSeconds(3600));
+        deliveryInTransit.confirmPickup();
+        deliveryInTransit.startTransit(EtaEstimate.of(Instant.now().plusSeconds(1800), 5.0, 30));
 
         deliveryPerson = DeliveryPerson.register(TENANT_ID, UUID.randomUUID(),
                 LogisticsType.MOTORBIKE, LogisticsClass.STANDARD,
@@ -148,6 +162,70 @@ class DeliveryLifecycleServiceTest {
 
         StepVerifier.create(service.cancelDelivery(cmd))
                 .assertNext(d -> assertThat(d.getStatus()).isEqualTo(DeliveryStatus.CANCELLED))
+                .verifyComplete();
+    }
+
+    @Test
+    @DisplayName("completeDelivery should anchor proof when photoHash and GPS are provided")
+    void shouldAnchorProofWhenDataProvided() {
+        when(deliveryRepository.findById(TENANT_ID, DELIVERY_ID)).thenReturn(Mono.just(deliveryInTransit));
+        when(deliveryRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(eventPublisher.publishAll(any())).thenReturn(Mono.empty());
+        when(deliveryPersonRepository.findByActorId(any(), any())).thenReturn(Mono.empty());
+        when(deliveryPersonRepository.findById(any(), any())).thenReturn(Mono.just(deliveryPerson));
+        when(deliveryPersonRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(deliveryProofAnchorPort.anchor(any())).thenReturn(Mono.empty());
+
+        CompleteDeliveryCommand cmd = new CompleteDeliveryCommand(TENANT_ID, DELIVERY_ID, DELIVERY_PERSON_ID,
+                "https://media/proof.jpg", "a".repeat(64), "b".repeat(64), 3.848, 11.502);
+
+        StepVerifier.create(service.completeDelivery(cmd))
+                .assertNext(d -> assertThat(d.getStatus()).isEqualTo(DeliveryStatus.DELIVERED))
+                .verifyComplete();
+
+        verify(deliveryProofAnchorPort).anchor(argThat(payload ->
+                payload.tenantId().equals(TENANT_ID)
+                        && payload.photoHash().equals("a".repeat(64))
+                        && payload.gpsLat() == 3.848
+                        && payload.gpsLng() == 11.502));
+    }
+
+    @Test
+    @DisplayName("completeDelivery should skip anchoring when photoHash is absent")
+    void shouldSkipAnchoringWhenPhotoHashMissing() {
+        when(deliveryRepository.findById(TENANT_ID, DELIVERY_ID)).thenReturn(Mono.just(deliveryInTransit));
+        when(deliveryRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(eventPublisher.publishAll(any())).thenReturn(Mono.empty());
+        when(deliveryPersonRepository.findByActorId(any(), any())).thenReturn(Mono.empty());
+        when(deliveryPersonRepository.findById(any(), any())).thenReturn(Mono.just(deliveryPerson));
+        when(deliveryPersonRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+
+        CompleteDeliveryCommand cmd = new CompleteDeliveryCommand(TENANT_ID, DELIVERY_ID, DELIVERY_PERSON_ID,
+                "https://media/proof.jpg", null, null, null, null);
+
+        StepVerifier.create(service.completeDelivery(cmd))
+                .assertNext(d -> assertThat(d.getStatus()).isEqualTo(DeliveryStatus.DELIVERED))
+                .verifyComplete();
+
+        verifyNoInteractions(deliveryProofAnchorPort);
+    }
+
+    @Test
+    @DisplayName("completeDelivery should still complete the delivery when trust anchoring fails")
+    void shouldCompleteEvenWhenAnchoringFails() {
+        when(deliveryRepository.findById(TENANT_ID, DELIVERY_ID)).thenReturn(Mono.just(deliveryInTransit));
+        when(deliveryRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(eventPublisher.publishAll(any())).thenReturn(Mono.empty());
+        when(deliveryPersonRepository.findByActorId(any(), any())).thenReturn(Mono.empty());
+        when(deliveryPersonRepository.findById(any(), any())).thenReturn(Mono.just(deliveryPerson));
+        when(deliveryPersonRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(deliveryProofAnchorPort.anchor(any())).thenReturn(Mono.error(new RuntimeException("trust unreachable")));
+
+        CompleteDeliveryCommand cmd = new CompleteDeliveryCommand(TENANT_ID, DELIVERY_ID, DELIVERY_PERSON_ID,
+                "https://media/proof.jpg", "a".repeat(64), null, 3.848, 11.502);
+
+        StepVerifier.create(service.completeDelivery(cmd))
+                .assertNext(d -> assertThat(d.getStatus()).isEqualTo(DeliveryStatus.DELIVERED))
                 .verifyComplete();
     }
 

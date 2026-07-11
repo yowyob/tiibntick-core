@@ -19,7 +19,7 @@
     <description>
         Socle commun TiiBnTick — Modules non-runnables partagés par toutes les plateformes.
         Couches L0 (Foundation — event + i18n), L2 (Identity), L3 (Logistics),
-        L4 (Business), L5 (Billing Engine) et L6 (Bootstrap).
+        L4 (Business), L5 (Billing Engine), L6 (Trust — transversal) et L7 (Bootstrap).
         Consomme le Kernel Yowyob (RT-comops) géré par TSAFACK Savio sur GitHub.
         Auteur / Responsable : MANFOUO Braun — ENSP Yaoundé 2026.
     </description>
@@ -31,8 +31,7 @@
             <name>MANFOUO Braun</name>
             <roles>
                 <role>Lead Architect — Responsable TiiBnTick</role>
-                <role>L0 (yow-event-kernel) · L3 Logistics · L5 Billing · L6 Bootstrap</role>
-                <role>Trust Base · Trust Event · tnt-trust</role>
+                <role>L0 (yow-event-kernel) · L3 Logistics · L5 Billing · L6 Trust (tnt-trust-core) · L7 Bootstrap</role>
             </roles>
         </developer>
         <developer>
@@ -98,12 +97,14 @@
         <!-- ─── COUCHE L4 — BUSINESS ───────────────────────────────────────
              FRANCOIS: tnt-resource-core, tnt-product-core, tnt-inventory-core, tnt-sales-core
              PAFE    : tnt-accounting-core
+             MANFOUO : tnt-hrm-core (Kernel HRM/human-resources proxy)
              ─────────────────────────────────────────────────────────────── -->
         <module>business/tnt-resource-core</module>
         <module>business/tnt-product-core</module>
         <module>business/tnt-inventory-core</module>
         <module>business/tnt-sales-core</module>
         <module>business/tnt-accounting-core</module>
+        <module>business/tnt-hrm-core</module>
 
         <!-- ─── COUCHE L5 — BILLING ENGINE ────────────────────────────────
              MANFOUO : tnt-billing-dsl, tnt-billing-pricing, tnt-billing-wallet
@@ -117,7 +118,22 @@
         <module>billing/tnt-billing-report</module>
         <module>billing/tnt-billing-templates</module>
 
-        <!-- ─── COUCHE L6 — RUNNABLE ───────────────────────────────────────
+        <!-- ─── COUCHE L6 — TRUST (TRANSVERSAL) ─────────────────────────────
+             Ancrage blockchain (DeliveryProof/CustodyTransfer/DID/PoL/Badge/
+             BillingPolicy/Payment/Incident) via le microservice Kernel
+             yow-trust-event. Consommé par (quasiment) toutes les couches
+             inférieures — aucune d'entre elles ne dépend jamais de trust en
+             retour (le module appelant possède toujours son port sortant,
+             tnt-trust-core en fournit l'implémentation). Positionné au-dessus
+             de L5 Billing et non plus en L3 Logistics : un module qui dépend
+             de couches allant de L2 à L5 ne peut structurellement PAS être
+             lui-même en L3 sans violer la règle "jamais de dépendance vers
+             une couche supérieure" — voir CLAUDE.md.
+             MANFOUO Braun : tnt-trust-core
+             ─────────────────────────────────────────────────────────────── -->
+        <module>trust/tnt-trust-core</module>
+
+        <!-- ─── COUCHE L7 — RUNNABLE ───────────────────────────────────────
              SEUL module @SpringBootApplication. Assemble tout.
              MANFOUO Braun — déclaré EN DERNIER.
              ─────────────────────────────────────────────────────────────── -->
@@ -189,6 +205,15 @@
         <!-- ── Observabilité ── -->
         <micrometer.version>1.13.0</micrometer.version>
         <zipkin.version>3.3.0</zipkin.version>
+
+        <!-- ── Résilience (circuit breaker / retry / time limiter) ── -->
+        <resilience4j.version>2.4.0</resilience4j.version>
+        <!-- resilience4j-spring6's RxJava3FallbackDecorator references RxJava3 types in its
+             method signatures — Spring's @ConditionalOnMissingBean type deduction reflectively
+             loads that class regardless of whether the app ever uses RxJava, so this must be
+             on the classpath (runtime-only, never referenced by TiiBnTick code) or context
+             refresh fails with NoClassDefFoundError. -->
+        <rxjava3.version>3.1.8</rxjava3.version>
 
         <!-- ── Blockchain (Trust Base — MANFOUO, en attente de migration vers RT-comops) ── -->
         <hyperledger-fabric-gateway.version>1.4.0</hyperledger-fabric-gateway.version>
@@ -303,6 +328,26 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>
                 <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- Pins EVERY transitive resilience4j-* artifact (resilience4j-spring6,
+                 resilience4j-circuitbreaker, resilience4j-core, ...) to the same version.
+                 Declared BEFORE spring-cloud-dependencies deliberately: for multiple
+                 import-scope BOMs managing the same GA, Maven's dependencyManagement
+                 uses first-declared-wins — spring-cloud-dependencies 2024.0.0 pins its
+                 own (older, 2.2.0) resilience4j-* versions transitively via
+                 spring-cloud-circuitbreaker-resilience4j, which would silently win and
+                 reintroduce the version mismatch this BOM exists to prevent if imported
+                 after it. Without full alignment, mismatched resilience4j-spring6 vs.
+                 resilience4j-spring-boot4 versions break FallbackConfigurationOnMissingBean's
+                 reflection-based class introspection at context refresh
+                 (NoClassDefFoundError on RxJava3FallbackDecorator). -->
+            <dependency>
+                <groupId>io.github.resilience4j</groupId>
+                <artifactId>resilience4j-bom</artifactId>
+                <version>${resilience4j.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -464,6 +509,11 @@
                 <artifactId>tnt-accounting-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-hrm-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
 
             <!-- ╔══════════════════════════════════════════════════════════╗
                  ║  TIIBNTICK L5 — BILLING ENGINE                           ║
@@ -502,6 +552,16 @@
             <dependency>
                 <groupId>com.yowyob.tiibntick.core</groupId>
                 <artifactId>tnt-billing-templates</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <!-- ╔══════════════════════════════════════════════════════════╗
+                 ║  TIIBNTICK L6 — TRUST (TRANSVERSAL)                      ║
+                 ╚══════════════════════════════════════════════════════════╝ -->
+
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-trust-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
@@ -824,6 +884,32 @@
                 <groupId>io.zipkin.reporter2</groupId>
                 <artifactId>zipkin-reporter-brave</artifactId>
                 <version>${zipkin.version}</version>
+            </dependency>
+
+            <!-- ╔══════════════════════════════════════════════════════════╗
+                 ║  RÉSILIENCE (circuit breaker / retry / time limiter)       ║
+                 ║  resilience4j-reactor and every other transitive           ║
+                 ║  resilience4j-* artifact (spring6, core, circuitbreaker,   ║
+                 ║  ...) are pinned by the resilience4j-bom import above —    ║
+                 ║  resilience4j-spring-boot4 is the one exception (the BOM   ║
+                 ║  only manages -spring-boot3), so it needs its own explicit ║
+                 ║  version here, kept equal to ${resilience4j.version} so it ║
+                 ║  never drifts from what the BOM pins for its dependencies. ║
+                 ║  resilience4j-reactor is required for @CircuitBreaker /     ║
+                 ║  @TimeLimiter to correctly decorate the Mono/Flux returned  ║
+                 ║  in WebFlux (otherwise the annotations silently no-op —     ║
+                 ║  see tnt-trust-core).                                       ║
+                 ╚══════════════════════════════════════════════════════════╝ -->
+
+            <dependency>
+                <groupId>io.github.resilience4j</groupId>
+                <artifactId>resilience4j-spring-boot4</artifactId>
+                <version>${resilience4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.reactivex.rxjava3</groupId>
+                <artifactId>rxjava</artifactId>
+                <version>${rxjava3.version}</version>
             </dependency>
 
             <!-- ╔══════════════════════════════════════════════════════════╗

@@ -5,9 +5,11 @@ import com.yowyob.tiibntick.core.actor.adapter.in.kafka.IncidentEventConsumer;
 import com.yowyob.tiibntick.core.actor.adapter.in.web.DelivererController;
 import com.yowyob.tiibntick.core.actor.adapter.in.web.FreelancerController;
 import com.yowyob.tiibntick.core.actor.adapter.in.web.ActorKycController;
+import com.yowyob.tiibntick.core.actor.adapter.in.web.KycVerificationProxyController;
 import com.yowyob.tiibntick.core.actor.adapter.out.auth.ActorCoreYowAuthTntAdapter;
 import com.yowyob.tiibntick.core.actor.adapter.out.incident.ActorReputationPortAdapter;
 import com.yowyob.tiibntick.core.actor.adapter.out.kernel.KernelActorAdapter;
+import com.yowyob.tiibntick.core.actor.adapter.out.kernel.KernelKycVerificationAdapter;
 import com.yowyob.tiibntick.core.actor.adapter.out.messaging.KafkaActorEventPublisher;
 import com.yowyob.tiibntick.core.actor.adapter.out.persistence.ClientProfileR2dbcRepositoryAdapter;
 import com.yowyob.tiibntick.core.actor.adapter.out.persistence.DelivererR2dbcRepositoryAdapter;
@@ -24,6 +26,7 @@ import com.yowyob.tiibntick.core.actor.application.service.FreelancerAssociation
 import com.yowyob.tiibntick.core.actor.application.service.FreelancerOrgLinkService;
 import com.yowyob.tiibntick.core.actor.application.service.FreelancerService;
 import com.yowyob.tiibntick.core.actor.application.service.ActorKycService;
+import com.yowyob.tiibntick.core.actor.application.service.KycVerificationGatewayService;
 import com.yowyob.tiibntick.core.actor.application.service.RelayOperatorService;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
@@ -59,6 +62,7 @@ import java.util.Map;
         ActorBadgeService.class,
         ActorKycService.class,
         ActorPerformanceService.class,
+        KycVerificationGatewayService.class,
         // ── Persistence adapters ────────────────────────────────────────────────
         DelivererR2dbcRepositoryAdapter.class,
         FreelancerR2dbcRepositoryAdapter.class,
@@ -68,12 +72,14 @@ import java.util.Map;
         DelivererController.class,
         FreelancerController.class,
         ActorKycController.class,
+        KycVerificationProxyController.class,
         // ── tnt-auth-core outbound adapter ──────────────────────────────────────
         ActorCoreYowAuthTntAdapter.class,
         // ── tnt-incident-core outbound adapter ─────────────────────────────────
         ActorReputationPortAdapter.class,
         // ── Kernel outbound adapter ─────────────────────────────────────────────
         KernelActorAdapter.class,
+        KernelKycVerificationAdapter.class,
         // ── Kafka publisher ─────────────────────────────────────────────────────
         KafkaActorEventPublisher.class,
         // ── Kafka consumers ─────────────────────────────────────────────────────

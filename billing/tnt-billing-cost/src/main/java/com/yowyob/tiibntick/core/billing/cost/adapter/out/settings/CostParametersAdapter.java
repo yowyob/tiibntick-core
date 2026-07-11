@@ -2,7 +2,6 @@ package com.yowyob.tiibntick.core.billing.cost.adapter.out.settings;
 
 import com.yowyob.tiibntick.core.billing.cost.application.port.out.ICostParametersPort;
 import com.yowyob.tiibntick.core.billing.cost.domain.model.CostParameters;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
@@ -22,11 +21,15 @@ import java.util.UUID;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class CostParametersAdapter implements ICostParametersPort {
 
-    @Qualifier("kernelWebClient")
     private final WebClient settingsCoreWebClient;
+
+    public CostParametersAdapter(
+            @Qualifier("kernelWebClient") 
+            WebClient settingsCoreWebClient) {
+        this.settingsCoreWebClient = settingsCoreWebClient;
+    }
 
     @Override
     public Mono<CostParameters> getForTenant(UUID tenantId) {

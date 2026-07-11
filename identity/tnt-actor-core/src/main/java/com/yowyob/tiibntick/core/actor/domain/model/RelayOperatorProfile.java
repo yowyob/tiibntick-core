@@ -26,9 +26,10 @@ public final class RelayOperatorProfile extends TntActorProfile {
             Instant updatedAt,
             UUID hubId,
             List<AvailabilitySlot> openingHours,
-            int declaredCapacityParcels) {
+            int declaredCapacityParcels,
+            String blockchainDid) {
         super(id, tenantId, actorId, ActorType.RELAY_OPERATOR, actorStatus, kycStatus,
-                currentLocation, rating, badges, createdAt, updatedAt);
+                currentLocation, rating, badges, createdAt, updatedAt, blockchainDid);
         this.hubId = Objects.requireNonNull(hubId, "hubId must not be null");
         this.openingHours = openingHours != null ? List.copyOf(openingHours) : List.of();
         if (declaredCapacityParcels < 0) {
@@ -48,7 +49,7 @@ public final class RelayOperatorProfile extends TntActorProfile {
                 ActorStatus.INACTIVE, KycStatus.PENDING,
                 null, ActorRating.zero(), Set.of(),
                 Instant.now(), Instant.now(),
-                hubId, openingHours, declaredCapacityParcels);
+                hubId, openingHours, declaredCapacityParcels, null);
     }
 
     public static RelayOperatorProfile rehydrate(
@@ -59,7 +60,8 @@ public final class RelayOperatorProfile extends TntActorProfile {
             double ratingScore, int ratingTotal, Instant ratingUpdatedAt,
             Set<Badge> badges,
             Instant createdAt, Instant updatedAt,
-            UUID hubId, List<AvailabilitySlot> openingHours, int declaredCapacityParcels) {
+            UUID hubId, List<AvailabilitySlot> openingHours, int declaredCapacityParcels,
+            String blockchainDid) {
         ActorLocation location = (locationLat != null && locationLng != null)
                 ? ActorLocation.of(locationLat, locationLng, locationAccuracy,
                         locationTimestamp != null ? locationTimestamp : Instant.now(),
@@ -72,31 +74,31 @@ public final class RelayOperatorProfile extends TntActorProfile {
                 id, tenantId, actorId,
                 ActorStatus.from(actorStatus), KycStatus.from(kycStatus),
                 location, rating, badges, createdAt, updatedAt,
-                hubId, openingHours, declaredCapacityParcels);
+                hubId, openingHours, declaredCapacityParcels, blockchainDid);
     }
 
     public RelayOperatorProfile withLocation(ActorLocation location) {
         return new RelayOperatorProfile(id(), tenantId(), actorId(), actorStatus(), kycStatus(),
                 location, rating(), badges(), createdAt(), Instant.now(),
-                hubId, openingHours, declaredCapacityParcels);
+                hubId, openingHours, declaredCapacityParcels, blockchainDid());
     }
 
     public RelayOperatorProfile withRating(ActorRating rating) {
         return new RelayOperatorProfile(id(), tenantId(), actorId(), actorStatus(), kycStatus(),
                 currentLocation(), rating, badges(), createdAt(), Instant.now(),
-                hubId, openingHours, declaredCapacityParcels);
+                hubId, openingHours, declaredCapacityParcels, blockchainDid());
     }
 
     public RelayOperatorProfile withKycStatus(KycStatus kycStatus) {
         return new RelayOperatorProfile(id(), tenantId(), actorId(), actorStatus(), kycStatus,
                 currentLocation(), rating(), badges(), createdAt(), Instant.now(),
-                hubId, openingHours, declaredCapacityParcels);
+                hubId, openingHours, declaredCapacityParcels, blockchainDid());
     }
 
     public RelayOperatorProfile activate() {
         return new RelayOperatorProfile(id(), tenantId(), actorId(), ActorStatus.ACTIVE, kycStatus(),
                 currentLocation(), rating(), badges(), createdAt(), Instant.now(),
-                hubId, openingHours, declaredCapacityParcels);
+                hubId, openingHours, declaredCapacityParcels, blockchainDid());
     }
 
     public RelayOperatorProfile withBadge(Badge badge) {
@@ -104,7 +106,18 @@ public final class RelayOperatorProfile extends TntActorProfile {
         updatedBadges.add(badge);
         return new RelayOperatorProfile(id(), tenantId(), actorId(), actorStatus(), kycStatus(),
                 currentLocation(), rating(), updatedBadges, createdAt(), Instant.now(),
-                hubId, openingHours, declaredCapacityParcels);
+                hubId, openingHours, declaredCapacityParcels, blockchainDid());
+    }
+
+    /**
+     * Records the blockchain DID issued by tnt-trust after KYC verification.
+     *
+     * @param did the blockchain Decentralized Identifier string
+     */
+    public RelayOperatorProfile withBlockchainDid(String did) {
+        return new RelayOperatorProfile(id(), tenantId(), actorId(), actorStatus(), kycStatus(),
+                currentLocation(), rating(), badges(), createdAt(), Instant.now(),
+                hubId, openingHours, declaredCapacityParcels, did);
     }
 
     public UUID hubId() {

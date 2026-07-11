@@ -69,6 +69,10 @@ databaseChangeLog:
       file: db/changelog/tnt-sync-master.yaml
       relativeToChangelogFile: false
 
+  - include:
+      file: db/changelog/tnt-trust-master.yaml
+      relativeToChangelogFile: false
+
   # ── L4 — Business ──────────────────────────────────────────────────────────
   - include:
       file: db/changelog/tnt-resource-master.yaml

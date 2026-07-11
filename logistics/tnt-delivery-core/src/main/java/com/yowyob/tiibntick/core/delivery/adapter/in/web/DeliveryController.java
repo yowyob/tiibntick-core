@@ -173,10 +173,15 @@ public class DeliveryController {
             @PathVariable UUID tenantId,
             @PathVariable UUID deliveryId,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
-            @RequestParam(required = false) String proofPhotoUrl) {
+            @RequestParam(required = false) String proofPhotoUrl,
+            @RequestParam(required = false) String photoHash,
+            @RequestParam(required = false) String signatureHash,
+            @RequestParam(required = false) Double gpsLat,
+            @RequestParam(required = false) Double gpsLng) {
         UUID deliveryPersonId = currentUser.actorId() != null ? currentUser.actorId() : currentUser.userId();
         return lifecycleUseCase.completeDelivery(
-                        new CompleteDeliveryCommand(tenantId, deliveryId, deliveryPersonId, proofPhotoUrl))
+                        new CompleteDeliveryCommand(tenantId, deliveryId, deliveryPersonId, proofPhotoUrl,
+                                photoHash, signatureHash, gpsLat, gpsLng))
                 .map(DeliveryResponseMapper::toDetail);
     }
 

@@ -18,7 +18,8 @@ public record AddEvidenceCommand(
         EvidenceSubmitterType submitterType,
         EvidenceType evidenceType,
         String fileKey,
-        String description
+        String description,
+        String evidenceHash
 ) {
     public AddEvidenceCommand {
         Objects.requireNonNull(disputeId, "disputeId is required");
