@@ -37,11 +37,11 @@ services:
       MINIO_ACCESS_KEY: "minioadmin"
       MINIO_SECRET_KEY: "${TNT_CORE_MINIO_SECRET:?TNT_CORE_MINIO_SECRET requis dans .env}"
       # ── Sécurité JWT : resource server valide via la JWKS de kernel-core ──
-      JWT_JWK_SET_URI: "https://kernel-core.yowyob.com/.well-known/jwks.json"
+      JWT_JWK_SET_URI: "https://kernel-core.yowyob.com/kernel-api/.well-known/jwks.json"
       JWT_AUTO_GENERATE_KEY_PAIR: "true"
       QR_HMAC_SECRET: "${TNT_CORE_QR_HMAC_SECRET:?TNT_CORE_QR_HMAC_SECRET requis dans .env}"
       # ── Relais vers kernel-core (client dédié, cf. .env.prod.example) ──
-      TNT_KERNEL_BASE_URL: "https://kernel-core.yowyob.com"
+      TNT_KERNEL_BASE_URL: "https://kernel-core.yowyob.com/kernel-api"
       TNT_KERNEL_CLIENT_ID: "tibntick-backend"
       TNT_KERNEL_API_KEY: "${TNT_KERNEL_API_KEY:?TNT_KERNEL_API_KEY requis dans .env}"
       TNT_SYSTEM_TENANT_ID: "00000000-0000-0000-0000-000000000001"
