@@ -122,3 +122,61 @@ databaseChangeLog:
   - include:
       file: db/changelog/tnt-billing-templates-master.yaml
       relativeToChangelogFile: false
+
+  # ── L6 — Agency ERP (tnt-agency-back-core) ─────────────────────────────────
+  - include:
+      file: db/changelog/tnt-agency-org-master.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/tnt-agency-staff-master.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/tnt-agency-workforce-master.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/tnt-agency-assignment-master.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/tnt-agency-commission-master.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/tnt-agency-billing-master.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/tnt-agency-onboarding-master.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/tnt-agency-intake-master.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/tnt-agency-inbox-master.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/tnt-agency-fleet-local-master.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/tnt-agency-sync-master.yaml
+      relativeToChangelogFile: false
+
+  # ── L6 — Core Backends (per-product orchestration) ─────────────────────────
+  - include:
+      file: db/changelog/tnt-gofp-master.xml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/tnt-link-master.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/tnt-market-master.yaml
+      relativeToChangelogFile: false

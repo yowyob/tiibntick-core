@@ -36,6 +36,18 @@ public interface DeliveryQueryUseCase {
     Flux<Delivery> findDeliveriesByDeliveryPerson(UUID tenantId, UUID deliveryPersonId);
 
     /**
+     * Counts deliveries assigned to a delivery person, without loading them — for
+     * callers that only need a total (e.g. a profile summary), not the full history.
+     */
+    Mono<Long> countDeliveriesByDeliveryPerson(UUID tenantId, UUID deliveryPersonId);
+
+    /**
+     * Counts deliveries assigned to a delivery person that are not yet in a
+     * terminal status ({@link DeliveryStatus#isTerminal()}), without loading them.
+     */
+    Mono<Long> countNonTerminalDeliveriesByDeliveryPerson(UUID tenantId, UUID deliveryPersonId);
+
+    /**
      * Lists deliveries by status for a given tenant.
      */
     Flux<Delivery> findDeliveriesByStatus(UUID tenantId, DeliveryStatus status);

@@ -215,6 +215,7 @@ public class TntKafkaTopicsConfig {
     // ── Sync Topics ───────────────────────────────────────────────────────────
     @Bean public NewTopic tntSyncDeltaRequested()    { return topic("tnt.sync.delta.requested"); }
     @Bean public NewTopic tntSyncConflictDetected()  { return topic("tnt.sync.conflict.detected"); }
+    @Bean public NewTopic tntSyncEntityChangedDlq()  { return topic("tnt.sync.entity-changed.dlq"); }
 
     // ── Actor / Identity Topics ───────────────────────────────────────────────
     @Bean public NewTopic tntActorProfileUpdated()    { return topic("tnt.actor.profile.updated"); }

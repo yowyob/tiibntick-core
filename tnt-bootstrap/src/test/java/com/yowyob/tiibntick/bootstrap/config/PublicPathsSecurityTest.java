@@ -73,4 +73,35 @@ class PublicPathsSecurityTest {
                 .exchange()
                 .expectStatus().isUnauthorized();
     }
+
+    /**
+     * Proves {@code TntRoleAssignmentAdminController} (tnt-roles-core, component-scanned —
+     * not an explicit {@code @Bean}) is actually registered in the assembled application
+     * context and published in the generated OpenAPI doc under its {@code @Tag}, the same
+     * way {@code PlatformClientAdminController} is. A missing entry here would mean the
+     * blanket {@code @ComponentScan} in {@code TiiBnTickApplication} isn't picking up the
+     * controller, or springdoc isn't seeing it.
+     */
+    @Test
+    void roleAssignmentAdminEndpointIsPublishedInOpenApiDocs() {
+        // The full OpenAPI doc (every module's controllers) exceeds WebTestClient's default
+        // 256KB in-memory body limit — raise it just for this call.
+        WebTestClient largeBodyClient = webTestClient.mutate()
+                .codecs(config -> config.defaultCodecs().maxInMemorySize(5 * 1024 * 1024))
+                .build();
+        largeBodyClient.get().uri("/v3/api-docs")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(body -> {
+                    if (!body.contains("\"/api/v1/admin/roles/assignments\"")) {
+                        throw new AssertionError(
+                                "Expected /api/v1/admin/roles/assignments in /v3/api-docs but it was missing");
+                    }
+                    if (!body.contains("Role Assignment Admin")) {
+                        throw new AssertionError(
+                                "Expected the 'Role Assignment Admin' tag in /v3/api-docs but it was missing");
+                    }
+                });
+    }
 }

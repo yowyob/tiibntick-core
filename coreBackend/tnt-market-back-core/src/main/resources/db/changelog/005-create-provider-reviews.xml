@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- Author: MANFOUO Braun -->
+    <!-- Creates the provider_reviews table -->
+
+    <changeSet id="005-create-provider-reviews" author="MANFOUO Braun">
+        <createTable schemaName="tnt_market" tableName="provider_reviews"
+                     remarks="Client reviews and ratings for Market providers">
+
+            <column name="id" type="UUID">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="tenant_id" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="client_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="provider_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="listing_id" type="UUID">
+                <constraints nullable="false"
+                             foreignKeyName="fk_provider_reviews_listing"
+                             references="tnt_market.market_listings(id)"/>
+            </column>
+            <column name="order_id" type="UUID"/>
+
+            <!-- Rating VO (4 scores) -->
+            <column name="overall_score" type="DOUBLE PRECISION">
+                <constraints nullable="false"/>
+            </column>
+            <column name="speed_score" type="DOUBLE PRECISION"/>
+            <column name="communication_score" type="DOUBLE PRECISION"/>
+            <column name="packaging_score" type="DOUBLE PRECISION"/>
+
+            <column name="comment" type="TEXT"/>
+            <column name="tags" type="TEXT" defaultValue="[]"
+                    remarks="JSON array of ReviewTag enum strings"/>
+
+            <!-- Moderation -->
+            <column name="status" type="VARCHAR(50)" defaultValue="PENDING_MODERATION">
+                <constraints nullable="false"/>
+            </column>
+            <column name="moderated_by" type="UUID"/>
+            <column name="moderated_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="rejection_reason" type="TEXT"/>
+
+            <!-- Audit -->
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!-- Prevent duplicate review per order -->
+        <addUniqueConstraint schemaName="tnt_market" tableName="provider_reviews"
+                             columnNames="order_id"
+                             constraintName="uq_reviews_order_id"/>
+
+        <createIndex schemaName="tnt_market" tableName="provider_reviews" indexName="idx_reviews_listing_status">
+            <column name="listing_id"/>
+            <column name="status"/>
+        </createIndex>
+        <createIndex schemaName="tnt_market" tableName="provider_reviews" indexName="idx_reviews_client">
+            <column name="client_id"/>
+            <column name="tenant_id"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

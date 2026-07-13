@@ -1,5 +1,5 @@
 # Purpose
-Offline, versioned reference for every HTTP endpoint the Yowyob Kernel (RT-comops, `https://kernel-core.yowyob.com`) exposes — so nobody needs to scrape `/swagger-ui/index.html` by hand to know what's available. TiiBnTick Core talks to the Kernel **only over HTTP** (see root `CLAUDE.md` — no `RT-comops-*-core` Maven dependency, no Kernel class import); this directory is the map of that HTTP surface.
+Offline, versioned reference for every HTTP endpoint the Yowyob Kernel (RT-comops, `https://kernel-core.yowyob.com/kernel-api`) exposes — so nobody needs to scrape `/swagger-ui/index.html` by hand to know what's available. TiiBnTick Core talks to the Kernel **only over HTTP** (see root `CLAUDE.md` — no `RT-comops-*-core` Maven dependency, no Kernel class import); this directory is the map of that HTTP surface.
 
 # Summary
 - `openapi.json` — raw OpenAPI 3 spec fetched from `GET /v3/api-docs`. Source of truth.
@@ -32,7 +32,7 @@ Every call to the Kernel (including the two above) requires headers `X-Api-Key` 
 # Links
 - `docs/architecture/dependencies.md` — why the Kernel is HTTP-only from TiiBnTick's side
 - `foundation/tnt-auth-core` — `TntSecurityContext`, JWT bridge consuming these endpoints
-- Live Swagger UI (for spot-checks only, not as the primary reference): `https://kernel-core.yowyob.com/swagger-ui/index.html`
+- Live Swagger UI (for spot-checks only, not as the primary reference): `https://kernel-core.yowyob.com/kernel-api/swagger-ui/index.html`
 
 ---
 > **Comment maintenir ce document** : ne pas éditer `endpoints.md`/`schemas.md` à la main — relancer `scripts/fetch-kernel-openapi.sh` et committer le diff.

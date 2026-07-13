@@ -97,6 +97,11 @@ public class TntSecurityConfig {
     @Value("${tnt.auth.dev-actor-id:709f0069-c5ed-4d50-8ad0-b6c67a9eb630}")
     private String devActorId;
 
+    // Same property/default as tnt-roles-core's TntRolesProperties#systemTenantId — kept in
+    // sync manually since this class lives in tnt-bootstrap and must not depend on tnt-roles-core.
+    @Value("${tnt.roles.system-tenant-id:00000000-0000-0000-0000-000000000001}")
+    private String systemTenantId;
+
     // ── Chain 1: Public paths ─────────────────────────────────────────────────
 
     /**
@@ -277,13 +282,17 @@ public class TntSecurityConfig {
                         .map(SimpleGrantedAuthority::new)
                         .forEach(authorities::add);
 
-                // Kernel OWNER → grant all TiiBnTick roles and fine-grained authority strings.
-                // ROLE_OWNER in the Kernel JWT means the user is the tenant owner with full rights.
+                // Kernel OWNER of TiiBnTick's own system tenant → grant all TiiBnTick roles and
+                // fine-grained authority strings. ROLE_OWNER/tenant:admin only means "owner of
+                // THIS particular Kernel tenant" — it must not be treated as system-wide
+                // TNT_ADMIN unless that tenant is TiiBnTick's system tenant, otherwise every
+                // self-registered tenant owner on the platform would get full admin rights.
                 boolean isKernelOwner = permList.stream()
                         .filter(String.class::isInstance)
                         .map(String.class::cast)
                         .anyMatch(p -> p.startsWith("ROLE_OWNER") || p.equals("tenant:admin"));
-                if (isKernelOwner) {
+                boolean ownsSystemTenant = systemTenantId.equals(jwt.getClaimAsString("tid"));
+                if (isKernelOwner && ownsSystemTenant) {
                     // TiiBnTick business roles (checked via hasRole / @PreAuthorize)
                     List.of("ROLE_TNT_ADMIN", "ROLE_AGENCY_MANAGER", "ROLE_BRANCH_MANAGER",
                             "ROLE_ORG_ADMIN", "ROLE_SUPPORT_AGENT",

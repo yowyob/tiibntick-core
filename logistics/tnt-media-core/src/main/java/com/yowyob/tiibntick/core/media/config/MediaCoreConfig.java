@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.r2dbc.repository.config.EnableR2dbcRepositories;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -32,6 +33,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  */
 @Slf4j
 @Configuration
+@ComponentScan(basePackages = "com.yowyob.tiibntick.core.media.adapter.in")
 @EnableConfigurationProperties(MediaCoreProperties.class)
 @EnableR2dbcRepositories(basePackages = "com.yowyob.tiibntick.core.media.adapter.persistence")
 @EnableScheduling

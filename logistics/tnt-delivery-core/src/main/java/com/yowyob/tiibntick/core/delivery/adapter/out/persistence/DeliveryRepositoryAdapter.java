@@ -99,6 +99,16 @@ public class DeliveryRepositoryAdapter implements DeliveryRepository {
     }
 
     @Override
+    public Mono<Long> countByDeliveryPersonId(UUID tenantId, UUID deliveryPersonId) {
+        return deliveryRepo.countByTenantIdAndDeliveryPersonId(tenantId, deliveryPersonId);
+    }
+
+    @Override
+    public Mono<Long> countNonTerminalByDeliveryPersonId(UUID tenantId, UUID deliveryPersonId) {
+        return deliveryRepo.countNonTerminalByTenantIdAndDeliveryPersonId(tenantId, deliveryPersonId);
+    }
+
+    @Override
     public Mono<Void> delete(UUID tenantId, UUID deliveryId) {
         return deliveryRepo.deleteById(deliveryId);
     }

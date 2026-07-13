@@ -28,7 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * End-to-end verification that the Kernel notification bridge speaks the
  * exact wire protocol documented by the Kernel's OpenAPI spec
  * ({@code /api/notifications/*}), using a stubbed HTTP server instead of the
- * real {@code kernel-core.yowyob.com}.
+ * real {@code kernel-core.yowyob.com/kernel-api}.
  *
  * <p>Also covers the {@code X-Tenant-Id}/{@code X-Organization-Id} headers —
  * undocumented in the OpenAPI spec but required by the Kernel's gateway

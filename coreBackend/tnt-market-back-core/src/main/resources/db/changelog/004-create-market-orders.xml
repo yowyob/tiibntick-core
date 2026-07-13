@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- Author: MANFOUO Braun -->
+    <!-- Creates the market_orders table for MarketOrder aggregate -->
+
+    <changeSet id="004-create-market-orders" author="MANFOUO Braun">
+        <createTable schemaName="tnt_market" tableName="market_orders"
+                     remarks="Market orders lifecycle: DRAFT → COMPLETED">
+
+            <column name="id" type="UUID">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="tenant_id" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="client_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="provider_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="listing_id" type="UUID"/>
+            <column name="offer_id" type="UUID"/>
+            <column name="quote_request_id" type="UUID"/>
+
+            <column name="status" type="VARCHAR(50)" defaultValue="DRAFT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="cancellation_reason" type="TEXT"/>
+            <column name="cancelled_at" type="TIMESTAMP WITH TIME ZONE"/>
+
+            <!-- Pricing (embedded OrderPricing VO) -->
+            <column name="base_amount" type="DECIMAL(15,2)"/>
+            <column name="total_amount" type="DECIMAL(15,2)"/>
+            <column name="currency" type="VARCHAR(10)" defaultValue="XAF"/>
+
+            <!-- Payment (embedded PaymentInfo VO) -->
+            <column name="transaction_id" type="VARCHAR(200)"/>
+            <column name="payment_method" type="VARCHAR(50)"/>
+            <column name="paid_amount" type="DECIMAL(15,2)"/>
+            <column name="paid_at" type="TIMESTAMP WITH TIME ZONE"/>
+
+            <!-- Delivery (embedded DeliveryRequest VO) -->
+            <column name="distance_km" type="DOUBLE PRECISION"/>
+            <column name="urgency" type="VARCHAR(50)"/>
+            <column name="desired_pickup_at" type="TIMESTAMP WITH TIME ZONE"/>
+
+            <!-- External references -->
+            <column name="delivery_mission_id" type="VARCHAR(100)"
+                    remarks="Mission ID from tnt-delivery-core"/>
+            <column name="invoice_id" type="UUID"
+                    remarks="Invoice ID from tnt-billing-invoice"/>
+
+            <!-- Audit -->
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="completed_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </createTable>
+
+        <createIndex schemaName="tnt_market" tableName="market_orders" indexName="idx_market_orders_tenant_status">
+            <column name="tenant_id"/>
+            <column name="status"/>
+        </createIndex>
+        <createIndex schemaName="tnt_market" tableName="market_orders" indexName="idx_market_orders_client">
+            <column name="client_id"/>
+            <column name="tenant_id"/>
+        </createIndex>
+        <createIndex schemaName="tnt_market" tableName="market_orders" indexName="idx_market_orders_provider">
+            <column name="provider_id"/>
+            <column name="tenant_id"/>
+        </createIndex>
+        <createIndex schemaName="tnt_market" tableName="market_orders" indexName="idx_market_orders_listing">
+            <column name="listing_id"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

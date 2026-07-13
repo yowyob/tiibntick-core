@@ -83,7 +83,7 @@ public class OrganizationCoreAutoConfiguration {
      * Configured via {@code tiibntick.kernel.organization.base-url} property.
      * Defaults to localhost for development.
      */
-    @Value("${tiibntick.kernel.organization.base-url:https://kernel-core.yowyob.com/}")
+    @Value("${tiibntick.kernel.organization.base-url:https://kernel-core.yowyob.com/kernel-api/}")
     private String kernelOrganizationBaseUrl;
 
     /**

@@ -53,6 +53,16 @@ public class DeliveryQueryService implements DeliveryQueryUseCase {
     }
 
     @Override
+    public Mono<Long> countDeliveriesByDeliveryPerson(UUID tenantId, UUID deliveryPersonId) {
+        return deliveryRepository.countByDeliveryPersonId(tenantId, deliveryPersonId);
+    }
+
+    @Override
+    public Mono<Long> countNonTerminalDeliveriesByDeliveryPerson(UUID tenantId, UUID deliveryPersonId) {
+        return deliveryRepository.countNonTerminalByDeliveryPersonId(tenantId, deliveryPersonId);
+    }
+
+    @Override
     public Flux<Delivery> findDeliveriesByStatus(UUID tenantId, DeliveryStatus status) {
         return deliveryRepository.findByStatus(tenantId, status);
     }

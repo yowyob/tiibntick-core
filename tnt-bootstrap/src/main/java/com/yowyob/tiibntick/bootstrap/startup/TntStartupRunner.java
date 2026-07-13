@@ -14,6 +14,7 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -77,28 +78,27 @@ public class TntStartupRunner implements ApplicationRunner {
             log.info("  Modules registered: {} (L0-L5, )", moduleRegistry.count());
         });
 
-        // ── Step 2: Kernel Ping (optional) ──────────────────────────────────
-        runStep(2, () -> {
-            boolean ok = kernelBridge.ping().block();
-            if (ok) {
-                String version = kernelBridge.getKernelVersion().block();
-                log.info("  Kernel version: {}", version);
-            }
-        });
+        // ── Step 2: Kernel Ping (optional, fire-and-forget) ──────────────────
+        // Never .block() here — this is a reactive app and the Kernel may be slow
+        // or unreachable at boot; each call below is already bounded by a 5s
+        // timeout inside YowyobKernelBridge, and its own onErrorResume never lets
+        // an exception escape, so subscribing without blocking is safe. Startup
+        // proceeds immediately; KernelConnectionStatus updates whenever the result
+        // arrives and is what /actuator/health/kernel actually reads.
+        runStep(2, () -> kernelBridge.ping()
+                .flatMap(ok -> ok ? kernelBridge.getKernelVersion() : Mono.just("unreachable"))
+                .subscribe(version -> log.info("  Kernel version: {}", version)));
 
-        // ── Step 3: YowAuth / tnt-auth-core Check (optional) ────────────────
+        // ── Step 3: YowAuth / tnt-auth-core Check (optional, fire-and-forget) ──
         // Validates that the Kernel auth bridge (tnt-auth-core) is reachable.
-        // Verifies JWT issuer URI and that TntSecurityContextService is wired.
-        runStep(3, () -> {
-            kernelBridge.checkYowAuthStatus().block();
-            appContext.setKernelConnectionStatus(kernelBridge.getConnectionStatus());
-            log.info("  tnt-auth-core bridge: JWT issuer verified");
-        });
+        runStep(3, () -> kernelBridge.checkYowAuthStatus()
+                .subscribe(ok -> {
+                    appContext.setKernelConnectionStatus(kernelBridge.getConnectionStatus());
+                    log.info("  tnt-auth-core bridge reachable: {}", ok);
+                }));
 
-        // ── Step 4: Event Bus Check (optional) ──────────────────────────────
-        runStep(4, () -> {
-            kernelBridge.checkKernelEventBus().block();
-        });
+        // ── Step 4: Event Bus Check (optional, fire-and-forget) ──────────────
+        runStep(4, () -> kernelBridge.checkKernelEventBus().subscribe());
 
         // ── Step 5: Role Registration (tnt-roles-core delegation) ────────────
         // Delegates to TntRoleInitializationService when tnt-roles-core is present.

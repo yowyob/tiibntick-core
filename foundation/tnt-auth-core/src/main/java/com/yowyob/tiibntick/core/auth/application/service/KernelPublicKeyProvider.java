@@ -21,7 +21,7 @@ import java.util.NoSuchElementException;
 /**
  * Fetches and caches the Kernel's JWT RSA public key from its JWKS endpoint.
  *
- * <p>JWKS endpoint: https://kernel-core.yowyob.com/.well-known/jwks.json
+ * <p>JWKS endpoint: https://kernel-core.yowyob.com/kernel-api/.well-known/jwks.json
  *
  * @author MANFOUO Braun
  */

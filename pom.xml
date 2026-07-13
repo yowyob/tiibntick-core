@@ -118,23 +118,24 @@
         <module>billing/tnt-billing-report</module>
         <module>billing/tnt-billing-templates</module>
 
-        <!-- ─── COUCHE L6 — TRUST (TRANSVERSAL) ─────────────────────────────
-             Ancrage blockchain (DeliveryProof/CustodyTransfer/DID/PoL/Badge/
-             BillingPolicy/Payment/Incident) via le microservice Kernel
-             yow-trust-event. Consommé par (quasiment) toutes les couches
-             inférieures — aucune d'entre elles ne dépend jamais de trust en
-             retour (le module appelant possède toujours son port sortant,
-             tnt-trust-core en fournit l'implémentation). Positionné au-dessus
-             de L5 Billing et non plus en L3 Logistics : un module qui dépend
-             de couches allant de L2 à L5 ne peut structurellement PAS être
-             lui-même en L3 sans violer la règle "jamais de dépendance vers
-             une couche supérieure" — voir CLAUDE.md.
-             MANFOUO Braun : tnt-trust-core
+        <!-- ─── COUCHE L6 — TRUST ──────────────────────────────────────────
+             Cross-cutting blockchain anchoring (Kernel yow-trust-event).
+             Consumed by L2-L5 modules; depends down into each caller.
              ─────────────────────────────────────────────────────────────── -->
         <module>trust/tnt-trust-core</module>
 
+        <!-- ─── COUCHE L6 — CORE BACKENDS ────────────────────────────────
+             Modules backends métier par produit. Orchestrent L0-L5.
+             Exposent les API métiers génériques, indépendants du frontend.
+             Déclarés AVANT tnt-bootstrap (ordre de build Maven).
+             ─────────────────────────────────────────────────────────────── -->
+        <module>coreBackend/tnt-go-freelancer-point-back-core</module>
+        <module>coreBackend/tnt-agency-back-core</module>
+        <module>coreBackend/tnt-link-back-core</module>
+        <module>coreBackend/tnt-market-back-core</module>
+
         <!-- ─── COUCHE L7 — RUNNABLE ───────────────────────────────────────
-             SEUL module @SpringBootApplication. Assemble tout.
+             SEUL module @SpringBootApplication. Assemble L0-L6.
              MANFOUO Braun — déclaré EN DERNIER.
              ─────────────────────────────────────────────────────────────── -->
         <module>tnt-bootstrap</module>
@@ -556,12 +557,97 @@
             </dependency>
 
             <!-- ╔══════════════════════════════════════════════════════════╗
-                 ║  TIIBNTICK L6 — TRUST (TRANSVERSAL)                      ║
+                 ║  TIIBNTICK L6 — CORE BACKENDS                            ║
                  ╚══════════════════════════════════════════════════════════╝ -->
 
             <dependency>
                 <groupId>com.yowyob.tiibntick.core</groupId>
                 <artifactId>tnt-trust-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-go-freelancer-point-back-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-link-back-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-market-back-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-agency-eventing-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-agency-org-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-agency-staff-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-agency-workforce-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-agency-assignment-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-agency-commission-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-agency-billing-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-agency-onboarding-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-agency-intake-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-agency-inbox-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-agency-fleet-local-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-agency-compliance-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-agency-analytics-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yowyob.tiibntick.core</groupId>
+                <artifactId>tnt-agency-sync-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
 

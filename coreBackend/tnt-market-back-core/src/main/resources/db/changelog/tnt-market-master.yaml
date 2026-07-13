@@ -1,0 +1,25 @@
+databaseChangeLog:
+  - include:
+      file: db/changelog/000-create-tnt-market-schema.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/001-create-market-listings.xml
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/002-create-service-offers.xml
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/003-create-quote-requests.xml
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/004-create-market-orders.xml
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/005-create-provider-reviews.xml
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/006-create-merchant-contracts.xml
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/007-create-market-campaigns.xml
+      relativeToChangelogFile: false

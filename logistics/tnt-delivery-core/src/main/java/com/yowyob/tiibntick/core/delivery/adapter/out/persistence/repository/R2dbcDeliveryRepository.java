@@ -39,6 +39,17 @@ public interface R2dbcDeliveryRepository extends ReactiveCrudRepository<Delivery
             """)
     Flux<DeliveryEntity> findActiveByTenantIdAndDeliveryPersonId(UUID tenantId, UUID dpId);
 
+    @Query("SELECT COUNT(*) FROM tnt_deliveries WHERE tenant_id = :tenantId AND delivery_person_id = :dpId")
+    Mono<Long> countByTenantIdAndDeliveryPersonId(UUID tenantId, UUID dpId);
+
+    @Query("""
+            SELECT COUNT(*) FROM tnt_deliveries
+            WHERE tenant_id = :tenantId
+              AND delivery_person_id = :dpId
+              AND status NOT IN ('DELIVERED','FAILED','CANCELLED')
+            """)
+    Mono<Long> countNonTerminalByTenantIdAndDeliveryPersonId(UUID tenantId, UUID dpId);
+
     /**
      * Finds a delivery by ID without tenant scoping (for cross-module calls from tnt-incident-core).
      */

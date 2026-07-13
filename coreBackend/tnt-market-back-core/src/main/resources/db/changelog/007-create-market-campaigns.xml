@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- Author: MANFOUO Braun -->
+    <!-- Creates market_campaigns table for promotional campaigns -->
+
+    <changeSet id="007-create-market-campaigns" author="MANFOUO Braun">
+        <createTable schemaName="tnt_market" tableName="market_campaigns"
+                     remarks="Promotional campaigns managed by TiiBnTick Market admins">
+
+            <column name="id" type="UUID">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="tenant_id" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="name" type="VARCHAR(200)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="description" type="TEXT"/>
+            <column name="campaign_type" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="VARCHAR(50)" defaultValue="DRAFT">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- DiscountRule VO -->
+            <column name="discount_type" type="VARCHAR(50)"/>
+            <column name="discount_value" type="DECIMAL(15,4)"/>
+            <column name="max_discount" type="DECIMAL(15,2)"/>
+            <column name="min_order_amount" type="DECIMAL(15,2)"/>
+            <column name="currency" type="VARCHAR(10)" defaultValue="XAF"/>
+
+            <!-- CampaignScope VO -->
+            <column name="scope_provider_ids" type="TEXT" defaultValue="[]"
+                    remarks="JSON array of UUID strings"/>
+            <column name="scope_service_types" type="TEXT" defaultValue="[]"
+                    remarks="JSON array of ServiceType strings"/>
+            <column name="scope_cities" type="TEXT" defaultValue="[]"
+                    remarks="JSON array of city strings"/>
+            <column name="applicable_to_all" type="BOOLEAN" defaultValueBoolean="false"/>
+
+            <!-- Budget tracking -->
+            <column name="budget" type="DECIMAL(15,2)"/>
+            <column name="spent_amount" type="DECIMAL(15,2)" defaultValueNumeric="0"/>
+
+            <!-- Usage limits -->
+            <column name="promo_code" type="VARCHAR(50)"/>
+            <column name="max_usage" type="INT" defaultValueNumeric="0"/>
+            <column name="usage_count" type="INT" defaultValueNumeric="0"/>
+
+            <!-- Scheduling -->
+            <column name="start_date" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="end_date" type="TIMESTAMP WITH TIME ZONE"/>
+
+            <!-- Audit -->
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!-- Unique promo code per tenant -->
+        <addUniqueConstraint schemaName="tnt_market" tableName="market_campaigns"
+                             columnNames="tenant_id, promo_code"
+                             constraintName="uq_campaigns_promo_code_tenant"/>
+
+        <createIndex schemaName="tnt_market" tableName="market_campaigns" indexName="idx_campaigns_tenant_status">
+            <column name="tenant_id"/>
+            <column name="status"/>
+        </createIndex>
+        <createIndex schemaName="tnt_market" tableName="market_campaigns" indexName="idx_campaigns_dates">
+            <column name="start_date"/>
+            <column name="end_date"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

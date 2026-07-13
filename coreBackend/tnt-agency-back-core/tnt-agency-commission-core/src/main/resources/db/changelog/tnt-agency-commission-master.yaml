@@ -1,0 +1,7 @@
+databaseChangeLog:
+  - include:
+      file: db/changelog/changes/001_create_agency_commercial_schema.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/002_create_commission_records.sql
+      relativeToChangelogFile: false

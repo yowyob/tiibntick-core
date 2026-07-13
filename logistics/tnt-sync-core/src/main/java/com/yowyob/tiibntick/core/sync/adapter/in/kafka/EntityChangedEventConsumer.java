@@ -12,37 +12,57 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
-import reactor.core.scheduler.Schedulers;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Map;
 
 /**
- * Kafka consumer that indexes entity change events from all other TiiBnTick Core modules
- * into the entity_version table. This is the server-side change log used by
- * DeltaSyncDomainService to answer client delta-pull requests.
- *
- * Consumed topics (from tnt-delivery-core, tnt-actor-core, tnt-organization-core, etc.):
- * - tnt.delivery.mission.status.changed
- * - tnt.delivery.package.updated
- * - tnt.actor.profile.updated
- * - tnt.organization.hub.updated
- * - tnt.geo.alert.created (for network alerts in TiiBnTick Link)
- *
- * Author: MANFOUO Braun
+ * Indexes entity change events into {@code entity_version} for delta pull.
+ * Failures are not acked — {@link com.yowyob.tiibntick.core.sync.config.SyncKafkaConfig}
+ * retries then publishes to {@code tnt.sync.entity-changed.dlq}.
  */
 @Component
 public class EntityChangedEventConsumer {
 
     private static final Logger log = LoggerFactory.getLogger(EntityChangedEventConsumer.class);
 
-    private static final Map<String, String> TOPIC_TO_AGGREGATE = Map.of(
-            "tnt.delivery.mission.status.changed", "MISSION",
-            "tnt.delivery.package.updated", "PACKAGE",
-            "tnt.actor.profile.updated", "ACTOR_PROFILE",
-            "tnt.organization.hub.updated", "RELAY_HUB",
-            "tnt.geo.alert.created", "GEO_ALERT",
-            "tnt.realtime.geofence.triggered", "GEOFENCE_TRIGGER"
+    // ── Market aggregate-type literals ──
+    // Mirrors com.yowyob.tiibntick.core.marketback.adapter.in.sync.MarketOfflineOperationApplier's
+    // MARKET_* constants (tnt-market-back-core). Cannot import them directly: tnt-market-back-core
+    // depends down into tnt-sync-core (see its pom.xml, added for IOfflineOperationApplier), so an
+    // import in the other direction would be a circular Maven dependency. Keep these literals in
+    // sync with that class if the aggregate-type vocabulary ever changes.
+    // NOTE: MARKET_SERVICE_OFFER and MARKET_CAMPAIGN are omitted here — there is currently no
+    // domain event published for those two aggregate types (see MarketKafkaEventPublisher's
+    // callers), so no topic maps to them below. Add the literal here if/when one is introduced.
+    private static final String MARKET_LISTING = "MARKET_LISTING";
+    private static final String MARKET_QUOTE_REQUEST = "MARKET_QUOTE_REQUEST";
+    private static final String MARKET_ORDER = "MARKET_ORDER";
+    private static final String MARKET_PROVIDER_REVIEW = "MARKET_PROVIDER_REVIEW";
+    private static final String MARKET_MERCHANT_CONTRACT = "MARKET_MERCHANT_CONTRACT";
+
+    private static final Map<String, String> TOPIC_TO_AGGREGATE = Map.ofEntries(
+            Map.entry("tnt.delivery.mission.status.changed", "MISSION"),
+            Map.entry("tnt.delivery.package.updated", "PACKAGE"),
+            Map.entry("tnt.actor.profile.updated", "ACTOR_PROFILE"),
+            Map.entry("tnt.organization.hub.updated", "RELAY_HUB"),
+            Map.entry("tnt.geo.alert.created", "GEO_ALERT"),
+            Map.entry("tnt.realtime.geofence.triggered", "GEOFENCE_TRIGGER"),
+            // ── Market — published by tnt-market-back-core's MarketKafkaEventPublisher,
+            //    topic = "tnt.market." + toTopicSuffix(eventClassSimpleName). Lets a delta-pull
+            //    pick up mutations made outside the sync engine (e.g. direct admin calls to
+            //    /api/v1/platform/market/**) that never went through OfflineQueueDomainService. ──
+            Map.entry("tnt.market.listing.published", MARKET_LISTING),
+            Map.entry("tnt.market.listing.approved", MARKET_LISTING),
+            Map.entry("tnt.market.listing.rejected", MARKET_LISTING),
+            Map.entry("tnt.market.order.created", MARKET_ORDER),
+            Map.entry("tnt.market.order.paid", MARKET_ORDER),
+            Map.entry("tnt.market.order.completed", MARKET_ORDER),
+            Map.entry("tnt.market.quote.request.created", MARKET_QUOTE_REQUEST),
+            Map.entry("tnt.market.quote.response.submitted", MARKET_QUOTE_REQUEST),
+            Map.entry("tnt.market.provider.review.published", MARKET_PROVIDER_REVIEW),
+            Map.entry("tnt.market.merchant.contract.signed", MARKET_MERCHANT_CONTRACT)
     );
 
     private final IEntityVersionRepository entityVersionRepository;
@@ -61,7 +81,17 @@ public class EntityChangedEventConsumer {
                     "tnt.actor.profile.updated",
                     "tnt.organization.hub.updated",
                     "tnt.geo.alert.created",
-                    "tnt.realtime.geofence.triggered"
+                    "tnt.realtime.geofence.triggered",
+                    "tnt.market.listing.published",
+                    "tnt.market.listing.approved",
+                    "tnt.market.listing.rejected",
+                    "tnt.market.order.created",
+                    "tnt.market.order.paid",
+                    "tnt.market.order.completed",
+                    "tnt.market.quote.request.created",
+                    "tnt.market.quote.response.submitted",
+                    "tnt.market.provider.review.published",
+                    "tnt.market.merchant.contract.signed"
             },
             groupId = "${spring.kafka.consumer.group-id:tnt-sync-core}",
             containerFactory = "syncKafkaListenerContainerFactory"
@@ -75,7 +105,9 @@ public class EntityChangedEventConsumer {
         try {
             JsonNode node = objectMapper.readTree(record.value());
             String tenantId = extractField(node, "tenantId", "default");
-            String aggregateId = record.key() != null ? record.key() : extractField(node, "id", extractField(node, "missionId", "unknown"));
+            String aggregateId = record.key() != null
+                    ? record.key()
+                    : extractField(node, "id", extractField(node, "missionId", "unknown"));
             String operation = extractField(node, "operation", "UPDATED");
 
             DeltaOperation deltaOp = parseDeltaOperation(operation, topic);
@@ -90,18 +122,16 @@ public class EntityChangedEventConsumer {
             );
 
             entityVersionRepository.upsert(versionRecord)
-                    .subscribeOn(Schedulers.boundedElastic())
-                    .doOnSuccess(v -> acknowledgment.acknowledge())
-                    .doOnError(ex -> {
-                        log.error("Failed to record entity version change for {}/{}: {}",
-                                aggregateType, aggregateId, ex.getMessage());
-                        acknowledgment.acknowledge();
-                    })
-                    .subscribe();
-
-        } catch (Exception e) {
-            log.error("Failed to process entity change event from topic={}: {}", topic, e.getMessage(), e);
+                    .block(Duration.ofSeconds(30));
             acknowledgment.acknowledge();
+        } catch (RuntimeException e) {
+            log.error("Failed to process entity change event from topic={} key={}: {}",
+                    topic, record.key(), e.getMessage(), e);
+            throw e;
+        } catch (Exception e) {
+            log.error("Failed to process entity change event from topic={} key={}: {}",
+                    topic, record.key(), e.getMessage(), e);
+            throw new IllegalStateException("Entity change indexing failed", e);
         }
     }
 

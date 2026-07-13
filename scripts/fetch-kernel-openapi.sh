@@ -5,7 +5,7 @@
 # Usage: scripts/fetch-kernel-openapi.sh
 set -euo pipefail
 
-KERNEL_URL="${KERNEL_URL:-https://kernel-core.yowyob.com}"
+KERNEL_URL="${KERNEL_URL:-https://kernel-core.yowyob.com/kernel-api}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DOCS_DIR="$ROOT_DIR/docs/kernel-api"
 

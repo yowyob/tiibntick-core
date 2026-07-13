@@ -2,6 +2,7 @@ package com.yowyob.tiibntick.core.sync.config;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,7 +16,10 @@ import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.kafka.listener.ContainerProperties;
+import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
+import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
+import org.springframework.util.backoff.FixedBackOff;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -23,6 +27,8 @@ import java.util.Map;
 @Configuration
 @EnableKafka
 public class SyncKafkaConfig {
+
+    public static final String ENTITY_CHANGED_DLQ = "tnt.sync.entity-changed.dlq";
 
     @Value("${spring.kafka.bootstrap-servers:localhost:9092}")
     private String bootstrapServers;
@@ -64,11 +70,19 @@ public class SyncKafkaConfig {
     }
 
     @Bean("syncKafkaListenerContainerFactory")
-    public ConcurrentKafkaListenerContainerFactory<String, String> syncKafkaListenerContainerFactory() {
+    public ConcurrentKafkaListenerContainerFactory<String, String> syncKafkaListenerContainerFactory(
+            @org.springframework.beans.factory.annotation.Qualifier("syncKafkaTemplate")
+            KafkaTemplate<String, String> syncKafkaTemplate) {
         var factory = new ConcurrentKafkaListenerContainerFactory<String, String>();
         factory.setConsumerFactory(syncKafkaConsumerFactory());
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
         factory.setConcurrency(2);
+
+        DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(
+                syncKafkaTemplate,
+                (record, ex) -> new TopicPartition(ENTITY_CHANGED_DLQ, record.partition()));
+        DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer, new FixedBackOff(1_000L, 3L));
+        factory.setCommonErrorHandler(errorHandler);
         return factory;
     }
 }

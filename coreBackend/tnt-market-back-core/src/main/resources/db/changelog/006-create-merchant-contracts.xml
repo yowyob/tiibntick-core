@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- Author: MANFOUO Braun -->
+    <!-- Creates merchant_contracts table for volume contracts -->
+
+    <changeSet id="006-create-merchant-contracts" author="MANFOUO Braun">
+        <createTable schemaName="tnt_market" tableName="merchant_contracts"
+                     remarks="Volume contracts between e-commerce merchants and logistics providers">
+
+            <column name="id" type="UUID">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="tenant_id" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="merchant_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="provider_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="listing_id" type="UUID">
+                <constraints nullable="false"
+                             foreignKeyName="fk_contracts_listing"
+                             references="tnt_market.market_listings(id)"/>
+            </column>
+
+            <column name="status" type="VARCHAR(50)" defaultValue="NEGOTIATING">
+                <constraints nullable="false"/>
+            </column>
+            <column name="termination_reason" type="TEXT"/>
+
+            <!-- ContractTerms VO -->
+            <column name="monthly_volume_estimate" type="INT"/>
+            <column name="committed_months" type="INT"/>
+            <column name="base_price_per_delivery" type="DECIMAL(15,2)"/>
+            <column name="currency" type="VARCHAR(10)" defaultValue="XAF"/>
+            <column name="sla_hours" type="INT"/>
+            <column name="penalty_per_breach" type="DECIMAL(15,2)"/>
+            <column name="auto_renewal" type="BOOLEAN" defaultValueBoolean="false"/>
+
+            <!-- VolumeTier list -->
+            <column name="volume_tiers" type="TEXT" defaultValue="[]"
+                    remarks="JSON array of VolumeTier objects"/>
+
+            <!-- Dates -->
+            <column name="start_date" type="DATE"/>
+            <column name="end_date" type="DATE"/>
+            <column name="signed_at" type="TIMESTAMP WITH TIME ZONE"/>
+
+            <!-- Execution tracking -->
+            <column name="total_orders_executed" type="INT" defaultValueNumeric="0"/>
+            <column name="total_amount_xaf" type="BIGINT" defaultValueNumeric="0"/>
+
+            <!-- Audit -->
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <createIndex schemaName="tnt_market" tableName="merchant_contracts" indexName="idx_contracts_merchant">
+            <column name="merchant_id"/>
+            <column name="tenant_id"/>
+        </createIndex>
+        <createIndex schemaName="tnt_market" tableName="merchant_contracts" indexName="idx_contracts_provider">
+            <column name="provider_id"/>
+            <column name="tenant_id"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

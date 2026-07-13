@@ -18,7 +18,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
-import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 
@@ -52,10 +51,9 @@ public class SyncBatchApplicationService implements IProcessSyncBatchUseCase {
                                                     SyncPushRequest request) {
         pushSyncCounter.increment();
 
-        SyncToken sinceToken = parseSyncToken(request.lastSyncToken(), userId, tenantId, deviceId);
-
-        return sessionManager.open(userId, tenantId, deviceId, sinceToken)
-                .flatMap(session -> processBatch(session, userId, tenantId, deviceId, request))
+        return Mono.fromCallable(() -> parseSyncToken(request.lastSyncToken(), userId, tenantId, deviceId))
+                .flatMap(sinceToken -> sessionManager.open(userId, tenantId, deviceId, sinceToken)
+                        .flatMap(session -> processBatch(session, userId, tenantId, deviceId, request)))
                 .doOnError(ex -> log.error("Push sync failed for user={}, tenant={}: {}", userId, tenantId, ex.getMessage()));
     }
 
@@ -111,9 +109,6 @@ public class SyncBatchApplicationService implements IProcessSyncBatchUseCase {
     }
 
     private SyncToken parseSyncToken(String tokenValue, String userId, String tenantId, String deviceId) {
-        if (tokenValue == null || tokenValue.isBlank()) {
-            return SyncToken.initial(userId, tenantId, deviceId);
-        }
-        return new SyncToken(tokenValue, userId, tenantId, deviceId, LocalDateTime.now().minusHours(1));
+        return SyncToken.parse(tokenValue, userId, tenantId, deviceId);
     }
 }

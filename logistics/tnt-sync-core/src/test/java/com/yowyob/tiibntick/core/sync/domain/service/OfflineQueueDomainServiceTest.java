@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.core.sync.domain.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yowyob.tiibntick.core.sync.application.port.out.IEntityVersionRepository;
 import com.yowyob.tiibntick.core.sync.application.port.out.IOfflineOperationRepository;
 import com.yowyob.tiibntick.core.sync.application.port.out.ISyncEventPublisher;
@@ -46,7 +47,8 @@ class OfflineQueueDomainServiceTest {
     @BeforeEach
     void setUp() {
         conflictResolver = new ConflictResolverService(ConflictResolverService.Strategy.LWW);
-        service = new OfflineQueueDomainService(operationRepository, entityVersionRepository, conflictResolver, eventPublisher);
+        service = new OfflineQueueDomainService(operationRepository, entityVersionRepository, conflictResolver,
+                eventPublisher, List.of(), new ObjectMapper());
         when(operationRepository.save(any())).thenReturn(Mono.empty());
         when(eventPublisher.publish(any())).thenReturn(Mono.empty());
     }

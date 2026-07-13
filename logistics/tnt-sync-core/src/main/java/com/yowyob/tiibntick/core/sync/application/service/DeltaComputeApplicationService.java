@@ -10,7 +10,6 @@ import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
-import java.time.LocalDateTime;
 import java.util.Set;
 
 @Service
@@ -33,14 +32,14 @@ public class DeltaComputeApplicationService implements IComputeDeltaUseCase {
                                                 String syncToken, Set<String> filterAggregates) {
         pullCounter.increment();
 
-        SyncToken token = resolveToken(syncToken, userId, tenantId, deviceId);
-        boolean isBootstrap = token.isInitial();
-
-        Mono<SyncDelta> deltaMono = isBootstrap
-                ? deltaSyncService.computeBootstrapDelta(tenantId, userId, deviceId, filterAggregates)
-                : deltaSyncService.computeDelta(token, tenantId, filterAggregates);
-
-        return deltaMono.map(this::toResponse);
+        return Mono.fromCallable(() -> resolveToken(syncToken, userId, tenantId, deviceId))
+                .flatMap(token -> {
+                    boolean isBootstrap = token.isInitial();
+                    Mono<SyncDelta> deltaMono = isBootstrap
+                            ? deltaSyncService.computeBootstrapDelta(tenantId, userId, deviceId, filterAggregates)
+                            : deltaSyncService.computeDelta(token, tenantId, filterAggregates);
+                    return deltaMono.map(this::toResponse);
+                });
     }
 
     private SyncPullResponse toResponse(SyncDelta delta) {
@@ -62,9 +61,6 @@ public class DeltaComputeApplicationService implements IComputeDeltaUseCase {
     }
 
     private SyncToken resolveToken(String tokenValue, String userId, String tenantId, String deviceId) {
-        if (tokenValue == null || tokenValue.isBlank()) {
-            return SyncToken.initial(userId, tenantId, deviceId);
-        }
-        return new SyncToken(tokenValue, userId, tenantId, deviceId, LocalDateTime.now().minusHours(1));
+        return SyncToken.parse(tokenValue, userId, tenantId, deviceId);
     }
 }

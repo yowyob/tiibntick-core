@@ -49,7 +49,9 @@ public class TntModuleRegistry {
         IDENTITY_L2,
         LOGISTICS_L3,
         BUSINESS_L4,
-        BILLING_ENGINE_L5
+        BILLING_ENGINE_L5,
+        /** L6 — Core Backend: official per-product business backends (tnt-link-back-core, ...). */
+        CORE_BACKEND_L6
     }
 
     public enum ModuleOrigin {
@@ -331,7 +333,20 @@ public class TntModuleRegistry {
                 List.of("tnt-billing-core", "tnt-administration-core"),
                 List.of("tnt.billing.template.applied", "tnt.billing.custom_template.saved"),
                 "billing");
-        
+
+        // ── L6 — Core Backend (per-product official business backends) ────────
+        register("tnt-link-back-core",
+                "Link Back Core — Official business backend for TiiBnTick Link: network nodes, " +
+                "bulletin board, DAO zones, gamification/leaderboard, orchestrates tnt-geo-core, " +
+                "tnt-route-core, tnt-delivery-core, tnt-incident-core, tnt-realtime-core, " +
+                "tnt-sync-core, tnt-notify-core, tnt-actor-core, tnt-organization-core. Consumed " +
+                "exclusively by the Link BFF (tiibntick-link-backend) over HTTP.",
+                ModuleLayer.CORE_BACKEND_L6, ModuleOrigin.TNT_EXCLUSIVE,
+                List.of("tnt-auth-core", "tnt-roles-core", "tnt-actor-core", "tnt-organization-core",
+                        "tnt-geo-core", "tnt-route-core", "tnt-delivery-core", "tnt-incident-core",
+                        "tnt-realtime-core", "tnt-sync-core", "tnt-notify-core"),
+                List.of(), "tnt_link");
+
         log.info("TiiBnTick Module Registry  — {} modules registered", modules.size());
         log.info(generateReport().summary());
     }

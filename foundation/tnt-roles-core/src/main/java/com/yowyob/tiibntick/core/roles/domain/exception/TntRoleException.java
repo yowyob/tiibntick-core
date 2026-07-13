@@ -1,5 +1,7 @@
 package com.yowyob.tiibntick.core.roles.domain.exception;
 
+import java.util.UUID;
+
 /**
  * Root domain exception for TiiBnTick RBAC operations.
  *
@@ -57,6 +59,27 @@ public class TntRoleException extends RuntimeException {
         return new TntRoleException(
                 "ROLE_MISSING_CONTEXT",
                 "No authenticated security context available for permission evaluation."
+        );
+    }
+
+    public static TntRoleException roleNotFoundInKernel(String code) {
+        return new TntRoleException(
+                "ROLE_NOT_PROVISIONED",
+                "Role '" + code + "' is not provisioned in the Kernel's system tenant yet."
+        );
+    }
+
+    public static TntRoleException missingScopeId(String code, String scopeType) {
+        return new TntRoleException(
+                "ROLE_MISSING_SCOPE_ID",
+                "Role '" + code + "' has scope " + scopeType + " and requires a scopeId to be assigned."
+        );
+    }
+
+    public static TntRoleException assignmentFailed(String code, UUID targetUserId) {
+        return new TntRoleException(
+                "ROLE_ASSIGNMENT_FAILED",
+                "Failed to assign role '" + code + "' to user " + targetUserId + " in the Kernel."
         );
     }
 }

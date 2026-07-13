@@ -65,4 +65,12 @@ public class R2dbcOfflineOperationRepository implements IOfflineOperationReposit
                 OfflineOperationEntity.class)
                 .then();
     }
+
+    @Override
+    public Mono<Boolean> isAlreadyApplied(String operationId) {
+        return template.exists(
+                Query.query(Criteria.where("id").is(operationId)
+                        .and("status").is(OfflineOpStatus.APPLIED.name())),
+                OfflineOperationEntity.class);
+    }
 }

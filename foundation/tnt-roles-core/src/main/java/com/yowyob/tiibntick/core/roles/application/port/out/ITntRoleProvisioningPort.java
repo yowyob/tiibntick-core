@@ -49,6 +49,15 @@ public interface ITntRoleProvisioningPort {
     Mono<Boolean> roleExists(UUID tenantId, String roleCode);
 
     /**
+     * Resolves the Kernel-side role UUID for a role definition already provisioned
+     * under {@code tenantId}. Empty if no such role exists in the Kernel's store.
+     *
+     * @param tenantId tenant scope the role was provisioned under
+     * @param roleCode TiiBnTick role code
+     */
+    Mono<UUID> findRoleId(UUID tenantId, String roleCode);
+
+    /**
      * Invalidates the permission cache for a user after a role change.
      * Delegates to the Kernel's {@code ReactivePermissionCache} if available.
      *

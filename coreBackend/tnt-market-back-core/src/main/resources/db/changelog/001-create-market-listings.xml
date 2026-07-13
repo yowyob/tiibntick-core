@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- Author: MANFOUO Braun -->
+    <!-- Creates the market_listings table for MarketListing aggregate root -->
+
+    <changeSet id="001-create-market-listings" author="MANFOUO Braun">
+        <createTable schemaName="tnt_market" tableName="market_listings"
+                     remarks="Public provider storefronts on TiiBnTick Market">
+
+            <column name="id" type="UUID">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="tenant_id" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="provider_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="provider_type" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="organization_id" type="UUID"/>
+
+            <!-- Status & Visibility -->
+            <column name="status" type="VARCHAR(50)" defaultValue="DRAFT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="visibility" type="VARCHAR(50)" defaultValue="PUBLIC">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Vitrine Profile -->
+            <column name="display_name" type="VARCHAR(200)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="tagline" type="VARCHAR(300)"/>
+            <column name="description" type="TEXT"/>
+            <column name="logo_url" type="TEXT"/>
+            <column name="banner_url" type="TEXT"/>
+            <column name="contact_email" type="VARCHAR(200)"/>
+            <column name="contact_phone" type="VARCHAR(30)"/>
+            <column name="website_url" type="TEXT"/>
+            <column name="founded_year" type="INT"/>
+
+            <!-- Coverage Zone -->
+            <column name="coverage_radius_km" type="DOUBLE PRECISION"/>
+            <column name="coverage_center_lat" type="DOUBLE PRECISION"/>
+            <column name="coverage_center_lng" type="DOUBLE PRECISION"/>
+            <column name="coverage_cities" type="TEXT" defaultValue="[]"
+                    remarks="JSON array of city strings"/>
+
+            <!-- SEO -->
+            <column name="seo_slug" type="VARCHAR(300)">
+                <constraints unique="true"/>
+            </column>
+            <column name="seo_title" type="VARCHAR(200)"/>
+            <column name="seo_description" type="VARCHAR(500)"/>
+            <column name="seo_keywords" type="TEXT" defaultValue="[]"
+                    remarks="JSON array of keyword strings"/>
+            <column name="qr_code" type="VARCHAR(500)"/>
+
+            <!-- Analytics -->
+            <column name="view_count" type="BIGINT" defaultValueNumeric="0"/>
+            <column name="conversion_count" type="BIGINT" defaultValueNumeric="0"/>
+            <column name="average_rating" type="DOUBLE PRECISION" defaultValueNumeric="0.0"/>
+            <column name="total_reviews" type="INT" defaultValueNumeric="0"/>
+
+            <!-- Moderation -->
+            <column name="moderated_by" type="UUID"/>
+            <column name="moderated_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="rejection_reason" type="TEXT"/>
+            <column name="published_at" type="TIMESTAMP WITH TIME ZONE"/>
+
+            <!-- Audit -->
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!-- Indexes for frequent query patterns -->
+        <createIndex schemaName="tnt_market" tableName="market_listings" indexName="idx_market_listings_tenant_status">
+            <column name="tenant_id"/>
+            <column name="status"/>
+        </createIndex>
+        <createIndex schemaName="tnt_market" tableName="market_listings" indexName="idx_market_listings_provider">
+            <column name="provider_id"/>
+            <column name="tenant_id"/>
+        </createIndex>
+        <createIndex schemaName="tnt_market" tableName="market_listings" indexName="idx_market_listings_geo">
+            <column name="coverage_center_lat"/>
+            <column name="coverage_center_lng"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

@@ -73,7 +73,7 @@ class DeltaComputeApplicationServiceTest {
         when(deltaSyncService.computeDelta(any(), any(), isNull()))
                 .thenReturn(Mono.just(buildDeltaWithRecords(3)));
 
-        String token = "some-base64-token";
+        String token = SyncToken.next(USER_ID, TENANT_ID, DEVICE_ID, LocalDateTime.now().minusMinutes(5)).value();
         StepVerifier.create(service.computeDelta(USER_ID, TENANT_ID, DEVICE_ID, token, null))
                 .assertNext(response -> assertThat(response.recordCount()).isEqualTo(3))
                 .verifyComplete();
@@ -107,10 +107,11 @@ class DeltaComputeApplicationServiceTest {
     @Test
     @DisplayName("computeDelta() propagates SyncTokenExpiredException from domain")
     void computeDeltaPropagatesTokExpired() {
+        String token = SyncToken.next(USER_ID, TENANT_ID, DEVICE_ID, LocalDateTime.now().minusMinutes(5)).value();
         when(deltaSyncService.computeDelta(any(), any(), isNull()))
-                .thenReturn(Mono.error(new SyncTokenExpiredException("old-token")));
+                .thenReturn(Mono.error(new SyncTokenExpiredException(token)));
 
-        StepVerifier.create(service.computeDelta(USER_ID, TENANT_ID, DEVICE_ID, "old-token", null))
+        StepVerifier.create(service.computeDelta(USER_ID, TENANT_ID, DEVICE_ID, token, null))
                 .expectError(SyncTokenExpiredException.class)
                 .verify();
     }
@@ -119,12 +120,21 @@ class DeltaComputeApplicationServiceTest {
     @DisplayName("computeDelta() passes filter aggregates to domain service")
     void computeDeltaPassesFilter() {
         Set<String> filter = Set.of("MISSION", "PACKAGE");
+        String token = SyncToken.next(USER_ID, TENANT_ID, DEVICE_ID, LocalDateTime.now().minusMinutes(5)).value();
 
         when(deltaSyncService.computeDelta(any(), any(), any()))
                 .thenReturn(Mono.just(buildDeltaWithRecords(2)));
 
-        StepVerifier.create(service.computeDelta(USER_ID, TENANT_ID, DEVICE_ID, "some-token", filter))
+        StepVerifier.create(service.computeDelta(USER_ID, TENANT_ID, DEVICE_ID, token, filter))
                 .assertNext(response -> assertThat(response.recordCount()).isEqualTo(2))
                 .verifyComplete();
+    }
+
+    @Test
+    @DisplayName("computeDelta() rejects malformed sync token")
+    void computeDeltaRejectsMalformedToken() {
+        StepVerifier.create(service.computeDelta(USER_ID, TENANT_ID, DEVICE_ID, "not-a-valid-token", null))
+                .expectError(SyncTokenExpiredException.class)
+                .verify();
     }
 }

@@ -3,6 +3,8 @@ package com.yowyob.tiibntick.bootstrap.config;
 import com.yowyob.tiibntick.bootstrap.registry.TntExtensionRegistry;
 import com.yowyob.tiibntick.bootstrap.registry.TntRoleRegistrar;
 import com.yowyob.tiibntick.bootstrap.registry.TntSettingsRegistrar;
+import com.yowyob.tiibntick.core.gofp.config.GoFreelancerPointCoreConfig;
+import com.yowyob.tiibntick.core.marketback.config.MarketBackCoreConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -31,13 +33,14 @@ import org.springframework.web.reactive.function.client.WebClient;
         TntDataSourceConfig.class,
         LiquibaseConfig.class,
         TntSecurityConfig.class,
-        TntAopConfiguration.class,          // AspectJ proxy — required for @RequirePermission
+        TntAopConfiguration.class,
         TntWebFluxConfig.class,
-        TntKafkaConfig.class,               // Kafka producer beans: tntKafkaTemplate, tntObjectMapper
+        TntKafkaConfig.class,
         TntKafkaTopicsConfig.class,
         TntOpenApiConfig.class,
         TntMetricsConfig.class,
-        TntActuatorConfig.class
+        TntActuatorConfig.class,
+        GoFreelancerPointCoreConfig.class   // ← L6 Core Backend Market
 })
 public class TntCoreConfig {
 

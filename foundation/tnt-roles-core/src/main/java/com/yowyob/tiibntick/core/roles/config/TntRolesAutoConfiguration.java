@@ -1,21 +1,25 @@
 package com.yowyob.tiibntick.core.roles.config;
 
 import com.yowyob.tiibntick.core.roles.adapter.in.web.TntPermissionAspect;
+import com.yowyob.tiibntick.core.roles.adapter.out.kernel.KernelRoleAssignmentAdapter;
 import com.yowyob.tiibntick.core.roles.adapter.out.kernel.KernelRoleProvisioningAdapter;
 import com.yowyob.tiibntick.core.roles.adapter.out.permission.CachingReactivePermissionResolverDecorator;
 import com.yowyob.tiibntick.core.roles.adapter.out.permission.HybridReactivePermissionResolver;
 import com.yowyob.tiibntick.core.roles.adapter.out.permission.LocalReactivePermissionResolver;
 import com.yowyob.tiibntick.core.roles.adapter.out.permission.PermissionCache;
 import com.yowyob.tiibntick.core.roles.adapter.out.permission.RemoteReactivePermissionResolver;
+import com.yowyob.tiibntick.core.roles.application.port.in.AssignTntRoleUseCase;
 import com.yowyob.tiibntick.core.roles.application.port.in.CheckPermissionUseCase;
 import com.yowyob.tiibntick.core.roles.application.port.in.ResolveUserRolesUseCase;
 import com.yowyob.tiibntick.core.roles.adapter.out.persistence.InMemoryRoleRepository;
 import com.yowyob.tiibntick.core.roles.adapter.out.persistence.InMemoryUserRoleAssignmentRepository;
+import com.yowyob.tiibntick.core.roles.application.port.out.ITntRoleAssignmentPort;
 import com.yowyob.tiibntick.core.roles.application.port.out.ITntRoleProvisioningPort;
 import com.yowyob.tiibntick.core.roles.application.port.out.ReactivePermissionResolver;
 import com.yowyob.tiibntick.core.roles.application.port.out.RoleRepository;
 import com.yowyob.tiibntick.core.roles.application.port.out.UserRoleAssignmentRepository;
 import com.yowyob.tiibntick.core.roles.application.service.TntPermissionEvaluator;
+import com.yowyob.tiibntick.core.roles.application.service.TntRoleAssignmentService;
 import com.yowyob.tiibntick.core.roles.application.service.TntRoleDefinitionRegistry;
 import com.yowyob.tiibntick.core.roles.application.service.TntRoleInitializationService;
 import com.yowyob.tiibntick.core.roles.application.service.TntRoleService;
@@ -88,6 +92,29 @@ public class TntRolesAutoConfiguration {
     public KernelRoleProvisioningAdapter kernelRoleProvisioningAdapter(
             @Qualifier("kernelWebClient") WebClient kernelWebClient) {
         return new KernelRoleProvisioningAdapter(kernelWebClient);
+    }
+
+    /**
+     * Assigns TiiBnTick canonical roles to Kernel users on behalf of a {@code TNT_ADMIN}
+     * caller. Uses {@code kernelTpWebClient} so the request is authenticated as the
+     * calling admin (bearer forwarding), not TiiBnTick's own service identity.
+     */
+    @Bean
+    @ConditionalOnMissingBean(ITntRoleAssignmentPort.class)
+    public KernelRoleAssignmentAdapter kernelRoleAssignmentAdapter(
+            @Qualifier("kernelTpWebClient") WebClient kernelTpWebClient,
+            ITntRoleProvisioningPort provisioningPort,
+            TntRolesProperties properties) {
+        return new KernelRoleAssignmentAdapter(kernelTpWebClient, provisioningPort, properties.getSystemTenantId());
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(AssignTntRoleUseCase.class)
+    public TntRoleAssignmentService tntRoleAssignmentService(
+            ITntRoleAssignmentPort assignmentPort,
+            ITntRoleProvisioningPort provisioningPort,
+            TntRolesProperties properties) {
+        return new TntRoleAssignmentService(assignmentPort, provisioningPort, properties.getSystemTenantId());
     }
 
     /**

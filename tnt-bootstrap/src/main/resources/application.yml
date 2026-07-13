@@ -80,7 +80,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          jwk-set-uri: ${JWT_JWK_SET_URI:https://kernel-core.yowyob.com/.well-known/jwks.json}
+          jwk-set-uri: ${JWT_JWK_SET_URI:https://kernel-core.yowyob.com/kernel-api/.well-known/jwks.json}
 
   # ── Jackson ────────────────────────────────────────────────────────────────
   jackson:
@@ -310,6 +310,36 @@ tnt:
   kafka:
     partitions: ${KAFKA_PARTITIONS:3}
     replication-factor: ${KAFKA_REPLICATION:1}
+    topics:
+      consumed:
+        core-mission-created: tnt.delivery.mission.created
+        core-mission-status: tnt.delivery.mission.status.changed
+        core-package-delivered: tnt.delivery.package.delivered
+        core-inventory-deposited: tnt.inventory.hub.package.deposited
+        core-inventory-pickedup: tnt.inventory.hub.package.pickedup
+        core-actor-kyc: tnt.staff.kyc.validated
+        core-wallet: tnt.billing.wallet.events
+      produced:
+        domain-events: tnt.agency.events
+        mission-request: tnt.agency.mission.request
+        staff-events: tnt.agency.staff.events
+        contract-events: tnt.agency.contract.events
+      groups:
+        agency-erp-delivery: tnt-agency-erp-delivery-consumer
+        agency-erp-inventory: tnt-agency-erp-inventory-consumer
+        agency-erp-billing: tnt-agency-erp-billing-consumer
+        agency-erp-actor: tnt-agency-erp-actor-consumer
+
+  # ── Agency ERP (Layer 6 back-core) ─────────────────────────────────────────
+  agency:
+    kafka:
+      consumers:
+        enabled: ${TNT_AGENCY_KAFKA_CONSUMERS_ENABLED:true}
+    hub:
+      expiry-job:
+        enabled: ${TNT_AGENCY_HUB_EXPIRY_JOB_ENABLED:true}
+        cron: ${TNT_AGENCY_HUB_EXPIRY_JOB_CRON:0 0 * * * *}
+        tenant-id: ${TNT_AGENCY_HUB_EXPIRY_JOB_TENANT_ID:}
 
   # ── Security ───────────────────────────────────────────────────────────────
   security:
@@ -533,7 +563,7 @@ tnt:
 
   # ── Kernel Bridge ──────────────────────────────────────────────────────────
   kernel:
-    base-url: ${TNT_KERNEL_BASE_URL:https://kernel-core.yowyob.com}
+    base-url: ${TNT_KERNEL_BASE_URL:https://kernel-core.yowyob.com/kernel-api}
     api-key: ${TNT_KERNEL_API_KEY:}
     client-id: ${TNT_KERNEL_CLIENT_ID:}
 

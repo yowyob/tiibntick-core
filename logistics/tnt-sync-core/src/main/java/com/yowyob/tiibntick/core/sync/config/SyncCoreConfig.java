@@ -1,6 +1,8 @@
 package com.yowyob.tiibntick.core.sync.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yowyob.tiibntick.core.sync.application.port.out.IEntityVersionRepository;
+import com.yowyob.tiibntick.core.sync.application.port.out.IOfflineOperationApplier;
 import com.yowyob.tiibntick.core.sync.application.port.out.IOfflineOperationRepository;
 import com.yowyob.tiibntick.core.sync.application.port.out.ISyncEventPublisher;
 import com.yowyob.tiibntick.core.sync.application.port.out.ISyncSessionRepository;
@@ -12,10 +14,13 @@ import com.yowyob.tiibntick.core.sync.domain.service.OfflineQueueDomainService;
 import com.yowyob.tiibntick.core.sync.domain.service.SyncSessionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
+
+import java.util.List;
 
 @Configuration
 @EnableScheduling
@@ -46,8 +51,11 @@ public class SyncCoreConfig {
     public OfflineQueueDomainService offlineQueueDomainService(IOfflineOperationRepository operationRepository,
                                                                 IEntityVersionRepository entityVersionRepository,
                                                                 ConflictResolverService conflictResolverService,
-                                                                ISyncEventPublisher eventPublisher) {
-        return new OfflineQueueDomainService(operationRepository, entityVersionRepository, conflictResolverService, eventPublisher);
+                                                                ISyncEventPublisher eventPublisher,
+                                                                List<IOfflineOperationApplier> offlineOperationAppliers,
+                                                                @Qualifier("tntObjectMapper") ObjectMapper objectMapper) {
+        return new OfflineQueueDomainService(operationRepository, entityVersionRepository, conflictResolverService,
+                eventPublisher, offlineOperationAppliers, objectMapper);
     }
 
     @Bean

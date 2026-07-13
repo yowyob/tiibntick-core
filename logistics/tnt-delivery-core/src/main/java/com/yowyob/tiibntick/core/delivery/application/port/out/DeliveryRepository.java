@@ -28,6 +28,18 @@ public interface DeliveryRepository {
 
     Flux<Delivery> findActiveByDeliveryPerson(UUID tenantId, UUID deliveryPersonId);
 
+    /**
+     * Counts deliveries assigned to a delivery person, without loading them — for
+     * callers that only need a total (e.g. a profile summary), not the full history.
+     */
+    Mono<Long> countByDeliveryPersonId(UUID tenantId, UUID deliveryPersonId);
+
+    /**
+     * Counts deliveries assigned to a delivery person that are not in a terminal
+     * status ({@link DeliveryStatus#isTerminal()}), without loading them.
+     */
+    Mono<Long> countNonTerminalByDeliveryPersonId(UUID tenantId, UUID deliveryPersonId);
+
     Mono<Void> delete(UUID tenantId, UUID deliveryId);
 
     /**

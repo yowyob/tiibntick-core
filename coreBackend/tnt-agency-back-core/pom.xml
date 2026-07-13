@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+        Agency ERP aggregator — lives under coreBackend/ until Core lead wires
+        into tiibntick-core-parent and tnt-bootstrap.
+        Author: BELEKOTAN II JEFF NICHOSS (Agency BFF / offline-first track)
+    -->
+    <parent>
+        <groupId>com.yowyob.tiibntick.core</groupId>
+        <artifactId>tiibntick-core-parent</artifactId>
+        <version>0.0.1</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>tnt-agency-back-core-parent</artifactId>
+    <packaging>pom</packaging>
+    <name>TiiBnTick — tnt-agency-back-core (Agency ERP)</name>
+    <description>
+        Parent POM for Agency ERP modules — org, HR, intake, sync.
+        Schemas: agency_* in the global TiiBnTick PostgreSQL database.
+    </description>
+
+    <modules>
+        <module>tnt-agency-eventing-core</module>
+        <module>tnt-agency-org-core</module>
+        <module>tnt-agency-staff-core</module>
+        <module>tnt-agency-workforce-core</module>
+        <module>tnt-agency-assignment-core</module>
+        <module>tnt-agency-commission-core</module>
+        <module>tnt-agency-billing-core</module>
+        <module>tnt-agency-onboarding-core</module>
+        <module>tnt-agency-intake-core</module>
+        <module>tnt-agency-inbox-core</module>
+        <module>tnt-agency-fleet-local-core</module>
+        <module>tnt-agency-compliance-core</module>
+        <module>tnt-agency-analytics-core</module>
+        <module>tnt-agency-sync-core</module>
+    </modules>
+
+</project>

@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- Author: MANFOUO Braun -->
+    <!-- Creates the service_offers table for ServiceOffer aggregate -->
+
+    <changeSet id="002-create-service-offers" author="MANFOUO Braun">
+        <createTable schemaName="tnt_market" tableName="service_offers"
+                     remarks="Configurable logistics service offerings by providers">
+
+            <column name="id" type="UUID">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="tenant_id" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="listing_id" type="UUID">
+                <constraints nullable="false"
+                             foreignKeyName="fk_service_offers_listing"
+                             references="tnt_market.market_listings(id)"/>
+            </column>
+            <column name="provider_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="name" type="VARCHAR(200)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="description" type="TEXT"/>
+            <column name="service_type" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="VARCHAR(50)" defaultValue="DRAFT">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Pricing Rules -->
+            <column name="base_price" type="DECIMAL(15,2)"/>
+            <column name="price_per_km" type="DECIMAL(15,4)"/>
+            <column name="price_per_kg" type="DECIMAL(15,4)"/>
+            <column name="currency" type="VARCHAR(10)" defaultValue="XAF"/>
+            <column name="min_price" type="DECIMAL(15,2)"/>
+            <column name="max_price" type="DECIMAL(15,2)"/>
+
+            <!-- Service Constraints -->
+            <column name="max_weight_kg" type="DOUBLE PRECISION"/>
+            <column name="max_volume_cm3" type="DOUBLE PRECISION"/>
+            <column name="allows_fragile" type="BOOLEAN" defaultValueBoolean="false"/>
+            <column name="allows_hazardous" type="BOOLEAN" defaultValueBoolean="false"/>
+            <column name="allows_refrigerated" type="BOOLEAN" defaultValueBoolean="false"/>
+            <column name="max_distance_km" type="DOUBLE PRECISION"/>
+
+            <!-- Availability -->
+            <column name="available_days" type="TEXT" defaultValue="[]"
+                    remarks="JSON array of DayOfWeek strings"/>
+            <column name="open_time" type="TIME"/>
+            <column name="close_time" type="TIME"/>
+            <column name="express_available" type="BOOLEAN" defaultValueBoolean="false"/>
+            <column name="same_day_available" type="BOOLEAN" defaultValueBoolean="false"/>
+
+            <!-- Audit -->
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <createIndex schemaName="tnt_market" tableName="service_offers" indexName="idx_service_offers_listing">
+            <column name="listing_id"/>
+            <column name="status"/>
+        </createIndex>
+        <createIndex schemaName="tnt_market" tableName="service_offers" indexName="idx_service_offers_provider">
+            <column name="provider_id"/>
+            <column name="tenant_id"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

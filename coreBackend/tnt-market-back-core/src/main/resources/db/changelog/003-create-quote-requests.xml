@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- Author: MANFOUO Braun -->
+    <!-- Creates the quote_requests table for QuoteRequest aggregate -->
+
+    <changeSet id="003-create-quote-requests" author="MANFOUO Braun">
+        <createTable schemaName="tnt_market" tableName="quote_requests"
+                     remarks="Client quote requests to providers on TiiBnTick Market">
+
+            <column name="id" type="UUID">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="tenant_id" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="client_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="listing_id" type="UUID"/>
+            <column name="provider_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="status" type="VARCHAR(50)" defaultValue="PENDING">
+                <constraints nullable="false"/>
+            </column>
+            <column name="notes" type="TEXT"/>
+            <column name="cancellation_reason" type="TEXT"/>
+
+            <!-- Delivery Request (embedded VO) -->
+            <column name="distance_km" type="DOUBLE PRECISION"/>
+            <column name="urgency" type="VARCHAR(50)"/>
+            <column name="desired_pickup_at" type="TIMESTAMP WITH TIME ZONE"/>
+
+            <!-- Response selection -->
+            <column name="selected_response_id" type="UUID"/>
+            <column name="expires_at" type="TIMESTAMP WITH TIME ZONE"/>
+
+            <!-- Audit -->
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <createIndex schemaName="tnt_market" tableName="quote_requests" indexName="idx_quote_requests_client">
+            <column name="client_id"/>
+            <column name="tenant_id"/>
+        </createIndex>
+        <createIndex schemaName="tnt_market" tableName="quote_requests" indexName="idx_quote_requests_provider">
+            <column name="provider_id"/>
+            <column name="tenant_id"/>
+        </createIndex>
+        <createIndex schemaName="tnt_market" tableName="quote_requests" indexName="idx_quote_requests_expires">
+            <column name="expires_at"/>
+            <column name="status"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

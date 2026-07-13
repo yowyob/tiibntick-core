@@ -30,7 +30,7 @@ import java.util.UUID;
  *
  * <p>Properties (override via env vars or application-prod.yml):
  * <pre>
- * tnt.kernel.base-url    = TNT_KERNEL_BASE_URL   (default: https://kernel-core.yowyob.com)
+ * tnt.kernel.base-url    = TNT_KERNEL_BASE_URL   (default: https://kernel-core.yowyob.com/kernel-api)
  * tnt.kernel.api-key     = TNT_KERNEL_API_KEY
  * tnt.kernel.client-id   = TNT_KERNEL_CLIENT_ID  (default: tibntick-backend)
  * </pre>
@@ -41,7 +41,7 @@ import java.util.UUID;
 @Configuration
 public class KernelBridgeConfig {
 
-    @Value("${tnt.kernel.base-url:https://kernel-core.yowyob.com}")
+    @Value("${tnt.kernel.base-url:https://kernel-core.yowyob.com/kernel-api}")
     private String kernelBaseUrl;
 
     @Value("${tnt.kernel.api-key:changeme-kernel-api-key}")

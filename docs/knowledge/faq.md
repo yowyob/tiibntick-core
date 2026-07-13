@@ -9,7 +9,7 @@ Covers: how to run the app, why some Kernel calls 404, why the build sometimes f
 **Q: How do I run the app locally?**
 A: `cd tnt-bootstrap && docker compose up -d` (infra), then `mvn -pl tnt-bootstrap spring-boot:run`. See `_quick-start.md`.
 
-**Q: Why do I see `404 Not Found from POST https://kernel-core.yowyob.com/v1/roles` in the logs?**
+**Q: Why do I see `404 Not Found from POST https://kernel-core.yowyob.com/kernel-api/v1/roles` in the logs?**
 A: Expected — the Kernel doesn't implement role provisioning or permission-resolution endpoints yet. Not a bug. See `development/roadmap.md` and `security/permissions.md`.
 
 **Q: My module won't compile with `TypeTag :: UNKNOWN` / a `NoSuchMethodError` after touching `pom.xml`.**

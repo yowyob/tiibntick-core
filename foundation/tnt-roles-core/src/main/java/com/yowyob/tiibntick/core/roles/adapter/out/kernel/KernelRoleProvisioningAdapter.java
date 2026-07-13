@@ -89,6 +89,19 @@ public class KernelRoleProvisioningAdapter implements ITntRoleProvisioningPort {
     }
 
     @Override
+    public Mono<UUID> findRoleId(UUID tenantId, String roleCode) {
+        var responseSpec = kernelWebClient
+                .get()
+                .uri("/api/roles")
+                .header("X-Tenant-Id", tenantId.toString())
+                .retrieve();
+        return KernelResponses.unwrapList(responseSpec, KernelRoleResponse.class, log, "findRoleId " + roleCode)
+                .filter(r -> roleCode.equals(r.code()))
+                .map(KernelRoleResponse::id)
+                .next();
+    }
+
+    @Override
     public Mono<Void> invalidatePermissionCache(UUID tenantId, UUID userId) {
         // The Kernel does not expose a permission-cache invalidation REST endpoint.
         // Cache invalidation on the Kernel side happens automatically on role/permission changes.

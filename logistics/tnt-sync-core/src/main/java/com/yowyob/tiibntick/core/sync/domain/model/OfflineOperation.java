@@ -83,6 +83,17 @@ public class OfflineOperation {
         return status == OfflineOpStatus.QUEUED || status == OfflineOpStatus.APPLYING;
     }
 
+    /**
+     * Returns a copy of this operation carrying a different payload, leaving identity
+     * (id/user/tenant/device/type/aggregate) untouched. Used by conflict resolution
+     * (CLIENT_WINS) to hand an {@code IOfflineOperationApplier} the resolved payload
+     * instead of this operation's original, possibly-superseded, payload.
+     */
+    public OfflineOperation withPayload(String newPayload) {
+        return new OfflineOperation(id, userId, tenantId, deviceId, type, aggregateType, aggregateId,
+                newPayload, localTimestamp, sequenceNumber);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

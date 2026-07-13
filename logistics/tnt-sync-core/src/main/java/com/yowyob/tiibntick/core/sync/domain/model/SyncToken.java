@@ -2,7 +2,9 @@ package com.yowyob.tiibntick.core.sync.domain.model;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.yowyob.tiibntick.core.sync.domain.exception.SyncTokenExpiredException;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Base64;
@@ -42,6 +44,38 @@ public record SyncToken(
         return new SyncToken(val, userId, tenantId, deviceId, timestamp);
     }
 
+    /**
+     * Decodes a Base64URL sync token produced by {@link #encode}.
+     * Blank/null → initial token. Invalid payload or identity mismatch → {@link SyncTokenExpiredException}.
+     */
+    public static SyncToken parse(String encoded, String userId, String tenantId, String deviceId) {
+        if (encoded == null || encoded.isBlank()) {
+            return initial(userId, tenantId, deviceId);
+        }
+        try {
+            String raw = new String(Base64.getUrlDecoder().decode(encoded), StandardCharsets.UTF_8);
+            String[] parts = raw.split(":", 4);
+            if (parts.length != 4) {
+                throw new SyncTokenExpiredException(encoded);
+            }
+            String tokenUserId = parts[0];
+            String tokenTenantId = parts[1];
+            String tokenDeviceId = parts[2];
+            LocalDateTime lastSyncAt = LocalDateTime.parse(parts[3]);
+
+            if (!tokenUserId.equals(userId) || !tokenTenantId.equals(tenantId)) {
+                throw new SyncTokenExpiredException(encoded);
+            }
+
+            String resolvedDevice = deviceId != null && !deviceId.isBlank() ? deviceId : tokenDeviceId;
+            return new SyncToken(encoded, userId, tenantId, resolvedDevice, lastSyncAt);
+        } catch (SyncTokenExpiredException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            throw new SyncTokenExpiredException(encoded);
+        }
+    }
+
     public boolean isStale() {
         return isStale(DEFAULT_STALE_DURATION);
     }
@@ -56,7 +90,7 @@ public record SyncToken(
 
     private static String encode(String userId, String tenantId, String deviceId, LocalDateTime ts) {
         String raw = userId + ":" + tenantId + ":" + (deviceId != null ? deviceId : "") + ":" + ts.toString();
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes());
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
     }
 
     @Override

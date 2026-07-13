@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- ── Schéma ── -->
+    <include file="db/changelog/changes/001_create_schema.sql"           relativeToChangelogFile="false"/>
+
+    <!-- ── Tables principales ── -->
+    <include file="db/changelog/changes/002_create_packets.sql"                        relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/003_create_announcements.sql"                  relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/004_create_deliveries.sql"                     relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/005_create_announcement_subscriptions.sql"     relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/006_create_subscriptions.sql"                  relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/007_create_payments.sql"                       relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/008_create_delivery_needs.sql"                 relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/009_create_relay_deposits.sql"                 relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/010_create_evaluations.sql"                    relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/011_create_delivery_person_pricing.sql"        relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/012_create_logistics_pricing.sql"              relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/013_create_delivery_person_availability.sql"   relativeToChangelogFile="false"/>
+
+    <!-- ── Tables d'extension (propriétés Market absent des modules Core) ── -->
+    <include file="db/changelog/changes/014_create_freelancer_extensions.sql"          relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/015_create_relay_hub_extensions.sql"           relativeToChangelogFile="false"/>
+
+    <!-- ── Index ── -->
+    <include file="db/changelog/changes/016_create_indexes.sql"                        relativeToChangelogFile="false"/>
+
+    <!-- ── Abonnements Points Relais ── -->
+    <include file="db/changelog/changes/017_create_relay_hub_subscriptions.sql"        relativeToChangelogFile="false"/>
+
+</databaseChangeLog>

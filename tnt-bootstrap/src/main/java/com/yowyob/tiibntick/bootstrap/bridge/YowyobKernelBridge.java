@@ -37,7 +37,7 @@ public class YowyobKernelBridge {
             new AtomicReference<>(KernelConnectionStatus.unknown());
 
     public YowyobKernelBridge(
-            @Value("${tnt.kernel.base-url:https://kernel-core.yowyob.com}") String kernelBaseUrl,
+            @Value("${tnt.kernel.base-url:https://kernel-core.yowyob.com/kernel-api}") String kernelBaseUrl,
             @Value("${tnt.kernel.api-key:changeme}") String kernelApiKey,
             @Value("${tnt.kernel.client-id:tibntick-backend}") String kernelClientId,
             WebClient.Builder webClientBuilder) {
@@ -53,14 +53,22 @@ public class YowyobKernelBridge {
     }
 
     /**
-     * Pings the kernel health endpoint and updates {@link KernelConnectionStatus}.
+     * Pings the kernel and updates {@link KernelConnectionStatus}.
+     *
+     * <p>Targets {@code /.well-known/openid-configuration} rather than
+     * {@code /actuator/health} — the Kernel's actuator is exposed on a separate
+     * management port, not on the public host this bridge talks to, so
+     * {@code /actuator/health} never resolves correctly here (confirmed by
+     * TSAFACK Savio, Kernel maintainer, 2026-07-12). The OIDC discovery document is
+     * public, lightweight, and already used elsewhere in {@code KernelBridgeConfig}
+     * as a reachability signal.
      *
      * @return {@code true} if the kernel responded successfully
      */
     public Mono<Boolean> ping() {
         long start = System.currentTimeMillis();
         return webClient.get()
-                .uri("/actuator/health")
+                .uri("/.well-known/openid-configuration")
                 .retrieve()
                 .bodyToMono(String.class)
                 .timeout(java.time.Duration.ofSeconds(5))

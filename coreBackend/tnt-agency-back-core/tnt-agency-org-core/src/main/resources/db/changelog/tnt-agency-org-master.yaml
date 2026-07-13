@@ -1,0 +1,19 @@
+databaseChangeLog:
+  - include:
+      file: db/changelog/changes/001_create_agency_org_schema.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/002_create_agencies.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/003_create_agency_settings.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/004_create_agency_branches.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/005_create_relay_hubs.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/006_create_hub_parcel_records.sql
+      relativeToChangelogFile: false

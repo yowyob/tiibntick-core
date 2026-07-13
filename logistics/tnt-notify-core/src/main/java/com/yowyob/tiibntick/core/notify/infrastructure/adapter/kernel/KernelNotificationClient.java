@@ -22,7 +22,7 @@ import reactor.core.publisher.Mono;
 
 /**
  * Thin typed client for the Kernel's (RT-comops) generic notification engine
- * ({@code /api/notifications/*} on {@code kernel-core.yowyob.com}).
+ * ({@code /api/notifications/*} on {@code kernel-core.yowyob.com/kernel-api}).
  *
  * <p>Centralizes the 10 REST calls documented by the Kernel's OpenAPI spec
  * (tag {@code notification-controller}) so every hexagonal port adapter in
@@ -33,7 +33,7 @@ import reactor.core.publisher.Mono;
  *
  * <p>Every call requires {@code X-Tenant-Id} and {@code X-Organization-Id}
  * headers — undocumented in the Kernel's OpenAPI spec but enforced by its
- * gateway middleware (confirmed against the real {@code kernel-core.yowyob.com}:
+ * gateway middleware (confirmed against the real {@code kernel-core.yowyob.com/kernel-api}:
  * missing either header fails closed with {@code TENANT_CONTEXT_REQUIRED} /
  * {@code ORGANIZATION_CONTEXT_REQUIRED} before the request even reaches the
  * notification service).

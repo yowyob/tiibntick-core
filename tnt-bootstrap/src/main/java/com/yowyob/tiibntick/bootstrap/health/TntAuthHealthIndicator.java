@@ -16,10 +16,17 @@ import java.util.Map;
  * <p>Verifies that the security bridge between TiiBnTick Core and YowAuth0 is correctly
  * configured. Checks:
  * <ol>
- *   <li>JWT issuer URI is configured (not empty).</li>
+ *   <li>JWT JWK set URI is configured (not empty).</li>
  *   <li>Auth service code is configured (not empty).</li>
  *   <li>Token cache TTL is a valid positive duration string.</li>
  * </ol>
+ *
+ * <p>Checks {@code jwk-set-uri}, not {@code issuer-uri} — {@code application.yml} deliberately
+ * leaves {@code issuer-uri} unset (see its comment there): the Kernel issues {@code iss:
+ * "kernel-core"}, not a URL, so setting {@code issuer-uri} would make Spring Security's OIDC
+ * auto-discovery reject every token. {@code jwk-set-uri} is what actually drives signature/expiry
+ * validation here; this indicator originally checked {@code issuer-uri} and therefore always
+ * reported DOWN despite the app working as intended (flagged externally 2026-07-12).
  *
  * <p>This indicator does NOT perform an outbound network call — it validates configuration
  * only. The Kernel connectivity check is handled by {@link TntKernelHealthIndicator}.
@@ -33,8 +40,8 @@ import java.util.Map;
 @Component
 public class TntAuthHealthIndicator implements ReactiveHealthIndicator {
 
-    @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri:}")
-    private String jwtIssuerUri;
+    @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri:}")
+    private String jwtJwkSetUri;
 
     @Value("${tnt.auth.service-code:}")
     private String authServiceCode;
@@ -63,20 +70,20 @@ public class TntAuthHealthIndicator implements ReactiveHealthIndicator {
     private Health evaluate() {
         Map<String, Object> details = new LinkedHashMap<>();
         details.put("service_code", authServiceCode.isEmpty() ? "<not-set>" : authServiceCode);
-        details.put("jwt_issuer_configured", !jwtIssuerUri.isEmpty());
+        details.put("jwt_jwk_set_uri_configured", !jwtJwkSetUri.isEmpty());
         details.put("token_cache_ttl", tokenCacheTtl);
         details.put("actor_resolution_enabled", actorResolutionEnabled);
         details.put("allow_anonymous_context", allowAnonymousContext);
 
         // Validate required configuration
-        boolean jwtConfigured = !jwtIssuerUri.isEmpty();
+        boolean jwtConfigured = !jwtJwkSetUri.isEmpty();
         boolean serviceCodeConfigured = !authServiceCode.isEmpty();
 
         if (!jwtConfigured) {
-            log.warn("tnt-auth-core health check FAILED: spring.security.oauth2.resourceserver.jwt.issuer-uri is not set");
+            log.warn("tnt-auth-core health check FAILED: spring.security.oauth2.resourceserver.jwt.jwk-set-uri is not set");
             return Health.down()
                     .withDetails(details)
-                    .withDetail("reason", "jwt_issuer_uri_missing")
+                    .withDetail("reason", "jwt_jwk_set_uri_missing")
                     .build();
         }
 
