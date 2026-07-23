@@ -153,8 +153,10 @@ public final class TntTopics {
 
     public static final String MEDIA_FILE_UPLOADED = "tnt.media.file.uploaded";
     public static final String MEDIA_FILE_DELETED = "tnt.media.file.deleted";
-    /** Consumed by tnt-notify-core; never published — only declared in TntKafkaTopicsConfig
-     *  (Audit n5 P-01, documented debt: no admin/onboarding service emits these lifecycle events). */
+    /** Published by FreelancerOrgAdminService (tnt-administration-core) via
+     *  TntAdministrationEventPublisherAdapter's outbox-backed publish() (Chantier C P5); consumed
+     *  by tnt-notify-core. Fixed 2026-07-23 — this Javadoc previously said "never published"
+     *  (Audit n5 P-01, documented debt), that is no longer accurate. */
     public static final String ADMIN_FREELANCER_ORG_KYC_APPROVED = "tnt.admin.freelancer_org.kyc_approved";
     public static final String ADMIN_FREELANCER_ORG_KYC_REJECTED = "tnt.admin.freelancer_org.kyc_rejected";
     public static final String ADMIN_FREELANCER_ORG_SUSPENDED = "tnt.admin.freelancer_org.suspended";
@@ -172,8 +174,11 @@ public final class TntTopics {
     /** Never published (Audit n5 P-01, documented debt — tnt-sync-core listens speculatively). */
     public static final String ACTOR_PROFILE_UPDATED = "tnt.actor.profile.updated";
     public static final String ACTOR_REPUTATION_CHANGED = "tnt.actor.reputation.changed";
-    /** Never published by tnt-organization-core (Audit n5 P-01, documented debt — actor-core's
-     *  FreelancerOrgEventConsumer listens speculatively for org lifecycle events). */
+    /** Published by tnt-organization-core's FreelancerOrgEventPublisherAdapter via the outbox
+     *  (Chantier C P5, fixed 2026-07-23 — it was previously publishing through a dead
+     *  ApplicationEventPublisher with no listener, silently losing every event; see the P5
+     *  inventory doc). Consumed by actor-core's FreelancerOrgEventConsumer. This Javadoc
+     *  previously said "never published" (Audit n5 P-01, documented debt), no longer accurate. */
     public static final String FREELANCER_ORG_CREATED = "tnt.freelancer_org.created";
     public static final String FREELANCER_ORG_SUB_DELIVERER_ASSOCIATED = "tnt.freelancer_org.sub_deliverer.associated";
     public static final String FREELANCER_ORG_SUB_DELIVERER_REVOKED = "tnt.freelancer_org.sub_deliverer.revoked";

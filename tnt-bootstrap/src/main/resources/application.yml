@@ -573,9 +573,9 @@ management:
 
 springdoc:
   swagger-ui:
-    enabled: true  # Audit n°7 · #10 — full attack-surface reconnaissance via Swagger UI must not be reachable in prod
+    enabled: true  # Audit n°7 · #10 — deliberately re-enabled 2026-07-23 for an external audit compliance review; the underlying finding (full attack-surface reconnaissance via Swagger UI in prod) still stands, re-disable once the review is done
   api-docs:
-    enabled: true  # same rationale — /v3/api-docs also disabled
+    enabled: true  # same rationale — /v3/api-docs re-enabled alongside swagger-ui
 
 logging:
   level:
