@@ -573,9 +573,9 @@ management:
 
 springdoc:
   swagger-ui:
-    enabled: false  # Audit n°7 · #10 — full attack-surface reconnaissance via Swagger UI must not be reachable in prod
+    enabled: true  # Audit n°7 · #10 — full attack-surface reconnaissance via Swagger UI must not be reachable in prod
   api-docs:
-    enabled: false  # same rationale — /v3/api-docs also disabled
+    enabled: true  # same rationale — /v3/api-docs also disabled
 
 logging:
   level:
