@@ -40,18 +40,32 @@ public final class TntTopics {
     /** FreelancerOrg assigned to a delivery. Consumed by tnt-notify-core, tnt-accounting-core,
      *  tnt-billing-wallet. */
     public static final String DELIVERY_FREELANCER_ORG_ASSIGNED = "tnt.delivery.freelancer_org.assigned";
-    /** Declared/provisioned but never published by any producer in this repo (Audit n5 P-01). */
+    /** Published by {@code KafkaDeliveryEventPublisher} on {@code DeliveryCreatedEvent}. Consumed
+     *  by coreBackend's agency-assignment (property core-mission-created). Fixed 2026-07-23 —
+     *  this Javadoc previously said "never published" (Audit n5 P-01, documented debt). */
     public static final String DELIVERY_MISSION_CREATED = "tnt.delivery.mission.created";
-    /** Never published — no MissionCompletedEvent exists; delivery only emits the catch-all
-     *  {@link #DELIVERY_EVENTS} envelope (Audit n5 P-01, documented debt). */
+    /** Published by {@code KafkaDeliveryEventPublisher} on {@code DeliveryCompletedEvent}.
+     *  Consumed by tnt-billing-invoice, tnt-tp-core, tnt-sales-core. Fixed 2026-07-23 — this
+     *  Javadoc previously said "never published" (Audit n5 P-01, documented debt). */
     public static final String DELIVERY_MISSION_COMPLETED = "tnt.delivery.mission.completed";
-    /** Never published (Audit n5 P-01, documented debt). */
+    /** Published by {@code KafkaDeliveryEventPublisher} on {@code ParcelPickedUpEvent} (physical
+     *  pickup = fulfillment start). Consumed by tnt-sales-core. Fixed 2026-07-23 — this Javadoc
+     *  previously said "never published" (Audit n5 P-01, documented debt). */
     public static final String DELIVERY_MISSION_STARTED = "tnt.delivery.mission.started";
-    /** Never published (Audit n5 P-01, documented debt). */
+    /** Published by {@code KafkaDeliveryEventPublisher} on {@code DeliveryFailedEvent}. Consumed
+     *  by tnt-sales-core. Fixed 2026-07-23 — this Javadoc previously said "never published"
+     *  (Audit n5 P-01, documented debt). */
     public static final String DELIVERY_MISSION_FAILED = "tnt.delivery.mission.failed";
-    /** Never published (Audit n5 P-01, documented debt). */
+    /** Published by {@code KafkaDeliveryEventPublisher} on {@code DeliveryCompletedEvent}, in
+     *  addition to {@link #DELIVERY_MISSION_COMPLETED} — same real-world occurrence, different
+     *  consumer group. Consumed by coreBackend's agency-assignment (property
+     *  core-package-delivered). Fixed 2026-07-23 — this Javadoc previously said "never
+     *  published" (Audit n5 P-01, documented debt). */
     public static final String DELIVERY_PACKAGE_DELIVERED = "tnt.delivery.package.delivered";
-    /** Never published (Audit n5 P-01, documented debt). */
+    /** Published by {@code KafkaDeliveryEventPublisher} alongside every package-state-changing
+     *  event (pickup, transit, relay stop, mission status change, completion). Consumed by
+     *  tnt-sync-core. Fixed 2026-07-23 — this Javadoc previously said "never published"
+     *  (Audit n5 P-01, documented debt). */
     public static final String DELIVERY_PACKAGE_UPDATED = "tnt.delivery.package.updated";
     /** Legacy hyphenated name — provisioning bean only, no producer/consumer wired yet. */
     public static final String DELIVERY_PACKAGE_PICKED_UP = "tnt.delivery.package.picked-up";
@@ -108,7 +122,12 @@ public final class TntTopics {
     public static final String GEO_TRAFFIC_EVENTS = "tnt.geo.traffic.events";
     public static final String GEO_NODE_EVENTS = "tnt.geo.node.events";
     public static final String GEO_ZONE_EVENTS = "tnt.geo.zone.events";
-    /** Never published (Audit n5 P-01, documented debt — tnt-sync-core listens speculatively). */
+    /** Published by {@code KafkaGeoEventPublisher} whenever a {@code TrafficConditionChangedEvent}
+     *  reaches it — that only happens when {@code TrafficConditionChangedEvent#isSignificant()}
+     *  was already true (&gt;20% congestion swing), the domain's own existing definition of
+     *  alert-worthy. Consumed by tnt-sync-core. Fixed 2026-07-23 — this Javadoc previously said
+     *  no "alert" concept existed in tnt-geo-core at all (Audit n5 P-01, documented debt); it
+     *  did, just not exposed as its own topic. */
     public static final String GEO_ALERT_CREATED = "tnt.geo.alert.created";
 
     // ── Sync (tnt-sync-core, L3) ─────────────────────────────────────────────────
@@ -136,11 +155,19 @@ public final class TntTopics {
     public static final String DISPUTE_EVIDENCE_ADDED = "tnt.dispute.evidence-added";
     public static final String DISPUTE_REFUND_INITIATED = "tnt.dispute.refund-initiated";
     public static final String DISPUTE_COMPENSATION_PAID = "tnt.dispute.compensation-paid";
-    /** Produced by tnt-dispute-core's BillingCompensationAdapter; never consumed
-     *  (Audit n5 P-01, documented debt — the dispute-to-wallet compensation loop is only
-     *  half-wired: nobody consumes this, and nobody ever emits {@link #BILLING_COMPENSATION_PAID}). */
+    /** Produced by tnt-dispute-core's BillingCompensationAdapter. Consumed by
+     *  tnt-billing-wallet's {@code WalletBillingEventConsumer#onCompensationInitiated}, which
+     *  pays out {@code WALLET_CREDIT} compensations and confirms on
+     *  {@link #BILLING_COMPENSATION_PAID}. Fixed 2026-07-23 — this Javadoc previously said the
+     *  dispute-to-wallet loop was only half-wired (Audit n5 P-01, documented debt); other
+     *  compensation methods ({@code MOBILE_MONEY_*}, {@code BANK_TRANSFER},
+     *  {@code SERVICE_CREDIT}, {@code REDELIVERY}) still have no automated payout and are logged
+     *  for manual settlement instead. */
     public static final String BILLING_COMPENSATION_INITIATED = "tnt.billing.compensation.initiated";
-    /** Never published — see {@link #BILLING_COMPENSATION_INITIATED} (Audit n5 P-01, documented debt). */
+    /** Published by tnt-billing-wallet's {@code WalletBillingEventConsumer} after a
+     *  {@code WALLET_CREDIT} compensation payout succeeds. Consumed by tnt-dispute-core's
+     *  {@code DisputeEventConsumer}, which transitions the dispute to {@code COMPENSATED}. Fixed
+     *  2026-07-23 — see {@link #BILLING_COMPENSATION_INITIATED} (Audit n5 P-01, documented debt). */
     public static final String BILLING_COMPENSATION_PAID = "tnt.billing.compensation.paid";
 
     // ── Notify (tnt-notify-core, L3) ─────────────────────────────────────────────
@@ -171,7 +198,14 @@ public final class TntTopics {
     /** Consumed by agency-workforce's ActorKycConsumer (property core-actor-kyc, Audit n5 P-01 fix). */
     public static final String ACTOR_KYC_VALIDATED = "tnt.actor.kyc.validated";
     public static final String ACTOR_MISSION_ASSIGNED = "tnt.actor.mission.assigned";
-    /** Never published (Audit n5 P-01, documented debt — tnt-sync-core listens speculatively). */
+    /** Published by {@code KafkaActorEventPublisher} on {@code ActorProfileUpdatedEvent},
+     *  emitted after every profile mutation already wired end-to-end elsewhere: KYC
+     *  submission/validation ({@code ActorKycService}), rating ({@code ActorRatingService}),
+     *  badges ({@code ActorBadgeService}), client loyalty points
+     *  ({@code ClientProfileService#addLoyaltyPoints}). Consumed by tnt-sync-core. Fixed
+     *  2026-07-23 — this Javadoc previously said no update mutation existed anywhere in
+     *  tnt-actor-core (Audit n5 P-01, documented debt); the mutations existed and were already
+     *  persisted, they just never announced themselves on this topic. */
     public static final String ACTOR_PROFILE_UPDATED = "tnt.actor.profile.updated";
     public static final String ACTOR_REPUTATION_CHANGED = "tnt.actor.reputation.changed";
     /** Published by tnt-organization-core's FreelancerOrgEventPublisherAdapter via the outbox
@@ -196,6 +230,16 @@ public final class TntTopics {
     // ── Administration (tnt-administration-core, L2) ────────────────────────────
 
     public static final String ADMINISTRATION_EVENTS = "tnt.administration.events";
+
+    // ── Organization (tnt-organization-core, L2) ─────────────────────────────────
+
+    /** Published by {@code HubEventPublisherAdapter} on {@code HubRelaisUpdatedEvent}, emitted
+     *  by {@code HubRelaisService#updateCapacity/assignOperator/suspendHub/resumeHub}. Consumed
+     *  by tnt-sync-core. Fixed 2026-07-23 — this Javadoc previously said no update/patch
+     *  operation existed on {@code HubRelais} (Audit n5 P-01, documented debt); the domain
+     *  aggregate already had {@code updateCapacity}/{@code assignOperator}/{@code suspend}/
+     *  {@code resume} methods, they were simply never exposed through any use case. */
+    public static final String ORGANIZATION_HUB_UPDATED = "tnt.organization.hub.updated";
 
     // ── Resource (tnt-resource-core, L4) ─────────────────────────────────────────
 
@@ -227,8 +271,10 @@ public final class TntTopics {
 
     /** Envelope topic. Consumed by tnt-billing-report's InvoiceEventReportConsumer. */
     public static final String BILLING_INVOICE_EVENTS = "tnt.billing.invoice.events";
-    /** Consumed by tnt-accounting-core; never published — invoice only emits the
-     *  catch-all {@link #BILLING_INVOICE_EVENTS} (Audit n5 P-01, documented debt). */
+    /** Published by {@code KafkaInvoiceEventPublisher} on {@code InvoicePaid}, in addition to the
+     *  catch-all {@link #BILLING_INVOICE_EVENTS}. Consumed by tnt-accounting-core. Fixed
+     *  2026-07-23 — this Javadoc previously said "never published" (Audit n5 P-01, documented
+     *  debt). */
     public static final String BILLING_INVOICE_PAID = "tnt.billing.invoice.paid";
     /** Provisioning bean only — no wired producer/consumer under this exact name. */
     public static final String BILLING_INVOICE_CREATED = "tnt.billing.invoice.created";
@@ -258,12 +304,19 @@ public final class TntTopics {
     /** Consumed by tnt-billing-wallet itself (intra-module) and tnt-accounting-core
      *  (Audit n5 P-01 fix — was tnt.billing.wallet.commission-calculated / tnt.billing.commission.calculated). */
     public static final String BILLING_WALLET_COMMISSION_CALCULATED = "tnt.billing.wallet.commission.calculated";
-    /** Consumed by tnt-accounting-core; never published (Audit n5 P-01, documented debt). */
+    /** Published by {@code WalletKafkaPublisher} on {@code WalletSplitExecuted}, emitted by
+     *  {@code WalletService.splitMissionRevenue()}. Consumed by tnt-accounting-core. Fixed
+     *  2026-07-23 — this Javadoc previously said "never published" (Audit n5 P-01, documented
+     *  debt). */
     public static final String BILLING_WALLET_SPLIT_EXECUTED = "tnt.billing.wallet.split_executed";
-    /** Consumed by tnt-agency-commission's WalletPayoutConsumer, which expects a single
-     *  multiplexed topic with an "eventType" discriminator field; wallet only ever produces
-     *  the 6 unitary topics above, and the consumer's payload shape doesn't match any of them
-     *  either. Never published — deeper than a topic-name fix (Audit n5 P-01, documented debt). */
+    /** Superseded 2026-07-23 (Audit n5 P-01) — tnt-agency-commission's WalletPayoutConsumer
+     *  used to listen here expecting a multiplexed "eventType" discriminator payload that
+     *  wallet never produced (wallet only knows 6 unitary event topics, none shaped like that).
+     *  The consumer now listens on {@link #BILLING_WALLET_PAYMENT_CONFIRMED} instead, reading the
+     *  agency-side commissionId back out of that event's {@code invoiceId} field (see
+     *  {@code WalletCoreClient}, which smuggles it in on the way out). Kept declared — no
+     *  producer or consumer references this topic name anymore, retained only as a historical
+     *  marker so the string isn't silently reintroduced. */
     public static final String BILLING_WALLET_EVENTS = "tnt.billing.wallet.events";
 
     // ── Billing templates (tnt-billing-templates, L5) ───────────────────────────
@@ -304,8 +357,11 @@ public final class TntTopics {
 
     // ── Roles (tnt-roles-core, L1) ───────────────────────────────────────────────
 
-    /** Never published — RBAC permission-cache invalidation is never actually triggered;
-     *  the cache only self-expires via TTL (Audit n5 P-01/P-20, documented debt). */
+    /** Published by tnt-roles-core's {@code PermissionChangeEventPublisher} on every role
+     *  assignment/revocation. Consumed by {@code PermissionCacheInvalidationListener} (same
+     *  module, every instance). Fixed 2026-07-23 — this Javadoc previously said "never
+     *  published" (Audit n5 P-01/P-20, documented debt); the TTL-based self-expiry remains as
+     *  a fallback for any instance that misses the broadcast. */
     public static final String ROLES_PERMISSION_CHANGED = "tnt.roles.permission-changed";
 
     // ── Trust (tnt-trust-core, L6) — external Kernel contract, not renamed by this referential ──

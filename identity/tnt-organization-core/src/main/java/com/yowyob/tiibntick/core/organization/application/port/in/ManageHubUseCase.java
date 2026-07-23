@@ -76,4 +76,38 @@ public interface ManageHubUseCase {
      * @return a {@link Flux} of all HubRelais for the tenant
      */
     Flux<HubRelais> listHubsForTenant(UUID tenantId);
+
+    /**
+     * Updates the maximum parcel capacity of a relay hub.
+     *
+     * @param hubId       the TiiBnTick hub ID
+     * @param newCapacity the new capacity (must be strictly positive)
+     * @return a {@link Mono} emitting the updated {@link HubRelais}
+     */
+    Mono<HubRelais> updateCapacity(OrganizationId hubId, int newCapacity);
+
+    /**
+     * Assigns or reassigns the operator for a relay hub.
+     *
+     * @param hubId      the TiiBnTick hub ID
+     * @param operatorId the new operator's actor UUID
+     * @return a {@link Mono} emitting the updated {@link HubRelais}
+     */
+    Mono<HubRelais> assignOperator(OrganizationId hubId, UUID operatorId);
+
+    /**
+     * Marks a relay hub as temporarily out of service.
+     *
+     * @param hubId the TiiBnTick hub ID
+     * @return a {@link Mono} emitting the updated {@link HubRelais}
+     */
+    Mono<HubRelais> suspendHub(OrganizationId hubId);
+
+    /**
+     * Marks a relay hub as operational again.
+     *
+     * @param hubId the TiiBnTick hub ID
+     * @return a {@link Mono} emitting the updated {@link HubRelais}
+     */
+    Mono<HubRelais> resumeHub(OrganizationId hubId);
 }

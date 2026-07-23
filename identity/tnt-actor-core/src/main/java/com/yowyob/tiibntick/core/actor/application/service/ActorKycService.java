@@ -10,6 +10,7 @@ import com.yowyob.tiibntick.core.actor.application.port.out.IActorEventPublisher
 import com.yowyob.tiibntick.core.actor.application.port.out.IDelivererRepository;
 import com.yowyob.tiibntick.core.actor.application.port.out.IFreelancerRepository;
 import com.yowyob.tiibntick.core.actor.application.port.out.IRelayOperatorRepository;
+import com.yowyob.tiibntick.core.actor.domain.event.ActorProfileUpdatedEvent;
 import com.yowyob.tiibntick.core.actor.domain.event.KycValidatedEvent;
 import com.yowyob.tiibntick.core.actor.domain.exception.KycAlreadyVerifiedException;
 import com.yowyob.tiibntick.core.actor.domain.model.KycStatus;
@@ -45,7 +46,7 @@ public class ActorKycService implements ISubmitKycUseCase, IValidateKycUseCase {
     @Override
     public Mono<Void> submitKyc(SubmitKycCommand command) {
         Objects.requireNonNull(command, "command must not be null");
-        return switch (command.actorType()) {
+        Mono<Void> saveMono = switch (command.actorType()) {
             case PERMANENT_DELIVERER -> delivererRepository
                     .findByActorId(command.tenantId(), command.actorId())
                     .flatMap(p -> {
@@ -76,6 +77,8 @@ public class ActorKycService implements ISubmitKycUseCase, IValidateKycUseCase {
             default -> Mono.error(new IllegalArgumentException(
                     "KYC not applicable for actor type: " + command.actorType()));
         };
+        return saveMono.then(eventPublisher.publishProfileUpdated(ActorProfileUpdatedEvent.of(
+                command.actorId(), command.tenantId(), command.actorType().name(), "KYC_SUBMITTED")));
     }
 
     @Override
@@ -111,7 +114,11 @@ public class ActorKycService implements ISubmitKycUseCase, IValidateKycUseCase {
                     "KYC validation not applicable for actor type: " + command.actorType()));
         };
 
-        return saveMono.then(eventPublisher.publishKycValidated(event));
+        return saveMono
+                .then(eventPublisher.publishKycValidated(event))
+                .then(eventPublisher.publishProfileUpdated(ActorProfileUpdatedEvent.of(
+                        command.actorId(), command.tenantId(), command.actorType().name(),
+                        "KYC_VALIDATED")));
     }
 
     /**

@@ -305,4 +305,42 @@ class WalletServiceTest {
         verify(paymentIntentRepository, never()).save(any());
         verifyNoInteractions(paymentAnchorPort, notificationPort);
     }
+
+    @Test
+    @DisplayName("splitMissionRevenue publishes a WalletSplitExecuted event so tnt-accounting-core "
+            + "can post the journal entries (Audit n5 P-01: this used to never be published)")
+    void splitMissionRevenuePublishesSplitExecutedEvent() {
+        String freelancerOrgId = "org-42";
+        String subDelivererId = "sub-7";
+        Wallet orgWallet = Wallet.createForOrg(
+                com.yowyob.tiibntick.core.billing.wallet.domain.enums.WalletOwnerType.FREELANCER_ORG,
+                freelancerOrgId, TENANT_ID, XAF);
+        Wallet subWallet = Wallet.createForOrg(
+                com.yowyob.tiibntick.core.billing.wallet.domain.enums.WalletOwnerType.FREELANCER_ORG,
+                subDelivererId, TENANT_ID, XAF);
+
+        when(walletRepository.findByOwnerId(freelancerOrgId, TENANT_ID)).thenReturn(Mono.just(orgWallet));
+        when(walletRepository.findByOwnerId(subDelivererId, TENANT_ID)).thenReturn(Mono.just(subWallet));
+        when(walletRepository.save(any(Wallet.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(eventPublisher.publish(any(
+                com.yowyob.tiibntick.core.billing.wallet.domain.event.WalletSplitExecuted.class)))
+                .thenReturn(Mono.empty());
+
+        com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.SplitMissionRevenueCommand cmd =
+                new com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.SplitMissionRevenueCommand(
+                        "MISSION-1", new BigDecimal("10000"), freelancerOrgId, TENANT_ID,
+                        subDelivererId, 0.05, 0.20);
+
+        StepVerifier.create(walletService.splitMissionRevenue(cmd))
+                .expectNextMatches(result -> "COMPLETED".equals(result.status()))
+                .verifyComplete();
+
+        ArgumentCaptor<com.yowyob.tiibntick.core.billing.wallet.domain.event.WalletSplitExecuted> captor =
+                ArgumentCaptor.forClass(com.yowyob.tiibntick.core.billing.wallet.domain.event.WalletSplitExecuted.class);
+        verify(eventPublisher).publish(captor.capture());
+        assertThat(captor.getValue().missionId()).isEqualTo("MISSION-1");
+        assertThat(captor.getValue().freelancerOrgId()).isEqualTo(freelancerOrgId);
+        assertThat(captor.getValue().subDelivererId()).isEqualTo(subDelivererId);
+        assertThat(captor.getValue().tenantId()).isEqualTo(TENANT_ID);
+    }
 }

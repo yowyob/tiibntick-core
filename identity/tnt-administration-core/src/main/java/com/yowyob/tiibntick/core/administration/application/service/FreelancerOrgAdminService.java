@@ -11,6 +11,7 @@ import reactor.core.publisher.Mono;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.UUID;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -56,54 +57,54 @@ public class FreelancerOrgAdminService implements FreelancerOrgAdminUseCase {
     @Override
     @RequirePermission(resource = "freelancer", action = "approve")
     @Transactional
-    public Mono<Void> approveKycBasic(String orgId, String adminId) {
+    public Mono<Void> approveKycBasic(String tenantId, String orgId, String adminId) {
         log.info("Approving KYC BASIC for FreelancerOrg={} by admin={}", orgId, adminId);
-        return eventPublisher.publish(TOPIC_KYC_APPROVED,
+        return eventPublisher.publish(TOPIC_KYC_APPROVED, UUID.fromString(tenantId),
                 buildEvent(orgId, adminId, "KYC_LEVEL", "BASIC", null));
     }
 
     @Override
     @RequirePermission(resource = "freelancer", action = "approve")
     @Transactional
-    public Mono<Void> approveKycFull(String orgId, String adminId) {
+    public Mono<Void> approveKycFull(String tenantId, String orgId, String adminId) {
         log.info("Approving KYC FULL for FreelancerOrg={} by admin={}", orgId, adminId);
-        return eventPublisher.publish(TOPIC_KYC_APPROVED,
+        return eventPublisher.publish(TOPIC_KYC_APPROVED, UUID.fromString(tenantId),
                 buildEvent(orgId, adminId, "KYC_LEVEL", "FULL", null));
     }
 
     @Override
     @RequirePermission(resource = "freelancer", action = "approve")
     @Transactional
-    public Mono<Void> rejectKyc(String orgId, String adminId, String reason) {
+    public Mono<Void> rejectKyc(String tenantId, String orgId, String adminId, String reason) {
         log.info("Rejecting KYC for FreelancerOrg={} by admin={} reason={}", orgId, adminId, reason);
-        return eventPublisher.publish(TOPIC_KYC_REJECTED,
+        return eventPublisher.publish(TOPIC_KYC_REJECTED, UUID.fromString(tenantId),
                 buildEvent(orgId, adminId, null, null, reason));
     }
 
     @Override
     @RequirePermission(resource = "freelancer", action = "write")
     @Transactional
-    public Mono<Void> suspendFreelancerOrg(String orgId, String adminId, String reason) {
+    public Mono<Void> suspendFreelancerOrg(String tenantId, String orgId, String adminId, String reason) {
         log.info("Suspending FreelancerOrg={} by admin={} reason={}", orgId, adminId, reason);
-        return eventPublisher.publish(TOPIC_SUSPENDED,
+        return eventPublisher.publish(TOPIC_SUSPENDED, UUID.fromString(tenantId),
                 buildEvent(orgId, adminId, null, null, reason));
     }
 
     @Override
     @RequirePermission(resource = "freelancer", action = "write")
     @Transactional
-    public Mono<Void> unsuspendFreelancerOrg(String orgId, String adminId) {
+    public Mono<Void> unsuspendFreelancerOrg(String tenantId, String orgId, String adminId) {
         log.info("Unsuspending FreelancerOrg={} by admin={}", orgId, adminId);
-        return eventPublisher.publish(TOPIC_UNSUSPENDED,
+        return eventPublisher.publish(TOPIC_UNSUSPENDED, UUID.fromString(tenantId),
                 buildEvent(orgId, adminId, null, null, null));
     }
 
     @Override
     @RequirePermission(resource = "tnt:platform", action = "admin")
     @Transactional
-    public Mono<Void> blacklistFreelancerOrg(String orgId, String adminId, String reason) {
+    public Mono<Void> blacklistFreelancerOrg(String tenantId, String orgId, String adminId, String reason) {
         log.warn("BLACKLISTING FreelancerOrg={} by admin={} reason={}", orgId, adminId, reason);
-        return eventPublisher.publish(TOPIC_BLACKLISTED,
+        return eventPublisher.publish(TOPIC_BLACKLISTED, UUID.fromString(tenantId),
                 buildEvent(orgId, adminId, null, null, reason));
     }
 

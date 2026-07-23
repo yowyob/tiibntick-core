@@ -21,6 +21,7 @@ import com.yowyob.tiibntick.core.roles.application.port.in.CheckPermissionUseCas
 import com.yowyob.tiibntick.core.roles.application.port.in.ManageTntRoleUseCase;
 import com.yowyob.tiibntick.core.roles.application.port.in.ResolveUserRolesUseCase;
 import com.yowyob.tiibntick.core.roles.application.port.in.RevokeTntRoleUseCase;
+import com.yowyob.tiibntick.core.roles.application.port.out.IPermissionChangeNotifier;
 import com.yowyob.tiibntick.core.roles.application.port.out.ITntRoleAssignmentPort;
 import com.yowyob.tiibntick.core.roles.application.port.out.ITntRoleProvisioningPort;
 import com.yowyob.tiibntick.core.roles.application.port.out.ReactivePermissionResolver;
@@ -224,9 +225,10 @@ public class TntRolesAutoConfiguration {
             RoleSyncOutboxRepository outboxRepository,
             TransactionalOperator transactionalOperator,
             ObjectMapper objectMapper,
-            TntRolesProperties properties) {
+            TntRolesProperties properties,
+            IPermissionChangeNotifier permissionChangeNotifier) {
         return new TntRoleAssignmentService(roleRepository, assignmentRepository, outboxRepository,
-                transactionalOperator, objectMapper, properties.getSystemTenantId());
+                transactionalOperator, objectMapper, properties.getSystemTenantId(), permissionChangeNotifier);
     }
 
     @Bean
@@ -235,8 +237,10 @@ public class TntRolesAutoConfiguration {
             UserRoleAssignmentRepository assignmentRepository,
             RoleSyncOutboxRepository outboxRepository,
             TransactionalOperator transactionalOperator,
-            ObjectMapper objectMapper) {
-        return new TntRoleRevocationService(assignmentRepository, outboxRepository, transactionalOperator, objectMapper);
+            ObjectMapper objectMapper,
+            IPermissionChangeNotifier permissionChangeNotifier) {
+        return new TntRoleRevocationService(assignmentRepository, outboxRepository, transactionalOperator,
+                objectMapper, permissionChangeNotifier);
     }
 
     @Bean

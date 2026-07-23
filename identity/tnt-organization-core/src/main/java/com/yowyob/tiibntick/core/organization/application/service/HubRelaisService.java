@@ -1,8 +1,10 @@
 package com.yowyob.tiibntick.core.organization.application.service;
 
 import com.yowyob.tiibntick.core.organization.application.port.in.ManageHubUseCase;
+import com.yowyob.tiibntick.core.organization.application.port.out.HubEventPublisherPort;
 import com.yowyob.tiibntick.core.organization.application.port.out.HubRepositoryPort;
 import com.yowyob.tiibntick.core.organization.application.port.out.KernelOrganizationPort;
+import com.yowyob.tiibntick.core.organization.domain.event.HubRelaisUpdatedEvent;
 import com.yowyob.tiibntick.core.organization.domain.model.HubRelais;
 import com.yowyob.tiibntick.core.organization.domain.vo.OrganizationId;
 import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
@@ -41,17 +43,21 @@ public class HubRelaisService implements ManageHubUseCase {
 
     private final HubRepositoryPort hubRepository;
     private final KernelOrganizationPort kernelOrganizationPort;
+    private final HubEventPublisherPort eventPublisher;
 
     /**
      * Constructor injection.
      *
      * @param hubRepository          persistence port for HubRelais aggregates
      * @param kernelOrganizationPort outbound Kernel integration port
+     * @param eventPublisher         outbound port for HubRelais domain events
      */
     public HubRelaisService(HubRepositoryPort hubRepository,
-                            KernelOrganizationPort kernelOrganizationPort) {
+                            KernelOrganizationPort kernelOrganizationPort,
+                            HubEventPublisherPort eventPublisher) {
         this.hubRepository = hubRepository;
         this.kernelOrganizationPort = kernelOrganizationPort;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
@@ -128,5 +134,68 @@ public class HubRelaisService implements ManageHubUseCase {
     @RequirePermission(resource = "relay", action = "read")
     public Flux<HubRelais> listHubsForTenant(UUID tenantId) {
         return hubRepository.findAllByTenantId(tenantId);
+    }
+
+    /**
+     * {@inheritDoc}
+     * Requires permission: {@code relay:write}.
+     */
+    @Override
+    @RequirePermission(resource = "relay", action = "write")
+    public Mono<HubRelais> updateCapacity(OrganizationId hubId, int newCapacity) {
+        return hubRepository.findById(hubId)
+                .flatMap(hub -> {
+                    hub.updateCapacity(newCapacity);
+                    return saveAndPublish(hub, "CAPACITY_UPDATED");
+                });
+    }
+
+    /**
+     * {@inheritDoc}
+     * Requires permission: {@code relay:write}.
+     */
+    @Override
+    @RequirePermission(resource = "relay", action = "write")
+    public Mono<HubRelais> assignOperator(OrganizationId hubId, UUID operatorId) {
+        return hubRepository.findById(hubId)
+                .flatMap(hub -> {
+                    hub.assignOperator(operatorId);
+                    return saveAndPublish(hub, "OPERATOR_ASSIGNED");
+                });
+    }
+
+    /**
+     * {@inheritDoc}
+     * Requires permission: {@code relay:write}.
+     */
+    @Override
+    @RequirePermission(resource = "relay", action = "write")
+    public Mono<HubRelais> suspendHub(OrganizationId hubId) {
+        return hubRepository.findById(hubId)
+                .flatMap(hub -> {
+                    hub.suspend();
+                    return saveAndPublish(hub, "SUSPENDED");
+                });
+    }
+
+    /**
+     * {@inheritDoc}
+     * Requires permission: {@code relay:write}.
+     */
+    @Override
+    @RequirePermission(resource = "relay", action = "write")
+    public Mono<HubRelais> resumeHub(OrganizationId hubId) {
+        return hubRepository.findById(hubId)
+                .flatMap(hub -> {
+                    hub.resume();
+                    return saveAndPublish(hub, "RESUMED");
+                });
+    }
+
+    private Mono<HubRelais> saveAndPublish(HubRelais hub, String updateReason) {
+        return hubRepository.save(hub)
+                .flatMap(saved -> eventPublisher.publishHubUpdated(HubRelaisUpdatedEvent.of(
+                                saved.getId().value(), saved.getTenantId(), updateReason))
+                        .thenReturn(saved));
     }
 }

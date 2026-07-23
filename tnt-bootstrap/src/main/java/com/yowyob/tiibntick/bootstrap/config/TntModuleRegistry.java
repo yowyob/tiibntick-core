@@ -152,7 +152,10 @@ public class TntModuleRegistry {
                 "Organization Core (Agency, Branch, ServiceZone, RelayHub, African POI)",
                 ModuleLayer.IDENTITY_L2, ModuleOrigin.TNT_EXTENSION,
                 List.of("comops-organization-core", "tnt-auth-core"),
-                List.of(), "tnt_organization");
+                List.of(TntTopics.ORGANIZATION_HUB_UPDATED, TntTopics.FREELANCER_ORG_CREATED,
+                        TntTopics.FREELANCER_ORG_VERIFIED, TntTopics.FREELANCER_ORG_SUB_DELIVERER_ASSOCIATED,
+                        TntTopics.FREELANCER_ORG_SUB_DELIVERER_REVOKED),
+                "tnt_organization");
 
         register("tnt-tp-core",
                 "Third-Party Core (Shippers, Fidelity, mobile KYC, GDPR masking, Rating)",
@@ -172,7 +175,9 @@ public class TntModuleRegistry {
                 "Geo Core (PostGIS road graph, OSM geocoding, Weather, African POI)",
                 ModuleLayer.LOGISTICS_L3, ModuleOrigin.TNT_EXCLUSIVE,
                 List.of(),
-                List.of(TntTopics.GEO_GPS_POSITION_UPDATED), "tnt_geo");
+                List.of(TntTopics.GEO_GPS_POSITION_UPDATED, TntTopics.GEO_TRAFFIC_EVENTS,
+                        TntTopics.GEO_NODE_EVENTS, TntTopics.GEO_ZONE_EVENTS, TntTopics.GEO_ALERT_CREATED),
+                "tnt_geo");
 
         register("tnt-route-core",
                 "Route Core (A* graph search, VRP OR-Tools 9.8.3296, Kalman ETA, ω(a,t), " +
@@ -188,7 +193,9 @@ public class TntModuleRegistry {
                 List.of("tnt-geo-core", "tnt-actor-core", "tnt-organization-core",
                         "tnt-auth-core", "tnt-roles-core"),
                 List.of(TntTopics.DELIVERY_MISSION_CREATED, TntTopics.DELIVERY_MISSION_STATUS_CHANGED,
-                        TntTopics.DELIVERY_PACKAGE_PICKED_UP, TntTopics.DELIVERY_PACKAGE_DELIVERED,
+                        TntTopics.DELIVERY_MISSION_STARTED, TntTopics.DELIVERY_MISSION_COMPLETED,
+                        TntTopics.DELIVERY_MISSION_FAILED, TntTopics.DELIVERY_PACKAGE_PICKED_UP,
+                        TntTopics.DELIVERY_PACKAGE_DELIVERED, TntTopics.DELIVERY_PACKAGE_UPDATED,
                         TntTopics.DELIVERY_HUB_DEPOSIT_CREATED, TntTopics.DELIVERY_HUB_DEPOSIT_PICKED_UP),
                 "tnt_delivery");
 
@@ -306,7 +313,8 @@ public class TntModuleRegistry {
                 "@RequirePermission guards on invoice:issue)",
                 ModuleLayer.BILLING_ENGINE_L5, ModuleOrigin.TNT_EXCLUSIVE,
                 List.of("tnt-billing-pricing", "tnt-media-core", "tnt-roles-core"),
-                List.of(TntTopics.BILLING_INVOICE_CREATED), "tnt_billing");
+                List.of(TntTopics.BILLING_INVOICE_CREATED, TntTopics.BILLING_INVOICE_EVENTS,
+                        TntTopics.BILLING_INVOICE_PAID), "tnt_billing");
 
         register("tnt-billing-wallet",
                 "Billing Wallet (in-app ledger; Mobile Money/card provider integration " +

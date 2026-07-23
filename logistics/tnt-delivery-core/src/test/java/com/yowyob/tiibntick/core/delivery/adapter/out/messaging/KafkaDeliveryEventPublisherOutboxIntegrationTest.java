@@ -85,12 +85,14 @@ import static org.springframework.kafka.test.utils.KafkaTestUtils.getSingleRecor
 @Testcontainers
 @EmbeddedKafka(partitions = 1, topics = {
         KafkaDeliveryEventPublisherOutboxIntegrationTest.MISSION_STATUS_TOPIC,
-        KafkaDeliveryEventPublisherOutboxIntegrationTest.FREELANCER_ORG_TOPIC})
+        KafkaDeliveryEventPublisherOutboxIntegrationTest.FREELANCER_ORG_TOPIC,
+        KafkaDeliveryEventPublisherOutboxIntegrationTest.PACKAGE_UPDATED_TOPIC})
 @Tag("integration")
 class KafkaDeliveryEventPublisherOutboxIntegrationTest {
 
     static final String MISSION_STATUS_TOPIC = "tnt.delivery.mission.status.changed";
     static final String FREELANCER_ORG_TOPIC = "tnt.delivery.freelancer_org.assigned";
+    static final String PACKAGE_UPDATED_TOPIC = "tnt.delivery.package.updated";
 
     @Container
     @SuppressWarnings("resource")
@@ -155,14 +157,21 @@ class KafkaDeliveryEventPublisherOutboxIntegrationTest {
         publisher.publish(event).block(Duration.ofSeconds(10));
 
         // 1. The envelope is durably persisted PENDING — nothing sent to Kafka yet.
-        StepVerifier.create(envelopeRepository.findByAggregateId(
-                        deliveryId.toString(), "Delivery", tenantId.toString()))
-                .assertNext(envelope -> {
-                    assertThat(envelope.getKafkaTopic()).isEqualTo(MISSION_STATUS_TOPIC);
-                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PENDING);
-                    assertThat(envelope.getTenantId()).isEqualTo(tenantId.toString());
-                })
-                .verifyComplete();
+        // MissionStatusChangedEvent fans out to two topics: the dedicated mission-status
+        // topic (tnt-incident-core, tnt-realtime-core, tnt-market-back-core) and the generic
+        // package-updated topic (tnt-sync-core) — Audit n°5 P-01, tnt.delivery.package.updated
+        // used to have no producer at all.
+        java.util.List<com.yowyob.kernel.event.domain.model.DomainEventEnvelope> envelopes =
+                envelopeRepository.findByAggregateId(deliveryId.toString(), "Delivery", tenantId.toString())
+                        .collectList().block(Duration.ofSeconds(10));
+        assertThat(envelopes).hasSize(2);
+        assertThat(envelopes).extracting(
+                com.yowyob.kernel.event.domain.model.DomainEventEnvelope::getKafkaTopic)
+                .containsExactlyInAnyOrder(MISSION_STATUS_TOPIC, PACKAGE_UPDATED_TOPIC);
+        assertThat(envelopes).allSatisfy(envelope -> {
+            assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PENDING);
+            assertThat(envelope.getTenantId()).isEqualTo(tenantId.toString());
+        });
 
         Map<String, Object> consumerProps = new HashMap<>(
                 KafkaTestUtils.consumerProps(embeddedKafka, "delivery-outbox-it", true));
@@ -195,11 +204,12 @@ class KafkaDeliveryEventPublisherOutboxIntegrationTest {
             assertThat(wireEnvelope.get("payload").get("newStatus").asText()).isEqualTo("IN_TRANSIT");
         }
 
-        // 3. Once relayed, the envelope transitions to PUBLISHED.
-        StepVerifier.create(envelopeRepository.findByAggregateId(
-                        deliveryId.toString(), "Delivery", tenantId.toString()))
-                .assertNext(envelope -> assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED))
-                .verifyComplete();
+        // 3. Once relayed, both fanned-out envelopes transition to PUBLISHED.
+        java.util.List<com.yowyob.kernel.event.domain.model.DomainEventEnvelope> publishedEnvelopes =
+                envelopeRepository.findByAggregateId(deliveryId.toString(), "Delivery", tenantId.toString())
+                        .collectList().block(Duration.ofSeconds(10));
+        assertThat(publishedEnvelopes).hasSize(2)
+                .allSatisfy(envelope -> assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED));
     }
 
     @Test

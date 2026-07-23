@@ -22,10 +22,10 @@ import java.util.UUID;
  *       an empty/unparseable payload evicts everything (fail-safe).</li>
  * </ul>
  *
- * <p>No producer publishes to this topic yet anywhere in TiiBnTick Core — this listener is a
- * forward-compatible scaffold for when role/permission mutation flows (e.g. in
- * {@code tnt-administration-core}) start emitting change events. Until then it simply never
- * fires; the cache still self-expires via {@code tnt.roles.permission-cache-ttl-seconds}.
+ * <p>Fixed 2026-07-23 (Audit n5 P-01) — {@code PermissionChangeEventPublisher} (same module)
+ * now publishes here on every role assignment/revocation. The cache still self-expires via
+ * {@code tnt.roles.permission-cache-ttl-seconds} as a fallback for any instance that misses
+ * the broadcast.
  *
  * @author MANFOUO Braun
  */

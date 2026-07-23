@@ -2,6 +2,7 @@ package com.yowyob.tiibntick.core.roles.application.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yowyob.tiibntick.core.roles.application.port.in.RevokeTntRoleUseCase;
+import com.yowyob.tiibntick.core.roles.application.port.out.IPermissionChangeNotifier;
 import com.yowyob.tiibntick.core.roles.application.port.out.RoleSyncOutboxRepository;
 import com.yowyob.tiibntick.core.roles.application.port.out.UserRoleAssignmentRepository;
 import com.yowyob.tiibntick.core.roles.domain.exception.TntRoleException;
@@ -32,15 +33,18 @@ public class TntRoleRevocationService implements RevokeTntRoleUseCase {
     private final RoleSyncOutboxRepository outboxRepository;
     private final TransactionalOperator transactionalOperator;
     private final ObjectMapper objectMapper;
+    private final IPermissionChangeNotifier permissionChangeNotifier;
 
     public TntRoleRevocationService(UserRoleAssignmentRepository assignmentRepository,
                                      RoleSyncOutboxRepository outboxRepository,
                                      TransactionalOperator transactionalOperator,
-                                     ObjectMapper objectMapper) {
+                                     ObjectMapper objectMapper,
+                                     IPermissionChangeNotifier permissionChangeNotifier) {
         this.assignmentRepository = assignmentRepository;
         this.outboxRepository = outboxRepository;
         this.transactionalOperator = transactionalOperator;
         this.objectMapper = objectMapper;
+        this.permissionChangeNotifier = permissionChangeNotifier;
     }
 
     @Override
@@ -53,7 +57,8 @@ public class TntRoleRevocationService implements RevokeTntRoleUseCase {
                         // locally — deleteById runs exactly once regardless of which branch fired.
                         assignmentRepository.findKernelAssignmentId(tenantId, assignmentId)
                                 .flatMap(kernelAssignmentId -> outboxRepository.save(revokeOutboxEntry(tenantId, assignmentId, kernelAssignmentId)))
-                                .then(assignmentRepository.deleteById(tenantId, assignmentId)))
+                                .then(assignmentRepository.deleteById(tenantId, assignmentId))
+                                .doOnSuccess(v -> permissionChangeNotifier.notifyChanged(tenantId, assignment.userId())))
                 .as(transactionalOperator::transactional);
     }
 

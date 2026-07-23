@@ -1,6 +1,7 @@
 package com.yowyob.tiibntick.core.actor.application.service;
 
 import com.yowyob.tiibntick.core.actor.application.command.RateActorCommand;
+import com.yowyob.tiibntick.core.actor.application.port.out.IActorEventPublisher;
 import com.yowyob.tiibntick.core.actor.application.port.out.IDelivererRepository;
 import com.yowyob.tiibntick.core.actor.application.port.out.IFreelancerRepository;
 import com.yowyob.tiibntick.core.actor.application.port.out.IRelayOperatorRepository;
@@ -21,6 +22,8 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -29,6 +32,7 @@ class ActorRatingServiceTest {
     @Mock private IDelivererRepository delivererRepository;
     @Mock private IFreelancerRepository freelancerRepository;
     @Mock private IRelayOperatorRepository relayOperatorRepository;
+    @Mock private IActorEventPublisher eventPublisher;
 
     private ActorRatingService service;
 
@@ -37,7 +41,9 @@ class ActorRatingServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ActorRatingService(delivererRepository, freelancerRepository, relayOperatorRepository);
+        service = new ActorRatingService(delivererRepository, freelancerRepository,
+                relayOperatorRepository, eventPublisher);
+        lenient().when(eventPublisher.publishProfileUpdated(any())).thenReturn(Mono.empty());
     }
 
     @Test

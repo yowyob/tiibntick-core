@@ -228,7 +228,8 @@ public class TntAdministrationController {
     public Mono<ResponseEntity<Void>> approveKycBasic(
             @PathVariable String orgId,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
-        return freelancerOrgAdminService.approveKycBasic(orgId, currentUser.actorId().toString())
+        return freelancerOrgAdminService.approveKycBasic(currentUser.tenantId().toString(), orgId,
+                        currentUser.actorId().toString())
                 .then(Mono.just(ResponseEntity.noContent().<Void>build()));
     }
 
@@ -242,7 +243,8 @@ public class TntAdministrationController {
     public Mono<ResponseEntity<Void>> approveKycFull(
             @PathVariable String orgId,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
-        return freelancerOrgAdminService.approveKycFull(orgId, currentUser.actorId().toString())
+        return freelancerOrgAdminService.approveKycFull(currentUser.tenantId().toString(), orgId,
+                        currentUser.actorId().toString())
                 .then(Mono.just(ResponseEntity.noContent().<Void>build()));
     }
 
@@ -257,7 +259,8 @@ public class TntAdministrationController {
             @PathVariable String orgId,
             @RequestParam String reason,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
-        return freelancerOrgAdminService.rejectKyc(orgId, currentUser.actorId().toString(), reason)
+        return freelancerOrgAdminService.rejectKyc(currentUser.tenantId().toString(), orgId,
+                        currentUser.actorId().toString(), reason)
                 .then(Mono.just(ResponseEntity.noContent().<Void>build()));
     }
 
@@ -272,7 +275,8 @@ public class TntAdministrationController {
             @PathVariable String orgId,
             @RequestParam String reason,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
-        return freelancerOrgAdminService.suspendFreelancerOrg(orgId, currentUser.actorId().toString(), reason)
+        return freelancerOrgAdminService.suspendFreelancerOrg(currentUser.tenantId().toString(), orgId,
+                        currentUser.actorId().toString(), reason)
                 .then(Mono.just(ResponseEntity.noContent().<Void>build()));
     }
 
@@ -286,7 +290,8 @@ public class TntAdministrationController {
     public Mono<ResponseEntity<Void>> unsuspendFreelancerOrg(
             @PathVariable String orgId,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
-        return freelancerOrgAdminService.unsuspendFreelancerOrg(orgId, currentUser.actorId().toString())
+        return freelancerOrgAdminService.unsuspendFreelancerOrg(currentUser.tenantId().toString(), orgId,
+                        currentUser.actorId().toString())
                 .then(Mono.just(ResponseEntity.noContent().<Void>build()));
     }
 
@@ -301,7 +306,8 @@ public class TntAdministrationController {
             @PathVariable String orgId,
             @RequestParam String reason,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
-        return freelancerOrgAdminService.blacklistFreelancerOrg(orgId, currentUser.actorId().toString(), reason)
+        return freelancerOrgAdminService.blacklistFreelancerOrg(currentUser.tenantId().toString(), orgId,
+                        currentUser.actorId().toString(), reason)
                 .then(Mono.just(ResponseEntity.noContent().<Void>build()));
     }
 

@@ -45,6 +45,7 @@ public class WalletKafkaPublisher implements IWalletEventPublisher {
     private static final String TOPIC_WALLET_CREDITED = TntTopics.BILLING_WALLET_WALLET_CREDITED;
     private static final String TOPIC_WALLET_DEBITED = TntTopics.BILLING_WALLET_WALLET_DEBITED;
     private static final String TOPIC_COMMISSION_CALCULATED = TntTopics.BILLING_WALLET_COMMISSION_CALCULATED;
+    private static final String TOPIC_SPLIT_EXECUTED = TntTopics.BILLING_WALLET_SPLIT_EXECUTED;
 
     private static final String AGGREGATE_TYPE = "Wallet";
     private static final String SOLUTION_CODE = "TNT";
@@ -93,6 +94,12 @@ public class WalletKafkaPublisher implements IWalletEventPublisher {
     public Mono<Void> publish(CommissionCalculated event) {
         return publishEvent(TOPIC_COMMISSION_CALCULATED,
                 event.delivererId().toString(), event.tenantId(), event.occurredAt(), event);
+    }
+
+    @Override
+    public Mono<Void> publish(WalletSplitExecuted event) {
+        return publishEvent(TOPIC_SPLIT_EXECUTED,
+                event.freelancerOrgId(), event.tenantId(), event.occurredAt(), event);
     }
 
     private Mono<Void> publishEvent(String topic, String key, UUID tenantId,

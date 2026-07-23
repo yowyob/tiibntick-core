@@ -2,9 +2,12 @@ package com.yowyob.tiibntick.core.billing.wallet.adapter.in.kafka;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yowyob.kernel.event.application.port.in.PublishEventUseCase;
+import com.yowyob.kernel.event.domain.model.DomainEventEnvelope;
 import com.yowyob.tiibntick.common.kafka.TntTopics;
 import com.yowyob.tiibntick.core.billing.wallet.application.port.in.IWalletUseCase;
 import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.CreditCommissionCommand;
+import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.CreditWalletCommand;
 import com.yowyob.tiibntick.core.billing.wallet.application.port.out.IPaymentIntentRepository;
 import com.yowyob.tiibntick.core.billing.wallet.application.port.out.IWalletRepository;
 import com.yowyob.tiibntick.core.billing.wallet.domain.enums.WalletStatus;
@@ -14,8 +17,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -27,6 +34,8 @@ import java.util.UUID;
  *       to their in-app wallet after a confirmed invoice payment.</li>
  *   <li>{@code tnt.incident.escalated.to.dispute} — permanently freezes the payment
  *       linked to the affected mission until the dispute is resolved by tnt-dispute-core.</li>
+ *   <li>{@code tnt.billing.compensation.initiated} — pays out a {@code WALLET_CREDIT}
+ *       dispute compensation and confirms back on {@code tnt.billing.compensation.paid}.</li>
  * </ul>
  *
  * <p>The {@code tnt.incident.escalated.to.dispute} handler implements the billing side
@@ -42,9 +51,13 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class WalletBillingEventConsumer {
 
+    private static final String COMPENSATION_AGGREGATE_TYPE = "Dispute";
+    private static final String COMPENSATION_SOLUTION_CODE = "TNT";
+
     private final IWalletUseCase walletUseCase;
     private final IPaymentIntentRepository paymentIntentRepository;
     private final IWalletRepository walletRepository;
+    private final PublishEventUseCase publishEventUseCase;
     @Qualifier("walletObjectMapper")
     private final ObjectMapper objectMapper;
 
@@ -166,5 +179,93 @@ public class WalletBillingEventConsumer {
         } catch (Exception e) {
             log.error("Failed to process IncidentEscalatedToDispute event: {}", e.getMessage(), e);
         }
+    }
+
+    // ── Dispute → Wallet compensation loop ───────────────────────────────────
+
+    /**
+     * Consumes {@code tnt.billing.compensation.initiated} events from tnt-dispute-core and,
+     * for {@code WALLET_CREDIT} compensations, credits the beneficiary's in-app wallet and
+     * confirms back on {@code tnt.billing.compensation.paid} so the dispute can transition to
+     * {@code COMPENSATED}.
+     *
+     * <p>Audit n°5 P-01, resolved 2026-07-23: this loop used to be only half-wired — dispute
+     * emitted {@code compensation.initiated} that nobody consumed, and waited forever for
+     * {@code compensation.paid} that nobody emitted. Other compensation methods
+     * ({@code MOBILE_MONEY_*}, {@code BANK_TRANSFER}, {@code SERVICE_CREDIT}, {@code REDELIVERY})
+     * have no payment gateway or fulfillment integration wired anywhere in this repo — rather
+     * than fabricate one, those are logged for manual settlement instead of silently claiming
+     * an automated payout that doesn't exist.
+     *
+     * @param message the raw Kafka message (JSON) from tnt-dispute-core
+     */
+    @KafkaListener(
+            topics = TntTopics.BILLING_COMPENSATION_INITIATED,
+            groupId = "tnt-billing-wallet-compensation",
+            containerFactory = "walletKafkaListenerContainerFactory"
+    )
+    public void onCompensationInitiated(String message) {
+        log.info("CompensationInitiated event received");
+        try {
+            JsonNode node = objectMapper.readTree(message);
+            String paymentRef    = node.path("paymentRef").asText(null);
+            String disputeId     = node.path("disputeId").asText(null);
+            String tenantIdStr   = node.path("tenantId").asText(null);
+            String method        = node.path("method").asText(null);
+            String beneficiaryId = node.path("beneficiaryId").asText(null);
+            BigDecimal amount    = new BigDecimal(node.path("amount").asText("0"));
+            String currency      = node.path("currency").asText(null);
+
+            if (disputeId == null || tenantIdStr == null || paymentRef == null) {
+                log.warn("Incomplete compensation.initiated event: disputeId={} paymentRef={}",
+                        disputeId, paymentRef);
+                return;
+            }
+
+            if (!"WALLET_CREDIT".equals(method)) {
+                log.warn("Compensation method={} for disputeId={} has no automated payout in this "
+                        + "repo — requires manual settlement, compensation.paid will not be emitted",
+                        method, disputeId);
+                return;
+            }
+
+            UUID tenantId = UUID.fromString(tenantIdStr);
+            UUID beneficiaryUserId = UUID.fromString(beneficiaryId);
+
+            walletUseCase.creditWallet(new CreditWalletCommand(
+                            beneficiaryUserId, tenantId, Money.of(amount, currency),
+                            paymentRef, "Dispute compensation payout ref=" + paymentRef))
+                    .flatMap(tx -> publishCompensationPaid(disputeId, tenantIdStr, paymentRef))
+                    .subscribe(
+                            v   -> log.info("Compensation paid: disputeId={} paymentRef={} beneficiary={}",
+                                    disputeId, paymentRef, beneficiaryUserId),
+                            err -> log.error("Failed to pay compensation for disputeId={}: {}",
+                                    disputeId, err.getMessage())
+                    );
+        } catch (Exception e) {
+            log.error("Failed to process CompensationInitiated event: {}", e.getMessage(), e);
+        }
+    }
+
+    private Mono<Void> publishCompensationPaid(String disputeId, String tenantId, String paymentReference) {
+        Map<String, Object> payload = Map.of(
+                "disputeId", disputeId,
+                "tenantId", tenantId,
+                "paymentReference", paymentReference,
+                "paidAt", LocalDateTime.now().toString());
+        return Mono.fromCallable(() -> objectMapper.writeValueAsString(payload))
+                .map(json -> DomainEventEnvelope.wrap()
+                        .correlationId(UUID.randomUUID().toString())
+                        .eventType("CompensationPaid")
+                        .aggregateId(disputeId)
+                        .aggregateType(COMPENSATION_AGGREGATE_TYPE)
+                        .tenantId(tenantId)
+                        .solutionCode(COMPENSATION_SOLUTION_CODE)
+                        .payload(json)
+                        .kafkaTopic(TntTopics.BILLING_COMPENSATION_PAID)
+                        .kafkaPartitionKey(disputeId)
+                        .occurredAt(LocalDateTime.now(ZoneOffset.UTC))
+                        .build())
+                .flatMap(publishEventUseCase::publish);
     }
 }

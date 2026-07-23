@@ -2,6 +2,7 @@ package com.yowyob.tiibntick.core.roles.application.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yowyob.tiibntick.core.roles.application.port.in.AssignTntRoleUseCase;
+import com.yowyob.tiibntick.core.roles.application.port.out.IPermissionChangeNotifier;
 import com.yowyob.tiibntick.core.roles.application.port.in.TntRoleAssignmentResult;
 import com.yowyob.tiibntick.core.roles.application.port.out.RoleRepository;
 import com.yowyob.tiibntick.core.roles.application.port.out.RoleSyncOutboxRepository;
@@ -42,19 +43,22 @@ public class TntRoleAssignmentService implements AssignTntRoleUseCase {
     private final TransactionalOperator transactionalOperator;
     private final ObjectMapper objectMapper;
     private final UUID systemTenantId;
+    private final IPermissionChangeNotifier permissionChangeNotifier;
 
     public TntRoleAssignmentService(RoleRepository roleRepository,
                                      UserRoleAssignmentRepository assignmentRepository,
                                      RoleSyncOutboxRepository outboxRepository,
                                      TransactionalOperator transactionalOperator,
                                      ObjectMapper objectMapper,
-                                     UUID systemTenantId) {
+                                     UUID systemTenantId,
+                                     IPermissionChangeNotifier permissionChangeNotifier) {
         this.roleRepository = roleRepository;
         this.assignmentRepository = assignmentRepository;
         this.outboxRepository = outboxRepository;
         this.transactionalOperator = transactionalOperator;
         this.objectMapper = objectMapper;
         this.systemTenantId = systemTenantId;
+        this.permissionChangeNotifier = permissionChangeNotifier;
     }
 
     @Override
@@ -96,6 +100,7 @@ public class TntRoleAssignmentService implements AssignTntRoleUseCase {
         return assignmentRepository.save(assignment)
                 .flatMap(saved -> outboxRepository.save(outboxEntry).thenReturn(saved))
                 .as(transactionalOperator::transactional)
+                .doOnSuccess(saved -> permissionChangeNotifier.notifyChanged(resolvedTenantId, targetUserId))
                 .map(saved -> new TntRoleAssignmentResult(
                         saved.id(), targetUserId, role.code(), scopeType.name(), resolvedScopeId));
     }

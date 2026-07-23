@@ -2,6 +2,7 @@ package com.yowyob.tiibntick.core.agency.commission.adapter.in.messaging;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yowyob.tiibntick.common.kafka.TntTopics;
 import com.yowyob.tiibntick.core.agency.commission.application.service.CommissionService;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
@@ -15,6 +16,21 @@ import reactor.core.publisher.Mono;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Consumes wallet payment confirmations to mark an agency commission as paid once the
+ * underlying wallet payout succeeds.
+ *
+ * <p>Audit n°5 P-01, resolved 2026-07-23: this used to listen on {@code tnt.billing.wallet.events},
+ * a topic nobody in the repo ever produced — wallet only ever publishes 6 unitary event topics,
+ * and none of them carry a {@code commissionId} field, so even fixing the topic name alone would
+ * not have been enough. {@code WalletCoreClient} (this module's outbound port) already smuggles
+ * the agency-side {@code commissionId} into the wallet payment request's {@code invoiceId} field
+ * ({@code WalletCoreClient.java}, {@code "invoiceId", request.commissionId().toString()}) — the
+ * wallet module has no concept of "commission" of its own. {@code PaymentConfirmed}
+ * (tnt-billing-wallet) echoes that same {@code invoiceId} back unchanged, so this consumer now
+ * listens on the real {@link TntTopics#BILLING_WALLET_PAYMENT_CONFIRMED} topic and reads the
+ * commission id back out of it, instead of waiting for a payload shape that never existed.
+ */
 @Component
 @ConditionalOnProperty(name = "tnt.agency.kafka.consumers.enabled", havingValue = "true", matchIfMissing = true)
 public class WalletPayoutConsumer {
@@ -37,13 +53,9 @@ public class WalletPayoutConsumer {
     public void onWalletEvent(ConsumerRecord<String, String> record, Acknowledgment ack) {
         try {
             Map<String, Object> payload = objectMapper.readValue(record.value(), new TypeReference<>() {});
-            if (!"PAYMENT_SUCCESS".equals(payload.get("eventType"))) {
-                ack.acknowledge();
-                return;
-            }
-            String commissionIdStr = (String) payload.get("commissionId");
+            String commissionIdStr = (String) payload.get("invoiceId");
             String tenantIdStr = (String) payload.get("tenantId");
-            if (commissionIdStr == null || tenantIdStr == null) {
+            if (commissionIdStr == null || commissionIdStr.isBlank() || tenantIdStr == null) {
                 ack.acknowledge();
                 return;
             }

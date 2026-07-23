@@ -10,6 +10,7 @@ import com.yowyob.tiibntick.core.organization.application.port.out.BranchReposit
 import com.yowyob.tiibntick.core.organization.application.port.out.FreelancerOrgDidAnchorPort;
 import com.yowyob.tiibntick.core.organization.application.port.out.FreelancerOrgEventPublisherPort;
 import com.yowyob.tiibntick.core.organization.application.port.out.FreelancerOrgRepositoryPort;
+import com.yowyob.tiibntick.core.organization.application.port.out.HubEventPublisherPort;
 import com.yowyob.tiibntick.core.organization.application.port.out.HubRepositoryPort;
 import com.yowyob.tiibntick.core.organization.application.port.out.KernelOrganizationPort;
 import com.yowyob.tiibntick.core.organization.application.service.AgencyService;
@@ -20,6 +21,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yowyob.kernel.event.application.port.in.PublishEventUseCase;
 import com.yowyob.tiibntick.core.organization.infrastructure.adapter.out.kernel.KernelOrganizationAdapter;
 import com.yowyob.tiibntick.core.organization.infrastructure.adapter.out.messaging.FreelancerOrgEventPublisherAdapter;
+import com.yowyob.tiibntick.core.organization.infrastructure.adapter.out.messaging.HubEventPublisherAdapter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -143,17 +145,36 @@ public class OrganizationCoreAutoConfiguration {
     }
 
     /**
+     * HubRelais event publisher adapter — enqueues {@code tnt.organization.hub.updated}
+     * events into yow-event-kernel's transactional outbox, mirroring
+     * {@link #freelancerOrgEventPublisherPort}.
+     *
+     * @param publishEventUseCase yow-event-kernel outbox inbound port
+     * @param objectMapper        JSON serializer for event payloads
+     * @return the {@link HubEventPublisherPort} implementation
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public HubEventPublisherPort hubEventPublisherPort(
+            PublishEventUseCase publishEventUseCase,
+            ObjectMapper objectMapper) {
+        return new HubEventPublisherAdapter(publishEventUseCase, objectMapper);
+    }
+
+    /**
      * Hub use case — creates, queries, and manages HubRelais aggregates.
      *
      * @param hubRepositoryPort      persistence port
      * @param kernelOrganizationPort Kernel validation port
+     * @param hubEventPublisherPort  messaging port for HubRelais domain events
      * @return the {@link ManageHubUseCase} implementation
      */
     @Bean
     @ConditionalOnMissingBean
     public ManageHubUseCase manageHubUseCase(HubRepositoryPort hubRepositoryPort,
-                                              KernelOrganizationPort kernelOrganizationPort) {
-        return new HubRelaisService(hubRepositoryPort, kernelOrganizationPort);
+                                              KernelOrganizationPort kernelOrganizationPort,
+                                              HubEventPublisherPort hubEventPublisherPort) {
+        return new HubRelaisService(hubRepositoryPort, kernelOrganizationPort, hubEventPublisherPort);
     }
 
     // ─FreelancerOrganization beans ────────────────────────────────

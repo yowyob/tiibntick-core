@@ -2,9 +2,11 @@ package com.yowyob.tiibntick.core.actor.application.service;
 
 import com.yowyob.tiibntick.core.actor.application.command.RateActorCommand;
 import com.yowyob.tiibntick.core.actor.application.port.in.IRateActorUseCase;
+import com.yowyob.tiibntick.core.actor.application.port.out.IActorEventPublisher;
 import com.yowyob.tiibntick.core.actor.application.port.out.IDelivererRepository;
 import com.yowyob.tiibntick.core.actor.application.port.out.IFreelancerRepository;
 import com.yowyob.tiibntick.core.actor.application.port.out.IRelayOperatorRepository;
+import com.yowyob.tiibntick.core.actor.domain.event.ActorProfileUpdatedEvent;
 import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
@@ -26,13 +28,16 @@ public class ActorRatingService implements IRateActorUseCase {
     private final IDelivererRepository delivererRepository;
     private final IFreelancerRepository freelancerRepository;
     private final IRelayOperatorRepository relayOperatorRepository;
+    private final IActorEventPublisher eventPublisher;
 
     public ActorRatingService(IDelivererRepository delivererRepository,
                                IFreelancerRepository freelancerRepository,
-                               IRelayOperatorRepository relayOperatorRepository) {
+                               IRelayOperatorRepository relayOperatorRepository,
+                               IActorEventPublisher eventPublisher) {
         this.delivererRepository = delivererRepository;
         this.freelancerRepository = freelancerRepository;
         this.relayOperatorRepository = relayOperatorRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
@@ -62,20 +67,25 @@ public class ActorRatingService implements IRateActorUseCase {
         return delivererRepository.findByActorId(command.tenantId(), command.actorId())
                 .flatMap(profile -> delivererRepository.save(
                         profile.withRating(profile.rating().addRating(command.score()))))
-                .then();
+                .then(publishProfileUpdated(command, "PERMANENT_DELIVERER"));
     }
 
     private Mono<Void> rateFreelancer(RateActorCommand command) {
         return freelancerRepository.findByActorId(command.tenantId(), command.actorId())
                 .flatMap(profile -> freelancerRepository.save(
                         profile.withRating(profile.rating().addRating(command.score()))))
-                .then();
+                .then(publishProfileUpdated(command, "FREELANCER"));
     }
 
     private Mono<Void> rateRelayOperator(RateActorCommand command) {
         return relayOperatorRepository.findByActorId(command.tenantId(), command.actorId())
                 .flatMap(profile -> relayOperatorRepository.save(
                         profile.withRating(profile.rating().addRating(command.score()))))
-                .then();
+                .then(publishProfileUpdated(command, "RELAY_OPERATOR"));
+    }
+
+    private Mono<Void> publishProfileUpdated(RateActorCommand command, String actorType) {
+        return eventPublisher.publishProfileUpdated(ActorProfileUpdatedEvent.of(
+                command.actorId(), command.tenantId(), actorType, "RATING_UPDATED"));
     }
 }

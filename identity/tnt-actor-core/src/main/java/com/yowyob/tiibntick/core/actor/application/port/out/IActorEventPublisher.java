@@ -1,6 +1,7 @@
 package com.yowyob.tiibntick.core.actor.application.port.out;
 
 import com.yowyob.tiibntick.core.actor.domain.event.ActorLocationUpdatedEvent;
+import com.yowyob.tiibntick.core.actor.domain.event.ActorProfileUpdatedEvent;
 import com.yowyob.tiibntick.core.actor.domain.event.ActorStatusChangedEvent;
 import com.yowyob.tiibntick.core.actor.domain.event.BadgeEarnedEvent;
 import com.yowyob.tiibntick.core.actor.domain.event.DelivererMissionAssignedEvent;
@@ -39,6 +40,12 @@ public interface IActorEventPublisher {
     Mono<Void> publishKycValidated(KycValidatedEvent event);
 
     Mono<Void> publishMissionAssigned(DelivererMissionAssignedEvent event);
+
+    /**
+     * Publishes a generic {@link ActorProfileUpdatedEvent} whenever a profile mutates.
+     * Consumed by tnt-sync-core for delta-pull indexing.
+     */
+    Mono<Void> publishProfileUpdated(ActorProfileUpdatedEvent event);
 
     // FreelancerOrganization integration ─────────────────────────────
 

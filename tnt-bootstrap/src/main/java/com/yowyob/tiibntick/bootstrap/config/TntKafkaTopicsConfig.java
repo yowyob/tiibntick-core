@@ -36,13 +36,21 @@ public class TntKafkaTopicsConfig {
     // ── Delivery Topics ────────────────────────────────────────────────────────
     @Bean public NewTopic tntMissionCreated()       { return topic(TntTopics.DELIVERY_MISSION_CREATED); }
     @Bean public NewTopic tntMissionStatusChanged() { return topic(TntTopics.DELIVERY_MISSION_STATUS_CHANGED); }
+    @Bean public NewTopic tntMissionStarted()       { return topic(TntTopics.DELIVERY_MISSION_STARTED); }
+    @Bean public NewTopic tntMissionCompleted()     { return topic(TntTopics.DELIVERY_MISSION_COMPLETED); }
+    @Bean public NewTopic tntMissionFailed()        { return topic(TntTopics.DELIVERY_MISSION_FAILED); }
     @Bean public NewTopic tntPackagePickedUp()      { return topic(TntTopics.DELIVERY_PACKAGE_PICKED_UP); }
     @Bean public NewTopic tntPackageDelivered()     { return topic(TntTopics.DELIVERY_PACKAGE_DELIVERED); }
+    @Bean public NewTopic tntPackageUpdated()       { return topic(TntTopics.DELIVERY_PACKAGE_UPDATED); }
     @Bean public NewTopic tntHubDepositCreated()    { return topic(TntTopics.DELIVERY_HUB_DEPOSIT_CREATED); }
     @Bean public NewTopic tntHubDepositPickedUp()   { return topic(TntTopics.DELIVERY_HUB_DEPOSIT_PICKED_UP); }
 
     // ── Geo Topics ────────────────────────────────────────────────────────────
     @Bean public NewTopic tntGpsPositionUpdated()   { return topic(TntTopics.GEO_GPS_POSITION_UPDATED); }
+    @Bean public NewTopic tntGeoAlertCreated()      { return topic(TntTopics.GEO_ALERT_CREATED); }
+
+    // ── Organization Topics ───────────────────────────────────────────────────
+    @Bean public NewTopic tntOrganizationHubUpdated() { return topic(TntTopics.ORGANIZATION_HUB_UPDATED); }
 
     // ── Realtime Topics ───────────────────────────────────────────────────────
     // tnt.realtime.gps.position.updated — enriched GPS events with anomaly flags
@@ -64,6 +72,8 @@ public class TntKafkaTopicsConfig {
     @Bean public NewTopic tntMediaDeleted()   { return topic(TntTopics.MEDIA_FILE_DELETED); }
 
     // ── Billing Topics ────────────────────────────────────────────────────────
+    @Bean public NewTopic tntInvoiceEvents()     { return topic(TntTopics.BILLING_INVOICE_EVENTS); }
+    @Bean public NewTopic tntInvoicePaid()       { return topic(TntTopics.BILLING_INVOICE_PAID); }
     @Bean public NewTopic tntInvoiceCreated()    { return topic(TntTopics.BILLING_INVOICE_CREATED); }
     @Bean public NewTopic tntPaymentConfirmed()  { return topic(TntTopics.BILLING_WALLET_PAYMENT_CONFIRMED); }
     @Bean public NewTopic tntPaymentFailed()     { return topic(TntTopics.BILLING_PAYMENT_FAILED); }
@@ -78,6 +88,8 @@ public class TntKafkaTopicsConfig {
     @Bean public NewTopic tntDisputeRefundInitiated()  { return topic(TntTopics.DISPUTE_REFUND_INITIATED); }
     @Bean public NewTopic tntDisputeCompensationPaid() { return topic(TntTopics.DISPUTE_COMPENSATION_PAID); }
     @Bean public NewTopic tntDisputeClosed()           { return topic(TntTopics.DISPUTE_CLOSED); }
+    @Bean public NewTopic tntBillingCompensationInitiated() { return topic(TntTopics.BILLING_COMPENSATION_INITIATED); }
+    @Bean public NewTopic tntBillingCompensationPaid()       { return topic(TntTopics.BILLING_COMPENSATION_PAID); }
 
     // ── Incident Topics (tnt-incident-core L3) ────────────────────────────────
     // Published by tnt-incident-core IncidentKafkaEventPublisher
@@ -221,6 +233,9 @@ public class TntKafkaTopicsConfig {
     // ── Actor / Identity Topics ───────────────────────────────────────────────
     @Bean public NewTopic tntActorProfileUpdated()    { return topic(TntTopics.ACTOR_PROFILE_UPDATED); }
     @Bean public NewTopic tntActorReputationChanged() { return topic(TntTopics.ACTOR_REPUTATION_CHANGED); }
+
+    // ── Roles Topics ──────────────────────────────────────────────────────────
+    @Bean public NewTopic tntRolesPermissionChanged() { return topic(TntTopics.ROLES_PERMISSION_CHANGED); }
 
     // ── Event Outbox (Dead Letter Queue) ──────────────────────────────────────
     @Bean public NewTopic tntDlq() { return topic(TntTopics.DLQ); }

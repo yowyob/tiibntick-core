@@ -11,6 +11,7 @@ import com.yowyob.tiibntick.core.actor.domain.event.BadgeEarnedEvent;
 import com.yowyob.tiibntick.core.actor.domain.model.ActorType;
 import com.yowyob.tiibntick.core.actor.domain.model.DelivererProfile;
 import com.yowyob.tiibntick.core.actor.domain.model.DelivererType;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,6 +25,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -60,6 +62,11 @@ class ActorBadgeServiceTest {
     private DelivererProfile sampleDeliverer() {
         return DelivererProfile.create(TENANT_ID, ACTOR_ID, UUID.randomUUID(), UUID.randomUUID(),
                 500.0, DelivererType.PERMANENT);
+    }
+
+    @BeforeEach
+    void stubProfileUpdatedBroadcast() {
+        lenient().when(eventPublisher.publishProfileUpdated(any())).thenReturn(Mono.empty());
     }
 
     @Test

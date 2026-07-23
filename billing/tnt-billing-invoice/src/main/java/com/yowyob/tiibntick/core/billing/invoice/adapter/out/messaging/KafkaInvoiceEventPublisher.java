@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -61,8 +62,12 @@ public class KafkaInvoiceEventPublisher implements InvoiceEventPublisher {
 
     @Override
     public Mono<Void> publish(Object event, UUID tenantId) {
-        return toEnvelope(event, tenantId)
-                .flatMap(publishEventUseCase::publish)
+        return toEnvelopes(event, tenantId)
+                .flatMap(envelopes -> switch (envelopes.size()) {
+                    case 0 -> Mono.<Void>empty();
+                    case 1 -> publishEventUseCase.publish(envelopes.get(0));
+                    default -> publishEventBatchUseCase.publishAll(envelopes).then();
+                })
                 .doOnSuccess(v -> log.debug("Enqueued invoice event={} key={} to outbox",
                         event.getClass().getSimpleName(), resolveKey(event)))
                 .doOnError(ex -> log.error("Failed to enqueue invoice event={} to outbox",
@@ -75,7 +80,8 @@ public class KafkaInvoiceEventPublisher implements InvoiceEventPublisher {
             return Mono.empty();
         }
         return Flux.fromIterable(events)
-                .flatMap(event -> toEnvelope(event, tenantId))
+                .concatMap(event -> toEnvelopes(event, tenantId))
+                .flatMapIterable(envelopes -> envelopes)
                 .collectList()
                 .flatMap(envelopes -> envelopes.isEmpty()
                         ? Mono.<Integer>empty()
@@ -85,23 +91,40 @@ public class KafkaInvoiceEventPublisher implements InvoiceEventPublisher {
 
     // ── Private helpers ───────────────────────────────────────────────
 
-    private Mono<DomainEventEnvelope> toEnvelope(Object event, UUID tenantId) {
+    /**
+     * {@code InvoicePaid} additionally fans out to the dedicated {@link TntTopics#BILLING_INVOICE_PAID}
+     * topic — {@code tnt-accounting-core} listens there specifically, rather than on the generic
+     * {@link TntTopics#BILLING_INVOICE_EVENTS} envelope topic (Audit n°5 P-01, previously
+     * undelivered — accounting never saw an invoice-paid event).
+     */
+    private Mono<List<DomainEventEnvelope>> toEnvelopes(Object event, UUID tenantId) {
         try {
             String key     = resolveKey(event);
             String payload = objectMapper.writeValueAsString(event);
-            return Mono.just(DomainEventEnvelope.wrap()
-                    .correlationId(UUID.randomUUID().toString())
-                    .eventType(event.getClass().getSimpleName())
-                    .aggregateId(key)
-                    .aggregateType(AGGREGATE_TYPE)
-                    .tenantId(tenantId.toString())
-                    .solutionCode(SOLUTION_CODE)
-                    .payload(payload)
-                    .kafkaTopic(TOPIC)
-                    .build());
+
+            List<String> topics = new ArrayList<>();
+            topics.add(TOPIC);
+            if (event instanceof InvoicePaid) {
+                topics.add(TntTopics.BILLING_INVOICE_PAID);
+            }
+
+            List<DomainEventEnvelope> envelopes = new ArrayList<>(topics.size());
+            for (String topic : topics) {
+                envelopes.add(DomainEventEnvelope.wrap()
+                        .correlationId(UUID.randomUUID().toString())
+                        .eventType(event.getClass().getSimpleName())
+                        .aggregateId(key)
+                        .aggregateType(AGGREGATE_TYPE)
+                        .tenantId(tenantId.toString())
+                        .solutionCode(SOLUTION_CODE)
+                        .payload(payload)
+                        .kafkaTopic(topic)
+                        .build());
+            }
+            return Mono.just(envelopes);
         } catch (JsonProcessingException e) {
             log.error("Failed to serialize invoice event: {}", e.getMessage());
-            return Mono.empty();
+            return Mono.just(List.of());
         }
     }
 

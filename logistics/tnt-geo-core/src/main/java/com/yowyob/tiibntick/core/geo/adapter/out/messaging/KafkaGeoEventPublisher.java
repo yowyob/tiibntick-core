@@ -3,6 +3,7 @@ package com.yowyob.tiibntick.core.geo.adapter.out.messaging;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yowyob.kernel.event.application.port.in.PublishEventUseCase;
 import com.yowyob.kernel.event.domain.model.DomainEventEnvelope;
+import com.yowyob.tiibntick.common.kafka.TntTopics;
 import com.yowyob.tiibntick.core.geo.application.port.out.IGeoEventPublisher;
 import com.yowyob.tiibntick.core.geo.domain.event.RoadNodeCreatedEvent;
 import com.yowyob.tiibntick.core.geo.domain.event.ServiceZoneUpdatedEvent;
@@ -36,6 +37,15 @@ import java.util.UUID;
  *   tnt.geo.traffic.events   — TrafficConditionChangedEvent (consumed by tnt-route-core)
  *   tnt.geo.node.events      — RoadNodeCreatedEvent (consumed by tnt-search)
  *   tnt.geo.zone.events      — ServiceZoneUpdatedEvent (consumed by tnt-actor-core, tnt-delivery-core)
+ *   tnt.geo.alert.created    — same TrafficConditionChangedEvent, additionally, whenever it
+ *                              reaches this adapter at all (consumed by tnt-sync-core)
+ *
+ * <p>{@code publishTrafficChanged} is only ever invoked by
+ * {@code CostFunctionService#updateTrafficAndPublishIfSignificant} when
+ * {@link TrafficConditionChangedEvent#isSignificant()} is true (&gt;20% congestion swing) —
+ * every call already represents what the domain considers alert-worthy, so it fans out to
+ * {@link TntTopics#GEO_ALERT_CREATED} too. Fixed 2026-07-23 (Audit n5 P-01): that topic
+ * previously had no producer at all.
  *
  * Author: MANFOUO Braun
  */
@@ -63,7 +73,9 @@ public class KafkaGeoEventPublisher implements IGeoEventPublisher {
     @Override
     public Mono<Void> publishTrafficChanged(TrafficConditionChangedEvent event) {
         return enqueue(TOPIC_TRAFFIC, event.eventId(), event.tenantId(),
-                event.arcId(), "RoadArc", event.occurredAt(), event);
+                event.arcId(), "RoadArc", event.occurredAt(), event)
+                .then(enqueue(TntTopics.GEO_ALERT_CREATED, event.eventId(), event.tenantId(),
+                        event.arcId(), "RoadArc", event.occurredAt(), event));
     }
 
     @Override

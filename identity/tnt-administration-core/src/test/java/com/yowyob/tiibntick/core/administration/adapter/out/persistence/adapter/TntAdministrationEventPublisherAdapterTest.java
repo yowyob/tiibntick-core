@@ -63,4 +63,25 @@ class TntAdministrationEventPublisherAdapterTest {
                 .expectErrorMessage("db unavailable")
                 .verify();
     }
+
+    @Test
+    void publishTopicOverload_enqueuesFreelancerOrgEventOnTheGivenTopic_keyedByOrgId() {
+        UUID tenantId = UUID.randomUUID();
+
+        when(publishEventUseCase.publish(any())).thenReturn(Mono.empty());
+
+        StepVerifier.create(adapter.publish("tnt.admin.freelancer_org.kyc_approved", tenantId,
+                        Map.of("orgId", "org-123", "adminId", "admin-456")))
+                .verifyComplete();
+
+        ArgumentCaptor<DomainEventEnvelope> captor = ArgumentCaptor.forClass(DomainEventEnvelope.class);
+        verify(publishEventUseCase).publish(captor.capture());
+
+        DomainEventEnvelope envelope = captor.getValue();
+        assertThat(envelope.getKafkaTopic()).isEqualTo("tnt.admin.freelancer_org.kyc_approved");
+        assertThat(envelope.getAggregateId()).isEqualTo("org-123");
+        assertThat(envelope.getAggregateType()).isEqualTo("FreelancerOrganization");
+        assertThat(envelope.getTenantId()).isEqualTo(tenantId.toString());
+        assertThat(envelope.getKafkaPartitionKey()).isEqualTo("org-123");
+    }
 }

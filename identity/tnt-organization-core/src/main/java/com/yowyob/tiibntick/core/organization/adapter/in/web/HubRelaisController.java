@@ -94,6 +94,44 @@ public class HubRelaisController {
                 request.operatorId());
     }
 
+    @Operation(summary = "Update a relay hub's maximum parcel capacity")
+    @PatchMapping("/{hubId}/capacity")
+    @PreAuthorize("hasAnyRole('AGENCY_MANAGER','TNT_ADMIN')")
+    public Mono<HubRelais> updateCapacity(
+            @PathVariable UUID tenantId,
+            @PathVariable UUID hubId,
+            @RequestParam @Min(1) int maxParcelCapacity) {
+        return manageHubUseCase.updateCapacity(OrganizationId.of(hubId), maxParcelCapacity);
+    }
+
+    @Operation(summary = "Assign or reassign a relay hub's operator")
+    @PatchMapping("/{hubId}/operator")
+    @PreAuthorize("hasAnyRole('AGENCY_MANAGER','TNT_ADMIN')")
+    public Mono<HubRelais> assignOperator(
+            @PathVariable UUID tenantId,
+            @PathVariable UUID hubId,
+            @RequestParam UUID operatorId) {
+        return manageHubUseCase.assignOperator(OrganizationId.of(hubId), operatorId);
+    }
+
+    @Operation(summary = "Suspend a relay hub (temporarily out of service)")
+    @PatchMapping("/{hubId}/suspend")
+    @PreAuthorize("hasAnyRole('AGENCY_MANAGER','TNT_ADMIN')")
+    public Mono<HubRelais> suspendHub(
+            @PathVariable UUID tenantId,
+            @PathVariable UUID hubId) {
+        return manageHubUseCase.suspendHub(OrganizationId.of(hubId));
+    }
+
+    @Operation(summary = "Resume a suspended relay hub")
+    @PatchMapping("/{hubId}/resume")
+    @PreAuthorize("hasAnyRole('AGENCY_MANAGER','TNT_ADMIN')")
+    public Mono<HubRelais> resumeHub(
+            @PathVariable UUID tenantId,
+            @PathVariable UUID hubId) {
+        return manageHubUseCase.resumeHub(OrganizationId.of(hubId));
+    }
+
     // ─── Request DTO ───────────────────────────────────────────────────────────
 
     /**

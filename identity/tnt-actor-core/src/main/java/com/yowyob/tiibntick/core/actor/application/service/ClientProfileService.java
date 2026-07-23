@@ -2,8 +2,10 @@ package com.yowyob.tiibntick.core.actor.application.service;
 
 import com.yowyob.tiibntick.core.actor.application.command.CreateClientProfileCommand;
 import com.yowyob.tiibntick.core.actor.application.port.in.ICreateClientProfileUseCase;
+import com.yowyob.tiibntick.core.actor.application.port.out.IActorEventPublisher;
 import com.yowyob.tiibntick.core.actor.application.port.out.IClientProfileRepository;
 import com.yowyob.tiibntick.core.actor.application.port.out.IKernelActorPort;
+import com.yowyob.tiibntick.core.actor.domain.event.ActorProfileUpdatedEvent;
 import com.yowyob.tiibntick.core.actor.domain.model.ClientProfile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,11 +22,14 @@ public class ClientProfileService implements ICreateClientProfileUseCase {
 
     private final IClientProfileRepository clientProfileRepository;
     private final IKernelActorPort kernelActorPort;
+    private final IActorEventPublisher eventPublisher;
 
     public ClientProfileService(IClientProfileRepository clientProfileRepository,
-                                 IKernelActorPort kernelActorPort) {
+                                 IKernelActorPort kernelActorPort,
+                                 IActorEventPublisher eventPublisher) {
         this.clientProfileRepository = clientProfileRepository;
         this.kernelActorPort = kernelActorPort;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -55,6 +60,9 @@ public class ClientProfileService implements ICreateClientProfileUseCase {
 
     public Mono<ClientProfile> addLoyaltyPoints(UUID tenantId, UUID actorId, int points) {
         return clientProfileRepository.findByActorId(tenantId, actorId)
-                .flatMap(profile -> clientProfileRepository.save(profile.addLoyaltyPoints(points)));
+                .flatMap(profile -> clientProfileRepository.save(profile.addLoyaltyPoints(points)))
+                .flatMap(saved -> eventPublisher.publishProfileUpdated(ActorProfileUpdatedEvent.of(
+                                actorId, tenantId, "CLIENT", "LOYALTY_POINTS_ADDED"))
+                        .thenReturn(saved));
     }
 }

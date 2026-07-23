@@ -58,6 +58,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -83,12 +84,14 @@ import static org.springframework.kafka.test.utils.KafkaTestUtils.getSingleRecor
 @Testcontainers
 @EmbeddedKafka(partitions = 1, topics = {
         KafkaGeoEventPublisherOutboxIntegrationTest.NODE_TOPIC,
-        KafkaGeoEventPublisherOutboxIntegrationTest.TRAFFIC_TOPIC})
+        KafkaGeoEventPublisherOutboxIntegrationTest.TRAFFIC_TOPIC,
+        KafkaGeoEventPublisherOutboxIntegrationTest.ALERT_TOPIC})
 @Tag("integration")
 class KafkaGeoEventPublisherOutboxIntegrationTest {
 
     static final String NODE_TOPIC = "tnt.geo.node.events";
     static final String TRAFFIC_TOPIC = "tnt.geo.traffic.events";
+    static final String ALERT_TOPIC = "tnt.geo.alert.created";
 
     @Container
     @SuppressWarnings("resource")
@@ -195,8 +198,9 @@ class KafkaGeoEventPublisherOutboxIntegrationTest {
     }
 
     @Test
-    @DisplayName("publishTrafficChanged() routes to the traffic topic through the outbox")
-    void publishTrafficChangedRoutesToTrafficTopic() {
+    @DisplayName("publishTrafficChanged() routes to both the traffic topic and the alert topic "
+            + "through the outbox — every call already represents a significant change")
+    void publishTrafficChangedRoutesToTrafficAndAlertTopics() {
         UUID tenantId = UUID.randomUUID();
         String arcId = "arc-" + UUID.randomUUID();
         TrafficConditionChangedEvent event =
@@ -204,13 +208,15 @@ class KafkaGeoEventPublisherOutboxIntegrationTest {
 
         publisher.publishTrafficChanged(event).block(Duration.ofSeconds(10));
 
-        StepVerifier.create(envelopeRepository.findByAggregateId(
-                        arcId, "RoadArc", tenantId.toString()))
-                .assertNext(envelope -> {
-                    assertThat(envelope.getKafkaTopic()).isEqualTo(TRAFFIC_TOPIC);
-                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PENDING);
-                })
-                .verifyComplete();
+        List<com.yowyob.kernel.event.domain.model.DomainEventEnvelope> envelopes =
+                envelopeRepository.findByAggregateId(arcId, "RoadArc", tenantId.toString())
+                        .collectList().block(Duration.ofSeconds(10));
+        assertThat(envelopes).hasSize(2);
+        assertThat(envelopes).extracting(
+                com.yowyob.kernel.event.domain.model.DomainEventEnvelope::getKafkaTopic)
+                .containsExactlyInAnyOrder(TRAFFIC_TOPIC, ALERT_TOPIC);
+        assertThat(envelopes).allSatisfy(envelope ->
+                assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PENDING));
     }
 
     @Configuration

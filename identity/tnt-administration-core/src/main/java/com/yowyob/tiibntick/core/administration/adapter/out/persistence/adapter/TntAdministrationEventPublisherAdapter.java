@@ -37,6 +37,7 @@ public class TntAdministrationEventPublisherAdapter implements TntAdministration
 
     private static final String TOPIC = "tnt.administration.events";
     private static final String AGGREGATE_TYPE = "Administration";
+    private static final String FREELANCER_ORG_AGGREGATE_TYPE = "FreelancerOrganization";
     private static final String SOLUTION_CODE = "TNT";
 
     private final PublishEventUseCase publishEventUseCase;
@@ -79,5 +80,36 @@ public class TntAdministrationEventPublisherAdapter implements TntAdministration
                 .flatMap(publishEventUseCase::publish)
                 .doOnError(e -> log.error("Failed to enqueue administration event {} to outbox: {}",
                         eventType, e.getMessage()));
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Backs the FreelancerOrg admin lifecycle events (KYC approval/rejection, suspension,
+     * blacklist) — {@code topic} is one of the dedicated {@code tnt.admin.freelancer_org.*}
+     * constants, keyed by tenant, aggregate id taken from the payload's {@code orgId} field.
+     */
+    @Override
+    public Mono<Void> publish(String topic, UUID tenantId, Map<String, Object> payload) {
+        Instant occurredAt = Instant.now();
+        Object orgId = payload.get("orgId");
+        String aggregateId = orgId != null ? orgId.toString() : tenantId.toString();
+
+        return Mono.fromCallable(() -> objectMapper.writeValueAsString(payload))
+                .map(json -> DomainEventEnvelope.wrap()
+                        .correlationId(UUID.randomUUID().toString())
+                        .eventType(topic)
+                        .aggregateId(aggregateId)
+                        .aggregateType(FREELANCER_ORG_AGGREGATE_TYPE)
+                        .tenantId(tenantId.toString())
+                        .solutionCode(SOLUTION_CODE)
+                        .payload(json)
+                        .kafkaTopic(topic)
+                        .kafkaPartitionKey(aggregateId)
+                        .occurredAt(LocalDateTime.ofInstant(occurredAt, ZoneOffset.UTC))
+                        .build())
+                .flatMap(publishEventUseCase::publish)
+                .doOnError(e -> log.error("Failed to enqueue FreelancerOrg admin event on topic {}: {}",
+                        topic, e.getMessage()));
     }
 }

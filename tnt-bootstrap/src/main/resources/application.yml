@@ -340,7 +340,7 @@ tnt:
         core-inventory-deposited: tnt.inventory.hub.package.deposited
         core-inventory-pickedup: tnt.inventory.hub.package.pickedup
         core-actor-kyc: tnt.actor.kyc.validated
-        core-wallet: tnt.billing.wallet.events
+        core-wallet: tnt.billing.wallet.payment.confirmed
       produced:
         domain-events: tnt.agency.events
         mission-request: tnt.agency.mission.request

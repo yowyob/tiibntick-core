@@ -2,6 +2,7 @@ package com.yowyob.tiibntick.core.roles.application.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yowyob.tiibntick.core.roles.application.port.out.IPermissionChangeNotifier;
 import com.yowyob.tiibntick.core.roles.application.port.out.RoleSyncOutboxRepository;
 import com.yowyob.tiibntick.core.roles.application.port.out.UserRoleAssignmentRepository;
 import com.yowyob.tiibntick.core.roles.domain.exception.TntRoleException;
@@ -45,6 +46,8 @@ class TntRoleRevocationServiceTest {
     private RoleSyncOutboxRepository outboxRepository;
     @Mock
     private TransactionalOperator transactionalOperator;
+    @Mock
+    private IPermissionChangeNotifier permissionChangeNotifier;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -53,7 +56,8 @@ class TntRoleRevocationServiceTest {
     @BeforeEach
     @SuppressWarnings("unchecked")
     void setUp() {
-        service = new TntRoleRevocationService(assignmentRepository, outboxRepository, transactionalOperator, objectMapper);
+        service = new TntRoleRevocationService(assignmentRepository, outboxRepository, transactionalOperator,
+                objectMapper, permissionChangeNotifier);
         lenient().when(transactionalOperator.transactional(any(Mono.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
     }

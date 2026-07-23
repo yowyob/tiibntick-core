@@ -11,6 +11,7 @@ import com.yowyob.kernel.event.config.YowEventKernelAutoConfiguration;
 import com.yowyob.kernel.event.domain.enums.EnvelopeStatus;
 import com.yowyob.tiibntick.core.billing.invoice.domain.event.InvoiceCancelled;
 import com.yowyob.tiibntick.core.billing.invoice.domain.event.InvoiceGenerated;
+import com.yowyob.tiibntick.core.billing.invoice.domain.event.InvoicePaid;
 import com.yowyob.tiibntick.core.billing.invoice.domain.model.Money;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -79,11 +80,14 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @SpringBootTest(classes = KafkaInvoiceEventPublisherOutboxIntegrationTest.TestConfig.class)
 @Testcontainers
-@EmbeddedKafka(partitions = 1, topics = {KafkaInvoiceEventPublisherOutboxIntegrationTest.INVOICE_EVENTS_TOPIC})
+@EmbeddedKafka(partitions = 1, topics = {
+        KafkaInvoiceEventPublisherOutboxIntegrationTest.INVOICE_EVENTS_TOPIC,
+        KafkaInvoiceEventPublisherOutboxIntegrationTest.INVOICE_PAID_TOPIC})
 @Tag("integration")
 class KafkaInvoiceEventPublisherOutboxIntegrationTest {
 
     static final String INVOICE_EVENTS_TOPIC = "tnt.billing.invoice.events";
+    static final String INVOICE_PAID_TOPIC = "tnt.billing.invoice.paid";
 
     @Container
     @SuppressWarnings("resource")
@@ -226,6 +230,45 @@ class KafkaInvoiceEventPublisherOutboxIntegrationTest {
             ConsumerRecord<String, String> received = findRecordByKey(
                     rawConsumer, INVOICE_EVENTS_TOPIC, invoiceId.toString());
             assertThat(received.topic()).isEqualTo(INVOICE_EVENTS_TOPIC);
+            assertThat(received.key()).isEqualTo(invoiceId.toString());
+        }
+    }
+
+    @Test
+    @DisplayName("publish() fans an InvoicePaid event out to both the generic invoice-events "
+            + "topic and the dedicated invoice-paid topic tnt-accounting-core listens on")
+    void publishFansInvoicePaidOutToBothTopics() throws Exception {
+        UUID invoiceId = UUID.randomUUID();
+        UUID tenantId = UUID.randomUUID();
+        InvoicePaid event = new InvoicePaid(invoiceId, "PAY-REF-42",
+                Money.of(15_000, "XAF"), Instant.now());
+
+        publisher.publish(event, tenantId).block(Duration.ofSeconds(10));
+
+        List<com.yowyob.kernel.event.domain.model.DomainEventEnvelope> envelopes =
+                envelopeRepository.findByAggregateId(invoiceId.toString(), "Invoice", tenantId.toString())
+                        .collectList().block(Duration.ofSeconds(10));
+        assertThat(envelopes).hasSize(2);
+        assertThat(envelopes).extracting(
+                com.yowyob.kernel.event.domain.model.DomainEventEnvelope::getKafkaTopic)
+                .containsExactlyInAnyOrder(INVOICE_EVENTS_TOPIC, INVOICE_PAID_TOPIC);
+
+        Map<String, Object> consumerProps = new HashMap<>(
+                KafkaTestUtils.consumerProps(embeddedKafka, "invoice-outbox-paid-it", true));
+        consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+
+        try (Consumer<String, String> rawConsumer = new KafkaConsumer<>(consumerProps)) {
+            embeddedKafka.consumeFromAnEmbeddedTopic(rawConsumer, INVOICE_PAID_TOPIC);
+
+            StepVerifier.create(outboxPollerPort.poll())
+                    .expectNextMatches(count -> count >= 1)
+                    .verifyComplete();
+
+            ConsumerRecord<String, String> received = KafkaTestUtils.getSingleRecord(
+                    rawConsumer, INVOICE_PAID_TOPIC, Duration.ofSeconds(15));
+            assertThat(received.topic()).isEqualTo(INVOICE_PAID_TOPIC);
             assertThat(received.key()).isEqualTo(invoiceId.toString());
         }
     }

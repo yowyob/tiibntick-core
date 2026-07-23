@@ -4,8 +4,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yowyob.kernel.event.application.port.in.PublishEventUseCase;
 import com.yowyob.kernel.event.domain.model.DomainEventEnvelope;
+import com.yowyob.tiibntick.common.kafka.TntTopics;
 import com.yowyob.tiibntick.core.actor.application.port.out.IActorEventPublisher;
 import com.yowyob.tiibntick.core.actor.domain.event.ActorLocationUpdatedEvent;
+import com.yowyob.tiibntick.core.actor.domain.event.ActorProfileUpdatedEvent;
 import com.yowyob.tiibntick.core.actor.domain.event.ActorStatusChangedEvent;
 import com.yowyob.tiibntick.core.actor.domain.event.BadgeEarnedEvent;
 import com.yowyob.tiibntick.core.actor.domain.event.DelivererMissionAssignedEvent;
@@ -123,6 +125,13 @@ public class KafkaActorEventPublisher implements IActorEventPublisher {
     @Override
     public Mono<Void> publishFreelancerOrgUnlinked(FreelancerOrgUnlinkedEvent event) {
         return enqueue(TOPIC_FREELANCER_ORG_UNLINKED, event.eventId(), event.actorId(),
+                event.tenantId(), event.occurredAt(), event);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public Mono<Void> publishProfileUpdated(ActorProfileUpdatedEvent event) {
+        return enqueue(TntTopics.ACTOR_PROFILE_UPDATED, event.eventId(), event.actorId(),
                 event.tenantId(), event.occurredAt(), event);
     }
 

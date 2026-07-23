@@ -1,13 +1,16 @@
 package com.yowyob.tiibntick.core.organization.application.service;
 
+import com.yowyob.tiibntick.core.organization.application.port.out.HubEventPublisherPort;
 import com.yowyob.tiibntick.core.organization.application.port.out.HubRepositoryPort;
 import com.yowyob.tiibntick.core.organization.application.port.out.KernelOrganizationPort;
+import com.yowyob.tiibntick.core.organization.domain.event.HubRelaisUpdatedEvent;
 import com.yowyob.tiibntick.core.organization.domain.model.HubRelais;
 import com.yowyob.tiibntick.core.organization.domain.vo.OrganizationId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -17,7 +20,10 @@ import reactor.test.StepVerifier;
 
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -38,6 +44,9 @@ class HubRelaisServiceTest {
     @Mock
     private KernelOrganizationPort kernelOrganizationPort;
 
+    @Mock
+    private HubEventPublisherPort hubEventPublisherPort;
+
     private HubRelaisService hubRelaisService;
 
     private static final UUID KERNEL_ORG_ID = UUID.randomUUID();
@@ -46,7 +55,8 @@ class HubRelaisServiceTest {
 
     @BeforeEach
     void setUp() {
-        hubRelaisService = new HubRelaisService(hubRepositoryPort, kernelOrganizationPort);
+        hubRelaisService = new HubRelaisService(hubRepositoryPort, kernelOrganizationPort, hubEventPublisherPort);
+        lenient().when(hubEventPublisherPort.publishHubUpdated(any())).thenReturn(Mono.empty());
     }
 
     @Test
@@ -123,5 +133,63 @@ class HubRelaisServiceTest {
         StepVerifier.create(hubRelaisService.checkHubCapacity(hubId, 10))
                 .expectNext(false)
                 .verifyComplete();
+    }
+
+    @Test
+    @DisplayName("updateCapacity() persists the new capacity and publishes HubRelaisUpdatedEvent")
+    void updateCapacity_shouldPersistAndPublish() {
+        OrganizationId hubId = OrganizationId.generate();
+        HubRelais hub = HubRelais.create(KERNEL_ORG_ID, TENANT_ID, "Hub", 10, DOUALA_WKT, null, null);
+        when(hubRepositoryPort.findById(hubId)).thenReturn(Mono.just(hub));
+        when(hubRepositoryPort.save(any(HubRelais.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+
+        StepVerifier.create(hubRelaisService.updateCapacity(hubId, 99))
+                .expectNextMatches(saved -> saved.getMaxParcelCapacity() == 99)
+                .verifyComplete();
+
+        ArgumentCaptor<HubRelaisUpdatedEvent> captor = ArgumentCaptor.forClass(HubRelaisUpdatedEvent.class);
+        verify(hubEventPublisherPort).publishHubUpdated(captor.capture());
+        assertThat(captor.getValue().tenantId()).isEqualTo(TENANT_ID);
+        assertThat(captor.getValue().updateReason()).isEqualTo("CAPACITY_UPDATED");
+    }
+
+    @Test
+    @DisplayName("assignOperator() persists the new operator and publishes HubRelaisUpdatedEvent")
+    void assignOperator_shouldPersistAndPublish() {
+        OrganizationId hubId = OrganizationId.generate();
+        HubRelais hub = HubRelais.create(KERNEL_ORG_ID, TENANT_ID, "Hub", 10, DOUALA_WKT, null, null);
+        UUID newOperatorId = UUID.randomUUID();
+        when(hubRepositoryPort.findById(hubId)).thenReturn(Mono.just(hub));
+        when(hubRepositoryPort.save(any(HubRelais.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+
+        StepVerifier.create(hubRelaisService.assignOperator(hubId, newOperatorId))
+                .expectNextMatches(saved -> newOperatorId.equals(saved.getOperatorId()))
+                .verifyComplete();
+
+        ArgumentCaptor<HubRelaisUpdatedEvent> captor = ArgumentCaptor.forClass(HubRelaisUpdatedEvent.class);
+        verify(hubEventPublisherPort).publishHubUpdated(captor.capture());
+        assertThat(captor.getValue().updateReason()).isEqualTo("OPERATOR_ASSIGNED");
+    }
+
+    @Test
+    @DisplayName("suspendHub() then resumeHub() toggle operational status and each publish an event")
+    void suspendThenResumeHub_shouldToggleOperationalStatusAndPublish() {
+        OrganizationId hubId = OrganizationId.generate();
+        HubRelais hub = HubRelais.create(KERNEL_ORG_ID, TENANT_ID, "Hub", 10, DOUALA_WKT, null, null);
+        when(hubRepositoryPort.findById(hubId)).thenReturn(Mono.just(hub));
+        when(hubRepositoryPort.save(any(HubRelais.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+
+        StepVerifier.create(hubRelaisService.suspendHub(hubId))
+                .expectNextMatches(saved -> !saved.isOperational())
+                .verifyComplete();
+
+        StepVerifier.create(hubRelaisService.resumeHub(hubId))
+                .expectNextMatches(HubRelais::isOperational)
+                .verifyComplete();
+
+        ArgumentCaptor<HubRelaisUpdatedEvent> captor = ArgumentCaptor.forClass(HubRelaisUpdatedEvent.class);
+        verify(hubEventPublisherPort, org.mockito.Mockito.times(2)).publishHubUpdated(captor.capture());
+        assertThat(captor.getAllValues()).extracting(HubRelaisUpdatedEvent::updateReason)
+                .containsExactly("SUSPENDED", "RESUMED");
     }
 }

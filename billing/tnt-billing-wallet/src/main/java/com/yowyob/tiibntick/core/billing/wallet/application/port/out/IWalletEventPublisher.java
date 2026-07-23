@@ -16,4 +16,5 @@ public interface IWalletEventPublisher {
     Mono<Void> publish(WalletCredited event);
     Mono<Void> publish(WalletDebited event);
     Mono<Void> publish(CommissionCalculated event);
+    Mono<Void> publish(WalletSplitExecuted event);
 }

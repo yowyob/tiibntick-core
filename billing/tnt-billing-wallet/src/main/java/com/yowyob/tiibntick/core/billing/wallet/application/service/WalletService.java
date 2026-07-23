@@ -304,7 +304,13 @@ public class WalletService implements IWalletUseCase {
                                     })
                             : Mono.empty();
                     
+                    Mono<Void> publishSplitEvent = eventPublisher.publish(new WalletSplitExecuted(
+                            command.missionId(), command.freelancerOrgId(), command.subDelivererId(),
+                            command.tenantId(), command.totalAmount(), platformFee,
+                            ownerShare, subDelivererShare));
+
                     return creditOrgMono.then(creditSubMono)
+                            .then(publishSplitEvent)
                             .thenReturn(new PaymentSplitResult(
                                     UUID.randomUUID(),
                                     command.missionId(),

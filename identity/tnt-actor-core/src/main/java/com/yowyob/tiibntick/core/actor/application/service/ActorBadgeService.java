@@ -8,6 +8,7 @@ import com.yowyob.tiibntick.core.actor.application.port.out.IBadgeAnchorPort;
 import com.yowyob.tiibntick.core.actor.application.port.out.IDelivererRepository;
 import com.yowyob.tiibntick.core.actor.application.port.out.IFreelancerRepository;
 import com.yowyob.tiibntick.core.actor.application.port.out.IRelayOperatorRepository;
+import com.yowyob.tiibntick.core.actor.domain.event.ActorProfileUpdatedEvent;
 import com.yowyob.tiibntick.core.actor.domain.event.BadgeEarnedEvent;
 import com.yowyob.tiibntick.core.actor.domain.model.Badge;
 import lombok.extern.slf4j.Slf4j;
@@ -71,7 +72,11 @@ public class ActorBadgeService implements IEarnBadgeUseCase {
                     "Badge not supported for actor type: " + command.actorType()));
         };
 
-        return saveMono.then(eventPublisher.publishBadgeEarned(event));
+        return saveMono
+                .then(eventPublisher.publishBadgeEarned(event))
+                .then(eventPublisher.publishProfileUpdated(ActorProfileUpdatedEvent.of(
+                        command.actorId(), command.tenantId(), command.actorType().name(),
+                        "BADGE_EARNED")));
     }
 
     /**

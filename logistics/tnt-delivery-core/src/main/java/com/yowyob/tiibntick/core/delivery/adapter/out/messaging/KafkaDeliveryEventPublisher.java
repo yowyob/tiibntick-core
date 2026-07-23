@@ -7,9 +7,15 @@ import com.yowyob.kernel.event.application.port.in.PublishEventUseCase;
 import com.yowyob.kernel.event.domain.model.DomainEventEnvelope;
 import com.yowyob.tiibntick.common.kafka.TntTopics;
 import com.yowyob.tiibntick.core.delivery.application.port.out.DeliveryEventPublisher;
+import com.yowyob.tiibntick.core.delivery.domain.event.DeliveryCompletedEvent;
+import com.yowyob.tiibntick.core.delivery.domain.event.DeliveryCreatedEvent;
 import com.yowyob.tiibntick.core.delivery.domain.event.DeliveryDomainEvent;
+import com.yowyob.tiibntick.core.delivery.domain.event.DeliveryFailedEvent;
+import com.yowyob.tiibntick.core.delivery.domain.event.DeliveryInTransitEvent;
 import com.yowyob.tiibntick.core.delivery.domain.event.FreelancerOrgAssignedEvent;
 import com.yowyob.tiibntick.core.delivery.domain.event.MissionStatusChangedEvent;
+import com.yowyob.tiibntick.core.delivery.domain.event.ParcelAtRelayPointEvent;
+import com.yowyob.tiibntick.core.delivery.domain.event.ParcelPickedUpEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
@@ -18,6 +24,7 @@ import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -71,8 +78,10 @@ public class KafkaDeliveryEventPublisher implements DeliveryEventPublisher {
     @Override
     public Mono<Void> publish(DeliveryDomainEvent event) {
         return serializeEvent(event)
-                .map(payload -> toEnvelope(event, payload))
-                .flatMap(publishEventUseCase::publish)
+                .map(payload -> toEnvelopes(event, payload))
+                .flatMap(envelopes -> envelopes.size() == 1
+                        ? publishEventUseCase.publish(envelopes.get(0))
+                        : publishEventBatchUseCase.publishAll(envelopes).then())
                 .doOnSuccess(v -> log.debug("Enqueued event={} aggregateId={} to outbox",
                         event.getClass().getSimpleName(), event.aggregateId()))
                 .doOnError(ex -> log.error("Failed to enqueue event={} to outbox",
@@ -83,7 +92,8 @@ public class KafkaDeliveryEventPublisher implements DeliveryEventPublisher {
     public Mono<Void> publishAll(List<DeliveryDomainEvent> events) {
         if (events == null || events.isEmpty()) return Mono.empty();
         return Flux.fromIterable(events)
-                .flatMap(event -> serializeEvent(event).map(payload -> toEnvelope(event, payload)))
+                .concatMap(event -> serializeEvent(event).map(payload -> toEnvelopes(event, payload)))
+                .flatMapIterable(envelopes -> envelopes)
                 .collectList()
                 .flatMap(envelopes -> envelopes.isEmpty()
                         ? Mono.<Integer>empty()
@@ -93,16 +103,49 @@ public class KafkaDeliveryEventPublisher implements DeliveryEventPublisher {
 
     // ── Private helpers ───────────────────────────────────────────────
 
-    private DomainEventEnvelope toEnvelope(DeliveryDomainEvent event, String payload) {
-        String topic;
-        if (event instanceof MissionStatusChangedEvent) {
-            topic = MISSION_STATUS_CHANGED_TOPIC;
+    /**
+     * Resolves the Kafka topic(s) a domain event must be relayed to. Most events map to a
+     * single topic; a few also fan out to a secondary, differently-named topic that an
+     * unrelated consumer group listens on for the same real-world occurrence (Audit n°5 P-01:
+     * these secondary topics used to have no producer at all).
+     */
+    private List<DomainEventEnvelope> toEnvelopes(DeliveryDomainEvent event, String payload) {
+        List<String> topics = new ArrayList<>();
+        if (event instanceof DeliveryCreatedEvent) {
+            // Consumed by coreBackend's agency-assignment (property core-mission-created).
+            topics.add(TntTopics.DELIVERY_MISSION_CREATED);
+        } else if (event instanceof ParcelPickedUpEvent) {
+            // Physical pickup = fulfillment start. Consumed by tnt-sales-core.
+            topics.add(TntTopics.DELIVERY_MISSION_STARTED);
+            topics.add(TntTopics.DELIVERY_PACKAGE_UPDATED);
+        } else if (event instanceof DeliveryCompletedEvent) {
+            // Consumed by tnt-billing-invoice, tnt-tp-core, tnt-sales-core.
+            topics.add(TntTopics.DELIVERY_MISSION_COMPLETED);
+            // Consumed by coreBackend's agency-assignment (property core-package-delivered).
+            topics.add(TntTopics.DELIVERY_PACKAGE_DELIVERED);
+        } else if (event instanceof DeliveryFailedEvent) {
+            // Consumed by tnt-sales-core.
+            topics.add(TntTopics.DELIVERY_MISSION_FAILED);
+        } else if (event instanceof DeliveryInTransitEvent || event instanceof ParcelAtRelayPointEvent) {
+            // Generic package state change. Consumed by tnt-sync-core.
+            topics.add(TntTopics.DELIVERY_PACKAGE_UPDATED);
+        } else if (event instanceof MissionStatusChangedEvent) {
+            topics.add(MISSION_STATUS_CHANGED_TOPIC);
+            topics.add(TntTopics.DELIVERY_PACKAGE_UPDATED);
         } else if (event instanceof FreelancerOrgAssignedEvent) {
-            topic = FREELANCER_ORG_ASSIGNED_TOPIC;
+            topics.add(FREELANCER_ORG_ASSIGNED_TOPIC);
         } else {
-            topic = DELIVERY_EVENTS_TOPIC;
+            topics.add(DELIVERY_EVENTS_TOPIC);
         }
 
+        List<DomainEventEnvelope> envelopes = new ArrayList<>(topics.size());
+        for (String topic : topics) {
+            envelopes.add(toEnvelope(event, payload, topic));
+        }
+        return envelopes;
+    }
+
+    private DomainEventEnvelope toEnvelope(DeliveryDomainEvent event, String payload, String topic) {
         return DomainEventEnvelope.wrap()
                 .correlationId(event.eventId().toString())
                 .eventType(event.getClass().getSimpleName())
