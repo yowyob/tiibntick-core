@@ -27,6 +27,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * Generic Market business API for MarketOrder lifecycle management —
@@ -51,6 +52,7 @@ public class MarketOrderController {
 
     @Operation(summary = "Place a MarketOrder directly from a service offer")
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<MarketOrderResponse> place(@Valid @RequestBody PlaceMarketOrderCommand command) {
         return orderUseCase.placeOrder(command);
@@ -58,6 +60,7 @@ public class MarketOrderController {
 
     @Operation(summary = "Place a MarketOrder from an accepted quote (a QuoteRequest with a selected response)")
     @PostMapping("/from-quote")
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<MarketOrderResponse> placeFromQuote(
             @RequestParam UUID quoteRequestId,
@@ -70,6 +73,7 @@ public class MarketOrderController {
 
     @Operation(summary = "Process payment for a MarketOrder")
     @PostMapping("/{id}/payment")
+    @PreAuthorize("isAuthenticated()")
     public Mono<MarketOrderResponse> processPayment(
             @PathVariable UUID id,
             @Valid @RequestBody ProcessPaymentCommand command,
@@ -79,6 +83,7 @@ public class MarketOrderController {
 
     @Operation(summary = "Confirm a MarketOrder (DRAFT -> CONFIRMED)")
     @PostMapping("/{id}/confirm")
+    @PreAuthorize("isAuthenticated()")
     public Mono<MarketOrderResponse> confirm(
             @PathVariable UUID id,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
@@ -87,6 +92,7 @@ public class MarketOrderController {
 
     @Operation(summary = "Dispatch a MarketOrder to a delivery mission (PAID -> DISPATCHED)")
     @PostMapping("/{id}/dispatch")
+    @PreAuthorize("isAuthenticated()")
     public Mono<MarketOrderResponse> dispatch(
             @PathVariable UUID id,
             @RequestParam String missionId,
@@ -96,6 +102,7 @@ public class MarketOrderController {
 
     @Operation(summary = "Mark a MarketOrder in transit (DISPATCHED -> IN_TRANSIT)")
     @PostMapping("/{id}/in-transit")
+    @PreAuthorize("isAuthenticated()")
     public Mono<MarketOrderResponse> markInTransit(
             @PathVariable UUID id,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
@@ -104,6 +111,7 @@ public class MarketOrderController {
 
     @Operation(summary = "Mark a MarketOrder delivered (IN_TRANSIT -> DELIVERED)")
     @PostMapping("/{id}/delivered")
+    @PreAuthorize("isAuthenticated()")
     public Mono<MarketOrderResponse> markDelivered(
             @PathVariable UUID id,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
@@ -112,6 +120,7 @@ public class MarketOrderController {
 
     @Operation(summary = "Complete a MarketOrder (DELIVERED -> COMPLETED)")
     @PostMapping("/{id}/complete")
+    @PreAuthorize("isAuthenticated()")
     public Mono<MarketOrderResponse> complete(
             @PathVariable UUID id,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
@@ -120,6 +129,7 @@ public class MarketOrderController {
 
     @Operation(summary = "Cancel a MarketOrder")
     @PostMapping("/{id}/cancel")
+    @PreAuthorize("isAuthenticated()")
     public Mono<MarketOrderResponse> cancel(
             @PathVariable UUID id,
             @RequestParam(required = false) String reason,

@@ -7,6 +7,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -42,10 +44,12 @@ import com.yowyob.tiibntick.core.trust.application.service.LogisticProofResolver
  * {@code tnt-roles-core} — no manual permission checks in controller code.
  *
  * <h3>Multi-tenancy</h3>
- * <p>The {@code tenantId} is resolved from the JWT security context via
- * {@code TntUserIdentity.tenantId()} for write operations.
- * For public read operations (e.g. parcel tracking), {@code tenantId}
- * is still accepted as a query parameter for backward compatibility.
+ * <p>The {@code tenantId} is always resolved from the JWT security context via
+ * {@code TntUserIdentity.tenantId()} — for both read and write operations.
+ * Every endpoint is authenticated (no anonymous access), so there is no
+ * client-supplied {@code tenantId} anywhere in this controller: it is never
+ * accepted as a query parameter, and any {@code tenantId} present in a
+ * request body is ignored in favor of the authenticated caller's tenant.
  *
  * @author MANFOUO Braun
  * @version 1.1
@@ -67,6 +71,9 @@ public class TrustApiController {
     private final GetDeliveryAuditTrailUseCase getDeliveryAuditTrail;
     private final GetActorDIDUseCase getActorDID;
     private final GetCustodyChainUseCase getCustodyChainUseCase;
+    private final GetGeofenceCrossingsUseCase getGeofenceCrossingsUseCase;
+    private final GetDaoRulesUseCase getDaoRulesUseCase;
+    private final GetPolVerificationsUseCase getPolVerificationsUseCase;
     private final LogisticProofResolverService proofResolver;
 
     public TrustApiController(
@@ -77,6 +84,9 @@ public class TrustApiController {
             final GetDeliveryAuditTrailUseCase getDeliveryAuditTrail,
             final GetActorDIDUseCase getActorDID,
             final GetCustodyChainUseCase getCustodyChainUseCase,
+            final GetGeofenceCrossingsUseCase getGeofenceCrossingsUseCase,
+            final GetDaoRulesUseCase getDaoRulesUseCase,
+            final GetPolVerificationsUseCase getPolVerificationsUseCase,
             final LogisticProofResolverService proofResolver) {
         this.recordDeliveryProof = recordDeliveryProof;
         this.recordCustodyTransfer = recordCustodyTransfer;
@@ -85,6 +95,9 @@ public class TrustApiController {
         this.getDeliveryAuditTrail = getDeliveryAuditTrail;
         this.getActorDID = getActorDID;
         this.getCustodyChainUseCase = getCustodyChainUseCase;
+        this.getGeofenceCrossingsUseCase = getGeofenceCrossingsUseCase;
+        this.getDaoRulesUseCase = getDaoRulesUseCase;
+        this.getPolVerificationsUseCase = getPolVerificationsUseCase;
         this.proofResolver = proofResolver;
     }
 
@@ -102,8 +115,9 @@ public class TrustApiController {
     @RequirePermission(resource = "trust", action = "read")
     public Flux<AuditTrailResponse> getDeliveryAuditTrail(
             @PathVariable @Parameter(description = "Delivery mission ID") final String missionId,
-            @RequestParam @Parameter(description = "Tenant ID") final String tenantId) {
-        log.debug("GET /tnt/trust/delivery/{}/trail?tenantId={}", missionId, tenantId);
+            @CurrentUser final TntUserIdentity currentUser) {
+        final String tenantId = currentUser.tenantId().toString();
+        log.debug("GET /tnt/trust/delivery/{}/trail — tenantId={}", missionId, tenantId);
         return getDeliveryAuditTrail.getByMissionId(missionId, tenantId)
                 .map(AuditTrailResponse::fromDeliveryProof);
     }
@@ -120,8 +134,9 @@ public class TrustApiController {
     @RequirePermission(resource = "trust", action = "read")
     public Flux<AuditTrailResponse> getPackageCustodyChain(
             @PathVariable @Parameter(description = "Package tracking code") final String trackingCode,
-            @RequestParam @Parameter(description = "Tenant ID") final String tenantId) {
-        log.debug("GET /tnt/trust/package/{}/custody?tenantId={}", trackingCode, tenantId);
+            @CurrentUser final TntUserIdentity currentUser) {
+        final String tenantId = currentUser.tenantId().toString();
+        log.debug("GET /tnt/trust/package/{}/custody — tenantId={}", trackingCode, tenantId);
         return getDeliveryAuditTrail.getByPackageTrackingCode(trackingCode, tenantId)
                 .map(AuditTrailResponse::fromCustodyTransfer);
     }
@@ -159,8 +174,8 @@ public class TrustApiController {
     @RequirePermission(resource = "trust", action = "read")
     public Mono<DIDDocumentResponse> getActorDID(
             @PathVariable @Parameter(description = "Actor ID") final String actorId,
-            @RequestParam @Parameter(description = "Tenant ID") final String tenantId) {
-        return getActorDID.getByActorId(actorId, tenantId)
+            @CurrentUser final TntUserIdentity currentUser) {
+        return getActorDID.getByActorId(actorId, currentUser.tenantId().toString())
                 .map(DIDDocumentResponse::from);
     }
 
@@ -176,8 +191,8 @@ public class TrustApiController {
     public Mono<BadgeVerificationResult> verifyBadge(
             @PathVariable @Parameter(description = "Actor ID") final String actorId,
             @PathVariable @Parameter(description = "Badge type (e.g., 100_DELIVERIES)") final String badgeType,
-            @RequestParam @Parameter(description = "Tenant ID") final String tenantId) {
-        return getActorDID.verifyBadge(actorId, badgeType, tenantId)
+            @CurrentUser final TntUserIdentity currentUser) {
+        return getActorDID.verifyBadge(actorId, badgeType, currentUser.tenantId().toString())
                 .map(valid -> new BadgeVerificationResult(actorId, badgeType, valid));
     }
 
@@ -197,11 +212,11 @@ public class TrustApiController {
     @Operation(summary = "Record a delivery proof on the blockchain")
     @RequirePermission(resource = "trust", action = "anchor")
     public Mono<CorrelationIdResponse> recordDeliveryProof(
-            @RequestBody final DeliveryProofRequest request,
+            @Valid @RequestBody final DeliveryProofRequest request,
             @CurrentUser final TntUserIdentity currentUser) {
         log.info("POST /tnt/trust/delivery/proof — proofId={}, actor={}",
                 request.proofId(), currentUser.actorId());
-        return recordDeliveryProof.record(request.toDomain())
+        return recordDeliveryProof.record(request.toDomain(currentUser.tenantId().toString()))
                 .map(correlationId -> new CorrelationIdResponse(correlationId,
                         "Delivery proof submitted for blockchain anchoring."));
     }
@@ -219,11 +234,11 @@ public class TrustApiController {
     @Operation(summary = "Record a package custody transfer on the blockchain")
     @RequirePermission(resource = "trust", action = "anchor")
     public Mono<CorrelationIdResponse> recordCustodyTransfer(
-            @RequestBody final CustodyTransferRequest request,
+            @Valid @RequestBody final CustodyTransferRequest request,
             @CurrentUser final TntUserIdentity currentUser) {
         log.info("POST /tnt/trust/custody/transfer — transferId={}, actor={}",
                 request.transferId(), currentUser.actorId());
-        return recordCustodyTransfer.record(request.toDomain())
+        return recordCustodyTransfer.record(request.toDomain(currentUser.tenantId().toString()))
                 .map(correlationId -> new CorrelationIdResponse(correlationId,
                         "Custody transfer submitted for blockchain anchoring."));
     }
@@ -241,11 +256,11 @@ public class TrustApiController {
     @Operation(summary = "Issue a Decentralized Identifier (DID) for a deliverer actor")
     @RequirePermission(resource = "trust", action = "anchor")
     public Mono<DIDDocumentResponse> issueDID(
-            @RequestBody final DIDIssueRequest request,
+            @Valid @RequestBody final DIDIssueRequest request,
             @CurrentUser final TntUserIdentity currentUser) {
         log.info("POST /tnt/trust/actors/did/issue — actorId={}, requester={}",
                 request.actorId(), currentUser.userId());
-        return issueDID.issue(request.actorId(), request.tenantId(), request.publicKeyPem())
+        return issueDID.issue(request.actorId(), currentUser.tenantId().toString(), request.publicKeyPem())
                 .map(DIDDocumentResponse::from);
     }
 
@@ -262,12 +277,12 @@ public class TrustApiController {
     @Operation(summary = "Record a verified Proof-of-Location on the blockchain")
     @RequirePermission(resource = "trust", action = "anchor")
     public Mono<CorrelationIdResponse> recordPolVerification(
-            @RequestBody final PolVerificationRequest request,
+            @Valid @RequestBody final PolVerificationRequest request,
             @CurrentUser final TntUserIdentity currentUser) {
         log.info("POST /tnt/trust/pol/record — actorId={}", request.actorId());
         return recordPolVerification.record(
                 request.actorId(), request.gpsLat(), request.gpsLng(),
-                request.polHash(), request.tenantId())
+                request.polHash(), currentUser.tenantId().toString())
                 .map(correlationId -> new CorrelationIdResponse(correlationId,
                         "Proof-of-Location submitted for blockchain anchoring."));
     }
@@ -286,16 +301,21 @@ public class TrustApiController {
      * Issues a DID for a FreelancerOrganization.
      */
     @org.springframework.web.bind.annotation.PostMapping("/did/freelancer-org")
+    @RequirePermission(resource = "trust", action = "anchor")
     public reactor.core.publisher.Mono<com.yowyob.tiibntick.core.trust.adapter.in.web.dto.DIDDocumentResponse>
             issueFreelancerOrgDID(
-                    @org.springframework.web.bind.annotation.RequestBody FreelancerOrgDIDRequest request) {
+                    @Valid @org.springframework.web.bind.annotation.RequestBody FreelancerOrgDIDRequest request,
+                    @CurrentUser final TntUserIdentity currentUser) {
         return issueDID.issueForFreelancerOrg(
-                        request.orgId(), request.tenantId(), request.tradeName(), request.publicKeyPem())
+                        request.orgId(), currentUser.tenantId().toString(), request.tradeName(), request.publicKeyPem())
                 .map(com.yowyob.tiibntick.core.trust.adapter.in.web.dto.DIDDocumentResponse::from);
     }
 
     public record FreelancerOrgDIDRequest(
-            String orgId, String tenantId, String tradeName, String publicKeyPem
+            @NotBlank(message = "orgId is required") String orgId,
+            String tenantId,
+            @NotBlank(message = "tradeName is required") String tradeName,
+            @NotBlank(message = "publicKeyPem is required") String publicKeyPem
     ) {}
 
     // ── Chain of Custody endpoints ────────────────────────────────────────────
@@ -309,8 +329,9 @@ public class TrustApiController {
     @RequirePermission(resource = "trust", action = "read")
     public Mono<ParcelCustodyChain> getCustodyChain(
             @PathVariable @Parameter(description = "Package UUID") final String packageId,
-            @RequestParam @Parameter(description = "Tenant ID") final String tenantId) {
-        log.debug("GET /tnt/trust/package/{}/custody-chain?tenantId={}", packageId, tenantId);
+            @CurrentUser final TntUserIdentity currentUser) {
+        final String tenantId = currentUser.tenantId().toString();
+        log.debug("GET /tnt/trust/package/{}/custody-chain — tenantId={}", packageId, tenantId);
         return getCustodyChainUseCase.getByPackageId(packageId, tenantId);
     }
 
@@ -322,8 +343,9 @@ public class TrustApiController {
     @RequirePermission(resource = "trust", action = "verify")
     public Mono<CustodyVerificationResult> verifyCustodyChain(
             @PathVariable @Parameter(description = "Package UUID") final String packageId,
-            @RequestParam @Parameter(description = "Tenant ID") final String tenantId) {
-        log.debug("GET /tnt/trust/package/{}/custody-chain/verify?tenantId={}", packageId, tenantId);
+            @CurrentUser final TntUserIdentity currentUser) {
+        final String tenantId = currentUser.tenantId().toString();
+        log.debug("GET /tnt/trust/package/{}/custody-chain/verify — tenantId={}", packageId, tenantId);
         return getCustodyChainUseCase.verifyCustodyChain(packageId, tenantId);
     }
 
@@ -335,8 +357,9 @@ public class TrustApiController {
     @RequirePermission(resource = "trust", action = "read")
     public Mono<String> getCurrentCustodian(
             @PathVariable @Parameter(description = "Package UUID") final String packageId,
-            @RequestParam @Parameter(description = "Tenant ID") final String tenantId) {
-        log.debug("GET /tnt/trust/package/{}/current-custodian?tenantId={}", packageId, tenantId);
+            @CurrentUser final TntUserIdentity currentUser) {
+        final String tenantId = currentUser.tenantId().toString();
+        log.debug("GET /tnt/trust/package/{}/current-custodian — tenantId={}", packageId, tenantId);
         return getCustodyChainUseCase.getCurrentCustodian(packageId, tenantId);
     }
 
@@ -348,8 +371,62 @@ public class TrustApiController {
     @RequirePermission(resource = "trust", action = "read")
     public Mono<ParcelDigitalTwin> getDigitalTwin(
             @PathVariable @Parameter(description = "Package UUID") final String packageId,
-            @RequestParam @Parameter(description = "Tenant ID") final String tenantId) {
-        log.debug("GET /tnt/trust/package/{}/digital-twin?tenantId={}", packageId, tenantId);
+            @CurrentUser final TntUserIdentity currentUser) {
+        final String tenantId = currentUser.tenantId().toString();
+        log.debug("GET /tnt/trust/package/{}/digital-twin — tenantId={}", packageId, tenantId);
         return proofResolver.resolveDigitalTwin(packageId, tenantId);
+    }
+
+    // ── Geofencing / DAO Rules / Proof-of-Location (read path) ───────────────
+
+    /**
+     * Returns the geofence zone crossing history for an actor.
+     *
+     * <p>Requires permission: {@code trust:read}.
+     */
+    @GetMapping(value = "/geofence/{actorId}/crossings", produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "Get geofence zone crossing history for an actor")
+    @RequirePermission(resource = "trust", action = "read")
+    public Flux<GeofenceCrossingResponse> getGeofenceCrossings(
+            @PathVariable @Parameter(description = "Actor ID") final String actorId,
+            @CurrentUser final TntUserIdentity currentUser) {
+        final String tenantId = currentUser.tenantId().toString();
+        log.debug("GET /tnt/trust/geofence/{}/crossings — tenantId={}", actorId, tenantId);
+        return getGeofenceCrossingsUseCase.getByActorId(actorId, tenantId)
+                .map(GeofenceCrossingResponse::from);
+    }
+
+    /**
+     * Returns the DAO zone governance rule activation history for a zone.
+     *
+     * <p>Requires permission: {@code trust:read}.
+     */
+    @GetMapping(value = "/dao/{zoneId}/rules", produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "Get DAO governance rule activation history for a zone")
+    @RequirePermission(resource = "trust", action = "read")
+    public Flux<DaoRuleResponse> getDaoRules(
+            @PathVariable @Parameter(description = "DAO zone ID") final String zoneId,
+            @CurrentUser final TntUserIdentity currentUser) {
+        final String tenantId = currentUser.tenantId().toString();
+        log.debug("GET /tnt/trust/dao/{}/rules — tenantId={}", zoneId, tenantId);
+        return getDaoRulesUseCase.getByZoneId(zoneId, tenantId)
+                .map(DaoRuleResponse::from);
+    }
+
+    /**
+     * Returns the Proof-of-Location verification history for an actor.
+     *
+     * <p>Requires permission: {@code trust:read}.
+     */
+    @GetMapping(value = "/pol/{actorId}/verifications", produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "Get Proof-of-Location verification history for an actor")
+    @RequirePermission(resource = "trust", action = "read")
+    public Flux<PolVerificationResponse> getPolVerifications(
+            @PathVariable @Parameter(description = "Actor ID") final String actorId,
+            @CurrentUser final TntUserIdentity currentUser) {
+        final String tenantId = currentUser.tenantId().toString();
+        log.debug("GET /tnt/trust/pol/{}/verifications — tenantId={}", actorId, tenantId);
+        return getPolVerificationsUseCase.getByActorId(actorId, tenantId)
+                .map(PolVerificationResponse::from);
     }
 }

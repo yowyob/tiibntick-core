@@ -11,6 +11,7 @@ import com.yowyob.tiibntick.core.linkback.adapter.in.web.response.NetworkNodePro
 import com.yowyob.tiibntick.core.linkback.adapter.in.web.response.NetworkNodeResponse;
 import com.yowyob.tiibntick.core.linkback.adapter.in.web.response.NetworkNodeProfileResponse;
 import com.yowyob.tiibntick.core.linkback.adapter.in.web.response.NetworkNodeResponseMapper;
+import com.yowyob.tiibntick.core.linkback.adapter.in.web.ratelimit.NearbyRateLimiter;
 import com.yowyob.tiibntick.core.linkback.adapter.in.web.response.TrustLinkResponse;
 import com.yowyob.tiibntick.core.linkback.adapter.in.web.response.TrustLinkResponseMapper;
 import com.yowyob.tiibntick.core.linkback.application.port.in.ActivateBeaconUseCase;
@@ -22,6 +23,7 @@ import com.yowyob.tiibntick.core.linkback.application.port.in.RegisterNetworkNod
 import com.yowyob.tiibntick.core.linkback.application.port.in.UpdateNodeLocationUseCase;
 import com.yowyob.tiibntick.core.linkback.application.port.in.UpdateNodeStatusUseCase;
 import com.yowyob.tiibntick.core.linkback.application.port.in.command.RegisterNetworkNodeCommand;
+import com.yowyob.tiibntick.core.linkback.domain.exception.NearbyRateLimitExceededException;
 import com.yowyob.tiibntick.core.linkback.domain.exception.NetworkNodeDomainException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -44,6 +46,7 @@ import reactor.core.publisher.Mono;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * Generic Link business API for network nodes — the single entry point the
@@ -69,9 +72,11 @@ public class NetworkNodeController {
     private final ActivateBeaconUseCase beaconUseCase;
     private final EndorseNodeUseCase endorseNodeUseCase;
     private final QueryTrustLinksUseCase queryTrustLinksUseCase;
+    private final NearbyRateLimiter nearbyRateLimiter;
 
     @Operation(summary = "Register a Link network node for an existing actor/organization")
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     public Mono<NetworkNodeResponse> register(
             @Valid @RequestBody RegisterNetworkNodeRequest request,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
@@ -107,6 +112,7 @@ public class NetworkNodeController {
 
     @Operation(summary = "Get the network nodes extending a batch of actor/organization ids in one round trip")
     @PostMapping("/by-ref/batch")
+    @PreAuthorize("isAuthenticated()")
     public Flux<NetworkNodeResponse> getByRefIds(
             @RequestBody List<UUID> refIds,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
@@ -115,7 +121,8 @@ public class NetworkNodeController {
                 .map(NetworkNodeResponseMapper::toResponse);
     }
 
-    @Operation(summary = "Find network nodes within a bounding box")
+    @Operation(summary = "Find network nodes within a bounding box (capped at "
+            + "NetworkNodeR2dbcRepository.MAX_NEARBY_RESULTS results, throttled per user — Phase 0 stop-gap)")
     @GetMapping("/nearby")
     public Flux<NetworkNodeResponse> nearby(
             @RequestParam double minLat,
@@ -123,12 +130,17 @@ public class NetworkNodeController {
             @RequestParam double maxLat,
             @RequestParam double maxLng,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
-        return queryUseCase.findWithinBoundingBox(currentUser.tenantId(), minLat, minLng, maxLat, maxLng)
-                .map(NetworkNodeResponseMapper::toResponse);
+        return nearbyRateLimiter.tryAcquire(currentUser.tenantId(), currentUser.userId(), "nodes")
+                .flatMapMany(allowed -> allowed
+                        ? queryUseCase.findWithinBoundingBox(currentUser.tenantId(), minLat, minLng, maxLat, maxLng)
+                                .map(NetworkNodeResponseMapper::toResponse)
+                        : Flux.error(new NearbyRateLimitExceededException(
+                                "Too many /nearby requests — please slow down and try again shortly")));
     }
 
     @Operation(summary = "Update a node's live status (online/offline/busy)")
     @PutMapping("/{nodeId}/status")
+    @PreAuthorize("isAuthenticated()")
     public Mono<NetworkNodeResponse> updateStatus(
             @PathVariable UUID nodeId,
             @Valid @RequestBody UpdateNodeStatusRequest request,
@@ -139,6 +151,7 @@ public class NetworkNodeController {
 
     @Operation(summary = "Update a node's last known location (heading and Proof-of-Location peer count optional)")
     @PutMapping("/{nodeId}/location")
+    @PreAuthorize("isAuthenticated()")
     public Mono<NetworkNodeResponse> updateLocation(
             @PathVariable UUID nodeId,
             @Valid @RequestBody UpdateNodeLocationRequest request,
@@ -151,6 +164,7 @@ public class NetworkNodeController {
 
     @Operation(summary = "Activate this node's beacon (broadcasts a message within a radius until it expires)")
     @PostMapping("/{nodeId}/beacon")
+    @PreAuthorize("isAuthenticated()")
     public Mono<NetworkNodeResponse> activateBeacon(
             @PathVariable UUID nodeId,
             @Valid @RequestBody ActivateBeaconRequest request,
@@ -162,6 +176,7 @@ public class NetworkNodeController {
 
     @Operation(summary = "Deactivate this node's beacon")
     @DeleteMapping("/{nodeId}/beacon")
+    @PreAuthorize("isAuthenticated()")
     public Mono<NetworkNodeResponse> deactivateBeacon(
             @PathVariable UUID nodeId,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
@@ -170,6 +185,7 @@ public class NetworkNodeController {
 
     @Operation(summary = "Endorse another node, using the caller's own registered node as the source")
     @PostMapping("/{toNodeId}/endorse")
+    @PreAuthorize("isAuthenticated()")
     public Mono<TrustLinkResponse> endorse(
             @PathVariable UUID toNodeId,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {

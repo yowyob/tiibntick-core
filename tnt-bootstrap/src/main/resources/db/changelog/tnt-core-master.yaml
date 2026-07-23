@@ -12,11 +12,31 @@ databaseChangeLog:
   # fails loudly instead of silently no-oping.
   # ══════════════════════════════════════════════════════════════════════════════
 
+  # ── L0 — Cross-cutting bootstrap-owned tables ──────────────────────────────
+  # shedlock: shared by every module's @Scheduled job (Chantier D · Audit n°6 · S2) —
+  # owned here, not by any single domain module, since it's genuinely cross-cutting.
+  - include:
+      file: db/changelog/changes/000-create-shedlock-table.sql
+      relativeToChangelogFile: false
+
+  # yow-event-kernel (L0) — transactional outbox / event store schema
+  # (Chantier C · Audit n°3 · P1-P4: module reactivated per the 2026-07-18 ADR,
+  # Option A — see docs/audits/remediation/phase-0-critical.md).
+  - include:
+      file: db/changelog/yow-event-kernel-master.yaml
+      relativeToChangelogFile: false
+
   # ── L1 — Foundation ─────────────────────────────────────────────────────────
   # First L1/foundation module with its own schema — see
   # docs/auth/platform-client-management-design.md §2.0/§3.
   - include:
       file: db/changelog/tnt-platform-gateway-master.yaml
+      relativeToChangelogFile: false
+
+  # tnt-roles-core — local RBAC persistence (tnt_roles / tnt_user_role_assignments /
+  # tnt_role_sync_outbox), Chantier D · Audit n°6 · S5.
+  - include:
+      file: db/changelog/tnt-roles-master.yaml
       relativeToChangelogFile: false
 
   # ── L2 — Identity ──────────────────────────────────────────────────────────

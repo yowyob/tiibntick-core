@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @Tag(name = "GOFP — Pricing", description = "API métier générique — Calcul tarifaire")
 @RestController
@@ -50,6 +51,7 @@ public class PricingCoreController {
     }
 
     @PutMapping("/freelancer/{freelancerActorId}")
+    @PreAuthorize("isAuthenticated()")
     public Mono<DeliveryPersonPricingEntity> updateFreelancerPricing(@PathVariable UUID freelancerActorId,
                                                                        @RequestBody DeliveryPersonPricingEntity pricing) {
         return pricingUseCase.updateFreelancerPricing(freelancerActorId, pricing);
@@ -61,6 +63,7 @@ public class PricingCoreController {
     }
 
     @PutMapping("/logistics/{relayHubId}")
+    @PreAuthorize("isAuthenticated()")
     public Mono<LogisticsPricingEntity> updateLogisticsPricing(@PathVariable UUID relayHubId,
                                                                  @RequestBody LogisticsPricingEntity pricing) {
         return pricingUseCase.updateLogisticsPricing(relayHubId, pricing);

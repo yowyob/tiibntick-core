@@ -50,4 +50,20 @@ public class InMemoryUserRoleAssignmentRepository implements UserRoleAssignmentR
         return Mono.fromRunnable(() -> assignments.computeIfPresent(assignmentId,
                 (id, existing) -> tenantId.equals(existing.tenantId()) ? null : existing));
     }
+
+    /**
+     * No-op — see {@code InMemoryRoleRepository#markKernelRoleId} for the rationale:
+     * {@link UserRoleAssignment} carries no {@code kernelAssignmentId} field, so this
+     * process-lifetime fallback has nowhere to durably record it.
+     */
+    @Override
+    public Mono<Void> markKernelAssignmentId(UUID tenantId, UUID assignmentId, UUID kernelAssignmentId) {
+        return Mono.empty();
+    }
+
+    /** Always empty — see {@link #markKernelAssignmentId}: nothing was ever durably recorded. */
+    @Override
+    public Mono<UUID> findKernelAssignmentId(UUID tenantId, UUID assignmentId) {
+        return Mono.empty();
+    }
 }

@@ -3,7 +3,6 @@ package com.yowyob.tiibntick.core.route.adapter.in.web;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -23,9 +22,7 @@ public class RouteOptimizeController {
 
     @PostMapping("/optimize")
     @ResponseStatus(HttpStatus.OK)
-    public Mono<OptimizeResponse> optimize(
-            @RequestHeader(value = "X-Tenant-Id", required = false) String tenantHeader,
-            @RequestBody OptimizeRequest request) {
+    public Mono<OptimizeResponse> optimize(@RequestBody OptimizeRequest request) {
         List<StopDto> ordered = nearestNeighborOrder(request.stops());
         double totalKm = estimateDistanceKm(ordered);
         int durationMin = ordered.stream()

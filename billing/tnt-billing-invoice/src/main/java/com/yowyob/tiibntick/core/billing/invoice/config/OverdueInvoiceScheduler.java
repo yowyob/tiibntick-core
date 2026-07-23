@@ -1,6 +1,8 @@
 package com.yowyob.tiibntick.core.billing.invoice.config;
 
 import com.yowyob.tiibntick.core.billing.invoice.application.service.InvoiceService;
+import net.javacrumbs.shedlock.core.LockAssert;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -24,7 +26,9 @@ public class OverdueInvoiceScheduler {
     }
 
     @Scheduled(fixedDelayString = "${tnt.billing.invoice.overdue-check-interval-ms:3600000}")
+    @SchedulerLock(name = "invoice-check-overdue", lockAtMostFor = "PT55M", lockAtLeastFor = "PT1M")
     public void checkOverdueInvoices() {
+        LockAssert.assertLocked();
         log.info("Running overdue invoice check...");
         invoiceService.markOverdueInvoices()
                 .doOnSuccess(count -> log.info("Overdue check complete: {} invoice(s) marked", count))

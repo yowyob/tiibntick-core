@@ -36,9 +36,6 @@ public interface DisputeR2dbcRepository extends ReactiveCrudRepository<DisputeEn
             """)
     Flux<DisputeEntity> findExpiredByStatusBefore(String status, LocalDateTime before);
 
-    @Query("SELECT COALESCE(MAX(CAST(SPLIT_PART(reference, '-', 3) AS INTEGER)), 0) FROM tnt_disputes")
-    Mono<Integer> findMaxReferenceSequence();
-
     @Query("""
             SELECT COUNT(*) > 0 FROM tnt_disputes
             WHERE package_id = :packageId

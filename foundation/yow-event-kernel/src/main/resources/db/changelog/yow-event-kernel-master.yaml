@@ -1,0 +1,16 @@
+databaseChangeLog:
+  - include:
+      file: db/changelog/changes/001-create-event-bus-schema.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/002-create-domain-event-envelopes-table.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/003-create-outbox-entries-table.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/004-create-event-schemas-table.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/005-create-dead-letter-entries-table.sql
+      relativeToChangelogFile: false

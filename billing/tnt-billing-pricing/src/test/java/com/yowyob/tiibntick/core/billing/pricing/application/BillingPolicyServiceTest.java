@@ -50,6 +50,7 @@ class BillingPolicyServiceTest {
     private BillingPolicyService policyService;
 
     private final UUID TENANT_ID = UUID.randomUUID();
+    private final UUID OTHER_TENANT_ID = UUID.randomUUID();
     private final UUID POLICY_ID = UUID.randomUUID();
 
     private BillingPolicy samplePolicy() {
@@ -112,11 +113,11 @@ class BillingPolicyServiceTest {
         BillingPolicy draftPolicy = samplePolicy();
         BillingPolicy activePolicy = draftPolicy.activate();
 
-        when(policyRepository.findById(POLICY_ID)).thenReturn(Mono.just(draftPolicy));
+        when(policyRepository.findByIdAndTenantId(POLICY_ID, TENANT_ID)).thenReturn(Mono.just(draftPolicy));
         when(policyRepository.save(any())).thenReturn(Mono.just(activePolicy));
         when(billingPolicyAnchorPort.anchor(any())).thenReturn(Mono.empty());
 
-        StepVerifier.create(policyService.activatePolicy(POLICY_ID))
+        StepVerifier.create(policyService.activatePolicy(POLICY_ID, TENANT_ID))
                 .expectNextMatches(p -> p.getStatus() == PolicyStatus.ACTIVE)
                 .verifyComplete();
     }
@@ -127,11 +128,11 @@ class BillingPolicyServiceTest {
         BillingPolicy draftPolicy = samplePolicy().toBuilder().ownerActorId("agency-42").build();
         BillingPolicy activePolicy = draftPolicy.activate();
 
-        when(policyRepository.findById(POLICY_ID)).thenReturn(Mono.just(draftPolicy));
+        when(policyRepository.findByIdAndTenantId(POLICY_ID, TENANT_ID)).thenReturn(Mono.just(draftPolicy));
         when(policyRepository.save(any())).thenReturn(Mono.just(activePolicy));
         when(billingPolicyAnchorPort.anchor(any())).thenReturn(Mono.empty());
 
-        StepVerifier.create(policyService.activatePolicy(POLICY_ID))
+        StepVerifier.create(policyService.activatePolicy(POLICY_ID, TENANT_ID))
                 .expectNextCount(1)
                 .verifyComplete();
 
@@ -151,11 +152,11 @@ class BillingPolicyServiceTest {
         BillingPolicy draftPolicy = samplePolicy();
         BillingPolicy activePolicy = draftPolicy.activate();
 
-        when(policyRepository.findById(POLICY_ID)).thenReturn(Mono.just(draftPolicy));
+        when(policyRepository.findByIdAndTenantId(POLICY_ID, TENANT_ID)).thenReturn(Mono.just(draftPolicy));
         when(policyRepository.save(any())).thenReturn(Mono.just(activePolicy));
         when(billingPolicyAnchorPort.anchor(any())).thenReturn(Mono.error(new RuntimeException("trust unavailable")));
 
-        StepVerifier.create(policyService.activatePolicy(POLICY_ID))
+        StepVerifier.create(policyService.activatePolicy(POLICY_ID, TENANT_ID))
                 .expectNextMatches(p -> p.getStatus() == PolicyStatus.ACTIVE)
                 .verifyComplete();
     }
@@ -163,9 +164,34 @@ class BillingPolicyServiceTest {
     @Test
     @DisplayName("activatePolicy should fail when policy not found")
     void testActivatePolicyNotFound() {
-        when(policyRepository.findById(POLICY_ID)).thenReturn(Mono.empty());
+        when(policyRepository.findByIdAndTenantId(POLICY_ID, TENANT_ID)).thenReturn(Mono.empty());
 
-        StepVerifier.create(policyService.activatePolicy(POLICY_ID))
+        StepVerifier.create(policyService.activatePolicy(POLICY_ID, TENANT_ID))
+                .expectError(BillingPolicyNotFoundException.class)
+                .verify();
+    }
+
+    @Test
+    @DisplayName("IDOR (Audit n°7 · #5): activatePolicy must not activate another tenant's policy")
+    void testActivatePolicyRejectsCrossTenantAccess() {
+        // The policy exists (tenant TENANT_ID) but the caller authenticates as OTHER_TENANT_ID.
+        // The repository call is tenant-scoped, so it must come back empty for the wrong tenant,
+        // never leaking or mutating another tenant's policy.
+        when(policyRepository.findByIdAndTenantId(POLICY_ID, OTHER_TENANT_ID)).thenReturn(Mono.empty());
+
+        StepVerifier.create(policyService.activatePolicy(POLICY_ID, OTHER_TENANT_ID))
+                .expectError(BillingPolicyNotFoundException.class)
+                .verify();
+
+        verify(policyRepository, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
+    @DisplayName("IDOR (Audit n°7 · #5): findById must not return another tenant's policy")
+    void testFindByIdRejectsCrossTenantAccess() {
+        when(policyRepository.findByIdAndTenantId(POLICY_ID, OTHER_TENANT_ID)).thenReturn(Mono.empty());
+
+        StepVerifier.create(policyService.findById(POLICY_ID, OTHER_TENANT_ID))
                 .expectError(BillingPolicyNotFoundException.class)
                 .verify();
     }
@@ -176,10 +202,10 @@ class BillingPolicyServiceTest {
         BillingPolicy activePolicy = samplePolicy().activate();
         BillingPolicy inactivePolicy = activePolicy.deactivate();
 
-        when(policyRepository.findById(POLICY_ID)).thenReturn(Mono.just(activePolicy));
+        when(policyRepository.findByIdAndTenantId(POLICY_ID, TENANT_ID)).thenReturn(Mono.just(activePolicy));
         when(policyRepository.save(any())).thenReturn(Mono.just(inactivePolicy));
 
-        StepVerifier.create(policyService.deactivatePolicy(POLICY_ID))
+        StepVerifier.create(policyService.deactivatePolicy(POLICY_ID, TENANT_ID))
                 .expectNextMatches(p -> p.getStatus() == PolicyStatus.INACTIVE)
                 .verifyComplete();
     }
@@ -198,20 +224,33 @@ class BillingPolicyServiceTest {
     @Test
     @DisplayName("deletePolicy should complete when policy exists")
     void testDeletePolicy() {
-        when(policyRepository.existsById(POLICY_ID)).thenReturn(Mono.just(true));
+        BillingPolicy policy = samplePolicy();
+        when(policyRepository.findByIdAndTenantId(POLICY_ID, TENANT_ID)).thenReturn(Mono.just(policy));
         when(policyRepository.deleteById(POLICY_ID)).thenReturn(Mono.empty());
 
-        StepVerifier.create(policyService.deletePolicy(POLICY_ID))
+        StepVerifier.create(policyService.deletePolicy(POLICY_ID, TENANT_ID))
                 .verifyComplete();
     }
 
     @Test
     @DisplayName("deletePolicy should fail when policy not found")
     void testDeletePolicyNotFound() {
-        when(policyRepository.existsById(POLICY_ID)).thenReturn(Mono.just(false));
+        when(policyRepository.findByIdAndTenantId(POLICY_ID, TENANT_ID)).thenReturn(Mono.empty());
 
-        StepVerifier.create(policyService.deletePolicy(POLICY_ID))
+        StepVerifier.create(policyService.deletePolicy(POLICY_ID, TENANT_ID))
                 .expectError(BillingPolicyNotFoundException.class)
                 .verify();
+    }
+
+    @Test
+    @DisplayName("IDOR (Audit n°7 · #5): deletePolicy must not delete another tenant's policy")
+    void testDeletePolicyRejectsCrossTenantAccess() {
+        when(policyRepository.findByIdAndTenantId(POLICY_ID, OTHER_TENANT_ID)).thenReturn(Mono.empty());
+
+        StepVerifier.create(policyService.deletePolicy(POLICY_ID, OTHER_TENANT_ID))
+                .expectError(BillingPolicyNotFoundException.class)
+                .verify();
+
+        verify(policyRepository, org.mockito.Mockito.never()).deleteById(any());
     }
 }

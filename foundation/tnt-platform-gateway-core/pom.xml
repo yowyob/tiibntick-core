@@ -78,6 +78,15 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
+        <!-- ReactiveJwtAuthenticationConverter type only — needed to accept the SAME bean
+             tnt-bootstrap's TntSecurityConfig defines, injected by type, for the dual-auth
+             chain (Audit n°7 · #4: tnt-dispute-core/tnt-sales-core). No JWT validation
+             logic lives in this module; tnt-bootstrap still owns the oauth2ResourceServer
+             issuer/JWK configuration for the whole app. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-aop</artifactId>

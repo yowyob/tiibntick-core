@@ -3,6 +3,7 @@ package com.yowyob.tiibntick.core.billing.wallet.adapter.out.persistence.reposit
 import com.yowyob.tiibntick.core.billing.wallet.adapter.out.persistence.entity.PaymentIntentEntity;
 import org.springframework.data.r2dbc.repository.R2dbcRepository;
 import org.springframework.stereotype.Repository;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import java.util.UUID;
 
@@ -15,4 +16,7 @@ public interface PaymentIntentR2dbcRepository extends R2dbcRepository<PaymentInt
     Mono<PaymentIntentEntity> findByExternalRef(String externalRef);
     Mono<PaymentIntentEntity> findByIdempotencyKey(String idempotencyKey);
     Mono<PaymentIntentEntity> findByInvoiceId(String invoiceId);
+
+    /** Backing query for {@code IPaymentIntentRepository#findAllPendingWithProviderReference}. */
+    Flux<PaymentIntentEntity> findByStatusAndExternalRefIsNotNull(String status);
 }

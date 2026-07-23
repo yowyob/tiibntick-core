@@ -18,6 +18,7 @@ import com.yowyob.tiibntick.core.marketback.domain.model.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -55,6 +56,7 @@ public class QuoteRequestApplicationService implements IManageQuoteRequestUseCas
     private final IPricingUseCase pricingUseCase;
 
     @Override
+    @Transactional
     public Mono<QuoteRequestResponse> createQuoteRequest(CreateQuoteRequestCommand cmd) {
         log.debug("Creating QuoteRequest from client={} tenant={}", cmd.clientId(), cmd.tenantId());
         ParcelSpec parcel = new ParcelSpec(cmd.parcelDescription(), cmd.weightKg(),
@@ -72,7 +74,7 @@ public class QuoteRequestApplicationService implements IManageQuoteRequestUseCas
         quote.setNotes(cmd.notes());
 
         return quoteRepository.save(quote)
-                .flatMap(saved -> eventPublisher.publishAll(saved.pullDomainEvents())
+                .flatMap(saved -> eventPublisher.publishAll(saved.pullDomainEvents(), cmd.tenantId())
                         .then(notificationPort.notifyProviderNewQuoteRequest(
                                 cmd.tenantId(), saved.getProviderId(), saved.getId().toString(), cmd.pickupCity()))
                         .thenReturn(saved))
@@ -80,6 +82,7 @@ public class QuoteRequestApplicationService implements IManageQuoteRequestUseCas
     }
 
     @Override
+    @Transactional
     public Mono<QuoteRequestResponse> submitQuoteResponse(UUID quoteRequestId, SubmitQuoteResponseCommand cmd, String tenantId) {
         return quoteRepository.findById(QuoteRequestId.of(quoteRequestId), tenantId)
                 .switchIfEmpty(Mono.error(new QuoteRequestNotFoundException(quoteRequestId.toString())))
@@ -91,7 +94,7 @@ public class QuoteRequestApplicationService implements IManageQuoteRequestUseCas
                             quote.addResponse(response);
                             return quoteRepository.save(quote);
                         }))
-                .flatMap(saved -> eventPublisher.publishAll(saved.pullDomainEvents()).thenReturn(saved))
+                .flatMap(saved -> eventPublisher.publishAll(saved.pullDomainEvents(), tenantId).thenReturn(saved))
                 .map(this::toResponse);
     }
 

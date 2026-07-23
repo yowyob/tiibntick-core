@@ -37,11 +37,12 @@ public class CommissionCalculatorService {
      * @param policyId       the billing policy
      * @param sellingPrice   the final selling price before commissions
      * @param delivererType  the type of deliverer actor
+     * @param tenantId       the tenant the policy must belong to (Audit n°7 · #5 — IDOR fix)
      * @return the commission breakdown
      */
     public Mono<CommissionBreakdown> compute(UUID policyId, Money sellingPrice,
-                                              CommissionAppliesTo delivererType) {
-        return policyRepository.findById(policyId)
+                                              CommissionAppliesTo delivererType, UUID tenantId) {
+        return policyRepository.findByIdAndTenantId(policyId, tenantId)
                 .switchIfEmpty(Mono.error(new BillingPolicyNotFoundException(policyId)))
                 .map(policy -> {
                     Money delivererCommission = Money.zeroXAF();
@@ -83,11 +84,12 @@ public class CommissionCalculatorService {
      * @param policyId       the FreelancerOrg billing policy
      * @param sellingPrice   the final selling price (after all surcharges, discounts, taxes)
      * @param subDelivererPct percentage to allocate to the sub-deliverer (0–100)
+     * @param tenantId       the tenant the policy must belong to (Audit n°7 · #5 — IDOR fix)
      * @return the multi-actor commission split
      */
     public Mono<FreelancerOrgCommissionSplit> computeFreelancerOrgSplit(
-            UUID policyId, Money sellingPrice, BigDecimal subDelivererPct) {
-        return policyRepository.findById(policyId)
+            UUID policyId, Money sellingPrice, BigDecimal subDelivererPct, UUID tenantId) {
+        return policyRepository.findByIdAndTenantId(policyId, tenantId)
                 .switchIfEmpty(Mono.error(new BillingPolicyNotFoundException(policyId)))
                 .map(policy -> {
                     Money platformFee = Money.zeroXAF();

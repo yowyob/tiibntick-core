@@ -1,5 +1,7 @@
 package com.yowyob.tiibntick.core.billing.pricing.infrastructure.adapter.in.web;
 
+import com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser;
+import com.yowyob.tiibntick.core.auth.domain.model.TntUserIdentity;
 import com.yowyob.tiibntick.core.billing.pricing.domain.model.enums.PolicyOwnerType;
 import com.yowyob.tiibntick.core.billing.pricing.domain.port.in.IBillingPolicyUseCase;
 import io.swagger.v3.oas.annotations.Operation;
@@ -9,6 +11,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -26,6 +29,18 @@ import java.util.UUID;
  *   <li>{@code POST /from-template} — creates a policy from a named template</li>
  * </ul>
  *
+ * <h3>Security (Audit n°7 · #5 / #6)</h3>
+ * <p>Single-resource endpoints ({@code getById}, {@code activate}, {@code deactivate},
+ * {@code archive}, {@code delete}, {@code assign-org}) resolve the tenant from the JWT
+ * security context via {@code @CurrentUser TntUserIdentity} and pass it down to
+ * {@link IBillingPolicyUseCase}, which scopes the repository lookup with
+ * {@code findByIdAndTenantId} — closing an IDOR that previously let any caller read or
+ * mutate another tenant's billing policy by ID alone. Mutation endpoints are additionally
+ * gated with {@code @PreAuthorize("isAuthenticated()")} as a minimum baseline: no dedicated
+ * {@code billing-policy:*} permission exists yet in the {@code tnt-roles-core} role catalog
+ * (only generic {@code billing:read}/{@code billing:write}), so fine-grained
+ * {@code @RequirePermission} enforcement is deferred until that catalog is extended.</p>
+ *
  * @author MANFOUO Braun
  */
 @RestController
@@ -40,6 +55,7 @@ public class BillingPolicyController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Create a new billing policy")
     public Mono<BillingPolicyResponse> create(@Valid @RequestBody CreateBillingPolicyRequest req) {
         return policyUseCase.createPolicy(RequestToDomainMapper.toDomain(req))
@@ -48,8 +64,10 @@ public class BillingPolicyController {
 
     @GetMapping("/{policyId}")
     @Operation(summary = "Get a billing policy by ID")
-    public Mono<BillingPolicyResponse> getById(@PathVariable UUID policyId) {
-        return policyUseCase.findById(policyId).map(BillingPolicyResponse::from);
+    public Mono<BillingPolicyResponse> getById(
+            @CurrentUser TntUserIdentity currentUser,
+            @PathVariable UUID policyId) {
+        return policyUseCase.findById(policyId, currentUser.tenantId()).map(BillingPolicyResponse::from);
     }
 
     @GetMapping
@@ -71,28 +89,40 @@ public class BillingPolicyController {
     }
 
     @PatchMapping("/{policyId}/activate")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Activate a billing policy")
-    public Mono<BillingPolicyResponse> activate(@PathVariable UUID policyId) {
-        return policyUseCase.activatePolicy(policyId).map(BillingPolicyResponse::from);
+    public Mono<BillingPolicyResponse> activate(
+            @CurrentUser TntUserIdentity currentUser,
+            @PathVariable UUID policyId) {
+        return policyUseCase.activatePolicy(policyId, currentUser.tenantId()).map(BillingPolicyResponse::from);
     }
 
     @PatchMapping("/{policyId}/deactivate")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Deactivate a billing policy")
-    public Mono<BillingPolicyResponse> deactivate(@PathVariable UUID policyId) {
-        return policyUseCase.deactivatePolicy(policyId).map(BillingPolicyResponse::from);
+    public Mono<BillingPolicyResponse> deactivate(
+            @CurrentUser TntUserIdentity currentUser,
+            @PathVariable UUID policyId) {
+        return policyUseCase.deactivatePolicy(policyId, currentUser.tenantId()).map(BillingPolicyResponse::from);
     }
 
     @PatchMapping("/{policyId}/archive")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Archive a billing policy")
-    public Mono<BillingPolicyResponse> archive(@PathVariable UUID policyId) {
-        return policyUseCase.archivePolicy(policyId).map(BillingPolicyResponse::from);
+    public Mono<BillingPolicyResponse> archive(
+            @CurrentUser TntUserIdentity currentUser,
+            @PathVariable UUID policyId) {
+        return policyUseCase.archivePolicy(policyId, currentUser.tenantId()).map(BillingPolicyResponse::from);
     }
 
     @DeleteMapping("/{policyId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Delete a billing policy")
-    public Mono<Void> delete(@PathVariable UUID policyId) {
-        return policyUseCase.deletePolicy(policyId);
+    public Mono<Void> delete(
+            @CurrentUser TntUserIdentity currentUser,
+            @PathVariable UUID policyId) {
+        return policyUseCase.deletePolicy(policyId, currentUser.tenantId());
     }
 
     // Multi-owner endpoints ──────────────────────────────────────────
@@ -101,14 +131,16 @@ public class BillingPolicyController {
      *  — Assigns a billing policy to a specific owner actor (FreelancerOrg, HubPoint…).
      */
     @PatchMapping("/{policyId}/assign-org")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = " — Assign a billing policy to an owner actor",
                description = "Links the policy to a FreelancerOrganization, HubPoint or "
                        + "Link network actor and sets the appropriate DSL access level.")
     public Mono<BillingPolicyResponse> assignToOrg(
+            @CurrentUser TntUserIdentity currentUser,
             @PathVariable UUID policyId,
             @RequestParam @NotBlank String orgId,
             @RequestParam @NotNull PolicyOwnerType ownerType) {
-        return policyUseCase.assignPolicyToOrg(policyId, orgId, ownerType)
+        return policyUseCase.assignPolicyToOrg(policyId, orgId, ownerType, currentUser.tenantId())
                 .map(BillingPolicyResponse::from);
     }
 
@@ -128,6 +160,7 @@ public class BillingPolicyController {
      */
     @PostMapping("/from-template")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = " — Create a billing policy from a template",
                description = "Instantiates a new billing policy using a named template. "
                        + "Templates provide default rules for FREELANCER_STANDARD, "

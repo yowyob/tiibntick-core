@@ -17,6 +17,7 @@ import com.yowyob.tiibntick.core.product.domain.model.ServiceOffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -90,6 +91,7 @@ public class ServiceOfferApplicationService implements
      * validates that the product is still active in the Kernel before publishing.
      * The offer is blocked if the Kernel product is explicitly inactive (not on network error).
      */
+    @Transactional
     @Override
     public Mono<Void> publishToMarket(UUID offerId) {
         return offerRepository.findById(offerId)

@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>P1 — Phase 1 — Durcissement · Audit TiiBnTick</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --text: #1c2430; --muted: #5b6675;
+  --border: #e3e7ec; --accent: #0f5fa8; --accent-soft: #e8f1fa;
+  --code-bg: #f0f2f5; --sidebar-bg: #101823; --sidebar-text: #c7d0dc;
+  --crit: #c62828; --high: #e65100; --med: #f9a825; --low: #2e7d32;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1319; --panel: #161d27; --text: #dbe2ea; --muted: #8b97a5;
+    --border: #263140; --accent: #5aa2e0; --accent-soft: #17273a;
+    --code-bg: #1d2733; --sidebar-bg: #0a0f15; --sidebar-text: #a9b4c0;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--bg); color: var(--text); line-height: 1.65; }
+.layout { display: flex; min-height: 100vh; }
+nav.sidebar { width: 270px; flex-shrink: 0; background: var(--sidebar-bg);
+  color: var(--sidebar-text); padding: 1.4rem 1rem; position: sticky; top: 0;
+  height: 100vh; overflow-y: auto; }
+nav.sidebar .brand { font-size: 1.05rem; font-weight: 700; color: #fff;
+  margin-bottom: .2rem; }
+nav.sidebar .brand small { display:block; font-weight: 400; color: var(--sidebar-text);
+  font-size: .75rem; margin-top: .2rem; }
+nav.sidebar ul { list-style: none; padding: 0; margin: 1.2rem 0; }
+nav.sidebar li a { display: block; color: var(--sidebar-text); text-decoration: none;
+  padding: .45rem .6rem; border-radius: 6px; font-size: .86rem; }
+nav.sidebar li a:hover { background: rgba(255,255,255,.08); color: #fff; }
+nav.sidebar li a.active { background: var(--accent); color: #fff; }
+nav.sidebar .section-label { text-transform: uppercase; letter-spacing: .08em;
+  font-size: .68rem; color: #6b7683; margin: 1.4rem 0 .4rem .4rem; }
+main { flex: 1; min-width: 0; padding: 2.2rem 3rem 4rem; max-width: 1100px; }
+header.page { border-bottom: 1px solid var(--border); padding-bottom: 1.2rem;
+  margin-bottom: 1.6rem; }
+header.page .kicker { color: var(--accent); font-weight: 600; font-size: .85rem;
+  text-transform: uppercase; letter-spacing: .06em; }
+header.page h1 { margin: .25rem 0 .4rem; font-size: 1.9rem; }
+header.page .meta { color: var(--muted); font-size: .85rem; }
+h2 { margin-top: 2.4rem; padding-bottom: .35rem; border-bottom: 1px solid var(--border);
+  font-size: 1.35rem; }
+h3 { margin-top: 1.8rem; font-size: 1.08rem; }
+h4 { margin-top: 1.4rem; font-size: .98rem; }
+a { color: var(--accent); }
+code { background: var(--code-bg); padding: .12em .38em; border-radius: 4px;
+  font-size: .84em; font-family: "JetBrains Mono", Consolas, monospace; }
+pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem; overflow-x: auto; font-size: .82rem; line-height: 1.5; }
+pre code { background: none; padding: 0; }
+.table-wrap { overflow-x: auto; margin: 1rem 0; border: 1px solid var(--border);
+  border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: .85rem; background: var(--panel); }
+th, td { border-bottom: 1px solid var(--border); padding: .55rem .75rem; text-align: left;
+  vertical-align: top; }
+th { background: var(--accent-soft); color: var(--text); font-weight: 600;
+  white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+blockquote { border-left: 4px solid var(--accent); background: var(--accent-soft);
+  margin: 1rem 0; padding: .7rem 1rem; border-radius: 0 8px 8px 0; }
+blockquote p { margin: .3rem 0; }
+.badge { display: inline-block; padding: .1em .6em; border-radius: 999px;
+  font-size: .74rem; font-weight: 700; color: #fff; white-space: nowrap; }
+.badge.crit { background: var(--crit); } .badge.high { background: var(--high); }
+.badge.med { background: var(--med); color: #333; } .badge.low { background: var(--low); }
+.mermaid { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem; margin: 1rem 0; text-align: center; overflow-x: auto; }
+.toc { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem 1.4rem; margin: 1.4rem 0; font-size: .88rem; }
+.toc > ul { margin: .3rem 0; padding-left: 1.1rem; }
+.toc .toctitle { font-weight: 700; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1rem; margin: 1.4rem 0; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1.1rem 1.2rem; text-decoration: none; color: var(--text); display: block; }
+.card:hover { border-color: var(--accent); }
+.card .icon { font-size: 1.5rem; }
+.card h3 { margin: .4rem 0 .2rem; font-size: 1rem; }
+.card p { margin: 0; color: var(--muted); font-size: .82rem; }
+.stat-row { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1.2rem 0; }
+.stat { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: .8rem 1.2rem; min-width: 130px; }
+.stat .num { font-size: 1.6rem; font-weight: 800; }
+.stat .lbl { font-size: .74rem; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .05em; }
+.stat.crit .num { color: var(--crit); } .stat.high .num { color: var(--high); }
+.stat.med .num { color: var(--med); } .stat.low .num { color: var(--low); }
+footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border);
+  color: var(--muted); font-size: .78rem; }
+.progress-block { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1rem 1.2rem; margin: 1rem 0 1.6rem; }
+.progress-block .progress-label { display: flex; justify-content: space-between; align-items: baseline;
+  font-size: .85rem; margin-bottom: .5rem; }
+.progress-block .progress-label b { font-size: 1rem; }
+.progress-bar-track { background: var(--code-bg); border-radius: 999px; height: .6rem; overflow: hidden; }
+.progress-bar-fill { height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--low), var(--accent)); transition: width .3s ease; }
+.progress-note { font-size: .72rem; color: var(--muted); margin-top: .5rem; }
+li:has(> input.task-checkbox) { list-style: none; margin-left: -1.4rem; padding-left: .3rem;
+  display: list-item; }
+input.task-checkbox { width: 1rem; height: 1rem; margin-right: .5rem; vertical-align: middle;
+  accent-color: var(--accent); }
+li:has(> input.task-checkbox:checked) { color: var(--muted); }
+li:has(> input.task-checkbox:checked) code { opacity: .75; }
+@media (max-width: 900px) {
+  .layout { flex-direction: column; }
+  nav.sidebar { width: 100%; height: auto; position: static; }
+  main { padding: 1.4rem 1.2rem 3rem; }
+}
+@media print { nav.sidebar { display: none; } main { padding: 0; } }
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar"><div class="brand">TiiBnTick Core<small>Audit technique — juillet 2026</small></div>
+<ul><li><a href="../index.html">🏠 Accueil</a></li>
+<li><a href="../executive-summary.html">📋 Résumé exécutif global</a></li>
+</ul><div class="section-label">Rapports d'audit</div><ul>
+<li><a href="../audit-1-architecture.html">🏛️ Audit n°1 — Architecture globale</a></li>
+<li><a href="../audit-2-inter-modules.html">🔗 Audit n°2 — Connexions inter-modules</a></li>
+<li><a href="../audit-3-yow-event-kernel.html">📨 Audit n°3 — yow-event-kernel</a></li>
+<li><a href="../audit-4-yow-i18n-kernel.html">🌍 Audit n°4 — yow-i18n-kernel</a></li>
+<li><a href="../audit-5-kafka.html">🧵 Audit n°5 — Kafka</a></li>
+<li><a href="../audit-6-scalabilite.html">📈 Audit n°6 — Scalabilité</a></li>
+<li><a href="../audit-7-system-design.html">🧭 Audit n°7 — System Design & Sécurité</a></li>
+</ul><div class="section-label">Plan de remédiation</div><ul>
+<li><a href="implementation-plan.html">🗂️ Plan — Plan d'implémentation — vue d'ensemble</a></li>
+<li><a href="phase-0-critical.html">🚨 P0 — Phase 0 — Bloquant production</a></li>
+<li><a href="phase-1-hardening.html" class="active">🛡️ P1 — Phase 1 — Durcissement</a></li>
+<li><a href="phase-2-target-architecture.html">🚀 P2 — Phase 2 — Architecture cible</a></li>
+<li><a href="workstream-payment-billing-kernel-delegation.html">💳 Chantier — Délégation paiement/facturation au Kernel</a></li>
+</ul></nav>
+<main>
+<header class="page">
+  <div class="kicker">P1</div>
+  <h1>🛡️ Phase 1 — Durcissement</h1>
+  <div class="meta">Plan d'implémentation — document vivant, mis à jour à chaque décision. Voir <code>docs/audits/raw/</code> pour le constat figé.</div>
+</header>
+<div class="progress-block">
+  <div class="progress-label"><span>Progression — Phase 1 — Durcissement</span><b>0 / 50 (0%)</b></div>
+  <div class="progress-bar-track"><div class="progress-bar-fill" style="width:0%"></div></div>
+  <div class="progress-note">Lecture seule : ces cases reflètent l'état du fichier Markdown versionné dans git au moment de la génération. On les coche en éditant le <code>.md</code> (IDE ou <code>- [x]</code> par commit), jamais depuis cette page — régénérer avec <code>python3 docs/audits/build_reports.py</code> après un commit pour mettre à jour l'affichage.</div>
+</div>
+<div class="toc"><div class="toc"><span class="toctitle">Sommaire</span><ul>
+<li><a href="#vue-densemble">Vue d'ensemble</a></li>
+<li><a href="#chantier-g-link-bff-temps-reel-par-tuiles-geohash-priorite-n1-de-la-phase-1">Chantier G — Link : BFF + temps réel par tuiles geohash (priorité n°1 de la Phase 1)</a></li>
+<li><a href="#chantier-a-securite-approfondie-resilience">Chantier A — Sécurité approfondie &amp; résilience</a></li>
+<li><a href="#chantier-c-kafka-fiabilite-dlq-outbox-idempotence-ordre">Chantier C — Kafka : fiabilité (DLQ, outbox, idempotence, ordre)</a></li>
+<li><a href="#chantier-d-scalabilite-pagination-db-cache-resilience-http">Chantier D — Scalabilité (pagination, DB, cache, résilience HTTP)</a></li>
+<li><a href="#chantier-e-architecture-gouvernance">Chantier E — Architecture &amp; gouvernance</a></li>
+<li><a href="#chantier-f-i18n-multidevise">Chantier F — i18n &amp; multidevise</a></li>
+<li><a href="#definition-of-done-phase-1">Definition of Done — Phase 1</a></li>
+</ul>
+</div>
+</div>
+<h1 id="phase-1-durcissement">Phase 1 — Durcissement</h1>
+<p><strong>Statut global : 🟡 Planifié — non commencé</strong>
+<strong>Horizon estimé : 1–3 mois, après la <a href="phase-0-critical.html">Phase 0</a></strong>
+<strong>Objectif :</strong> rendre le monolithe modulaire résilient, observable et gouvernable avant toute montée en charge significative — et livrer le premier vrai chantier produit : la carte Link en temps réel.</p>
+<blockquote>
+<p>Cases à cocher : voir le mode d'emploi en tête de la <a href="phase-0-critical.html">Phase 0</a> — lecture seule dans le navigateur, source de vérité = ce fichier Markdown versionné, coché dans l'IDE puis committé.</p>
+</blockquote>
+<h2 id="vue-densemble">Vue d'ensemble</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Chantier</th>
+<th>Effort</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>G — Link : BFF + temps réel par tuiles geohash</td>
+<td>3–4 sem.</td>
+</tr>
+<tr>
+<td>A — Sécurité approfondie &amp; résilience</td>
+<td>3–4 sem.</td>
+</tr>
+<tr>
+<td>C — Kafka : fiabilité (DLQ, outbox, idempotence, ordre)</td>
+<td>2–3 sem.</td>
+</tr>
+<tr>
+<td>D — Scalabilité (pagination, DB, cache, résilience HTTP)</td>
+<td>3–4 sem.</td>
+</tr>
+<tr>
+<td>E — Architecture &amp; gouvernance</td>
+<td>2 sem.</td>
+</tr>
+<tr>
+<td>F — i18n &amp; multidevise</td>
+<td>1–2 sem.</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="chantier-g-link-bff-temps-reel-par-tuiles-geohash-priorite-n1-de-la-phase-1">Chantier G — Link : BFF + temps réel par tuiles geohash (priorité n°1 de la Phase 1)</h2>
+<p>Placé en tête de Phase 1 conformément à la justification de l'<a href="../audit-7-system-design.html#p1-bis-architecture-temps-reel-link-carte-live-par-utilisateur-decision-bff">Audit n°7 (§ P1 bis)</a> : la carte Link est destinée à des millions d'utilisateurs simultanés, chacun avec sa propre vue — c'est le chantier produit le plus structurant de tout le plan.</p>
+<ul>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>Décision BFF actée</strong> : construire le Link BFF (frontend web + app mobile → BFF → tiibntick-core), rôle limité à l'agrégation d'écran, la terminaison temps réel, et la gestion d'abonnements viewport — <strong>aucune logique métier dans le BFF</strong> — <strong>[Audit n°7 · P1 bis]</strong></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°6 · S24 / Audit n°7 · #24]</strong> Migrer les colonnes géo de Link vers <code>geometry</code> + index <strong>GIST</strong> (<code>ST_DWithin</code>/<code>ST_Contains</code>), indexer <code>network_alerts</code> — prérequis absolu avant tout le reste — <strong>Élevé</strong> — <code>003-create-network-nodes.sql:12-19</code>, <code>002-create-network-alerts.sql:10-11</code>, <code>NetworkAlertR2dbcRepository.java:17-20</code>, <code>DaoZonePersistenceAdapter.java:45</code></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°6 · S23 / Audit n°7 · #25]</strong> Construire le canal de push : abonnement par tuiles geohash (précision 5–6 ≈ 1–5 km), fan-out borné en réutilisant le moteur <strong><code>tnt-realtime-core</code></strong> existant (STOMP + Redis pub/sub multi-instances) — ne pas réécrire un second moteur — <strong>Critique</strong> — <code>coreBackend/tnt-link-back-core</code> (module entier)</li>
+<li><input type="checkbox" class="task-checkbox" disabled> Abonnement viewport : le client déclare au BFF les tuiles couvrant son viewport à l'ouverture/déplacement de la carte ; la connexion WebSocket n'est abonnée qu'aux canaux de ces tuiles — <strong>[Audit n°7 · P1 bis]</strong></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°6 · S25]</strong> Remplacer le plafonnement temporaire de <code>/nearby</code> (mitigation Phase 0) par une solution définitive : tuilage complet, plus de scan viewport arbitraire — <strong>Élevé</strong> — <code>NetworkNodeController.java:119-128</code>, <code>NetworkAlertController.java:100-108</code></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°6 · S26]</strong> <code>updateLocation</code> : réduire les ≥3 requêtes DB par ping (lecture nœud + zones DAO contenantes + save) et <strong>émettre un événement</strong> à chaque mise à jour pour rendre le fan-out possible — <strong>Moyen</strong> — <code>NetworkNodeApplicationService.java:61-77</code></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°5 · P-17]</strong> Brancher Link sur Kafka : consommer <code>tnt.realtime.gps.position.updated</code> (clé corrigée en Phase 0/chantier C), matérialiser la dernière position en Redis, prévoir un topic compacté <code>tnt.tracking.position.latest</code> — remplace la lecture synchrone actuelle de delivery-core à chaque requête — <strong>Moyen</strong> — <code>TrackParcelApplicationService.java:22-26</code></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°1 · A16]</strong> Durcir le reste de <code>tnt-link-back-core</code> : requête bbox devient PostGIS + LIMIT + validation viewport, cache Redis court sur les lectures chaudes — <strong>Élevé</strong> — <code>NetworkNodeR2dbcRepository.java:17-20</code>, <code>NetworkNodeController.java:109-128</code></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°1 · A17]</strong> Nettoyer les 5 dépendances Maven mortes de <code>tnt-link-back-core</code> (<code>tnt-realtime-core</code>, <code>tnt-incident-core</code>, <code>tnt-sync-core</code>, <code>tnt-route-core</code>, <code>tnt-organization-core</code>) — soit les brancher réellement (le cas de <code>tnt-realtime-core</code> est traité par ce chantier), soit les retirer du pom — <strong>Faible</strong> — <code>coreBackend/tnt-link-back-core/pom.xml</code></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°6 · S27]</strong> Corriger le N+1 sur <code>by-ref/batch</code> (un <code>flatMap</code> par id au lieu d'un <code>IN (...)</code>) — <strong>Faible</strong> — <code>NetworkNodeController.java:109-116</code></li>
+<li><input type="checkbox" class="task-checkbox" disabled> Debounce des positions GPS côté producteur (ex. 1 màj/2–5 s par livreur) + delta-encoding (n'émettre que les entités entrées/sorties/déplacées de la tuile) — <strong>[Audit n°7 · P1 bis]</strong>, budget mémoire/connexion maîtrisé (backpressure Reactor déjà native WebFlux)</li>
+</ul>
+<p><strong>Vérification :</strong> test de charge simulant N clients abonnés à des tuiles différentes + M livreurs en mouvement ; vérifier qu'un client ne reçoit que les événements de ses tuiles ; requête <code>/nearby</code> sous 50 ms avec l'index GIST sur un jeu de données représentatif.</p>
+<h2 id="chantier-a-securite-approfondie-resilience">Chantier A — Sécurité approfondie &amp; résilience</h2>
+<ul>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°7 · P1 item6]</strong> Isolation tenant en profondeur : <strong>PostgreSQL Row-Level Security</strong> par schéma (policy <code>tenant_id = current_setting(...)</code>) — couvre structurellement les 139 <code>findById</code> sans filtre — meilleur rapport garantie/effort — <strong>Élevé</strong>, effort 2–4 sem.</li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°7 · P1 item7 / #11]</strong> Frontal API gateway léger (nginx/Traefik ou Spring Cloud Gateway) : TLS, rate limiting (par IP + par client-id, compteurs Redis), headers de sécurité (HSTS, X-Content-Type-Options) — <strong>Élevé</strong>, aucun rate limiting actuellement (grep global = 0 résultat)</li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°7 · P1 item8 / #12]</strong> Résilience Kernel généralisée : WebClient partagé avec timeouts, circuit breaker et bulkhead Resilience4j pour tous les proxys (HRM ×160, auth, SSO) — aujourd'hui seul trust en bénéficie — <strong>Élevé</strong> — <code>business/tnt-hrm-core/.../Hrm*Controller.java</code>, <code>application.yml:160-186</code></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°7 · #22]</strong> Redimensionner les 8 pools R2DBC (dimensionnement manuel aujourd'hui) en cohérence avec la résilience Kernel ci-dessus et le chantier D — <strong>Faible</strong>, cross-réf. <code>TntDataSourceConfig.java:59</code></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°7 · P1 item9 / #14]</strong> Réparer le tracing : aligner <code>micrometer-tracing-bridge-otel</code> + <code>opentelemetry-exporter-zipkin</code> (ou tout-Brave), vérifier la propagation de contexte réactif, tester une trace HTTP→Kafka→consumer — <strong>Moyen</strong> — <code>tnt-bootstrap/pom.xml:363-367</code></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°7 · P1 item10 / #17]</strong> Migrer le versioning API incohérent (<code>/billing/*</code>, <code>/tnt/trust</code>, <code>/api/employees</code> hors <code>/api/v1</code>) sous <code>/api/v1</code> avec redirections temporaires — <strong>Moyen</strong></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°7 · P1 item10 / #18]</strong> Généraliser un filtre <code>Idempotency-Key</code> (Redis SETNX, réponse rejouée) sur les POST financiers, hors wallet où il existe déjà — <strong>Moyen</strong></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°7 · P1 item11 / #13]</strong> Formaliser en chorégraphie le flux delivery→invoice→wallet : table <code>fulfillment_progress</code> alimentée par les événements + compensations explicites (annulation facture, remboursement wallet) + alerte sur saga bloquée — pas d'orchestrateur lourd nécessaire — <strong>Élevé</strong>, aucune saga/compensation aujourd'hui (grep "saga" = 0)</li>
+</ul>
+<p><strong>Vérification :</strong> test RLS — requête directe SQL avec un <code>current_setting</code> différent du tenant propriétaire retourne 0 ligne. Test de coupure réseau Kernel simulée → 503 propre au lieu d'un timeout en cascade.</p>
+<h2 id="chantier-c-kafka-fiabilite-dlq-outbox-idempotence-ordre">Chantier C — Kafka : fiabilité (DLQ, outbox, idempotence, ordre)</h2>
+<ul>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°5 · P1 item5]</strong> Généraliser le pattern <code>sync-core</code> : une auto-configuration Kafka commune (factory producteur + factory listener avec <code>ErrorHandlingDeserializer</code>, <code>DefaultErrorHandler(DeadLetterPublishingRecoverer → tnt.dlq.&lt;module&gt;, ExponentialBackOff)</code>) au lieu de 15 copies divergentes — couvre <strong>P-04</strong> (une seule DLQ aujourd'hui) — <strong>Élevé</strong></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°5 · P1 item6 / Audit n°3 · PR4]</strong> Outbox réel : table outbox R2DBC écrite dans la même transaction que l'agrégat + relayeur vers Kafka ; supprimer <code>onErrorComplete()</code>/fire-and-forget des publishers (<code>KafkaDeliveryEventPublisher.java:66</code>, <code>IncidentKafkaEventPublisher.java:137</code>, <code>KafkaInvoiceEventPublisher.java:46</code>, <code>MarketKafkaEventPublisher.java:41</code>, <code>KafkaGofpEventPublisher.java:32-59</code>) — couvre <strong>P-05</strong> — <strong>Élevé</strong></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°5 · P1 item7 / Audit n°3 · PR6]</strong> Idempotence consommateur : table <code>processed_events(event_id, consumer_group)</code> ou clé Redis SETNX, alimentée par le header <code>X-Yow-Envelope-Id</code> — prioritaire sur wallet/accounting/dispute (17 modules concernés) — couvre <strong>P-06</strong> — <strong>Élevé</strong></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°5 · P1 item8]</strong> Clés d'ordre : realtime → <code>actorId</code>/<code>missionId</code> au lieu d'<code>eventId</code> aléatoire (couvre <strong>P-07</strong>, positions GPS hors ordre) ; sync → <code>aggregateId</code> ; geo/route → aligner <code>acks=all</code> + idempotence (couvre <strong>P-08</strong>) — <strong>Élevé</strong></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°3 · PR5]</strong> Unifier l'enveloppe d'événement : une seule (celle du kernel : correlationId, causationId, tenantId, schemaVersion, headers <code>X-Yow-*</code>) et un seul contrat (<code>TntDomainEvent</code> aligné dessus), migration des 3 formats existants — <strong>Élevé</strong></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°5 · P-20b]</strong> Émettre l'événement <code>tnt.roles.permission-changed</code> (déclaré, jamais publié) pour invalider le cache RBAC au lieu d'attendre le TTL 300 s — <strong>Moyen</strong></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°5 · P-20d]</strong> Remplacer l'appel HTTP synchrone Agency→Core de création de mission par la publication sur <code>tnt.agency.mission.request</code> (le topic existe déjà côté producteur, non exploité) — <strong>Moyen</strong></li>
+</ul>
+<p><strong>Vérification :</strong> test d'intégration DLQ — un message malformé atterrit dans <code>tnt.dlq.&lt;module&gt;</code> au lieu d'être silencieusement skippé. Test idempotence — publier deux fois le même <code>eventId</code>, vérifier une seule écriture.</p>
+<h2 id="chantier-d-scalabilite-pagination-db-cache-resilience-http">Chantier D — Scalabilité (pagination, DB, cache, résilience HTTP)</h2>
+<ul>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°6 · S7/S20]</strong> Pagination keyset sur tous les endpoints de listing (deliveries, templates de facturation) — <strong>Élevé/Faible</strong> — <code>DeliveryController.java:72-97</code>, <code>ListTemplatesUseCase.java:69</code></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°6 · S9]</strong> Retry avec backoff sur les échecs de verrou optimiste wallet ; planifier le modèle ledger pour le point de contention wallet d'organisation — <strong>Élevé</strong> — <code>WalletService.java:80-115,239-291</code></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°6 · S6]</strong> Dimensionner <code>DB_POOL_MAX_SIZE</code> (10 connexions aujourd'hui pour ~30 schémas) ; mettre en place 1–2 read replicas et router les lectures — <strong>Élevé</strong> — <code>TntDataSourceConfig.java:59-64</code></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°6 · S10/S15]</strong> État GPS/geofence en mémoire par instance → Redis (TTL glissant) ou sticky partitioning + éviction locale — <strong>Élevé/Moyen</strong> — <code>GpsPingProcessor.java:71-77</code>, <code>GeofenceMonitorService.java:43</code></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°6 · S11]</strong> Bulkhead sur le solveur VRP (OR-Tools, CPU-bound sans limitation de concurrence) + cache des matrices de distances — <strong>Élevé</strong> — <code>VrpSolverService.java:39-43,45-66</code></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°6 · S12]</strong> <code>max.in.flight.requests.per.connection=5</code> (au lieu de 1, sans bénéfice actuel), plus de partitions sur les topics chauds, cluster Kafka RF 3 — <strong>Élevé</strong> — <code>application.yml:46-50,314-315</code></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°6 · S17]</strong> Généraliser les timeouts explicites aux 80/83 usages de <code>WebClient</code> du dépôt (au-delà du périmètre Kernel déjà couvert en Phase 0/chantier D) — <strong>Moyen</strong></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°6 · S18]</strong> Réseau routier complet chargé en mémoire JVM par tenant (empreinte non bornée multi-tenants) — revoir la stratégie de cache — <strong>Moyen</strong> — <code>RoadNetworkProviderAdapter.java:61</code></li>
+</ul>
+<p><strong>Vérification :</strong> test de charge sur un endpoint de listing avec pagination — temps de réponse stable indépendamment du volume total. Test de coupure Kernel avec les nouveaux timeouts — dégradation propre, pas de blocage de thread.</p>
+<h2 id="chantier-e-architecture-gouvernance">Chantier E — Architecture &amp; gouvernance</h2>
+<ul>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°1 · A4]</strong> Charte <code>coreBackend/</code> : position dans les couches (L6-bis), règle « BFF orchestre, ne réimplémente pas », activation par profil dans bootstrap — <strong>Élevé</strong></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°1 · A5]</strong> Refactorer les 9 contrôleurs <code>tnt-go-freelancer-point-back-core</code> qui accèdent directement à la persistance, en passant par de vrais use-cases — <strong>Élevé</strong> — <code>coreBackend/tnt-go-freelancer-point-back-core/.../adapter/in/web/*</code></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°1 · A13]</strong> Clarifier les responsabilités potentiellement dupliquées entre la couche billing/sync cœur et les sous-modules agency (<code>tnt-agency-sync-core</code> vs <code>tnt-sync-core</code>, <code>tnt-agency-billing-core</code> vs <code>billing/*</code>) — <strong>Moyen</strong></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°1 · A7]</strong> Tests sur <code>tnt-platform-gateway-core</code> (82 classes de sécurité, 0 test aujourd'hui) puis réactivation de la gate JaCoCo avec ratchet progressif — <strong>Élevé</strong></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°2 · reco 2]</strong> Purger les 112 dépendances Maven mortes (liste exhaustive §2.2 de l'audit, directement actionnable pom par pom) — <strong>Élevé</strong>, effort moyen</li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°2 · reco 5]</strong> Mettre l'assemblage en cohérence : documenter le <code>@ComponentScan</code> global dans CLAUDE.md et nettoyer <code>TntCoreConfig</code> (import mort ligne 7, commentaire faux ligne 43) — <strong>Moyen</strong></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°2 · reco 6]</strong> Documenter la couche <code>coreBackend/</code> (L6-bis, feuilles consommatrices) et <code>tnt-hrm-core</code> dans CLAUDE.md, avec sa règle : jamais de dépendance entrante depuis le cœur — <strong>Moyen</strong>, pairs avec A4</li>
+</ul>
+<p><strong>Vérification :</strong> <code>mvn -pl tnt-platform-gateway-core test</code> passe avec une couverture non nulle. <code>mvn dependency:analyze</code> ne remonte plus les 112 dépendances mortes après purge.</p>
+<h2 id="chantier-f-i18n-multidevise">Chantier F — i18n &amp; multidevise</h2>
+<ul>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°4 · P1]</strong> Unifier <code>Money</code> sur <code>tnt-common-core</code> (supprimer les 6 doublons, y compris market-back et sa sémantique <code>long</code> ambiguë), migrer <code>'FCFA'→'XAF'</code> en base, contrainte ISO 4217 — couvre <strong>P-6, P-7, P-19, P-22, P-23</strong> — <strong>Élevé</strong>, 4–6 j, à traiter en ADR (touche billing + market)</li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°4 · P1]</strong> Implémenter la résolution de locale : filtre <code>Accept-Language</code> → contexte Reactor ; consultation de <code>preferredLanguage</code> dans <code>NotificationService</code> au lieu des producteurs Kafka — couvre <strong>P-4</strong> — <strong>Élevé</strong></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°4 · P1]</strong> Implémenter le fallback de locale dans <code>JsonLocalePackAdapter</code> (fr_CM→fr_FR→défaut) et corriger <code>LocaleConfig.toLocaleTag()</code> (<code>replace("_","_")</code> est un no-op) — couvre <strong>P-5, P-12</strong> — <strong>Moyen</strong></li>
+</ul>
+<p><strong>Vérification :</strong> test unitaire sur <code>Money</code> — une opération XAF+XAF ne produit jamais de décimales fantômes. Test d'intégration — une notification envoyée sans <code>Accept-Language</code> explicite utilise <code>preferredLanguage</code> du destinataire.</p>
+<hr />
+<h2 id="definition-of-done-phase-1">Definition of Done — Phase 1</h2>
+<ul>
+<li><input type="checkbox" class="task-checkbox" disabled> Chantier G : test de charge tuiles/BFF vert ; <code>/nearby</code> sous 50 ms avec index GIST.</li>
+<li><input type="checkbox" class="task-checkbox" disabled> Chantier A : RLS actif sur au moins les tables sensibles (factures, wallet, litiges) ; gateway de rate limiting en place ; circuit breakers Kernel généralisés.</li>
+<li><input type="checkbox" class="task-checkbox" disabled> Chantier C : DLQ générique fonctionnelle sur tous les modules ; idempotence consommateur vérifiée sur wallet/accounting/dispute.</li>
+<li><input type="checkbox" class="task-checkbox" disabled> Chantier D : pagination systématique ; read replica opérationnel ; VRP sous bulkhead.</li>
+<li><input type="checkbox" class="task-checkbox" disabled> Chantier E : dépendances mortes purgées ; <code>coreBackend/</code> documenté dans CLAUDE.md.</li>
+<li><input type="checkbox" class="task-checkbox" disabled> Chantier F : <code>Money</code> unique ; résolution de locale opérationnelle en test.</li>
+</ul>
+<footer>Audit technique TiiBnTick — généré à partir de l'analyse du code source réel. Chaque constat référence les fichiers et lignes concernés.</footer>
+</main>
+</div>
+
+<script type="module">
+  try {
+    const m = await import("https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs");
+    const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    m.default.initialize({ startOnLoad: true, theme: dark ? "dark" : "neutral", securityLevel: "loose" });
+  } catch (e) {
+    document.querySelectorAll(".mermaid").forEach(el => {
+      el.style.textAlign = "left";
+      el.innerHTML = "<div style='color:var(--muted);font-size:.75rem;margin-bottom:.5rem'>⚠ Diagramme Mermaid (connexion internet requise pour le rendu) — source :</div><pre>" + el.textContent.replace(/&/g,"&amp;").replace(/</g,"&lt;") + "</pre>";
+    });
+  }
+</script>
+
+</body>
+</html>

@@ -12,6 +12,7 @@ import com.yowyob.tiibntick.core.incident.port.outbound.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
@@ -50,6 +51,7 @@ public class IncidentHandoverService implements IConfirmHandoverUseCase {
      * @return the updated driver replacement record
      */
     @Override
+    @Transactional
     public Mono<IncidentDriverReplacement> execute(ConfirmHandoverCommand command) {
         return incidentRepository.findById(command.getIncidentId())
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Incident not found")))

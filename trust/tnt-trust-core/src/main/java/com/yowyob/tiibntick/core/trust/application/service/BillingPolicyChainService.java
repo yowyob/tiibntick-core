@@ -4,10 +4,12 @@ import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Mono;
 import com.yowyob.tiibntick.core.trust.domain.model.valueobject.BillingPolicyRecord;
 import com.yowyob.tiibntick.core.trust.domain.model.valueobject.LogisticTrustEvent;
 import com.yowyob.tiibntick.core.trust.application.port.in.RecordBillingPolicyUseCase;
+import com.yowyob.tiibntick.core.trust.application.port.out.BillingPolicyRecordRepository;
 import com.yowyob.tiibntick.core.trust.application.port.out.TrustProofQueryPort;
 
 /**
@@ -36,14 +38,17 @@ public class BillingPolicyChainService implements RecordBillingPolicyUseCase {
     private static final Logger log = LoggerFactory.getLogger(BillingPolicyChainService.class);
 
     private final LogisticEventPublisherService publisherService;
+    private final BillingPolicyRecordRepository billingPolicyRecordRepository;
     private final TrustProofQueryPort trustProofQueryPort;
     private final MeterRegistry meterRegistry;
 
     public BillingPolicyChainService(
             final LogisticEventPublisherService publisherService,
+            final BillingPolicyRecordRepository billingPolicyRecordRepository,
             final TrustProofQueryPort trustProofQueryPort,
             final MeterRegistry meterRegistry) {
         this.publisherService = publisherService;
+        this.billingPolicyRecordRepository = billingPolicyRecordRepository;
         this.trustProofQueryPort = trustProofQueryPort;
         this.meterRegistry = meterRegistry;
     }
@@ -51,11 +56,13 @@ public class BillingPolicyChainService implements RecordBillingPolicyUseCase {
     /**
      * {@inheritDoc}
      *
-     * <p>Creates a {@link BillingPolicyRecord}, builds a
-     * {@code BILLING_POLICY_ACTIVATED} {@link LogisticTrustEvent}, and
+     * <p>Creates a {@link BillingPolicyRecord} and persists it locally first —
+     * so it is immediately visible to reads — then builds a
+     * {@code BILLING_POLICY_ACTIVATED} {@link LogisticTrustEvent} and
      * publishes it to the Kafka trust topic for Fabric anchoring.
      */
     @Override
+    @Transactional
     public Mono<String> record(
             final String agencyId,
             final String policyId,
@@ -71,7 +78,8 @@ public class BillingPolicyChainService implements RecordBillingPolicyUseCase {
         final LogisticTrustEvent event = LogisticTrustEvent.forBillingPolicyActivated(
                 agencyId, policyId, tenantId);
 
-        return publisherService.publish(event)
+        return billingPolicyRecordRepository.save(policyRecord)
+                .then(publisherService.publish(event))
                 .doOnSuccess(v -> {
                     meterRegistry.counter("tnt.trust.billing.policy.anchored",
                             "tenant", tenantId).increment();

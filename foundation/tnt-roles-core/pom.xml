@@ -75,6 +75,31 @@
         </dependency>
 
         <!-- ═══════════════════════════════════════════════════════
+             DATABASE — R2DBC (runtime) + Liquibase (JDBC, schema-only)
+             Local persistence for tnt_roles / tnt_user_role_assignments /
+             tnt_role_sync_outbox (Chantier D · Audit n°6 · S5 — RBAC persistence).
+             Same block as tnt-platform-gateway-core, the first L1 module with
+             its own schema — see docs/auth/platform-client-management-design.md §2.0/§3.
+             ═══════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-r2dbc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>r2dbc-postgresql</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.liquibase</groupId>
+            <artifactId>liquibase-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- ═══════════════════════════════════════════════════════
              REDIS — cache des permissions (TTL 5 min)
              ReactivePermissionCache from RT-comops-kernel-core
              uses ReactiveStringRedisTemplate internally
@@ -102,6 +127,17 @@
         </dependency>
 
         <!-- ═══════════════════════════════════════════════════════
+             SHEDLOCK — @SchedulerLock for KernelRoleSyncWorker /
+             KernelRoleReconciliationJob (Chantier D · Audit n°6 · S5/S2).
+             Only the annotation + AOP; the shared LockProvider bean lives
+             in tnt-bootstrap's TntSchedulerLockConfig (see its Javadoc).
+             ═══════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>net.javacrumbs.shedlock</groupId>
+            <artifactId>shedlock-spring</artifactId>
+        </dependency>
+
+        <!-- ═══════════════════════════════════════════════════════
              TESTS
              ═══════════════════════════════════════════════════════ -->
         <dependency>
@@ -118,6 +154,11 @@
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>mockwebserver</artifactId>
             <scope>test</scope>
         </dependency>
 

@@ -14,6 +14,9 @@ import org.springframework.stereotype.Component;
 import com.yowyob.tiibntick.core.trust.application.port.out.CustodyTransferCacheRepository;
 import com.yowyob.tiibntick.core.trust.application.port.out.DeliveryProofCacheRepository;
 import com.yowyob.tiibntick.core.trust.application.port.out.DIDRepository;
+import com.yowyob.tiibntick.core.trust.application.port.out.GeofenceCrossingRepository;
+import com.yowyob.tiibntick.core.trust.application.port.out.DaoRuleRepository;
+import com.yowyob.tiibntick.core.trust.application.port.out.PolVerificationRepository;
 
 /**
  * Kafka Adapter — {@code TrustCommittedEventConsumer}.
@@ -43,6 +46,11 @@ public class TrustCommittedEventConsumer {
     private final CustodyTransferCacheRepository custodyCacheRepository;
     private final DIDRepository didRepository;
     private final com.yowyob.tiibntick.core.trust.application.port.out.ActorBadgeRepository actorBadgeRepository;
+    private final com.yowyob.tiibntick.core.trust.application.port.out.BillingPolicyRecordRepository
+            billingPolicyRecordRepository;
+    private final GeofenceCrossingRepository geofenceCrossingRepository;
+    private final DaoRuleRepository daoRuleRepository;
+    private final PolVerificationRepository polVerificationRepository;
     private final MeterRegistry meterRegistry;
 
     public TrustCommittedEventConsumer(
@@ -51,12 +59,21 @@ public class TrustCommittedEventConsumer {
             final CustodyTransferCacheRepository custodyCacheRepository,
             final DIDRepository didRepository,
             final com.yowyob.tiibntick.core.trust.application.port.out.ActorBadgeRepository actorBadgeRepository,
+            final com.yowyob.tiibntick.core.trust.application.port.out.BillingPolicyRecordRepository
+                    billingPolicyRecordRepository,
+            final GeofenceCrossingRepository geofenceCrossingRepository,
+            final DaoRuleRepository daoRuleRepository,
+            final PolVerificationRepository polVerificationRepository,
             final MeterRegistry meterRegistry) {
         this.objectMapper = objectMapper;
         this.proofCacheRepository = proofCacheRepository;
         this.custodyCacheRepository = custodyCacheRepository;
         this.didRepository = didRepository;
         this.actorBadgeRepository = actorBadgeRepository;
+        this.billingPolicyRecordRepository = billingPolicyRecordRepository;
+        this.geofenceCrossingRepository = geofenceCrossingRepository;
+        this.daoRuleRepository = daoRuleRepository;
+        this.polVerificationRepository = polVerificationRepository;
         this.meterRegistry = meterRegistry;
     }
 
@@ -144,6 +161,26 @@ public class TrustCommittedEventConsumer {
             case "BADGE" ->
                     actorBadgeRepository.updateTxHash(entityId, txHash)
                             .doOnSuccess(v -> log.debug("Badge confirmed on-chain — badgeId={}", entityId))
+                            .subscribe();
+
+            case "BILLING_POLICY" ->
+                    billingPolicyRecordRepository.updateTxHash(entityId, txHash)
+                            .doOnSuccess(v -> log.debug("Billing policy confirmed on-chain — policyId={}", entityId))
+                            .subscribe();
+
+            case "GEOFENCE_EVENT" ->
+                    geofenceCrossingRepository.updateTxHash(entityId, txHash)
+                            .doOnSuccess(v -> log.debug("Geofence crossing confirmed on-chain — crossingId={}", entityId))
+                            .subscribe();
+
+            case "DAO_RULE" ->
+                    daoRuleRepository.updateTxHash(entityId, txHash)
+                            .doOnSuccess(v -> log.debug("DAO rule confirmed on-chain — ruleId={}", entityId))
+                            .subscribe();
+
+            case "POL_EVENT" ->
+                    polVerificationRepository.updateTxHash(entityId, txHash)
+                            .doOnSuccess(v -> log.debug("PoL verification confirmed on-chain — eventId={}", entityId))
                             .subscribe();
 
             default ->

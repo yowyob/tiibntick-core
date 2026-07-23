@@ -9,7 +9,7 @@ public interface InvoiceGenerationPort {
 
     Mono<GeneratedInvoice> generate(InvoiceGenerationRequest request);
 
-    Mono<String> getPdfUrl(String coreInvoiceId);
+    Mono<String> getPdfUrl(UUID tenantId, String coreInvoiceId);
 
     record InvoiceGenerationRequest(
             UUID tenantId,

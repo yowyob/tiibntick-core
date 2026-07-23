@@ -3,12 +3,12 @@ package com.yowyob.tiibntick.core.billing.wallet.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.yowyob.tiibntick.core.billing.wallet.adapter.out.kernel.KernelPaymentGatewayAdapter;
+import com.yowyob.tiibntick.core.billing.wallet.application.port.out.IKernelPaymentGatewayPort;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
-import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.r2dbc.repository.config.EnableR2dbcRepositories;
@@ -22,41 +22,47 @@ import java.util.Map;
 
 /**
  * WalletModuleConfig — Spring configuration for tnt-billing-wallet.
- * Registers WebClient beans for MTN, Orange, Stripe, Kafka producer/consumer,
- * and JSON ObjectMapper.
+ * Registers the Kernel payment gateway fallback WebClient/port, Kafka consumer,
+ * and JSON ObjectMapper. (The module's dedicated Kafka producer was removed in the
+ * Chantier C · Audit n°3 · P5 outbox migration — {@code WalletKafkaPublisher} now goes
+ * through yow-event-kernel's transactional outbox.)
+ *
+ * <p>Direct MTN/Orange/Stripe WebClients were removed as part of the payment/wallet
+ * Kernel-delegation workstream (step 6) — provider integration is now exclusively the
+ * Kernel's responsibility; see {@code KernelPaymentGatewayAdapter}.
  *
  * @author MANFOUO Braun
  */
 @Configuration
 @EnableR2dbcRepositories(basePackages = "com.yowyob.tiibntick.core.billing.wallet.adapter.out.persistence.repository")
-@EnableConfigurationProperties({MtnMoMoProperties.class, OrangeMoneyProperties.class, StripeProperties.class})
 @EnableScheduling
 public class WalletModuleConfig {
 
     @Value("${spring.kafka.bootstrap-servers:localhost:9092}")
     private String kafkaBootstrapServers;
 
-    @Bean
-    public WebClient mtnWebClient(MtnMoMoProperties props) {
+    @Value("${tnt.kernel.base-url:https://kernel-core.yowyob.com}")
+    private String kernelBaseUrl;
+
+    /**
+     * Fallback Kernel payment WebClient, only used if {@code tnt-bootstrap}'s
+     * {@code KernelBridgeConfig} hasn't already defined the {@code kernelPaymentWebClient}
+     * bean (e.g. running this module standalone in tests). In the real app, the bootstrap
+     * bean always wins — see {@code KernelBridgeConfig} javadoc.
+     */
+    @Bean("kernelPaymentWebClient")
+    @ConditionalOnMissingBean(name = "kernelPaymentWebClient")
+    public WebClient kernelPaymentWebClient() {
         return WebClient.builder()
-                .baseUrl(props.baseUrl())
+                .baseUrl(kernelBaseUrl)
                 .defaultHeader("Content-Type", "application/json")
                 .build();
     }
 
     @Bean
-    public WebClient orangeWebClient(OrangeMoneyProperties props) {
-        return WebClient.builder()
-                .baseUrl(props.baseUrl())
-                .defaultHeader("Content-Type", "application/json")
-                .build();
-    }
-
-    @Bean
-    public WebClient stripeWebClient() {
-        return WebClient.builder()
-                .baseUrl("https://api.stripe.com")
-                .build();
+    @ConditionalOnMissingBean
+    public IKernelPaymentGatewayPort kernelPaymentGatewayPort(WebClient kernelPaymentWebClient) {
+        return new KernelPaymentGatewayAdapter(kernelPaymentWebClient);
     }
 
     @Bean
@@ -65,24 +71,6 @@ public class WalletModuleConfig {
         mapper.registerModule(new JavaTimeModule());
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         return mapper;
-    }
-
-    @Bean
-    public ProducerFactory<String, String> walletProducerFactory() {
-        Map<String, Object> props = new HashMap<>();
-        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBootstrapServers);
-        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        props.put(ProducerConfig.ACKS_CONFIG, "all");
-        props.put(ProducerConfig.RETRIES_CONFIG, 3);
-        props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
-        return new DefaultKafkaProducerFactory<>(props);
-    }
-
-    @Bean("walletKafkaTemplate")
-    public KafkaTemplate<String, String> kafkaTemplate(
-            ProducerFactory<String, String> walletProducerFactory) {
-        return new KafkaTemplate<>(walletProducerFactory);
     }
 
     @Bean

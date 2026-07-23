@@ -17,9 +17,11 @@
     <packaging>jar</packaging>
     <name>TiiBnTick Core — tnt-billing-wallet</name>
     <description>
-        Wallet in-app and Mobile Money integration module (MTN MoMo Collections v2, Orange Money Cameroun,
-        Stripe). Handles credit/debit/freeze operations, idempotency via Redis,
-        HMAC-verified webhook callbacks, and periodic reconciliation.
+        Wallet ledger module. Credit/debit/freeze operations, idempotency via Redis, and
+        periodic reconciliation. Mobile Money/card provider integration (MTN MoMo, Orange
+        Money, Stripe) and their webhook callbacks are delegated entirely to the Kernel's
+        payment-controller (see KernelPaymentGatewayAdapter) — this module no longer holds
+        provider credentials or dispatches to providers directly.
         Author: MANFOUO Braun — ENSP Yaoundé 2026.
     </description>
 
@@ -131,6 +133,11 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>mockwebserver</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>postgresql</artifactId>
             <scope>test</scope>
@@ -140,7 +147,27 @@
             <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- In-process broker for the outbox integration test (Chantier C · Audit n°3 · P5) —
+             see KafkaDeliveryEventPublisherOutboxIntegrationTest's Javadoc in tnt-delivery-core
+             for why this repo standardises on spring-kafka-test for Kafka-side assertions. -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka-test</artifactId>
+            <scope>test</scope>
+        </dependency>
 
+
+        <!-- ── yow-event-kernel (Foundation L0 ─ transactional outbox, Chantier C · Audit n°3 · P5) ── -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>yow-event-kernel</artifactId>
+        </dependency>
+
+        <!-- ── tnt-common-core (Foundation L1 ─ KernelResponses/KernelEnvelope) ── -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-common-core</artifactId>
+        </dependency>
 
         <!-- ── tnt-auth-core (Foundation L1 ─ security context) ── -->
         <dependency>
@@ -164,6 +191,14 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+
+        <!-- @SchedulerLock annotation (Chantier D · Audit n°6 · S2) — distributed lock around
+             this module's @Scheduled job(s); LockProvider bean lives centrally in
+             tnt-bootstrap's TntSchedulerLockConfig. -->
+        <dependency>
+            <groupId>net.javacrumbs.shedlock</groupId>
+            <artifactId>shedlock-spring</artifactId>
         </dependency>
 
     </dependencies>

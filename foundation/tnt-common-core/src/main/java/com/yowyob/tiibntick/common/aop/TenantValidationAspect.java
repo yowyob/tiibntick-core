@@ -14,6 +14,7 @@ import reactor.core.publisher.Mono;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.time.Duration;
 import java.util.UUID;
 
 /**
@@ -41,6 +42,17 @@ import java.util.UUID;
 @Slf4j
 public class TenantValidationAspect {
 
+    /**
+     * Chantier D · Audit n°6 · S14 / Audit n°1 · A3 — the blocking fallback branch below
+     * used to call {@code .block()} with no timeout: if {@link CurrentTenantUseCase} ever
+     * failed to complete (Reactor Context never populated, upstream hang), whatever thread
+     * invoked the advised method — potentially a Netty event-loop thread, since this aspect
+     * has no way to know its caller's threading context ahead of time — would hang
+     * indefinitely. Bounded instead, so a stuck tenant lookup surfaces as a fast, explicit
+     * failure.
+     */
+    private static final Duration BLOCKING_PROCEED_TIMEOUT = Duration.ofSeconds(5);
+
     private final CurrentTenantUseCase currentTenantUseCase;
 
     public TenantValidationAspect(CurrentTenantUseCase currentTenantUseCase) {
@@ -61,6 +73,8 @@ public class TenantValidationAspect {
                 .flatMapMany(ctx -> proceedWithTenantFlux(joinPoint, method, ctx.tenantId()));
         } else {
             // For blocking methods: not ideal in reactive context, but supported for tests/batch
+            // (no @TenantScoped method in the codebase is non-reactive today, but this branch
+            // must stay safe for whenever one is added).
             return currentTenantUseCase.currentTenant()
                 .map(ctx -> {
                     try {
@@ -71,7 +85,7 @@ public class TenantValidationAspect {
                         throw new RuntimeException("Error in @TenantScoped blocking method", e);
                     }
                 })
-                .block();
+                .block(BLOCKING_PROCEED_TIMEOUT);
         }
     }
 

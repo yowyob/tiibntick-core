@@ -4,9 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
-import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -41,22 +39,6 @@ public class TntBillingInvoiceAutoConfiguration {
         mapper.registerModule(new JavaTimeModule());
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         return mapper;
-    }
-
-    @Bean
-    public ProducerFactory<String, String> invoiceProducerFactory() {
-        return new DefaultKafkaProducerFactory<>(Map.of(
-                ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers,
-                ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class,
-                ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class,
-                ProducerConfig.ACKS_CONFIG, "all",
-                ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "true"
-        ));
-    }
-
-    @Bean("invoiceKafkaTemplate")
-    public KafkaTemplate<String, String> invoiceKafkaTemplate() {
-        return new KafkaTemplate<>(invoiceProducerFactory());
     }
 
     @Bean

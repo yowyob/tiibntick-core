@@ -30,6 +30,11 @@
     </description>
 
     <dependencies>
+        <!-- ── tnt-auth-core (Foundation L1 — security context, @CurrentUser) ── -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-auth-core</artifactId>
+        </dependency>
 
         <!-- ── Foundation Layer Dependencies ── -->
         <dependency>
@@ -142,26 +147,25 @@
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
-            <artifactId>testcontainers</artifactId>
-            <version>${testcontainers.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
             <artifactId>postgresql</artifactId>
-            <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- No explicit version pin on any org.testcontainers artifact below (matching
+             tnt-geo-core/tnt-incident-core exactly): pinning to testcontainers.version
+             (1.19.8) would force that release's own default docker-java client (3.3.6),
+             which rejects modern Docker daemons ("client version 1.32 is too old, minimum
+             supported is 1.40"). org.testcontainers:r2dbc transitively pulls
+             org.testcontainers:testcontainers 2.0.5 -> docker-java 3.7.1, which works, and
+             must be left free to win Maven's dependency mediation. Also needed here since
+             tnt-sync-core has its own R2dbcEntityVersionRepositoryIntegrationTest. -->
         <dependency>
             <groupId>org.testcontainers</groupId>
-            <artifactId>kafka</artifactId>
-            <version>${testcontainers.version}</version>
+            <artifactId>r2dbc</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>junit-jupiter</artifactId>
-            <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -174,6 +178,14 @@
             <artifactId>spring-kafka-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- @SchedulerLock annotation (Chantier D · Audit n°6 · S2) — distributed lock around
+             this module's @Scheduled job(s); LockProvider bean lives centrally in
+             tnt-bootstrap's TntSchedulerLockConfig. -->
+        <dependency>
+            <groupId>net.javacrumbs.shedlock</groupId>
+            <artifactId>shedlock-spring</artifactId>
+        </dependency>
+
     </dependencies>
 
 </project>

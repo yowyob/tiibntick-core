@@ -8,6 +8,7 @@ import com.yowyob.tiibntick.core.geo.domain.exception.GeoNotFoundException;
 import com.yowyob.tiibntick.core.geo.domain.model.GeoPoint;
 import com.yowyob.tiibntick.core.geo.domain.model.ServiceZonePolygon;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -33,8 +34,8 @@ public class GeofencingService implements IGeofenceUseCase {
     }
 
     @Override
-    public Mono<Boolean> isPointInZone(GeoPoint point, UUID zoneId) {
-        return zoneRepository.findById(zoneId, null)
+    public Mono<Boolean> isPointInZone(GeoPoint point, UUID zoneId, UUID tenantId) {
+        return zoneRepository.findById(zoneId, tenantId)
                 .switchIfEmpty(Mono.error(new GeoNotFoundException("ServiceZone", zoneId.toString())))
                 .map(zone -> zone.isActive() && zone.contains(point));
     }
@@ -54,6 +55,7 @@ public class GeofencingService implements IGeofenceUseCase {
                 .map(ServiceZonePolygon::id);
     }
 
+    @Transactional
     public Mono<ServiceZonePolygon> createZone(UUID tenantId, UUID agencyId,
                                                 String name, List<GeoPoint> vertices) {
         ServiceZonePolygon zone = ServiceZonePolygon.create(tenantId, agencyId, name, vertices);

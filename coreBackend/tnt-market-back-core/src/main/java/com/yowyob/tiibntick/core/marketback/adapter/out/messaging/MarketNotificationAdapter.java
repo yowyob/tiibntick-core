@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.core.marketback.adapter.out.messaging;
 
+import com.yowyob.kernel.i18n.domain.enums.SupportedLanguage;
 import com.yowyob.tiibntick.core.marketback.application.port.out.IMarketNotificationPort;
 import com.yowyob.tiibntick.core.notify.application.port.in.ISendNotificationUseCase;
 import com.yowyob.tiibntick.core.notify.domain.enums.NotificationChannel;
@@ -81,7 +82,7 @@ public class MarketNotificationAdapter implements IMarketNotificationPort {
     }
 
     private Mono<Void> sendNotification(String tenantId, UUID recipientId, String templateKey, Map<String, String> params) {
-        NotificationModel model = NotificationModel.of(templateKey, "fr", Map.copyOf(params));
+        NotificationModel model = NotificationModel.of(templateKey, SupportedLanguage.FR_CM.getTag(), Map.copyOf(params));
         return sendNotificationUseCase.send(
                         tenantId,
                         null,

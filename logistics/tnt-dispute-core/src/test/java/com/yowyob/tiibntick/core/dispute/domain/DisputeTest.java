@@ -63,7 +63,7 @@ class DisputeTest {
         @Test
         @DisplayName("should create dispute in OPEN status with generated reference")
         void shouldCreateDisputeInOpenStatus() {
-            Dispute dispute = Dispute.open(buildOpenCmd());
+            Dispute dispute = Dispute.open(buildOpenCmd(), DisputeReference.forSequence(1));
 
             assertThat(dispute.getStatus()).isEqualTo(DisputeStatus.OPEN);
             assertThat(dispute.getId()).isNotNull();
@@ -77,7 +77,7 @@ class DisputeTest {
         @Test
         @DisplayName("should emit DisputeOpened domain event")
         void shouldEmitDisputeOpenedEvent() {
-            Dispute dispute = Dispute.open(buildOpenCmd());
+            Dispute dispute = Dispute.open(buildOpenCmd(), DisputeReference.forSequence(1));
 
             List<Object> events = dispute.getDomainEvents();
             assertThat(events).hasSize(1);
@@ -92,7 +92,7 @@ class DisputeTest {
         @Test
         @DisplayName("should compute SLA deadline based on HIGH priority")
         void shouldComputeSlaDeadline() {
-            Dispute dispute = Dispute.open(buildOpenCmd());
+            Dispute dispute = Dispute.open(buildOpenCmd(), DisputeReference.forSequence(1));
 
             assertThat(dispute.getDeadline()).isNotNull();
             assertThat(dispute.getSlaPolicy()).isNotNull();
@@ -124,7 +124,7 @@ class DisputeTest {
         @Test
         @DisplayName("should transition to UNDER_INVESTIGATION when open")
         void shouldTransitionToUnderInvestigation() {
-            Dispute dispute = Dispute.open(buildOpenCmd());
+            Dispute dispute = Dispute.open(buildOpenCmd(), DisputeReference.forSequence(1));
             dispute.clearDomainEvents();
 
             dispute.assignMediator(MEDIATOR_ID);
@@ -155,7 +155,7 @@ class DisputeTest {
         @Test
         @DisplayName("should add evidence and emit EvidenceSubmitted event")
         void shouldAddEvidence() {
-            Dispute dispute = Dispute.open(buildOpenCmd());
+            Dispute dispute = Dispute.open(buildOpenCmd(), DisputeReference.forSequence(1));
             dispute.assignMediator(MEDIATOR_ID); // OPEN -> UNDER_INVESTIGATION
             dispute.clearDomainEvents();
 
@@ -230,7 +230,7 @@ class DisputeTest {
         @Test
         @DisplayName("should close as CLOSED_WITHDRAWN when in withdrawable state")
         void shouldWithdraw() {
-            Dispute dispute = Dispute.open(buildOpenCmd());
+            Dispute dispute = Dispute.open(buildOpenCmd(), DisputeReference.forSequence(1));
             dispute.clearDomainEvents();
 
             dispute.withdraw(CLAIMANT_ID);
@@ -255,7 +255,7 @@ class DisputeTest {
     @Test
     @DisplayName("clearDomainEvents() should remove all accumulated events")
     void shouldClearDomainEvents() {
-        Dispute dispute = Dispute.open(buildOpenCmd());
+        Dispute dispute = Dispute.open(buildOpenCmd(), DisputeReference.forSequence(1));
         assertThat(dispute.getDomainEvents()).isNotEmpty();
 
         dispute.clearDomainEvents();
@@ -268,7 +268,7 @@ class DisputeTest {
     // =========================================================================
 
     private Dispute buildDisputeUnderMediation() {
-        Dispute dispute = Dispute.open(buildOpenCmd());
+        Dispute dispute = Dispute.open(buildOpenCmd(), DisputeReference.forSequence(1));
         dispute.clearDomainEvents();
         dispute.assignMediator(MEDIATOR_ID);
         dispute.clearDomainEvents();
@@ -278,7 +278,7 @@ class DisputeTest {
     }
 
     private Dispute buildClosedDispute() {
-        Dispute dispute = Dispute.open(buildOpenCmd());
+        Dispute dispute = Dispute.open(buildOpenCmd(), DisputeReference.forSequence(1));
         dispute.withdraw(CLAIMANT_ID);
         dispute.clearDomainEvents();
         return dispute;

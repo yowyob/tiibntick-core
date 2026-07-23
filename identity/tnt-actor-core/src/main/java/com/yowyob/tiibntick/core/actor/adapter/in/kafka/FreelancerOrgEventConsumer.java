@@ -2,6 +2,7 @@ package com.yowyob.tiibntick.core.actor.adapter.in.kafka;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yowyob.tiibntick.common.kafka.TntTopics;
 import com.yowyob.tiibntick.core.actor.application.command.LinkFreelancerOrgCommand;
 import com.yowyob.tiibntick.core.actor.application.command.UnlinkFreelancerOrgCommand;
 import com.yowyob.tiibntick.core.actor.application.port.in.ILinkFreelancerOrgUseCase;
@@ -67,9 +68,9 @@ public class FreelancerOrgEventConsumer {
      * @param record the Kafka consumer record
      */
     @KafkaListener(
-            topics = "tnt.freelancer_org.created",
+            topics = TntTopics.FREELANCER_ORG_CREATED,
             groupId = "${spring.kafka.consumer.group-id:tiibntick-core}",
-            containerFactory = "kafkaListenerContainerFactory")
+            containerFactory = "actorKafkaListenerContainerFactory")
     public void onFreelancerOrgCreated(ConsumerRecord<String, String> record) {
         log.debug("Received tnt.freelancer_org.created: key={}", record.key());
         Mono.fromCallable(() -> objectMapper.readTree(record.value()))
@@ -111,9 +112,9 @@ public class FreelancerOrgEventConsumer {
      * @param record the Kafka consumer record
      */
     @KafkaListener(
-            topics = "tnt.freelancer_org.sub_deliverer.associated",
+            topics = TntTopics.FREELANCER_ORG_SUB_DELIVERER_ASSOCIATED,
             groupId = "${spring.kafka.consumer.group-id:tiibntick-core}",
-            containerFactory = "kafkaListenerContainerFactory")
+            containerFactory = "actorKafkaListenerContainerFactory")
     public void onSubDelivererAssociated(ConsumerRecord<String, String> record) {
         log.debug("Received tnt.freelancer_org.sub_deliverer.associated: key={}", record.key());
         Mono.fromCallable(() -> objectMapper.readTree(record.value()))
@@ -159,9 +160,9 @@ public class FreelancerOrgEventConsumer {
      * @param record the Kafka consumer record
      */
     @KafkaListener(
-            topics = "tnt.freelancer_org.sub_deliverer.revoked",
+            topics = TntTopics.FREELANCER_ORG_SUB_DELIVERER_REVOKED,
             groupId = "${spring.kafka.consumer.group-id:tiibntick-core}",
-            containerFactory = "kafkaListenerContainerFactory")
+            containerFactory = "actorKafkaListenerContainerFactory")
     public void onSubDelivererRevoked(ConsumerRecord<String, String> record) {
         log.debug("Received tnt.freelancer_org.sub_deliverer.revoked: key={}", record.key());
         Mono.fromCallable(() -> objectMapper.readTree(record.value()))
@@ -203,9 +204,9 @@ public class FreelancerOrgEventConsumer {
      * @param record the Kafka consumer record
      */
     @KafkaListener(
-            topics = "tnt.freelancer_org.verified",
+            topics = TntTopics.FREELANCER_ORG_VERIFIED,
             groupId = "${spring.kafka.consumer.group-id:tiibntick-core}",
-            containerFactory = "kafkaListenerContainerFactory")
+            containerFactory = "actorKafkaListenerContainerFactory")
     public void onFreelancerOrgVerified(ConsumerRecord<String, String> record) {
         log.debug("Received tnt.freelancer_org.verified: key={}", record.key());
         Mono.fromCallable(() -> objectMapper.readTree(record.value()))

@@ -1,5 +1,7 @@
 package com.yowyob.tiibntick.core.realtime.adapter.in.rest;
 
+import com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser;
+import com.yowyob.tiibntick.core.auth.domain.model.TntUserIdentity;
 import com.yowyob.tiibntick.core.realtime.application.port.in.IProcessGpsPingUseCase;
 import com.yowyob.tiibntick.core.realtime.domain.model.GPSStreamEntry;
 import com.yowyob.tiibntick.core.realtime.domain.model.GeoCoordinates;
@@ -35,12 +37,12 @@ public class GpsPingRestController {
     @PostMapping("/ping")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public Mono<Void> ping(
-            @RequestHeader("X-Tenant-Id") String tenantId,
+            @io.swagger.v3.oas.annotations.Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @Valid @RequestBody GpsPingRestRequest body) {
         GPSStreamEntry entry = new GPSStreamEntry(
                 body.delivererId(),
                 body.missionId(),
-                tenantId,
+                currentUser.tenantId().toString(),
                 GeoCoordinates.of(body.latitude(), body.longitude(), null, null),
                 body.speedKmh() != null ? body.speedKmh() : 0.0,
                 body.bearing() != null ? body.bearing() : 0.0,

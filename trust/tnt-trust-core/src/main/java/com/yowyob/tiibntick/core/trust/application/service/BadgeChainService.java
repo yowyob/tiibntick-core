@@ -4,9 +4,12 @@ import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Mono;
+import com.yowyob.tiibntick.core.trust.domain.model.valueobject.ActorBadge;
 import com.yowyob.tiibntick.core.trust.domain.model.valueobject.LogisticTrustEvent;
 import com.yowyob.tiibntick.core.trust.application.port.in.RecordBadgeUseCase;
+import com.yowyob.tiibntick.core.trust.application.port.out.ActorBadgeRepository;
 
 /**
  * Application Service — {@code BadgeChainService}.
@@ -26,22 +29,29 @@ public class BadgeChainService implements RecordBadgeUseCase {
     private static final Logger log = LoggerFactory.getLogger(BadgeChainService.class);
 
     private final LogisticEventPublisherService publisherService;
+    private final ActorBadgeRepository actorBadgeRepository;
     private final MeterRegistry meterRegistry;
 
     public BadgeChainService(
             final LogisticEventPublisherService publisherService,
+            final ActorBadgeRepository actorBadgeRepository,
             final MeterRegistry meterRegistry) {
         this.publisherService = publisherService;
+        this.actorBadgeRepository = actorBadgeRepository;
         this.meterRegistry = meterRegistry;
     }
 
     /**
      * {@inheritDoc}
      *
-     * <p>Builds a {@code BADGE_AWARDED} logistic event and publishes it
-     * to Kafka for Fabric anchoring.
+     * <p>Persists the badge locally first — so it is immediately visible to
+     * reads via {@code ActorBadgeRepository} — then builds a
+     * {@code BADGE_AWARDED} logistic event and publishes it to Kafka for
+     * Fabric anchoring. {@code TrustCommittedEventConsumer} later fills in
+     * the Fabric tx hash on this same persisted row once the ledger confirms.
      */
     @Override
+    @Transactional
     public Mono<String> record(
             final String actorId,
             final String badgeType,
@@ -50,10 +60,11 @@ public class BadgeChainService implements RecordBadgeUseCase {
 
         log.info("Recording badge award — actorId={}, badge={}, points={}", actorId, badgeType, points);
 
-        final LogisticTrustEvent event = LogisticTrustEvent.forBadgeAwarded(
-                actorId, tenantId, badgeType, points);
+        final ActorBadge badge = ActorBadge.award(actorId, tenantId, badgeType, points);
+        final LogisticTrustEvent event = LogisticTrustEvent.forBadgeAwarded(badge);
 
-        return publisherService.publish(event)
+        return actorBadgeRepository.save(badge)
+                .then(publisherService.publish(event))
                 .doOnSuccess(v -> {
                     meterRegistry.counter("tnt.trust.badge.awarded",
                             "badgeType", badgeType,

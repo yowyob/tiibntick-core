@@ -1,5 +1,7 @@
 package com.yowyob.tiibntick.core.billing.pricing.infrastructure.adapter.in.web;
 
+import com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser;
+import com.yowyob.tiibntick.core.auth.domain.model.TntUserIdentity;
 import com.yowyob.tiibntick.core.billing.pricing.application.service.CommissionCalculatorService;
 import com.yowyob.tiibntick.core.billing.pricing.domain.model.enums.CommissionAppliesTo;
 import com.yowyob.tiibntick.core.billing.pricing.domain.port.in.IPricingUseCase;
@@ -102,12 +104,17 @@ public class PricingController {
                description = "Calculates the storage fee for a parcel stored at a hub relay point "
                        + "for the specified number of hours.")
     public Mono<PriceEvaluationResponse.MoneyDto> evaluateHubStorage(
+            @CurrentUser TntUserIdentity currentUser,
             @RequestParam @NotNull UUID policyId,
             @RequestParam @PositiveOrZero int storageHours,
             @RequestParam(required = false) String packageType,
             @RequestParam(defaultValue = "XAF") String currency) {
+        // Audit n°7 · #5 (IDOR) — this endpoint previously built a PricingContext with no
+        // tenantId at all, so the policy lookup could not be tenant-scoped. Resolve the
+        // tenant from the JWT (@CurrentUser) since none was available before.
         PricingContext ctx = PricingContext.builder()
                 .storageHours(storageHours)
+                .tenantId(currentUser.tenantId())
                 .build();
         return pricingUseCase.computeSellingPrice(policyId, ctx)
                 .map(m -> new PriceEvaluationResponse.MoneyDto(
@@ -122,12 +129,15 @@ public class PricingController {
                description = "Calculates the per-hop transit fee for a parcel routed through "
                        + "a Link relay network.")
     public Mono<PriceEvaluationResponse.MoneyDto> evaluateNetworkTransit(
+            @CurrentUser TntUserIdentity currentUser,
             @RequestParam @NotNull UUID policyId,
             @RequestParam @PositiveOrZero int hopCount,
             @RequestParam(defaultValue = "false") boolean interCity,
             @RequestParam(defaultValue = "XAF") String currency) {
+        // Audit n°7 · #5 (IDOR) — see evaluateHubStorage: tenant now sourced from JWT.
         PricingContext ctx = PricingContext.builder()
                 .networkHopCount(hopCount)
+                .tenantId(currentUser.tenantId())
                 .build();
         return pricingUseCase.computeSellingPrice(policyId, ctx)
                 .map(m -> new PriceEvaluationResponse.MoneyDto(
@@ -143,13 +153,15 @@ public class PricingController {
                description = "Splits the total selling price between the platform, the org OWNER, "
                        + "and a sub-deliverer according to the policy's commission rules.")
     public Mono<CommissionSplitResponse> evaluateCommissionSplit(
+            @CurrentUser TntUserIdentity currentUser,
             @Valid @RequestBody CommissionSplitRequest req) {
         return commissionCalculatorService
                 .computeFreelancerOrgSplit(
                         req.policyId(),
                         com.yowyob.tiibntick.core.billing.dsl.domain.model.Money.of(
                                 req.sellingPriceAmount(), req.currencyCode()),
-                        req.subDelivererPct())
+                        req.subDelivererPct(),
+                        currentUser.tenantId())
                 .map(split -> new CommissionSplitResponse(
                         new PriceEvaluationResponse.MoneyDto(
                                 split.platformFee().getAmount(),
@@ -168,6 +180,7 @@ public class PricingController {
     @PostMapping("/commission")
     @Operation(summary = "Compute commission breakdown for a given actor type")
     public Mono<CommissionCalculatorService.CommissionBreakdown> computeCommission(
+            @CurrentUser TntUserIdentity currentUser,
             @RequestParam UUID policyId,
             @RequestParam BigDecimal sellingPriceAmount,
             @RequestParam(defaultValue = "XAF") String currencyCode,
@@ -176,7 +189,8 @@ public class PricingController {
                 policyId,
                 com.yowyob.tiibntick.core.billing.dsl.domain.model.Money.of(
                         sellingPriceAmount, currencyCode),
-                delivererType);
+                delivererType,
+                currentUser.tenantId());
     }
 
     // ── Private helper ────────────────────────────────────────────────────────

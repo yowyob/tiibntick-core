@@ -45,10 +45,15 @@ class TrustApiControllerTest {
     @Mock private GetDeliveryAuditTrailUseCase getDeliveryAuditTrail;
     @Mock private GetActorDIDUseCase getActorDID;
     @Mock private GetCustodyChainUseCase getCustodyChainUseCase;
+    @Mock private GetGeofenceCrossingsUseCase getGeofenceCrossingsUseCase;
+    @Mock private GetDaoRulesUseCase getDaoRulesUseCase;
+    @Mock private GetPolVerificationsUseCase getPolVerificationsUseCase;
     @Mock private LogisticProofResolverService proofResolver;
 
+    private static final UUID TENANT_ID = UUID.randomUUID();
+
     private static final TntUserIdentity STUB_USER = new TntUserIdentity(
-            UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+            UUID.randomUUID(), TENANT_ID, UUID.randomUUID(),
             UUID.randomUUID(), UUID.randomUUID(), Set.of("trust:anchor", "trust:read"), false);
 
     private static final ResolveCurrentUserUseCase STUB_RESOLVE_CURRENT_USER = new ResolveCurrentUserUseCase() {
@@ -72,7 +77,8 @@ class TrustApiControllerTest {
         return WebTestClient.bindToController(new TrustApiController(
                 recordDeliveryProof, recordCustodyTransfer, issueDID,
                 recordPolVerification, getDeliveryAuditTrail, getActorDID,
-                getCustodyChainUseCase, proofResolver))
+                getCustodyChainUseCase, getGeofenceCrossingsUseCase, getDaoRulesUseCase,
+                getPolVerificationsUseCase, proofResolver))
                 .argumentResolvers(configurer -> configurer.addCustomResolver(
                         new TntCurrentUserArgumentResolver(STUB_RESOLVE_CURRENT_USER)))
                 .build();
@@ -89,11 +95,11 @@ class TrustApiControllerTest {
         void shouldReturn200WithTrail() {
             final DeliveryProofRecord proof = buildProof("proof-001");
 
-            when(getDeliveryAuditTrail.getByMissionId("mission-001", "tenant-001"))
+            when(getDeliveryAuditTrail.getByMissionId("mission-001", TENANT_ID.toString()))
                     .thenReturn(Flux.just(proof));
 
             webTestClient().get()
-                    .uri("/tnt/trust/delivery/mission-001/trail?tenantId=tenant-001")
+                    .uri("/tnt/trust/delivery/mission-001/trail")
                     .exchange()
                     .expectStatus().isOk()
                     .expectHeader().contentType(MediaType.APPLICATION_JSON)
@@ -105,11 +111,11 @@ class TrustApiControllerTest {
         @Test
         @DisplayName("should return empty array when no proofs")
         void shouldReturnEmptyArray() {
-            when(getDeliveryAuditTrail.getByMissionId("mission-999", "tenant-001"))
+            when(getDeliveryAuditTrail.getByMissionId("mission-999", TENANT_ID.toString()))
                     .thenReturn(Flux.empty());
 
             webTestClient().get()
-                    .uri("/tnt/trust/delivery/mission-999/trail?tenantId=tenant-001")
+                    .uri("/tnt/trust/delivery/mission-999/trail")
                     .exchange()
                     .expectStatus().isOk()
                     .expectBody().json("[]");
@@ -165,11 +171,11 @@ class TrustApiControllerTest {
                     "-----BEGIN CERTIFICATE-----\nMock\n-----END CERTIFICATE-----", null);
             doc.confirmOnChain("b".repeat(64));
 
-            when(getActorDID.getByActorId("actor-001", "tenant-001"))
+            when(getActorDID.getByActorId("actor-001", TENANT_ID.toString()))
                     .thenReturn(Mono.just(doc));
 
             webTestClient().get()
-                    .uri("/tnt/trust/actors/actor-001/did?tenantId=tenant-001")
+                    .uri("/tnt/trust/actors/actor-001/did")
                     .exchange()
                     .expectStatus().isOk()
                     .expectBody()

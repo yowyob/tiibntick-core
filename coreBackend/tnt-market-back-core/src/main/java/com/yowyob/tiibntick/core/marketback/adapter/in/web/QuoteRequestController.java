@@ -24,6 +24,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * Generic Market QuoteRequest API — client-to-provider quote requests
@@ -52,6 +53,7 @@ public class QuoteRequestController {
 
     @Operation(summary = "Create a quote request from a client to a provider listing")
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<QuoteRequestResponse> create(
             @RequestBody CreateQuoteRequestCommand request,
@@ -73,6 +75,7 @@ public class QuoteRequestController {
 
     @Operation(summary = "Provider submits a response (offer) to a quote request")
     @PostMapping("/{id}/responses")
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<QuoteRequestResponse> respond(
             @PathVariable UUID id,
@@ -83,6 +86,7 @@ public class QuoteRequestController {
 
     @Operation(summary = "Client selects one of the provider responses")
     @PostMapping("/{id}/responses/{responseId}/select")
+    @PreAuthorize("isAuthenticated()")
     public Mono<QuoteRequestResponse> selectResponse(
             @PathVariable UUID id,
             @PathVariable UUID responseId,
@@ -93,6 +97,7 @@ public class QuoteRequestController {
 
     @Operation(summary = "Client rejects one of the provider responses")
     @PostMapping("/{id}/responses/{responseId}/reject")
+    @PreAuthorize("isAuthenticated()")
     public Mono<QuoteRequestResponse> rejectResponse(
             @PathVariable UUID id,
             @PathVariable UUID responseId,
@@ -103,6 +108,7 @@ public class QuoteRequestController {
 
     @Operation(summary = "Cancel a quote request")
     @PostMapping("/{id}/cancel")
+    @PreAuthorize("isAuthenticated()")
     public Mono<QuoteRequestResponse> cancel(
             @PathVariable UUID id,
             @RequestParam(required = false) String reason,

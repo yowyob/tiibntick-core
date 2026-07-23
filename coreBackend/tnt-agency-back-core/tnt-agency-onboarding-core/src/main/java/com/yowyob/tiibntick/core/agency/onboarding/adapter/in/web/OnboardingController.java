@@ -7,7 +7,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /** Candidate self-service onboarding — port of tnt-agency {@code OnboardingController}. */
 @Tag(name = "Agency ERP Onboarding", description = "Agency registration applications (candidate)")
@@ -30,6 +30,7 @@ public class OnboardingController {
     private final OnboardingService onboardingService;
 
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/onboarding/applications")
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Submit agency registration application")
     public Mono<ApiResponse<SubmitOnboardingResponse>> submit(
@@ -58,14 +59,16 @@ public class OnboardingController {
     }
 
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/onboarding/applications/{agencyId}/kernel-identity")
-    @Operation(summary = "Persist Kernel phase-1 business actor (BFF calls Kernel first)")
-    public Mono<ApiResponse<KernelIdentityResponse>> linkKernelIdentity(
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Complete Kernel phase-1 — ERP creates BusinessActor via Core then persists")
+    public Mono<ApiResponse<KernelIdentityResponse>> completeKernelIdentity(
             @PathVariable UUID tenantId,
             @PathVariable UUID agencyId,
             @RequestHeader("X-User-Id") UUID userId,
-            @Valid @RequestBody LinkKernelIdentityRequest body) {
-        return onboardingService.linkKernelIdentity(new OnboardingService.LinkKernelIdentityInput(
-                tenantId, userId, agencyId, body.kernelBusinessActorId()
+            @RequestBody(required = false) LinkKernelIdentityRequest body) {
+        UUID providedActorId = body != null ? body.kernelBusinessActorId() : null;
+        return onboardingService.completeKernelIdentity(new OnboardingService.LinkKernelIdentityInput(
+                tenantId, userId, agencyId, providedActorId
         )).map(r -> ApiResponse.success(new KernelIdentityResponse(
                 r.agencyId(), r.applicationId(), r.kernelBusinessActorId(), r.readyForAdminApproval())));
     }
@@ -107,7 +110,8 @@ public class OnboardingController {
         record AddressRequest(String street, String city, String country) {}
     }
 
-    record LinkKernelIdentityRequest(@NotNull UUID kernelBusinessActorId) {}
+    /** Optional legacy body — when null, ERP creates the actor via Core. */
+    record LinkKernelIdentityRequest(UUID kernelBusinessActorId) {}
 
     record SubmitOnboardingResponse(
             UUID agencyId, UUID applicationId, String agencyStatus,

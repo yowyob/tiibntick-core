@@ -27,6 +27,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * Generic Market ServiceOffer management API — pricing rules, handling
@@ -47,6 +48,7 @@ public class MarketServiceOfferController {
 
     @Operation(summary = "Create a service offer for a listing")
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<ServiceOfferResponse> create(
             @Valid @RequestBody CreateServiceOfferCommand command,
@@ -66,6 +68,7 @@ public class MarketServiceOfferController {
 
     @Operation(summary = "Update an existing service offer")
     @PutMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     public Mono<ServiceOfferResponse> update(
             @PathVariable UUID id,
             @RequestBody UpdateServiceOfferCommand command,
@@ -75,6 +78,7 @@ public class MarketServiceOfferController {
 
     @Operation(summary = "Activate a service offer so it becomes visible to clients")
     @PostMapping("/{id}/activate")
+    @PreAuthorize("isAuthenticated()")
     public Mono<ServiceOfferResponse> activate(
             @PathVariable UUID id,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
@@ -83,6 +87,7 @@ public class MarketServiceOfferController {
 
     @Operation(summary = "Temporarily deactivate a service offer")
     @PostMapping("/{id}/deactivate")
+    @PreAuthorize("isAuthenticated()")
     public Mono<ServiceOfferResponse> deactivate(
             @PathVariable UUID id,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
@@ -91,6 +96,7 @@ public class MarketServiceOfferController {
 
     @Operation(summary = "Permanently archive a service offer")
     @PostMapping("/{id}/archive")
+    @PreAuthorize("isAuthenticated()")
     public Mono<ServiceOfferResponse> archive(
             @PathVariable UUID id,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
@@ -123,6 +129,7 @@ public class MarketServiceOfferController {
 
     @Operation(summary = "Simulate delivery cost for a given parcel and route on this offer")
     @PostMapping("/{id}/simulate-price")
+    @PreAuthorize("isAuthenticated()")
     public Mono<PriceSimulationResponse> simulatePrice(
             @PathVariable UUID id,
             @Valid @RequestBody SimulatePriceCommand command,

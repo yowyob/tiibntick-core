@@ -1,0 +1,4 @@
+#
+#Sat Jul 18 10:01:32 WAT 2026
+no\ classes\ that\ reside\ in\ a\ package\ '..adapter.in..'\ should\ depend\ on\ classes\ that\ reside\ in\ a\ package\ '..adapter.out..',\ because\ inbound\ adapters\ (web\ controllers,\ Kafka/messaging\ consumers)\ must\ go\ through\ application\ ports,\ never\ call\ outbound\ adapters\ directly=6c0488e3-9ef5-4bac-b898-371999f148df
+no\ classes\ that\ reside\ in\ a\ package\ '..application..'\ should\ depend\ on\ classes\ that\ reside\ in\ a\ package\ '..adapter.in.web..',\ because\ the\ application\ layer\ must\ not\ know\ about\ web-facing\ request/response\ DTOs\ (Audit\ n1\ A6)\ \u2014\ controllers\ map\ to/from\ web\ DTOs,\ application\ services\ expose\ domain/entity\ types\ only=209b387f-7fd1-4d8c-8c49-830d9989e5c7

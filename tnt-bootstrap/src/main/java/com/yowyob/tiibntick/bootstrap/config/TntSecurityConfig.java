@@ -1,6 +1,8 @@
 package com.yowyob.tiibntick.bootstrap.config;
 
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -58,12 +60,19 @@ import java.util.List;
 @EnableReactiveMethodSecurity
 public class TntSecurityConfig {
 
-    /** Paths that are always publicly accessible — no JWT required. */
-    private static final String[] PUBLIC_PATHS = {
+    /**
+     * Paths that are always publicly accessible — no JWT required — except
+     * {@code /actuator/prometheus} which is dropped from this list in {@code PROD}
+     * (Audit n°7 · #16: a metrics endpoint reachable with zero authentication is a
+     * free reconnaissance/DoS surface). It still falls through to the {@code @Order(20)}
+     * authenticated chain there — production scraping must go through network-level
+     * ACLs (Prometheus is only ever reached from inside the cluster) or a scrape
+     * credential, never an open HTTP GET.
+     */
+    private static final List<String> BASE_PUBLIC_PATHS = List.of(
             "/actuator/health",
             "/actuator/health/**",
             "/actuator/info",
-            "/actuator/prometheus",
             "/swagger-ui/**",
             "/swagger-ui.html",
             "/v3/api-docs/**",
@@ -80,7 +89,9 @@ public class TntSecurityConfig {
             // which enforces X-Client-Id/X-Api-Key via PlatformApiKeyWebFilter. Adding them to
             // this @Order(5) fully-public chain would short-circuit that check entirely — see
             // docs/auth/platform-client-management-design.md.
-    };
+    );
+
+    private static final String PROMETHEUS_PATH = "/actuator/prometheus";
 
     @Value("${tnt.security.allowed-origins:http://localhost:3000,http://localhost:3001}")
     private List<String> allowedOrigins;
@@ -102,6 +113,46 @@ public class TntSecurityConfig {
     @Value("${tnt.roles.system-tenant-id:00000000-0000-0000-0000-000000000001}")
     private String systemTenantId;
 
+    @Autowired
+    private ApplicationProfile applicationProfile;
+
+    // ── Fail-fast guard (Audit n°7 · #9) ────────────────────────────────────────
+
+    /**
+     * Refuses to start when {@code tnt.auth.allow-anonymous-context=true} (dev-mode
+     * bypass that injects a synthetic, fully-authenticated {@code ROLE_TNT_ADMIN}
+     * principal for every request — see {@link #devAuthFilter()}) is combined with an
+     * active {@code PROD} profile. Without this guard a stray/leaked
+     * {@code TNT_AUTH_ALLOW_ANONYMOUS=true} env var in production would silently grant
+     * every unauthenticated caller full admin rights on every endpoint.
+     *
+     * <p>Runs as a plain {@code @PostConstruct} so throwing here aborts
+     * {@code ApplicationContext.refresh()} itself — the same fail-fast shape used by
+     * {@link TntProdSecretsGuard} for Audit n°7 · #8.
+     */
+    @PostConstruct
+    void validateAnonymousContextNotAllowedInProd() {
+        if (allowAnonymousContext && applicationProfile.isProduction()) {
+            throw new IllegalStateException(
+                    "Refusing to start with profile PROD: tnt.auth.allow-anonymous-context=true "
+                            + "(TNT_AUTH_ALLOW_ANONYMOUS) would inject a synthetic ROLE_TNT_ADMIN principal "
+                            + "into every unauthenticated request. Set TNT_AUTH_ALLOW_ANONYMOUS=false (or unset it) "
+                            + "for the prod profile.");
+        }
+    }
+
+    /**
+     * Builds the effective public-path list: {@link #BASE_PUBLIC_PATHS} plus
+     * {@code /actuator/prometheus} in every profile except {@code PROD} (Audit n°7 · #16).
+     */
+    private String[] resolvePublicPaths() {
+        List<String> paths = new ArrayList<>(BASE_PUBLIC_PATHS);
+        if (!applicationProfile.isProduction()) {
+            paths.add(PROMETHEUS_PATH);
+        }
+        return paths.toArray(new String[0]);
+    }
+
     // ── Chain 1: Public paths ─────────────────────────────────────────────────
 
     /**
@@ -114,9 +165,11 @@ public class TntSecurityConfig {
     @Bean
     @Order(5)
     public SecurityWebFilterChain publicPathsSecurityWebFilterChain(ServerHttpSecurity http) {
-        log.info("Configuring TiiBnTick public-paths security chain (order=5)");
+        String[] publicPaths = resolvePublicPaths();
+        log.info("Configuring TiiBnTick public-paths security chain (order=5) — {} paths, prometheus public={}",
+                publicPaths.length, !applicationProfile.isProduction());
         return http
-                .securityMatcher(ServerWebExchangeMatchers.pathMatchers(PUBLIC_PATHS))
+                .securityMatcher(ServerWebExchangeMatchers.pathMatchers(publicPaths))
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .securityContextRepository(NoOpServerSecurityContextRepository.getInstance())

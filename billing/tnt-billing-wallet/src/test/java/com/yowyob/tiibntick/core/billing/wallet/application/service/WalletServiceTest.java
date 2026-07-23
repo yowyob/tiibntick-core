@@ -1,7 +1,9 @@
 package com.yowyob.tiibntick.core.billing.wallet.application.service;
 
+import com.yowyob.tiibntick.core.billing.wallet.adapter.out.kernel.dto.KernelPaymentOrderDto;
 import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.ConfirmPaymentCommand;
 import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.CreditWalletCommand;
+import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.InitiatePaymentCommand;
 import com.yowyob.tiibntick.core.billing.wallet.application.port.out.*;
 import com.yowyob.tiibntick.core.billing.wallet.domain.enums.PaymentChannel;
 import com.yowyob.tiibntick.core.billing.wallet.domain.enums.PaymentIntentStatus;
@@ -13,9 +15,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Currency;
 import java.util.UUID;
@@ -34,11 +38,11 @@ class WalletServiceTest {
 
     @Mock private IWalletRepository walletRepository;
     @Mock private IPaymentIntentRepository paymentIntentRepository;
-    @Mock private IMoMoPaymentPort moMoPaymentPort;
     @Mock private IIdempotencyStore idempotencyStore;
     @Mock private IWalletEventPublisher eventPublisher;
     @Mock private IWalletNotificationPort notificationPort;
     @Mock private IPaymentAnchorPort paymentAnchorPort;
+    @Mock private IKernelPaymentGatewayPort kernelPaymentGatewayPort;
 
     private WalletService walletService;
 
@@ -50,8 +54,9 @@ class WalletServiceTest {
     void setUp() {
         walletService = new WalletService(
                 walletRepository, paymentIntentRepository,
-                moMoPaymentPort, idempotencyStore,
-                eventPublisher, notificationPort, paymentAnchorPort);
+                idempotencyStore,
+                eventPublisher, notificationPort, paymentAnchorPort,
+                kernelPaymentGatewayPort);
         lenient().when(walletRepository.save(any(Wallet.class)))
             .thenReturn(Mono.just(Wallet.createNew(USER_ID, TENANT_ID, XAF)));
         lenient().when(paymentAnchorPort.anchor(any())).thenReturn(Mono.empty());
@@ -173,5 +178,131 @@ class WalletServiceTest {
         StepVerifier.create(walletService.handlePaymentCallback(cmd))
                 .expectNextCount(1)
                 .verifyComplete();
+    }
+
+    @Test
+    @DisplayName("initiatePayment for MTN_MOMO dispatches to the Kernel payment-gateway-controller and records the returned order id")
+    void initiatePaymentDispatchesToKernelForMtnMomo() {
+        Wallet wallet = Wallet.createNew(USER_ID, TENANT_ID, XAF);
+        when(walletRepository.findByUserId(USER_ID, TENANT_ID)).thenReturn(Mono.just(wallet));
+        when(idempotencyStore.getResult(anyString())).thenReturn(Mono.empty());
+        when(idempotencyStore.tryAcquire(anyString(), any())).thenReturn(Mono.just(true));
+
+        KernelPaymentOrderDto order = new KernelPaymentOrderDto(
+                "kernel-order-1", TENANT_ID.toString(), null, null,
+                new BigDecimal("5000.00"), "XAF", "MYCOOLPAY", "MOBILE_MONEY",
+                "+237600000000", "PENDING", null, null, null, null);
+        when(kernelPaymentGatewayPort.initiateOrder(
+                eq("MYCOOLPAY"), eq("MOBILE_MONEY"), any(), any(), any(), any(), any(), any()))
+                .thenReturn(Mono.just(order));
+
+        when(paymentIntentRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(walletRepository.saveTransaction(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(idempotencyStore.storeResult(anyString(), anyString(), any())).thenReturn(Mono.empty());
+        when(eventPublisher.publish(any(
+                com.yowyob.tiibntick.core.billing.wallet.domain.event.PaymentInitiated.class)))
+                .thenReturn(Mono.empty());
+
+        InitiatePaymentCommand cmd = new InitiatePaymentCommand(
+                USER_ID, TENANT_ID, "INV-001", Money.ofXAF(5000), PaymentChannel.MTN_MOMO,
+                "+237600000000", null, "test payment");
+
+        StepVerifier.create(walletService.initiatePayment(cmd))
+                .assertNext(intent -> assertThat(intent.getExternalRef()).isEqualTo("kernel-order-1"))
+                .verifyComplete();
+
+        verify(kernelPaymentGatewayPort).initiateOrder(
+                eq("MYCOOLPAY"), eq("MOBILE_MONEY"), eq(new BigDecimal("5000.00")), eq("XAF"),
+                eq("+237600000000"), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("initiatePayment for CASH_ON_DELIVERY never calls the Kernel payment-gateway-controller")
+    void initiatePaymentForCashOnDeliverySkipsKernelDispatch() {
+        Wallet wallet = Wallet.createNew(USER_ID, TENANT_ID, XAF);
+        when(walletRepository.findByUserId(USER_ID, TENANT_ID)).thenReturn(Mono.just(wallet));
+        when(idempotencyStore.getResult(anyString())).thenReturn(Mono.empty());
+        when(idempotencyStore.tryAcquire(anyString(), any())).thenReturn(Mono.just(true));
+        when(paymentIntentRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(walletRepository.saveTransaction(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(idempotencyStore.storeResult(anyString(), anyString(), any())).thenReturn(Mono.empty());
+        when(eventPublisher.publish(any(
+                com.yowyob.tiibntick.core.billing.wallet.domain.event.PaymentInitiated.class)))
+                .thenReturn(Mono.empty());
+
+        InitiatePaymentCommand cmd = new InitiatePaymentCommand(
+                USER_ID, TENANT_ID, "INV-002", Money.ofXAF(2000), PaymentChannel.CASH_ON_DELIVERY,
+                null, null, "cash on delivery");
+
+        StepVerifier.create(walletService.initiatePayment(cmd))
+                .assertNext(intent -> assertThat(intent.getExternalRef()).isNull())
+                .verifyComplete();
+
+        verifyNoInteractions(kernelPaymentGatewayPort);
+    }
+
+    @Test
+    @DisplayName("reconcilePendingProviderOrders confirms a payment intent whose Kernel order succeeded")
+    void reconcilePendingProviderOrdersConfirmsSuccessfulOrder() {
+        Wallet wallet = Wallet.createNew(USER_ID, TENANT_ID, XAF);
+        PaymentIntent intent = PaymentIntent.builder()
+                .id(PaymentIntentId.generate())
+                .walletId(wallet.getId())
+                .amount(Money.ofXAF(5000))
+                .channel(PaymentChannel.MTN_MOMO)
+                .status(PaymentIntentStatus.PENDING)
+                .idempotencyKey("IDEMP-POLL")
+                .externalRef("kernel-order-1")
+                .createdAt(LocalDateTime.now())
+                .expiresAt(LocalDateTime.now().plusMinutes(5))
+                .build();
+
+        when(paymentIntentRepository.findAllPendingWithProviderReference()).thenReturn(Flux.just(intent));
+        KernelPaymentOrderDto order = new KernelPaymentOrderDto(
+                "kernel-order-1", null, null, null, null, null, null, null,
+                null, "CONFIRMED", "PROV-REF-9", null, null, null);
+        when(kernelPaymentGatewayPort.refreshOrder("kernel-order-1")).thenReturn(Mono.just(order));
+        when(walletRepository.findById(wallet.getId())).thenReturn(Mono.just(wallet));
+        when(walletRepository.save(any(Wallet.class))).thenReturn(Mono.just(wallet));
+        when(paymentIntentRepository.save(any())).thenReturn(Mono.just(intent));
+        when(idempotencyStore.release("IDEMP-POLL")).thenReturn(Mono.empty());
+        when(eventPublisher.publish(any(
+                com.yowyob.tiibntick.core.billing.wallet.domain.event.PaymentConfirmed.class)))
+                .thenReturn(Mono.empty());
+        when(notificationPort.sendPaymentConfirmed(any(), any())).thenReturn(Mono.empty());
+
+        walletService.reconcilePendingProviderOrders();
+
+        ArgumentCaptor<PaymentAnchorPayload> captor = ArgumentCaptor.forClass(PaymentAnchorPayload.class);
+        verify(paymentAnchorPort).anchor(captor.capture());
+        assertThat(captor.getValue().externalRef()).isEqualTo("PROV-REF-9");
+    }
+
+    @Test
+    @DisplayName("reconcilePendingProviderOrders leaves a still-in-flight order pending (no confirmation, no failure)")
+    void reconcilePendingProviderOrdersLeavesInFlightOrderPending() {
+        Wallet wallet = Wallet.createNew(USER_ID, TENANT_ID, XAF);
+        PaymentIntent intent = PaymentIntent.builder()
+                .id(PaymentIntentId.generate())
+                .walletId(wallet.getId())
+                .amount(Money.ofXAF(5000))
+                .channel(PaymentChannel.MTN_MOMO)
+                .status(PaymentIntentStatus.PENDING)
+                .idempotencyKey("IDEMP-POLL-2")
+                .externalRef("kernel-order-2")
+                .createdAt(LocalDateTime.now())
+                .expiresAt(LocalDateTime.now().plusMinutes(5))
+                .build();
+
+        when(paymentIntentRepository.findAllPendingWithProviderReference()).thenReturn(Flux.just(intent));
+        KernelPaymentOrderDto order = new KernelPaymentOrderDto(
+                "kernel-order-2", null, null, null, null, null, null, null,
+                null, "AWAITING_PROVIDER", null, null, null, null);
+        when(kernelPaymentGatewayPort.refreshOrder("kernel-order-2")).thenReturn(Mono.just(order));
+
+        walletService.reconcilePendingProviderOrders();
+
+        verify(paymentIntentRepository, never()).save(any());
+        verifyNoInteractions(paymentAnchorPort, notificationPort);
     }
 }

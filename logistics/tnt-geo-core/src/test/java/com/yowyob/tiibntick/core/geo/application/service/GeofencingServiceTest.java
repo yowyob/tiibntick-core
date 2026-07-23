@@ -2,6 +2,7 @@ package com.yowyob.tiibntick.core.geo.application.service;
 
 import com.yowyob.tiibntick.core.geo.application.port.out.IGeoEventPublisher;
 import com.yowyob.tiibntick.core.geo.application.port.out.IServiceZoneRepository;
+import com.yowyob.tiibntick.core.geo.domain.exception.GeoNotFoundException;
 import com.yowyob.tiibntick.core.geo.domain.model.GeoPoint;
 import com.yowyob.tiibntick.core.geo.domain.model.ServiceZonePolygon;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,10 +53,10 @@ class GeofencingServiceTest {
     @Test
     void isPointInZone_pointInside_returnsTrue() {
         ServiceZonePolygon zone = buildYaoundeZone();
-        when(zoneRepository.findById(zone.id(), null)).thenReturn(Mono.just(zone));
+        when(zoneRepository.findById(zone.id(), TENANT)).thenReturn(Mono.just(zone));
 
         StepVerifier.create(
-                geofencingService.isPointInZone(GeoPoint.of(3.9, 11.5), zone.id())
+                geofencingService.isPointInZone(GeoPoint.of(3.9, 11.5), zone.id(), TENANT)
         )
         .expectNext(true)
         .verifyComplete();
@@ -64,13 +65,32 @@ class GeofencingServiceTest {
     @Test
     void isPointInZone_pointOutside_returnsFalse() {
         ServiceZonePolygon zone = buildYaoundeZone();
-        when(zoneRepository.findById(zone.id(), null)).thenReturn(Mono.just(zone));
+        when(zoneRepository.findById(zone.id(), TENANT)).thenReturn(Mono.just(zone));
 
         StepVerifier.create(
-                geofencingService.isPointInZone(GeoPoint.of(5.0, 11.5), zone.id())
+                geofencingService.isPointInZone(GeoPoint.of(5.0, 11.5), zone.id(), TENANT)
         )
         .expectNext(false)
         .verifyComplete();
+    }
+
+    @Test
+    void isPointInZone_zoneBelongsToAnotherTenant_isNotFound_neverLeaksAcrossTenants() {
+        // Regression test for Audit n°7 · #19: findById(id, tenantId) must scope the
+        // lookup to the caller's tenant. A zone that exists but belongs to a different
+        // tenant must surface as "not found", not as a leaked cross-tenant result.
+        ServiceZonePolygon zone = buildYaoundeZone();
+        UUID otherTenant = UUID.randomUUID();
+        // The repository is tenant-scoped: querying with a different tenant than the
+        // zone's owner returns empty (this is what a correct WHERE tenant_id = :tenantId
+        // clause produces).
+        when(zoneRepository.findById(zone.id(), otherTenant)).thenReturn(Mono.empty());
+
+        StepVerifier.create(
+                geofencingService.isPointInZone(GeoPoint.of(3.9, 11.5), zone.id(), otherTenant)
+        )
+        .expectError(GeoNotFoundException.class)
+        .verify();
     }
 
     @Test

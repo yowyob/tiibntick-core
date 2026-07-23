@@ -537,7 +537,7 @@ public class Delivery {
 
     /**
      * Adds a {@link MissionStatusChangedEvent} to the domain events list.
-     * This event is published to {@code tnt.delivery.mission.status-changed} and consumed
+     * This event is published to {@code tnt.delivery.mission.status.changed} and consumed
      * by tnt-incident-core's {@code IncidentEventConsumer} for SLA monitoring and
      * incident auto-detection.
      */

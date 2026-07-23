@@ -46,6 +46,36 @@ public class OnboardingKernelClient implements OnboardingKernelPort {
     }
 
     @Override
+    public Mono<UUID> onboardApplicantBusinessActor(AgencyRegistryResponse agency, OnboardingApplication app) {
+        String ownerName = nullToEmpty(app.getOwnerName());
+        if (ownerName.isBlank()) {
+            ownerName = agency.name();
+        }
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("ownerName", ownerName);
+        body.put("businessId", organizationCode(agency));
+        body.put("isIndividual", true);
+
+        return webClient.post()
+                .uri(ONBOARDING_BASE + "/{agencyRef}/kernel-identity", agency.id())
+                .bodyValue(body)
+                .retrieve()
+                .bodyToMono(MAP_TYPE)
+                .map(root -> {
+                    Map<String, Object> data = unwrapData(root);
+                    UUID actorId = uuid(data, "kernelBusinessActorId");
+                    if (actorId == null) {
+                        actorId = uuid(data, "id");
+                    }
+                    if (actorId == null) {
+                        throw new IllegalStateException("Core kernel-identity response missing actor id");
+                    }
+                    return actorId;
+                });
+    }
+
+    @Override
     public Mono<ProvisionResult> provisionOrganization(ProvisionRequest request) {
         AgencyRegistryResponse agency = request.agency();
         OnboardingApplication app = request.application();

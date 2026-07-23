@@ -1,5 +1,7 @@
 package com.yowyob.tiibntick.core.dispute.infrastructure.adapter.in.rest;
 
+import com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser;
+import com.yowyob.tiibntick.core.auth.domain.model.TntUserIdentity;
 import com.yowyob.tiibntick.core.dispute.application.command.StartMediationCommand;
 import com.yowyob.tiibntick.core.dispute.application.port.inbound.IDisputeCommandUseCase;
 import com.yowyob.tiibntick.core.dispute.domain.model.DisputeId;
@@ -7,7 +9,9 @@ import com.yowyob.tiibntick.core.dispute.infrastructure.adapter.in.rest.dto.requ
 import com.yowyob.tiibntick.core.dispute.infrastructure.adapter.in.rest.dto.response.DisputeResponses;
 import com.yowyob.tiibntick.core.dispute.infrastructure.adapter.in.rest.mapper.DisputeRestMapper;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
@@ -18,11 +22,16 @@ import reactor.core.publisher.Mono;
  * escalate to arbitration. These endpoints are restricted to authenticated
  * mediators and platform administrators.
  *
+ * <p>Tenant isolation via {@code @CurrentUser TntUserIdentity} (Audit n°7 · #4
+ * remediation, 2026-07-18) — see {@link DisputeController} javadoc for the full
+ * rationale (JWT or platform Client-Id/Api-Key, never a raw header).
+ *
  * @author MANFOUO Braun
  */
 @RestController
 @RequestMapping("/api/v1/disputes/{disputeId}/mediation")
 @Tag(name = "Mediation & Arbitration", description = "Mediator actions: start mediation, issue ruling, escalate to arbitration")
+@PreAuthorize("isAuthenticated()")
 public class MediationController {
 
     private final IDisputeCommandUseCase commandUseCase;
@@ -40,9 +49,10 @@ public class MediationController {
             description = "Transitions the dispute from UNDER_INVESTIGATION to MEDIATION_IN_PROGRESS. "
                     + "Requires an assigned mediator.")
     public Mono<DisputeResponses.DisputeDetailResponse> startMediation(
-            @RequestHeader("X-Tenant-ID") String tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestHeader("X-Actor-ID") String mediatorId,
             @PathVariable String disputeId) {
+        String tenantId = currentUser.tenantId().toString();
         return commandUseCase.startMediation(
                         new StartMediationCommand(DisputeId.of(disputeId), tenantId, mediatorId))
                 .map(DisputeRestMapper::toDetailResponse);
@@ -57,10 +67,11 @@ public class MediationController {
             description = "Records the mediator's decision. If compensation is required, "
                     + "the dispute transitions to PENDING_COMPENSATION and triggers tnt-billing-wallet.")
     public Mono<DisputeResponses.DisputeDetailResponse> rule(
-            @RequestHeader("X-Tenant-ID") String tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestHeader("X-Actor-ID") String ruledBy,
             @PathVariable String disputeId,
             @RequestBody DisputeRequests.RuleDisputeRequest request) {
+        String tenantId = currentUser.tenantId().toString();
         return commandUseCase.ruleDispute(DisputeRestMapper.toCommand(request, disputeId, tenantId, ruledBy))
                 .map(DisputeRestMapper::toDetailResponse);
     }
@@ -74,9 +85,10 @@ public class MediationController {
             description = "Used for complex cases, fraud suspicion, or when mediation fails. "
                     + "Moves to PENDING_ARBITRATION and notifies the assigned arbitrator.")
     public Mono<DisputeResponses.DisputeDetailResponse> escalate(
-            @RequestHeader("X-Tenant-ID") String tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @PathVariable String disputeId,
             @RequestBody DisputeRequests.EscalateDisputeRequest request) {
+        String tenantId = currentUser.tenantId().toString();
         return commandUseCase.escalateDispute(DisputeRestMapper.toCommand(request, disputeId, tenantId))
                 .map(DisputeRestMapper::toDetailResponse);
     }

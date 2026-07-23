@@ -28,6 +28,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * Port of tnt-agency {@code StaffController} (deliverers, contracts, freelancers — no commissions).
@@ -44,6 +45,7 @@ public class WorkforceController {
     // ── Deliverers ─────────────────────────────────────────────────────────
 
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/agencies/{agencyId}/deliverers")
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Register a deliverer (links existing Core actor)")
     public Mono<ApiResponse<DelivererResponse>> registerDeliverer(
@@ -56,6 +58,7 @@ public class WorkforceController {
     }
 
     @PatchMapping("/api/v1/tenants/{tenantId}/agency-registry/deliverers/{delivererId}/branch")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Attach deliverer to a branch")
     public Mono<ApiResponse<DelivererResponse>> attachToBranch(
             @PathVariable UUID tenantId,
@@ -65,18 +68,21 @@ public class WorkforceController {
     }
 
     @PatchMapping("/api/v1/tenants/{tenantId}/agency-registry/deliverers/{delivererId}/suspend")
+    @PreAuthorize("isAuthenticated()")
     public Mono<ApiResponse<DelivererResponse>> suspendDeliverer(
             @PathVariable UUID tenantId, @PathVariable UUID delivererId) {
         return delivererService.suspend(tenantId, delivererId).map(ApiResponse::success);
     }
 
     @PatchMapping("/api/v1/tenants/{tenantId}/agency-registry/deliverers/{delivererId}/reactivate")
+    @PreAuthorize("isAuthenticated()")
     public Mono<ApiResponse<DelivererResponse>> reactivateDeliverer(
             @PathVariable UUID tenantId, @PathVariable UUID delivererId) {
         return delivererService.reactivate(tenantId, delivererId).map(ApiResponse::success);
     }
 
     @PatchMapping("/api/v1/tenants/{tenantId}/agency-registry/deliverers/{delivererId}/availability")
+    @PreAuthorize("isAuthenticated()")
     public Mono<ApiResponse<DelivererResponse>> updateAvailability(
             @PathVariable UUID tenantId,
             @PathVariable UUID delivererId,
@@ -101,6 +107,7 @@ public class WorkforceController {
     // ── Contracts ────────────────────────────────────────────────────────
 
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/deliverers/{delivererId}/contracts")
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<ApiResponse<ContractResponse>> signContract(
             @PathVariable UUID tenantId,
@@ -114,6 +121,7 @@ public class WorkforceController {
     }
 
     @DeleteMapping("/api/v1/tenants/{tenantId}/agency-registry/deliverers/{delivererId}/contracts/active")
+    @PreAuthorize("isAuthenticated()")
     public Mono<ApiResponse<ContractResponse>> terminateContract(
             @PathVariable UUID tenantId, @PathVariable UUID delivererId) {
         return contractService.terminate(tenantId, delivererId).map(ApiResponse::success);
@@ -138,6 +146,7 @@ public class WorkforceController {
     }
 
     @PatchMapping("/api/v1/tenants/{tenantId}/agency-registry/contracts/{contractId}/remuneration")
+    @PreAuthorize("isAuthenticated()")
     public Mono<ApiResponse<ContractResponse>> updateRemuneration(
             @PathVariable UUID tenantId,
             @PathVariable UUID contractId,
@@ -148,6 +157,7 @@ public class WorkforceController {
     }
 
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/contracts/{contractId}/renew")
+    @PreAuthorize("isAuthenticated()")
     public Mono<ApiResponse<ContractResponse>> renewContract(
             @PathVariable UUID tenantId,
             @PathVariable UUID contractId,
@@ -158,6 +168,7 @@ public class WorkforceController {
     // ── Freelancers ────────────────────────────────────────────────────────
 
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/agencies/{agencyId}/freelancers")
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<ApiResponse<FreelancerAssociationResponse>> associateFreelancer(
             @PathVariable UUID tenantId,
@@ -169,6 +180,7 @@ public class WorkforceController {
     }
 
     @PatchMapping("/api/v1/tenants/{tenantId}/agency-registry/freelancers/associations/{associationId}/end")
+    @PreAuthorize("isAuthenticated()")
     public Mono<ApiResponse<FreelancerAssociationResponse>> endAssociation(
             @PathVariable UUID tenantId,
             @PathVariable UUID associationId,
@@ -177,12 +189,14 @@ public class WorkforceController {
     }
 
     @PatchMapping("/api/v1/tenants/{tenantId}/agency-registry/freelancers/associations/{associationId}/pause")
+    @PreAuthorize("isAuthenticated()")
     public Mono<ApiResponse<FreelancerAssociationResponse>> pauseAssociation(
             @PathVariable UUID tenantId, @PathVariable UUID associationId) {
         return freelancerService.pause(tenantId, associationId).map(ApiResponse::success);
     }
 
     @PatchMapping("/api/v1/tenants/{tenantId}/agency-registry/freelancers/associations/{associationId}/cancel")
+    @PreAuthorize("isAuthenticated()")
     public Mono<ApiResponse<FreelancerAssociationResponse>> cancelInvitation(
             @PathVariable UUID tenantId, @PathVariable UUID associationId) {
         return freelancerService.cancelInvitation(tenantId, associationId).map(ApiResponse::success);

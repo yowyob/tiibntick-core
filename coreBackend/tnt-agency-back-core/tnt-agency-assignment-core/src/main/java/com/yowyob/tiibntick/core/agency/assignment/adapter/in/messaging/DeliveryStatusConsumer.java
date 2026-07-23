@@ -3,6 +3,7 @@ package com.yowyob.tiibntick.core.agency.assignment.adapter.in.messaging;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yowyob.tiibntick.core.agency.assignment.application.service.MissionService;
+import com.yowyob.tiibntick.core.agency.assignment.application.service.MissionService.CoreMissionSyncHint;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,7 +62,8 @@ public class DeliveryStatusConsumer {
                 ack.acknowledge();
                 return;
             }
-            sync(UUID.fromString(tenantIdStr), UUID.fromString(missionIdStr), "DELIVERED", ack);
+            sync(UUID.fromString(tenantIdStr), UUID.fromString(missionIdStr), "DELIVERED",
+                    hintFrom(payload), ack);
         } catch (Exception e) {
             log.warn("[DeliveryStatusConsumer] package.delivered parse error: {}", e.getMessage());
             ack.acknowledge();
@@ -85,17 +87,23 @@ public class DeliveryStatusConsumer {
                 ack.acknowledge();
                 return;
             }
-            sync(UUID.fromString(tenantIdStr), UUID.fromString(missionIdStr), status, ack);
+            sync(UUID.fromString(tenantIdStr), UUID.fromString(missionIdStr), status,
+                    hintFrom(payload), ack);
         } catch (Exception e) {
             log.warn("[DeliveryStatusConsumer] {} parse error: {}", kind, e.getMessage());
             ack.acknowledge();
         }
     }
 
-    private void sync(UUID tenantId, UUID coreMissionId, String status, Acknowledgment ack) {
-        missionService.syncFromCoreStatus(tenantId, coreMissionId, status)
-                .doOnSuccess(m -> log.debug("[DeliveryStatusConsumer] synced coreMissionId={} status={}",
-                        coreMissionId, status))
+    private void sync(UUID tenantId, UUID coreMissionId, String status,
+                      CoreMissionSyncHint hint, Acknowledgment ack) {
+        missionService.syncFromCoreStatus(tenantId, coreMissionId, status, hint)
+                .doOnSuccess(m -> {
+                    if (m != null) {
+                        log.debug("[DeliveryStatusConsumer] synced coreMissionId={} status={}",
+                                coreMissionId, status);
+                    }
+                })
                 .doOnError(e -> log.warn("[DeliveryStatusConsumer] sync failed coreMissionId={}: {}",
                         coreMissionId, e.getMessage()))
                 .onErrorResume(e -> Mono.empty())
@@ -103,10 +111,74 @@ public class DeliveryStatusConsumer {
                 .subscribe();
     }
 
+    private static CoreMissionSyncHint hintFrom(Map<String, Object> payload) {
+        return new CoreMissionSyncHint(
+                uuidVal(payload.get("agencyId"), payload.get("agency_id")),
+                uuidVal(payload.get("branchId"), payload.get("branch_id")),
+                stringVal(payload.get("pickupAddress"), payload.get("pickup_address")),
+                stringVal(payload.get("deliveryAddress"), payload.get("delivery_address")),
+                stringVal(payload.get("senderName"), payload.get("sender_name")),
+                stringVal(payload.get("recipientName"), payload.get("recipient_name")),
+                stringVal(payload.get("recipientPhone"), payload.get("recipient_phone")),
+                doubleVal(payload.get("weightKg"), payload.get("weight_kg")),
+                doubleVal(payload.get("distanceKm"), payload.get("distance_km")),
+                intVal(payload.get("packagesCount"), payload.get("packages_count")),
+                stringVal(payload.get("priority")),
+                uuidVal(payload.get("targetHubId"), payload.get("target_hub_id"), payload.get("relayPointId"))
+        );
+    }
+
     private static String stringVal(Object... candidates) {
         for (Object c : candidates) {
             if (c != null) {
-                return c.toString();
+                String s = c.toString();
+                if (!s.isBlank()) {
+                    return s;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static UUID uuidVal(Object... candidates) {
+        String raw = stringVal(candidates);
+        if (raw == null) {
+            return null;
+        }
+        try {
+            return UUID.fromString(raw);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private static Double doubleVal(Object... candidates) {
+        for (Object c : candidates) {
+            if (c instanceof Number n) {
+                return n.doubleValue();
+            }
+            if (c != null) {
+                try {
+                    return Double.parseDouble(c.toString());
+                } catch (NumberFormatException ignored) {
+                    // next
+                }
+            }
+        }
+        return null;
+    }
+
+    private static Integer intVal(Object... candidates) {
+        for (Object c : candidates) {
+            if (c instanceof Number n) {
+                return n.intValue();
+            }
+            if (c != null) {
+                try {
+                    return Integer.parseInt(c.toString());
+                } catch (NumberFormatException ignored) {
+                    // next
+                }
             }
         }
         return null;

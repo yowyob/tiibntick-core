@@ -10,6 +10,7 @@ import com.yowyob.tiibntick.core.resource.domain.model.EquipmentStatus;
 import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -54,6 +55,7 @@ public class EquipmentApplicationService implements
                 });
     }
 
+    @Transactional
     @Override
     @RequirePermission(resource = "resource", action = "reserve")
     public Mono<Equipment> assignEquipment(AssignEquipmentCommand cmd) {

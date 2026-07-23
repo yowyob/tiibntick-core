@@ -7,6 +7,8 @@ import com.yowyob.tiibntick.core.incident.application.command.EscalateIncidentCo
 import com.yowyob.tiibntick.core.incident.domain.enums.ActorRole;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.core.LockAssert;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import java.time.Instant;
@@ -37,7 +39,9 @@ public class IncidentAutoEscalationScheduler {
      * and severity >= MEDIUM, then escalates them to the platform administrator.
      */
     @Scheduled(fixedDelayString = "${tnt.incident.auto-escalation.delay-ms:600000}")
+    @SchedulerLock(name = "incident-auto-escalate-stagnant", lockAtMostFor = "PT9M", lockAtLeastFor = "PT1M")
     public void autoEscalateStagnant() {
+        LockAssert.assertLocked();
         log.debug("Auto-escalation scheduler running at {}", Instant.now());
         Instant threshold = Instant.now().minus(30, ChronoUnit.MINUTES);
         incidentRepository.findByStatusIn(

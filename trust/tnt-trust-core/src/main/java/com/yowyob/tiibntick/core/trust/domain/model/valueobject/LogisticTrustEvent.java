@@ -143,71 +143,55 @@ public final class LogisticTrustEvent {
     /**
      * Creates a {@link LogisticTrustEvent} for a Proof-of-Location verification.
      *
-     * @param actorId   the actor whose location is being proven
-     * @param tenantId  the tenant identifier
-     * @param gpsLat    the verified GPS latitude
-     * @param gpsLng    the verified GPS longitude
-     * @param polHash   the SHA-256 hash of the PoL payload from the mobile app
+     * <p>The event's {@code entityId} is the verification's own {@code eventId}, so that
+     * {@code TrustCommittedEventConsumer} can later match the Fabric commit
+     * notification back to the {@link PolVerificationRecord} row persisted by
+     * {@code PolVerificationRepository.save(verification)} — the two must share the same ID.
+     *
+     * @param verification the PoL verification that was recorded, already persisted locally
      */
-    public static LogisticTrustEvent forPolVerification(
-            final String actorId,
-            final String tenantId,
-            final double gpsLat,
-            final double gpsLng,
-            final String polHash) {
-        Objects.requireNonNull(actorId, "actorId must not be null");
-        Objects.requireNonNull(tenantId, "tenantId must not be null");
-        Objects.requireNonNull(polHash, "polHash must not be null");
+    public static LogisticTrustEvent forPolVerification(final PolVerificationRecord verification) {
+        Objects.requireNonNull(verification);
         final String payload = String.format(
                 "{\"actorId\":\"%s\",\"gpsLat\":%f,\"gpsLng\":%f,\"polHash\":\"%s\"}",
-                actorId, gpsLat, gpsLng, polHash);
+                verification.getActorId(), verification.getGpsLat(),
+                verification.getGpsLng(), verification.getPolHash());
         return new LogisticTrustEvent(
-                UUID.randomUUID().toString(), tenantId,
+                UUID.randomUUID().toString(), verification.getTenantId(),
                 LogisticTrustEventType.PROOF_OF_LOCATION_VERIFIED,
-                "POL_EVENT", UUID.randomUUID().toString(),
-                null, null, actorId, null,
-                gpsLat, gpsLng, polHash,
-                LocalDateTime.now(), payload);
+                "POL_EVENT", verification.getEventId(),
+                null, null, verification.getActorId(), null,
+                verification.getGpsLat(), verification.getGpsLng(), verification.getPolHash(),
+                verification.getVerifiedAt(), payload);
     }
 
     /**
      * Creates a {@link LogisticTrustEvent} for a geofence zone crossing.
      *
-     * @param actorId   the deliverer who crossed the zone boundary
-     * @param tenantId  the tenant identifier
-     * @param zoneId    the geofence zone identifier
-     * @param zoneName  the geofence zone's display name
-     * @param zoneType  the zone classification (e.g. RELAY_HUB, DANGER_ZONE)
-     * @param direction {@code ENTER} or {@code EXIT}
-     * @param gpsLat    latitude at crossing time
-     * @param gpsLng    longitude at crossing time
-     * @param missionId the mission in progress at crossing time, if any
+     * <p>The event's {@code entityId} is the crossing's own {@code crossingId}, so that
+     * {@code TrustCommittedEventConsumer} can later match the Fabric commit
+     * notification back to the {@link GeofenceCrossingRecord} row persisted by
+     * {@code GeofenceCrossingRepository.save(crossing)} — the two must share the same ID.
+     *
+     * @param crossing the geofence crossing that was recorded, already persisted locally
      */
-    public static LogisticTrustEvent forGeofenceCrossing(
-            final String actorId,
-            final String tenantId,
-            final String zoneId,
-            final String zoneName,
-            final String zoneType,
-            final String direction,
-            final double gpsLat,
-            final double gpsLng,
-            final String missionId) {
-        Objects.requireNonNull(actorId, "actorId must not be null");
-        Objects.requireNonNull(tenantId, "tenantId must not be null");
-        Objects.requireNonNull(zoneId, "zoneId must not be null");
+    public static LogisticTrustEvent forGeofenceCrossing(final GeofenceCrossingRecord crossing) {
+        Objects.requireNonNull(crossing);
         final String payload = String.format(
                 "{\"actorId\":\"%s\",\"zoneId\":\"%s\",\"zoneName\":\"%s\",\"zoneType\":\"%s\"," +
                 "\"direction\":\"%s\",\"gpsLat\":%f,\"gpsLng\":%f,\"missionId\":\"%s\"}",
-                actorId, zoneId, zoneName != null ? zoneName : "", zoneType != null ? zoneType : "",
-                direction, gpsLat, gpsLng, missionId != null ? missionId : "");
+                crossing.getActorId(), crossing.getZoneId(),
+                crossing.getZoneName() != null ? crossing.getZoneName() : "",
+                crossing.getZoneType() != null ? crossing.getZoneType() : "",
+                crossing.getDirection(), crossing.getGpsLat(), crossing.getGpsLng(),
+                crossing.getMissionId() != null ? crossing.getMissionId() : "");
         return new LogisticTrustEvent(
-                UUID.randomUUID().toString(), tenantId,
+                UUID.randomUUID().toString(), crossing.getTenantId(),
                 LogisticTrustEventType.GEOFENCE_CROSSING_RECORDED,
-                "GEOFENCE_EVENT", UUID.randomUUID().toString(),
-                missionId, null, actorId, null,
-                gpsLat, gpsLng, null,
-                LocalDateTime.now(), payload);
+                "GEOFENCE_EVENT", crossing.getCrossingId(),
+                crossing.getMissionId(), null, crossing.getActorId(), null,
+                crossing.getGpsLat(), crossing.getGpsLng(), null,
+                crossing.getOccurredAt(), payload);
     }
 
     /**
@@ -286,51 +270,49 @@ public final class LogisticTrustEvent {
     /**
      * Creates a {@link LogisticTrustEvent} for a badge being awarded.
      *
-     * @param actorId   the actor receiving the badge
-     * @param tenantId  the tenant identifier
-     * @param badgeType the badge type identifier (e.g., "100_DELIVERIES")
-     * @param points    the reputation points associated with the badge
+     * <p>The event's {@code entityId} is the badge's own {@code badgeId}, so that
+     * {@code TrustCommittedEventConsumer} can later match the Fabric commit
+     * notification back to the {@link ActorBadge} row persisted by
+     * {@code ActorBadgeRepository.save(badge)} — the two must share the same ID.
+     *
+     * @param badge the badge that was awarded, already persisted locally
      */
-    public static LogisticTrustEvent forBadgeAwarded(
-            final String actorId,
-            final String tenantId,
-            final String badgeType,
-            final int points) {
-        final String badgeId = UUID.randomUUID().toString();
+    public static LogisticTrustEvent forBadgeAwarded(final ActorBadge badge) {
+        Objects.requireNonNull(badge);
         final String payload = String.format(
                 "{\"actorId\":\"%s\",\"badgeType\":\"%s\",\"points\":%d,\"awardedAt\":\"%s\"}",
-                actorId, badgeType, points, LocalDateTime.now());
+                badge.getActorId(), badge.getBadgeType(), badge.getPoints(), badge.getAwardedAt());
         return new LogisticTrustEvent(
-                UUID.randomUUID().toString(), tenantId,
+                UUID.randomUUID().toString(), badge.getTenantId(),
                 LogisticTrustEventType.BADGE_AWARDED,
-                "BADGE", badgeId,
-                null, null, actorId, null,
+                "BADGE", badge.getBadgeId(),
+                null, null, badge.getActorId(), null,
                 null, null, null,
-                LocalDateTime.now(), payload);
+                badge.getAwardedAt(), payload);
     }
 
     /**
      * Creates a {@link LogisticTrustEvent} for a DAO zone rule activation.
      *
-     * @param zoneId   the DAO zone identifier
-     * @param tenantId the tenant identifier
-     * @param rule     the JSON-encoded rule definition
+     * <p>The event's {@code entityId} is the rule's own {@code ruleId}, so that
+     * {@code TrustCommittedEventConsumer} can later match the Fabric commit
+     * notification back to the {@link DaoRuleRecord} row persisted by
+     * {@code DaoRuleRepository.save(rule)} — the two must share the same ID.
+     *
+     * @param rule the DAO rule that was activated, already persisted locally
      */
-    public static LogisticTrustEvent forDaoRuleActivated(
-            final String zoneId,
-            final String tenantId,
-            final String rule) {
-        final String ruleId = UUID.randomUUID().toString();
+    public static LogisticTrustEvent forDaoRuleActivated(final DaoRuleRecord rule) {
+        Objects.requireNonNull(rule);
         final String payload = String.format(
                 "{\"zoneId\":\"%s\",\"ruleId\":\"%s\",\"rule\":%s,\"activatedAt\":\"%s\"}",
-                zoneId, ruleId, rule, LocalDateTime.now());
+                rule.getZoneId(), rule.getRuleId(), rule.getRuleJson(), rule.getActivatedAt());
         return new LogisticTrustEvent(
-                UUID.randomUUID().toString(), tenantId,
+                UUID.randomUUID().toString(), rule.getTenantId(),
                 LogisticTrustEventType.DAO_RULE_ACTIVATED,
-                "DAO_RULE", ruleId,
+                "DAO_RULE", rule.getRuleId(),
                 null, null, null, null,
                 null, null, null,
-                LocalDateTime.now(), payload);
+                rule.getActivatedAt(), payload);
     }
 
     /**
@@ -727,15 +709,25 @@ public final class LogisticTrustEvent {
             case DELIVERY_PROOF_RECORDED -> "DELIVERY_PROOF_RECORDED";
             case PACKAGE_CUSTODY_TRANSFERRED -> "PACKAGE_CUSTODY_TRANSFERRED";
             case HUB_DEPOSIT_CONFIRMED -> "HUB_DEPOSIT_CONFIRMED";
-            case HUB_PICKUP_CONFIRMED -> "HUB_DEPOSIT_CONFIRMED";
+            case HUB_PICKUP_CONFIRMED -> "HUB_PICKUP_CONFIRMED";
+            case MISSION_CREATED_ON_CHAIN -> "MISSION_CREATED_ON_CHAIN";
+            case MISSION_COMPLETED_ON_CHAIN -> "MISSION_COMPLETED_ON_CHAIN";
+            case MISSION_CANCELLED_ON_CHAIN -> "MISSION_CANCELLED_ON_CHAIN";
             case DELIVERER_DID_ISSUED -> "DELIVERER_DID_ISSUED";
-            case DELIVERER_DID_REVOKED -> "IDENTITY_VERIFIED";
+            case DELIVERER_DID_REVOKED -> "DELIVERER_DID_REVOKED";
+            case FREELANCER_ORG_DID_ISSUED -> "FREELANCER_ORG_DID_ISSUED";
+            case FREELANCER_ORG_DID_REVOKED -> "FREELANCER_ORG_DID_REVOKED";
             case BADGE_AWARDED -> "BADGE_AWARDED";
+            case BADGE_REVOKED -> "BADGE_REVOKED";
             case PROOF_OF_LOCATION_VERIFIED -> "LOCATION_PROOF_VERIFIED";
             case GEOFENCE_CROSSING_RECORDED -> "GEOFENCE_CROSSING_RECORDED";
-            case FREELANCER_ORG_DID_ISSUED -> "FREELANCER_ORG_DID_ISSUED";
             case DAO_RULE_ACTIVATED -> "DAO_RULE_ACTIVATED";
+            case DAO_PROPOSAL_VOTED -> "DAO_PROPOSAL_VOTED";
+            case ZONE_MEMBERSHIP_RECORDED -> "ZONE_MEMBERSHIP_RECORDED";
             case BILLING_POLICY_ACTIVATED -> "BILLING_POLICY_ACTIVATED";
+            case PRICING_RULE_CHANGED -> "PRICING_RULE_CHANGED";
+            case PAYMENT_COMMITTED -> "PAYMENT_COMMITTED";
+            case DISPUTE_EVIDENCE_ANCHORED -> "DISPUTE_EVIDENCE_ANCHORED";
             // Incident blockchain event type mappings (v1.1)
             case INCIDENT_CREATED -> "INCIDENT_CREATED";
             case INCIDENT_CHAIN_INITIALIZED -> "INCIDENT_CHAIN_INITIALIZED";
@@ -744,7 +736,6 @@ public final class LogisticTrustEvent {
             case INTER_AGENCY_COOPERATION_COMPLETED -> "INTER_AGENCY_COOPERATION_COMPLETED";
             case INCIDENT_CLOSED -> "INCIDENT_CLOSED";
             case PARCEL_CHAIN_RESUMED -> "PARCEL_CHAIN_RESUMED";
-            default -> "SOLUTION_SPECIFIC_EVENT";
         };
     }
 

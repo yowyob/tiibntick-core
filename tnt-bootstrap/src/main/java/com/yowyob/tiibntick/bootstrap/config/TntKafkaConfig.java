@@ -27,7 +27,7 @@ import java.util.Map;
  * these beans via {@code @Qualifier}.
  *
  * <p>Also provides fallback beans for module-specific qualifiers
- * (e.g. {@code deliveryKafkaProducer}) so that module components loaded
+ * (e.g. {@code deliveryObjectMapper}) so that module components loaded
  * from pre-built JARs always resolve their dependencies, even when the
  * module's own {@code @Configuration} is not yet re-installed.
  *
@@ -54,19 +54,6 @@ public class TntKafkaConfig {
 
     @Bean("tntKafkaTemplate")
     public KafkaTemplate<String, String> tntKafkaTemplate() {
-        return new KafkaTemplate<>(tntKafkaProducerFactory());
-    }
-
-    /**
-     * Fallback bean satisfying {@code @Qualifier("deliveryKafkaProducer")} injected by
-     * {@code KafkaDeliveryEventPublisher}.
-     * Activated only when {@code DeliveryModuleConfig} (from {@code tnt-delivery-core}) has
-     * not already registered a bean of this name — i.e. when the module JAR is out of date
-     * or not yet re-installed in the local Maven repository.
-     */
-    @Bean("deliveryKafkaProducer")
-    @ConditionalOnMissingBean(name = "deliveryKafkaProducer")
-    public KafkaTemplate<String, String> deliveryKafkaProducerFallback() {
         return new KafkaTemplate<>(tntKafkaProducerFactory());
     }
 

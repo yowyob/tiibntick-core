@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @Tag(name = "GOFP — Matching", description = "API métier générique — Matching TOPSIS/AHP")
 @RestController
@@ -22,6 +23,7 @@ public class MatchingCoreController {
 
     @Operation(summary = "Lancer le matching pour une annonce publiée")
     @PostMapping("/announce/{announcementId}")
+    @PreAuthorize("isAuthenticated()")
     public Flux<MatchingResult> matchAnnouncement(
             @PathVariable UUID announcementId,
             @RequestParam double pickupLat,
@@ -45,6 +47,7 @@ public class MatchingCoreController {
 
     @Operation(summary = "Classer des candidats sans notification (prévisualisation)")
     @PostMapping("/rank")
+    @PreAuthorize("isAuthenticated()")
     public Flux<MatchingResult> rank(
             @RequestParam UUID announcementId,
             @RequestParam double pickupLat,

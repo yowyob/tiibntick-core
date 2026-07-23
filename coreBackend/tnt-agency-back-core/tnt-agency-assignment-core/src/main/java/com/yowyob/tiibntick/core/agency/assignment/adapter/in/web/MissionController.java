@@ -37,6 +37,7 @@ import java.time.Instant;
 import java.util.List;
 
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 
 
@@ -55,6 +56,7 @@ public class MissionController {
 
 
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/agencies/{agencyId}/missions")
+    @PreAuthorize("isAuthenticated()")
 
     @Operation(summary = "Create agency mission projection")
 
@@ -78,7 +80,7 @@ public class MissionController {
 
                 body.priority(), body.targetHubId()
 
-        )).map(ApiResponse::success);
+        )).map(MissionResponse::from).map(ApiResponse::success);
 
     }
 
@@ -102,7 +104,7 @@ public class MissionController {
 
                 : missionService.listByAgency(tenantId, agencyId);
 
-        return flux.collectList().map(ApiResponse::success);
+        return flux.map(MissionResponse::from).collectList().map(ApiResponse::success);
 
     }
 
@@ -116,7 +118,10 @@ public class MissionController {
 
             @PathVariable UUID tenantId, @PathVariable UUID delivererId) {
 
-        return missionService.listByDeliverer(tenantId, delivererId).collectList().map(ApiResponse::success);
+        return missionService.listByDeliverer(tenantId, delivererId)
+                .map(MissionResponse::from)
+                .collectList()
+                .map(ApiResponse::success);
 
     }
 
@@ -130,13 +135,14 @@ public class MissionController {
 
             @PathVariable UUID tenantId, @PathVariable UUID missionId) {
 
-        return missionService.getById(tenantId, missionId).map(ApiResponse::success);
+        return missionService.getById(tenantId, missionId).map(MissionResponse::from).map(ApiResponse::success);
 
     }
 
 
 
     @PatchMapping("/api/v1/tenants/{tenantId}/agency-registry/missions/{missionId}/assign")
+    @PreAuthorize("isAuthenticated()")
 
     @Operation(summary = "Assign deliverer to mission")
 
@@ -159,6 +165,7 @@ public class MissionController {
 
 
     @PatchMapping("/api/v1/tenants/{tenantId}/agency-registry/missions/{missionId}/reassign")
+    @PreAuthorize("isAuthenticated()")
 
     @Operation(summary = "Reassign mission")
 
@@ -181,6 +188,7 @@ public class MissionController {
 
 
     @PatchMapping("/api/v1/tenants/{tenantId}/agency-registry/missions/{missionId}/cancel")
+    @PreAuthorize("isAuthenticated()")
 
     @Operation(summary = "Cancel mission")
 
@@ -203,6 +211,7 @@ public class MissionController {
 
 
     @PatchMapping("/api/v1/tenants/{tenantId}/agency-registry/missions/{missionId}/reschedule")
+    @PreAuthorize("isAuthenticated()")
 
     @Operation(summary = "Reschedule mission")
 
@@ -225,6 +234,7 @@ public class MissionController {
 
 
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/missions/{missionId}/pickup")
+    @PreAuthorize("isAuthenticated()")
 
     @Operation(summary = "Start mission (pickup)")
 
@@ -247,6 +257,7 @@ public class MissionController {
 
 
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/missions/{missionId}/deliver")
+    @PreAuthorize("isAuthenticated()")
 
     @Operation(summary = "Confirm delivery")
 
@@ -269,6 +280,7 @@ public class MissionController {
 
 
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/missions/{missionId}/deposit-hub")
+    @PreAuthorize("isAuthenticated()")
 
     @Operation(summary = "Deposit parcel at relay hub")
 
@@ -293,6 +305,7 @@ public class MissionController {
 
 
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/missions/{missionId}/anomaly")
+    @PreAuthorize("isAuthenticated()")
 
     @Operation(summary = "Report mission anomaly")
 

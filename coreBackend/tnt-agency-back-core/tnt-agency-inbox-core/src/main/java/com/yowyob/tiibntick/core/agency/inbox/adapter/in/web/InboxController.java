@@ -21,6 +21,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /** Port of tnt-agency {@code NotificationInboxController}. */
 @Tag(name = "Agency ERP Inbox", description = "Persisted agency notification inbox")
@@ -31,6 +32,7 @@ public class InboxController {
     private final InboxService inboxService;
 
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/agencies/{agencyId}/notifications")
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Persist an inbox notification (BFF broadcasts SSE / notify-core separately)")
     public Mono<ApiResponse<NotificationResponse>> create(
@@ -54,6 +56,7 @@ public class InboxController {
     }
 
     @PatchMapping("/api/v1/tenants/{tenantId}/agency-registry/notifications/{notificationId}/read")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Mark a notification as read")
     public Mono<ApiResponse<NotificationResponse>> markRead(
             @PathVariable UUID tenantId,
@@ -62,6 +65,7 @@ public class InboxController {
     }
 
     @PatchMapping("/api/v1/tenants/{tenantId}/agency-registry/agencies/{agencyId}/notifications/read-all")
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Mark all agency notifications as read")
     public Mono<Void> markAllRead(

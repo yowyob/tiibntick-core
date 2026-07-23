@@ -16,12 +16,13 @@ import com.yowyob.tiibntick.core.organization.application.service.AgencyService;
 import com.yowyob.tiibntick.core.organization.application.service.BranchService;
 import com.yowyob.tiibntick.core.organization.application.service.FreelancerOrgService;
 import com.yowyob.tiibntick.core.organization.application.service.HubRelaisService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yowyob.kernel.event.application.port.in.PublishEventUseCase;
 import com.yowyob.tiibntick.core.organization.infrastructure.adapter.out.kernel.KernelOrganizationAdapter;
 import com.yowyob.tiibntick.core.organization.infrastructure.adapter.out.messaging.FreelancerOrgEventPublisherAdapter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.data.r2dbc.repository.config.EnableR2dbcRepositories;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -65,8 +66,8 @@ import org.springframework.web.reactive.function.client.WebClient;
  * <p>Added wiring for:
  * <ul>
  *   <li>{@link FreelancerOrgService} — manages FreelancerOrganization lifecycle.</li>
- *   <li>{@link FreelancerOrgEventPublisherAdapter} — publishes domain events via
- *       Spring ApplicationEventPublisher (forwarded to Kafka by bootstrap).</li>
+ *   <li>{@link FreelancerOrgEventPublisherAdapter} — enqueues domain events into
+ *       the yow-event-kernel transactional outbox (relayed to Kafka by the poller).</li>
  * </ul>
  *
  * @author MANFOUO Braun
@@ -160,18 +161,22 @@ public class OrganizationCoreAutoConfiguration {
     /**
      * FreelancerOrganization event publisher adapter.
      *
-     * <p>Uses Spring's {@link ApplicationEventPublisher} as the event bus.
-     * The tnt-bootstrap module registers a listener that forwards events to Kafka
-     * via {@code yow-event-kernel}.
+     * <p>Chantier C · Audit n°3 · P5: enqueues events into yow-event-kernel's
+     * transactional outbox ({@code PublishEventUseCase}); the outbox poller relays
+     * them to Kafka. The previous {@code ApplicationEventPublisher}-based
+     * implementation relied on a bootstrap forwarding listener that never existed,
+     * so these events were silently lost.
      *
-     * @param applicationEventPublisher Spring application event publisher
+     * @param publishEventUseCase yow-event-kernel outbox inbound port
+     * @param objectMapper        JSON serializer for event payloads
      * @return the {@link FreelancerOrgEventPublisherPort} implementation
      */
     @Bean
     @ConditionalOnMissingBean
     public FreelancerOrgEventPublisherPort freelancerOrgEventPublisherPort(
-            ApplicationEventPublisher applicationEventPublisher) {
-        return new FreelancerOrgEventPublisherAdapter(applicationEventPublisher);
+            PublishEventUseCase publishEventUseCase,
+            ObjectMapper objectMapper) {
+        return new FreelancerOrgEventPublisherAdapter(publishEventUseCase, objectMapper);
     }
 
     /**

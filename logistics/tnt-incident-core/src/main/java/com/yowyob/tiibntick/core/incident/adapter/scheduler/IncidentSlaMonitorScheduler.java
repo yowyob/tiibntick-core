@@ -6,6 +6,8 @@ import com.yowyob.tiibntick.core.incident.application.command.EscalateIncidentCo
 import com.yowyob.tiibntick.core.incident.domain.enums.ActorRole;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.core.LockAssert;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import java.time.Instant;
@@ -34,7 +36,9 @@ public class IncidentSlaMonitorScheduler {
      * that have not yet been escalated and auto-escalates them to the agency manager.
      */
     @Scheduled(fixedDelayString = "${tnt.incident.sla-monitor.delay-ms:300000}")
+    @SchedulerLock(name = "incident-sla-monitor", lockAtMostFor = "PT4M", lockAtLeastFor = "PT30S")
     public void monitorSlaBreaches() {
+        LockAssert.assertLocked();
         log.debug("SLA breach monitor running at {}", Instant.now());
         incidentRepository.findByStatusIn(
                 List.of(IncidentStatus.AUTO_RESOLVING, IncidentStatus.REASSIGNING_DRIVER,

@@ -19,8 +19,10 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.lang.reflect.Method;
+import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Central application service for {@code tnt-administration-core}.
@@ -124,6 +126,7 @@ public class TntAdministrationApplicationService implements
 
     @Override
     @RequirePermission(resource = "administration", action = "settings:write")
+    @Transactional
     public Mono<TntPlatformOptions> updatePlatformOptions(UUID tenantId, TntPlatformOptions options) {
         return optionsRepository.findByTenantId(tenantId)
                 .switchIfEmpty(Mono.just(TntPlatformOptions.defaults(tenantId)))
@@ -136,6 +139,7 @@ public class TntAdministrationApplicationService implements
 
     @Override
     @RequirePermission(resource = "admin", action = "settings")
+    @Transactional
     public Mono<TntPlatformOptions> initializeDefaultOptions(UUID tenantId) {
         return optionsRepository.findByTenantId(tenantId)
                 .switchIfEmpty(Mono.defer(() -> {
@@ -178,6 +182,7 @@ public class TntAdministrationApplicationService implements
      */
     @Override
     @RequirePermission(resource = "administration", action = "roles:write")
+    @Transactional
     public Mono<Void> provisionForTenant(UUID tenantId, UUID organizationId, UUID actorUserId) {
         // Step 1: Local TntRoleDefinition provisioning (existing logic)
         Flux<TntRoleDefinition> localProvisionFlux = Flux.fromIterable(roleTemplateRegistry.getTemplates())
@@ -300,9 +305,14 @@ public class TntAdministrationApplicationService implements
                 Method provisionMethod = tntRoleInitializationService.getClass()
                         .getMethod("provisionForTenant", UUID.class);
                 Object result = provisionMethod.invoke(tntRoleInitializationService, tenantId);
-                // Block the reactive pipeline if the result is a Mono
+                // Block the reactive pipeline if the result is a Mono. Already isolated on
+                // Schedulers.boundedElastic() (see subscribeOn() below), so this never ties
+                // up a Netty event-loop thread — but a stuck downstream call (Kernel HTTP
+                // provisioning call) used to be able to tie up this boundedElastic worker
+                // indefinitely with no bound at all. Bounded now (Chantier D · Audit n°6 ·
+                // S14 / Audit n°1 · A3).
                 if (result instanceof reactor.core.publisher.Mono<?> mono) {
-                    mono.block();
+                    mono.block(Duration.ofSeconds(15));
                 }
                 log.info("Canonical TntRole provisioning via tnt-roles-core complete for tenant {}", tenantId);
                 return (Void) null;

@@ -154,5 +154,17 @@
             <version>${reactor-test.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- Chantier C · Audit n3 · P5 — outbox migration integration test
+             (real Postgres for the event_bus schema, embedded Kafka broker). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka-test</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>

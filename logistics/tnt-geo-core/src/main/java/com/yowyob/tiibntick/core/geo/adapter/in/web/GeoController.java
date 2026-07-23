@@ -127,7 +127,7 @@ public class GeoController {
             @PathVariable UUID zoneId,
             @RequestParam double latitude,
             @RequestParam double longitude) {
-        return geofenceUseCase.isPointInZone(GeoPoint.of(latitude, longitude), zoneId);
+        return geofenceUseCase.isPointInZone(GeoPoint.of(latitude, longitude), zoneId, tenantId);
     }
 
     @Operation(summary = "Check whether a point is covered by any zone of a given agency")

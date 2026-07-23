@@ -2,6 +2,7 @@ package com.yowyob.tiibntick.core.billing.wallet.adapter.in.kafka;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yowyob.tiibntick.common.kafka.TntTopics;
 import com.yowyob.tiibntick.core.billing.wallet.application.port.in.IWalletUseCase;
 import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.CreditCommissionCommand;
 import com.yowyob.tiibntick.core.billing.wallet.application.port.out.IPaymentIntentRepository;
@@ -22,7 +23,7 @@ import java.util.UUID;
  *
  * <p>Listens to:</p>
  * <ul>
- *   <li>{@code tnt.billing.wallet.commission-calculated} — credits deliverer commission
+ *   <li>{@code tnt.billing.wallet.commission.calculated} — credits deliverer commission
  *       to their in-app wallet after a confirmed invoice payment.</li>
  *   <li>{@code tnt.incident.escalated.to.dispute} — permanently freezes the payment
  *       linked to the affected mission until the dispute is resolved by tnt-dispute-core.</li>
@@ -58,7 +59,7 @@ public class WalletBillingEventConsumer {
      * @param message the raw Kafka message (JSON)
      */
     @KafkaListener(
-            topics = "tnt.billing.wallet.commission-calculated",
+            topics = TntTopics.BILLING_WALLET_COMMISSION_CALCULATED,
             groupId = "tnt-billing-wallet-commission",
             containerFactory = "walletKafkaListenerContainerFactory"
     )
@@ -112,7 +113,7 @@ public class WalletBillingEventConsumer {
      * @param message the raw Kafka message (JSON) from tnt-incident-core
      */
     @KafkaListener(
-            topics = "tnt.incident.escalated.to.dispute",
+            topics = TntTopics.INCIDENT_ESCALATED_TO_DISPUTE,
             groupId = "tnt-billing-wallet-dispute-freeze",
             containerFactory = "walletKafkaListenerContainerFactory"
     )

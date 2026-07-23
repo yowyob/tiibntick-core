@@ -57,6 +57,7 @@ import com.yowyob.tiibntick.core.tp.application.service.TntClientProfileService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -125,6 +126,7 @@ public class MarketOrderApplicationService implements IManageMarketOrderUseCase 
     private final IWalletUseCase walletUseCase;
 
     @Override
+    @Transactional
     public Mono<MarketOrderResponse> placeOrder(PlaceMarketOrderCommand cmd) {
         log.debug("Placing MarketOrder for client={} offer={} tenant={}", cmd.clientId(), cmd.offerId(), cmd.tenantId());
         return actorPort.exists(cmd.clientId())
@@ -156,7 +158,7 @@ public class MarketOrderApplicationService implements IManageMarketOrderUseCase 
                                 List<Object> events = order.pullDomainEvents();
 
                                 return orderRepository.save(order)
-                                        .flatMap(saved -> eventPublisher.publishAll(events).thenReturn(saved));
+                                        .flatMap(saved -> eventPublisher.publishAll(events, cmd.tenantId()).thenReturn(saved));
                             });
                 })
                 .map(this::toResponse);
@@ -177,6 +179,7 @@ public class MarketOrderApplicationService implements IManageMarketOrderUseCase 
      * longer {@code SELECTED}, i.e. on a second call for the same quote.</p>
      */
     @Override
+    @Transactional
     public Mono<MarketOrderResponse> placeOrderFromQuote(PlaceOrderFromQuoteCommand cmd) {
         log.debug("Placing MarketOrder from quote={} client={} tenant={}", cmd.quoteRequestId(), cmd.clientId(), cmd.tenantId());
         return quoteRepository.findById(QuoteRequestId.of(cmd.quoteRequestId()), cmd.tenantId())
@@ -201,12 +204,13 @@ public class MarketOrderApplicationService implements IManageMarketOrderUseCase 
 
                     return quoteRepository.save(quote)
                             .then(orderRepository.save(order))
-                            .flatMap(saved -> eventPublisher.publishAll(events).thenReturn(saved));
+                            .flatMap(saved -> eventPublisher.publishAll(events, cmd.tenantId()).thenReturn(saved));
                 })
                 .map(this::toResponse);
     }
 
     @Override
+    @Transactional
     public Mono<MarketOrderResponse> processPayment(UUID orderId, ProcessPaymentCommand cmd, String tenantId) {
         // ── tnt-billing-wallet semantics (business-critical — read before touching) ──────────────
         // ProcessPaymentCommand carries paymentMethod + transactionRef + paidAmountXaf: the shape of
@@ -238,7 +242,7 @@ public class MarketOrderApplicationService implements IManageMarketOrderUseCase 
 
                     return processWalletMovement(tenantUuid, orderId, order, cmd, paidAmount)
                             .then(orderRepository.save(order))
-                            .flatMap(saved -> eventPublisher.publishAll(events)
+                            .flatMap(saved -> eventPublisher.publishAll(events, tenantId)
                                     .then(notificationPort.notifyOrderPaid(tenantId, saved.getProviderId(),
                                             orderId.toString(), payment.paidAmount().amount()))
                                     .thenReturn(saved));
@@ -383,13 +387,14 @@ public class MarketOrderApplicationService implements IManageMarketOrderUseCase 
     }
 
     @Override
+    @Transactional
     public Mono<MarketOrderResponse> completeOrder(UUID orderId, String tenantId) {
         return findOrError(orderId, tenantId)
                 .flatMap(order -> {
                     order.complete();
                     List<Object> events = order.pullDomainEvents();
                     return orderRepository.save(order)
-                            .flatMap(saved -> eventPublisher.publishAll(events)
+                            .flatMap(saved -> eventPublisher.publishAll(events, tenantId)
                                     .then(notificationPort.notifyOrderCompleted(tenantId, saved.getClientId(), orderId.toString()))
                                     .then(enrichOnCompletion(tenantId, saved))
                                     .thenReturn(saved));

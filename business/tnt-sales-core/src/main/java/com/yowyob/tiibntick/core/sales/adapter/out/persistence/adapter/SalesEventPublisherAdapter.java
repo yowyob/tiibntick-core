@@ -1,61 +1,92 @@
 package com.yowyob.tiibntick.core.sales.adapter.out.persistence.adapter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yowyob.kernel.event.application.port.in.PublishEventUseCase;
+import com.yowyob.kernel.event.domain.model.DomainEventEnvelope;
 import com.yowyob.tiibntick.core.sales.application.port.out.SalesEventPublisher;
 import com.yowyob.tiibntick.core.sales.domain.event.*;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
+
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.UUID;
 
 /**
- * Kafka adapter implementing SalesEventPublisher port.
- * Author: MANFOUO Braun
+ * Outbox-backed adapter implementing {@link SalesEventPublisher}.
+ *
+ * <p>Chantier C · Audit n°3 · P5 migration (see
+ * {@code docs/audits/remediation/chantier-c-p5-inventory.md}): delegates to
+ * {@link PublishEventUseCase} (yow-event-kernel's transactional outbox) instead of
+ * sending to Kafka directly and swallowing send failures. Envelopes are persisted in
+ * the same DB transaction as the business write (see the {@code @Transactional}
+ * boundaries on {@code SalesApplicationService}'s confirm/dispatch/deliver/cancel
+ * use cases), and {@code OutboxPollerService} relays them to Kafka asynchronously
+ * with retry/DLQ — a business save can no longer succeed while its event is
+ * silently lost.
+ *
+ * <p>The Kafka wire format is unchanged: the payload is still simply
+ * {@code objectMapper.writeValueAsString(event)} — the raw event record serialized
+ * directly, with no extra wrapper envelope — so existing consumers require no change.
+ *
+ * @author MANFOUO Braun
  */
 @Component
 public class SalesEventPublisherAdapter implements SalesEventPublisher {
 
-    private static final String TOPIC_CONFIRMED  = "tnt.sales.order.confirmed";
-    private static final String TOPIC_DISPATCHED = "tnt.sales.order.dispatched";
-    private static final String TOPIC_DELIVERED  = "tnt.sales.order.delivered";
-    private static final String TOPIC_CANCELLED  = "tnt.sales.order.cancelled";
+    static final String TOPIC_CONFIRMED  = "tnt.sales.order.confirmed";
+    static final String TOPIC_DISPATCHED = "tnt.sales.order.dispatched";
+    static final String TOPIC_DELIVERED  = "tnt.sales.order.delivered";
+    static final String TOPIC_CANCELLED  = "tnt.sales.order.cancelled";
 
-    private final KafkaTemplate<String, String> kafkaTemplate;
+    private static final String AGGREGATE_TYPE = "SalesOrder";
+    private static final String SOLUTION_CODE = "TNT";
+
+    private final PublishEventUseCase publishEventUseCase;
     private final ObjectMapper objectMapper;
 
     public SalesEventPublisherAdapter(
-            @Qualifier("tntKafkaTemplate") KafkaTemplate<String, String> kafkaTemplate,
+            PublishEventUseCase publishEventUseCase,
             @Qualifier("tntObjectMapper") ObjectMapper objectMapper) {
-        this.kafkaTemplate = kafkaTemplate;
+        this.publishEventUseCase = publishEventUseCase;
         this.objectMapper = objectMapper;
     }
 
     @Override
     public Mono<Void> publishOrderConfirmed(SalesOrderConfirmedEvent event) {
-        return publish(TOPIC_CONFIRMED, event.orderId().toString(), event);
+        return enqueue(TOPIC_CONFIRMED, event, event.orderId(), event.tenantId(), event.occurredAt());
     }
 
     @Override
     public Mono<Void> publishOrderDispatched(SalesOrderDispatchedEvent event) {
-        return publish(TOPIC_DISPATCHED, event.orderId().toString(), event);
+        return enqueue(TOPIC_DISPATCHED, event, event.orderId(), event.tenantId(), event.occurredAt());
     }
 
     @Override
     public Mono<Void> publishOrderDelivered(SalesOrderDeliveredEvent event) {
-        return publish(TOPIC_DELIVERED, event.orderId().toString(), event);
+        return enqueue(TOPIC_DELIVERED, event, event.orderId(), event.tenantId(), event.occurredAt());
     }
 
     @Override
     public Mono<Void> publishOrderCancelled(SalesOrderCancelledEvent event) {
-        return publish(TOPIC_CANCELLED, event.orderId().toString(), event);
+        return enqueue(TOPIC_CANCELLED, event, event.orderId(), event.tenantId(), event.occurredAt());
     }
 
-    private Mono<Void> publish(String topic, String key, Object payload) {
-        return Mono.fromCallable(() -> objectMapper.writeValueAsString(payload))
-                .flatMap(json -> Mono.fromFuture(kafkaTemplate.send(topic, key, json).toCompletableFuture()))
-                .then()
-                .subscribeOn(Schedulers.boundedElastic())
-                .onErrorResume(e -> Mono.empty());
+    private Mono<Void> enqueue(String topic, Object event, UUID orderId, UUID tenantId, Instant occurredAt) {
+        return Mono.fromCallable(() -> objectMapper.writeValueAsString(event))
+                .map(payload -> DomainEventEnvelope.wrap()
+                        .correlationId(UUID.randomUUID().toString())
+                        .eventType(event.getClass().getSimpleName())
+                        .aggregateId(orderId.toString())
+                        .aggregateType(AGGREGATE_TYPE)
+                        .tenantId(tenantId.toString())
+                        .solutionCode(SOLUTION_CODE)
+                        .payload(payload)
+                        .kafkaTopic(topic)
+                        .occurredAt(LocalDateTime.ofInstant(occurredAt, ZoneOffset.UTC))
+                        .build())
+                .flatMap(publishEventUseCase::publish);
     }
 }

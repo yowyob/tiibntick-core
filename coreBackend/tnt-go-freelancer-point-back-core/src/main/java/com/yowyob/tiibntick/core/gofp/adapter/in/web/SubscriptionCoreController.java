@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @Tag(name = "GOFP — Abonnements", description = "API métier générique — Plans d'abonnement livreurs")
 @RestController
@@ -22,6 +23,7 @@ public class SubscriptionCoreController {
 
     @Operation(summary = "Souscrire ou changer de plan")
     @PostMapping("/freelancer/{freelancerActorId}")
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<SubscriptionEntity> subscribe(@PathVariable UUID freelancerActorId,
                                                @RequestParam String subscriptionType,
@@ -41,11 +43,13 @@ public class SubscriptionCoreController {
     }
 
     @PatchMapping("/freelancer/{freelancerActorId}/cancel")
+    @PreAuthorize("isAuthenticated()")
     public Mono<SubscriptionEntity> cancel(@PathVariable UUID freelancerActorId) {
         return subscriptionUseCase.cancel(freelancerActorId);
     }
 
     @PatchMapping("/freelancer/{freelancerActorId}/reset-quota")
+    @PreAuthorize("isAuthenticated()")
     public Mono<SubscriptionEntity> resetQuota(@PathVariable UUID freelancerActorId) {
         return subscriptionUseCase.resetMonthlyQuota(freelancerActorId);
     }

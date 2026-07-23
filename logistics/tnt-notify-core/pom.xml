@@ -59,6 +59,16 @@
             <artifactId>spring-boot-starter-webflux</artifactId>
         </dependency>
 
+        <!-- ── Spring Boot Actuator / Micrometer (i18n missing-translation metric) ── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+        </dependency>
+
         <!-- JavaMailSender / MimeMessage — used by EmailNotificationAdapter,
              only active when tnt.notify.kernel.enabled=false and mail is configured. -->
         <dependency>
@@ -107,6 +117,20 @@
             <groupId>org.testcontainers</groupId>
             <artifactId>postgresql</artifactId>
             <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- Outbox migration integration test (Chantier C · Audit n°3 · P5) — embedded broker,
+             see tnt-delivery-core's pilot for why EmbeddedKafka over a Testcontainers Kafka
+             container. -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka-test</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

@@ -8,6 +8,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.web.server.authorization.AuthorizationContext;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
+
 /**
  * Coarse, route-level scope check for one gateway block (e.g. {@code AUTH:*} for
  * {@code /api/v1/auth/**}) — wired via {@code .pathMatchers(...).access(...)} in
@@ -21,16 +23,27 @@ import reactor.core.publisher.Mono;
  * semantics, no drift (see
  * {@code docs/auth/platform-client-management-design.md} §2.4/§7).
  *
+ * <p>A block can require more than one acceptable scope (e.g.
+ * {@code /api/v1/platform/**} accepts either {@code MARKET:*} or {@code LINK:*} —
+ * Audit n°7 · #15): the multi-{@link Scope} constructor grants access if the client's
+ * scopes satisfy <em>any</em> of the listed requirements (logical OR), not all of them.
+ *
  * @author MANFOUO Braun
  */
 public class PlatformScopeAuthorizationManager implements ReactiveAuthorizationManager<AuthorizationContext> {
 
-    private final String resource;
-    private final String action;
+    /** One acceptable {@code resource:action} scope requirement. */
+    public record Scope(String resource, String action) {
+    }
+
+    private final List<Scope> acceptedScopes;
 
     public PlatformScopeAuthorizationManager(String resource, String action) {
-        this.resource = resource;
-        this.action = action;
+        this(new Scope(resource, action));
+    }
+
+    public PlatformScopeAuthorizationManager(Scope... acceptedScopes) {
+        this.acceptedScopes = List.of(acceptedScopes);
     }
 
     @Override
@@ -39,7 +52,9 @@ public class PlatformScopeAuthorizationManager implements ReactiveAuthorizationM
                 .filter(Authentication::isAuthenticated)
                 .filter(PlatformClientAuthenticationToken.class::isInstance)
                 .cast(PlatformClientAuthenticationToken.class)
-                .<AuthorizationResult>map(token -> new AuthorizationDecision(PermissionMatcher.matchesAny(token.getScopes(), resource, action)))
+                .<AuthorizationResult>map(token -> new AuthorizationDecision(
+                        acceptedScopes.stream().anyMatch(scope ->
+                                PermissionMatcher.matchesAny(token.getScopes(), scope.resource(), scope.action()))))
                 .defaultIfEmpty(new AuthorizationDecision(false));
     }
 }

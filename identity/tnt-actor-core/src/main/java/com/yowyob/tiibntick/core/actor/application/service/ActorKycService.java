@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
 import java.util.Objects;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
@@ -78,6 +79,7 @@ public class ActorKycService implements ISubmitKycUseCase, IValidateKycUseCase {
     }
 
     @Override
+    @Transactional
     public Mono<Void> validateKyc(ValidateKycCommand command) {
         Objects.requireNonNull(command, "command must not be null");
         KycValidatedEvent event = KycValidatedEvent.of(command.actorId(), command.tenantId(),

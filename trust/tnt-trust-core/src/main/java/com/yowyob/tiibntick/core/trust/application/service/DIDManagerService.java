@@ -4,6 +4,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Mono;
 import com.yowyob.tiibntick.core.trust.domain.model.valueobject.DIDDocument;
 import com.yowyob.tiibntick.core.trust.domain.model.valueobject.LogisticTrustEvent;
@@ -70,6 +71,7 @@ public class DIDManagerService implements IssueDIDUseCase, GetActorDIDUseCase {
      * {@link LogisticTrustEvent} with type {@code DELIVERER_DID_ISSUED} to Kafka.
      */
     @Override
+    @Transactional
     public Mono<DIDDocument> issue(
             final String actorId,
             final String tenantId,
@@ -114,6 +116,7 @@ public class DIDManagerService implements IssueDIDUseCase, GetActorDIDUseCase {
      * @return the issued DIDDocument
      */
     @Override
+    @Transactional
     public Mono<DIDDocument> issueForFreelancerOrg(
             final String orgId, final String tenantId,
             final String tradeName, final String publicKeyPem) {
@@ -140,6 +143,7 @@ public class DIDManagerService implements IssueDIDUseCase, GetActorDIDUseCase {
      * {@link LogisticTrustEvent} with type {@code DELIVERER_DID_REVOKED}.
      */
     @Override
+    @Transactional
     public Mono<Void> revoke(final String did, final String tenantId) {
         log.info("Revoking DID={}", did);
 

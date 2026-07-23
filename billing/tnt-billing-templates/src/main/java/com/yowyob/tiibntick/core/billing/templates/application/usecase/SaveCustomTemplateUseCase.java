@@ -12,6 +12,7 @@ import com.yowyob.tiibntick.core.billing.templates.port.outbound.ITemplateEventP
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -36,8 +37,13 @@ public class SaveCustomTemplateUseCase implements ISaveCustomTemplateUseCase {
 
     /**
      * {@inheritDoc}
+     *
+     * <p>{@code @Transactional} so the custom-template row and the outbox envelope/entry
+     * written by {@link ITemplateEventPublisher} (Chantier C · Audit n°3 · P5) commit
+     * atomically — the save can no longer succeed while its event is silently lost.
      */
     @Override
+    @Transactional
     public Mono<CustomPolicyTemplate> save(SaveCustomTemplateCommand command) {
         log.info("Saving custom template '{}' for actor {}", command.getName(), command.getOwnerActorId());
 

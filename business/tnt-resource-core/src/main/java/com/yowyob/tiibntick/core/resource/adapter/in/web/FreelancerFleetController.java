@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -40,6 +41,7 @@ public class FreelancerFleetController {
     @Operation(summary = "Register a vehicle in the freelancer org fleet")
     @PostMapping("/vehicles")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("isAuthenticated()")
     public Mono<FreelancerVehicle> addVehicle(
             @PathVariable UUID orgId,
             @RequestBody AddVehicleRequest body) {
@@ -72,6 +74,7 @@ public class FreelancerFleetController {
 
     @Operation(summary = "Assign a freelancer vehicle to a delivery mission")
     @PostMapping("/vehicles/{vehicleId}/assign-mission")
+    @PreAuthorize("isAuthenticated()")
     public Mono<FreelancerVehicle> assignToMission(
             @PathVariable UUID orgId,
             @PathVariable UUID vehicleId,
@@ -82,6 +85,7 @@ public class FreelancerFleetController {
 
     @Operation(summary = "Release a freelancer vehicle from its current mission")
     @PostMapping("/vehicles/{vehicleId}/release-mission")
+    @PreAuthorize("isAuthenticated()")
     public Mono<FreelancerVehicle> releaseFromMission(
             @PathVariable UUID vehicleId,
             @RequestParam String missionId) {
@@ -90,6 +94,7 @@ public class FreelancerFleetController {
 
     @Operation(summary = "Deactivate a vehicle (sold, scrapped, long-term storage)")
     @PostMapping("/vehicles/{vehicleId}/deactivate")
+    @PreAuthorize("isAuthenticated()")
     public Mono<FreelancerVehicle> deactivateVehicle(@PathVariable UUID vehicleId) {
         return deactivateVehicleUseCase.deactivateVehicle(vehicleId);
     }
@@ -99,6 +104,7 @@ public class FreelancerFleetController {
     @Operation(summary = "Add specialized equipment to the freelancer org")
     @PostMapping("/equipments")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("isAuthenticated()")
     public Mono<FreelancerEquipment> addEquipment(
             @PathVariable UUID orgId,
             @RequestBody AddEquipmentRequest body) {

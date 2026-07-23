@@ -11,6 +11,7 @@ import reactor.core.publisher.Mono;
 
 import java.time.Instant;
 import java.util.Map;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Application service implementing administrative operations for FreelancerOrganizations.
@@ -54,6 +55,7 @@ public class FreelancerOrgAdminService implements FreelancerOrgAdminUseCase {
 
     @Override
     @RequirePermission(resource = "freelancer", action = "approve")
+    @Transactional
     public Mono<Void> approveKycBasic(String orgId, String adminId) {
         log.info("Approving KYC BASIC for FreelancerOrg={} by admin={}", orgId, adminId);
         return eventPublisher.publish(TOPIC_KYC_APPROVED,
@@ -62,6 +64,7 @@ public class FreelancerOrgAdminService implements FreelancerOrgAdminUseCase {
 
     @Override
     @RequirePermission(resource = "freelancer", action = "approve")
+    @Transactional
     public Mono<Void> approveKycFull(String orgId, String adminId) {
         log.info("Approving KYC FULL for FreelancerOrg={} by admin={}", orgId, adminId);
         return eventPublisher.publish(TOPIC_KYC_APPROVED,
@@ -70,6 +73,7 @@ public class FreelancerOrgAdminService implements FreelancerOrgAdminUseCase {
 
     @Override
     @RequirePermission(resource = "freelancer", action = "approve")
+    @Transactional
     public Mono<Void> rejectKyc(String orgId, String adminId, String reason) {
         log.info("Rejecting KYC for FreelancerOrg={} by admin={} reason={}", orgId, adminId, reason);
         return eventPublisher.publish(TOPIC_KYC_REJECTED,
@@ -78,6 +82,7 @@ public class FreelancerOrgAdminService implements FreelancerOrgAdminUseCase {
 
     @Override
     @RequirePermission(resource = "freelancer", action = "write")
+    @Transactional
     public Mono<Void> suspendFreelancerOrg(String orgId, String adminId, String reason) {
         log.info("Suspending FreelancerOrg={} by admin={} reason={}", orgId, adminId, reason);
         return eventPublisher.publish(TOPIC_SUSPENDED,
@@ -86,6 +91,7 @@ public class FreelancerOrgAdminService implements FreelancerOrgAdminUseCase {
 
     @Override
     @RequirePermission(resource = "freelancer", action = "write")
+    @Transactional
     public Mono<Void> unsuspendFreelancerOrg(String orgId, String adminId) {
         log.info("Unsuspending FreelancerOrg={} by admin={}", orgId, adminId);
         return eventPublisher.publish(TOPIC_UNSUSPENDED,
@@ -94,6 +100,7 @@ public class FreelancerOrgAdminService implements FreelancerOrgAdminUseCase {
 
     @Override
     @RequirePermission(resource = "tnt:platform", action = "admin")
+    @Transactional
     public Mono<Void> blacklistFreelancerOrg(String orgId, String adminId, String reason) {
         log.warn("BLACKLISTING FreelancerOrg={} by admin={} reason={}", orgId, adminId, reason);
         return eventPublisher.publish(TOPIC_BLACKLISTED,

@@ -25,6 +25,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * Generic Market API for merchant volume contracts — negotiation, dual
@@ -43,6 +44,7 @@ public class MerchantContractController {
 
     @Operation(summary = "Initiate a merchant/provider volume contract negotiation")
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<MerchantContractResponse> initiate(@Valid @RequestBody InitContractNegotiationCommand command) {
         return contractUseCase.initNegotiation(command);
@@ -50,6 +52,7 @@ public class MerchantContractController {
 
     @Operation(summary = "Sign the contract as the merchant (caller's own identity)")
     @PostMapping("/{id}/sign")
+    @PreAuthorize("isAuthenticated()")
     public Mono<MerchantContractResponse> sign(
             @PathVariable UUID id,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
@@ -59,6 +62,7 @@ public class MerchantContractController {
 
     @Operation(summary = "Countersign the contract as the provider (caller's own identity)")
     @PostMapping("/{id}/countersign")
+    @PreAuthorize("isAuthenticated()")
     public Mono<MerchantContractResponse> countersign(
             @PathVariable UUID id,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
@@ -68,6 +72,7 @@ public class MerchantContractController {
 
     @Operation(summary = "Renew a contract with a new end date")
     @PostMapping("/{id}/renew")
+    @PreAuthorize("isAuthenticated()")
     public Mono<MerchantContractResponse> renew(
             @PathVariable UUID id,
             @Valid @RequestBody RenewContractCommand command,
@@ -77,6 +82,7 @@ public class MerchantContractController {
 
     @Operation(summary = "Terminate a contract")
     @PostMapping("/{id}/terminate")
+    @PreAuthorize("isAuthenticated()")
     public Mono<MerchantContractResponse> terminate(
             @PathVariable UUID id,
             @RequestParam(required = false) String reason,

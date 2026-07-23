@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chantier — Délégation paiement/facturation au Kernel · Audit TiiBnTick</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --text: #1c2430; --muted: #5b6675;
+  --border: #e3e7ec; --accent: #0f5fa8; --accent-soft: #e8f1fa;
+  --code-bg: #f0f2f5; --sidebar-bg: #101823; --sidebar-text: #c7d0dc;
+  --crit: #c62828; --high: #e65100; --med: #f9a825; --low: #2e7d32;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1319; --panel: #161d27; --text: #dbe2ea; --muted: #8b97a5;
+    --border: #263140; --accent: #5aa2e0; --accent-soft: #17273a;
+    --code-bg: #1d2733; --sidebar-bg: #0a0f15; --sidebar-text: #a9b4c0;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--bg); color: var(--text); line-height: 1.65; }
+.layout { display: flex; min-height: 100vh; }
+nav.sidebar { width: 270px; flex-shrink: 0; background: var(--sidebar-bg);
+  color: var(--sidebar-text); padding: 1.4rem 1rem; position: sticky; top: 0;
+  height: 100vh; overflow-y: auto; }
+nav.sidebar .brand { font-size: 1.05rem; font-weight: 700; color: #fff;
+  margin-bottom: .2rem; }
+nav.sidebar .brand small { display:block; font-weight: 400; color: var(--sidebar-text);
+  font-size: .75rem; margin-top: .2rem; }
+nav.sidebar ul { list-style: none; padding: 0; margin: 1.2rem 0; }
+nav.sidebar li a { display: block; color: var(--sidebar-text); text-decoration: none;
+  padding: .45rem .6rem; border-radius: 6px; font-size: .86rem; }
+nav.sidebar li a:hover { background: rgba(255,255,255,.08); color: #fff; }
+nav.sidebar li a.active { background: var(--accent); color: #fff; }
+nav.sidebar .section-label { text-transform: uppercase; letter-spacing: .08em;
+  font-size: .68rem; color: #6b7683; margin: 1.4rem 0 .4rem .4rem; }
+main { flex: 1; min-width: 0; padding: 2.2rem 3rem 4rem; max-width: 1100px; }
+header.page { border-bottom: 1px solid var(--border); padding-bottom: 1.2rem;
+  margin-bottom: 1.6rem; }
+header.page .kicker { color: var(--accent); font-weight: 600; font-size: .85rem;
+  text-transform: uppercase; letter-spacing: .06em; }
+header.page h1 { margin: .25rem 0 .4rem; font-size: 1.9rem; }
+header.page .meta { color: var(--muted); font-size: .85rem; }
+h2 { margin-top: 2.4rem; padding-bottom: .35rem; border-bottom: 1px solid var(--border);
+  font-size: 1.35rem; }
+h3 { margin-top: 1.8rem; font-size: 1.08rem; }
+h4 { margin-top: 1.4rem; font-size: .98rem; }
+a { color: var(--accent); }
+code { background: var(--code-bg); padding: .12em .38em; border-radius: 4px;
+  font-size: .84em; font-family: "JetBrains Mono", Consolas, monospace; }
+pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem; overflow-x: auto; font-size: .82rem; line-height: 1.5; }
+pre code { background: none; padding: 0; }
+.table-wrap { overflow-x: auto; margin: 1rem 0; border: 1px solid var(--border);
+  border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: .85rem; background: var(--panel); }
+th, td { border-bottom: 1px solid var(--border); padding: .55rem .75rem; text-align: left;
+  vertical-align: top; }
+th { background: var(--accent-soft); color: var(--text); font-weight: 600;
+  white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+blockquote { border-left: 4px solid var(--accent); background: var(--accent-soft);
+  margin: 1rem 0; padding: .7rem 1rem; border-radius: 0 8px 8px 0; }
+blockquote p { margin: .3rem 0; }
+.badge { display: inline-block; padding: .1em .6em; border-radius: 999px;
+  font-size: .74rem; font-weight: 700; color: #fff; white-space: nowrap; }
+.badge.crit { background: var(--crit); } .badge.high { background: var(--high); }
+.badge.med { background: var(--med); color: #333; } .badge.low { background: var(--low); }
+.mermaid { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem; margin: 1rem 0; text-align: center; overflow-x: auto; }
+.toc { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem 1.4rem; margin: 1.4rem 0; font-size: .88rem; }
+.toc > ul { margin: .3rem 0; padding-left: 1.1rem; }
+.toc .toctitle { font-weight: 700; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1rem; margin: 1.4rem 0; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1.1rem 1.2rem; text-decoration: none; color: var(--text); display: block; }
+.card:hover { border-color: var(--accent); }
+.card .icon { font-size: 1.5rem; }
+.card h3 { margin: .4rem 0 .2rem; font-size: 1rem; }
+.card p { margin: 0; color: var(--muted); font-size: .82rem; }
+.stat-row { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1.2rem 0; }
+.stat { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: .8rem 1.2rem; min-width: 130px; }
+.stat .num { font-size: 1.6rem; font-weight: 800; }
+.stat .lbl { font-size: .74rem; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .05em; }
+.stat.crit .num { color: var(--crit); } .stat.high .num { color: var(--high); }
+.stat.med .num { color: var(--med); } .stat.low .num { color: var(--low); }
+footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border);
+  color: var(--muted); font-size: .78rem; }
+.progress-block { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1rem 1.2rem; margin: 1rem 0 1.6rem; }
+.progress-block .progress-label { display: flex; justify-content: space-between; align-items: baseline;
+  font-size: .85rem; margin-bottom: .5rem; }
+.progress-block .progress-label b { font-size: 1rem; }
+.progress-bar-track { background: var(--code-bg); border-radius: 999px; height: .6rem; overflow: hidden; }
+.progress-bar-fill { height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--low), var(--accent)); transition: width .3s ease; }
+.progress-note { font-size: .72rem; color: var(--muted); margin-top: .5rem; }
+li:has(> input.task-checkbox) { list-style: none; margin-left: -1.4rem; padding-left: .3rem;
+  display: list-item; }
+input.task-checkbox { width: 1rem; height: 1rem; margin-right: .5rem; vertical-align: middle;
+  accent-color: var(--accent); }
+li:has(> input.task-checkbox:checked) { color: var(--muted); }
+li:has(> input.task-checkbox:checked) code { opacity: .75; }
+@media (max-width: 900px) {
+  .layout { flex-direction: column; }
+  nav.sidebar { width: 100%; height: auto; position: static; }
+  main { padding: 1.4rem 1.2rem 3rem; }
+}
+@media print { nav.sidebar { display: none; } main { padding: 0; } }
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar"><div class="brand">TiiBnTick Core<small>Audit technique — juillet 2026</small></div>
+<ul><li><a href="../index.html">🏠 Accueil</a></li>
+<li><a href="../executive-summary.html">📋 Résumé exécutif global</a></li>
+</ul><div class="section-label">Rapports d'audit</div><ul>
+<li><a href="../audit-1-architecture.html">🏛️ Audit n°1 — Architecture globale</a></li>
+<li><a href="../audit-2-inter-modules.html">🔗 Audit n°2 — Connexions inter-modules</a></li>
+<li><a href="../audit-3-yow-event-kernel.html">📨 Audit n°3 — yow-event-kernel</a></li>
+<li><a href="../audit-4-yow-i18n-kernel.html">🌍 Audit n°4 — yow-i18n-kernel</a></li>
+<li><a href="../audit-5-kafka.html">🧵 Audit n°5 — Kafka</a></li>
+<li><a href="../audit-6-scalabilite.html">📈 Audit n°6 — Scalabilité</a></li>
+<li><a href="../audit-7-system-design.html">🧭 Audit n°7 — System Design & Sécurité</a></li>
+</ul><div class="section-label">Plan de remédiation</div><ul>
+<li><a href="implementation-plan.html">🗂️ Plan — Plan d'implémentation — vue d'ensemble</a></li>
+<li><a href="phase-0-critical.html">🚨 P0 — Phase 0 — Bloquant production</a></li>
+<li><a href="phase-1-hardening.html">🛡️ P1 — Phase 1 — Durcissement</a></li>
+<li><a href="phase-2-target-architecture.html">🚀 P2 — Phase 2 — Architecture cible</a></li>
+<li><a href="workstream-payment-billing-kernel-delegation.html" class="active">💳 Chantier — Délégation paiement/facturation au Kernel</a></li>
+</ul></nav>
+<main>
+<header class="page">
+  <div class="kicker">Chantier</div>
+  <h1>💳 Délégation paiement/facturation au Kernel</h1>
+  <div class="meta">Plan d'implémentation — document vivant, mis à jour à chaque décision. Voir <code>docs/audits/raw/</code> pour le constat figé.</div>
+</header>
+<div class="progress-block">
+  <div class="progress-label"><span>Progression — Délégation paiement/facturation au Kernel</span><b>10 / 10 (100%)</b></div>
+  <div class="progress-bar-track"><div class="progress-bar-fill" style="width:100%"></div></div>
+  <div class="progress-note">Lecture seule : ces cases reflètent l'état du fichier Markdown versionné dans git au moment de la génération. On les coche en éditant le <code>.md</code> (IDE ou <code>- [x]</code> par commit), jamais depuis cette page — régénérer avec <code>python3 docs/audits/build_reports.py</code> après un commit pour mettre à jour l'affichage.</div>
+</div>
+<div class="toc"><div class="toc"><span class="toctitle">Sommaire</span><ul>
+<li><a href="#decision">Décision</a></li>
+<li><a href="#pourquoi-cest-aussi-un-correctif-de-securite-pas-seulement-un-refactor">Pourquoi c'est aussi un correctif de sécurité (pas seulement un refactor)</a></li>
+<li><a href="#inventaire-du-code-actuel-concerne">Inventaire du code actuel concerné</a><ul>
+<li><a href="#billingtnt-billing-wallet-a-restructurer-en-profondeur">billing/tnt-billing-wallet — à restructurer en profondeur</a></li>
+<li><a href="#billingtnt-billing-invoice-perimetre-a-clarifier-voir-question-ouverte-ci-dessous">billing/tnt-billing-invoice — périmètre à clarifier (voir « Question ouverte » ci-dessous)</a></li>
+<li><a href="#modules-dependants-impact-a-verifier-ne-pas-casser">Modules dépendants (impact à vérifier, ne pas casser)</a></li>
+</ul>
+</li>
+<li><a href="#architecture-cible">Architecture cible</a></li>
+<li><a href="#mapping-des-endpoints-kernel-utilises">Mapping des endpoints Kernel utilisés</a></li>
+<li><a href="#question-ouverte-a-trancher-avant-limplementation">Question ouverte à trancher avant l'implémentation</a></li>
+<li><a href="#etapes-dimplementation-ordre-recommande">Étapes d'implémentation (ordre recommandé)</a></li>
+<li><a href="#note-de-verification-etapes-2-3-6-7-2026-07-18">Note de vérification (étapes 2, 3, 6, 7 — 2026-07-18)</a></li>
+<li><a href="#note-de-verification-etapes-4-5-2026-07-18">Note de vérification (étapes 4, 5 — 2026-07-18)</a></li>
+<li><a href="#note-de-verification-etape-8-2026-07-18">Note de vérification (étape 8 — 2026-07-18)</a></li>
+<li><a href="#ce-que-ce-chantier-ne-couvre-pas">Ce que ce chantier ne couvre pas</a></li>
+</ul>
+</div>
+</div>
+<h1 id="chantier-delegation-complete-paiement-facturation-au-kernel">Chantier — Délégation complète Paiement &amp; Facturation au Kernel</h1>
+<p><strong>Statut : 🟡 Planifié — non commencé</strong>
+<strong>Décidé le :</strong> 17/07/2026, par directive explicite de l'utilisateur.
+<strong>Remplace :</strong> le point P0 « vérifier les signatures webhooks Stripe/MTN/Orange » de l'<a href="../executive-summary.html">executive-summary</a> et de l'<a href="../audit-7-system-design.html">Audit n°7</a>.
+<strong>Fait partie de :</strong> <a href="phase-0-critical.html#chantier-b-paiement-facturation-delegation-complete-au-kernel">Phase 0, chantier B</a>.</p>
+<blockquote>
+<p>Cases à cocher : source de vérité = ce fichier Markdown, coché par commit. Voir le mode d'emploi complet en tête de la <a href="phase-0-critical.html">Phase 0</a>.</p>
+</blockquote>
+<h2 id="decision">Décision</h2>
+<p>TiiBnTick Core <strong>cesse de gérer lui-même les modes de paiement et leurs mécanismes</strong>. Toute intégration Mobile Money / carte bancaire, tout webhook de confirmation, toute vérification de signature est <strong>entièrement déléguée au Kernel</strong> :</p>
+<ul>
+<li><strong>Paiements / wallet</strong> → Kernel <code>payment-controller</code> (<code>/api/payments/wallets/**</code>) + <code>payment-gateway-controller</code> (<code>/api/payments/orders/**</code>).</li>
+<li><strong>Facturation / documents commerciaux</strong> → Kernel <code>billing-legacy-documents-controller</code> (<code>/api/bon-commande</code>, <code>/api/bons-achat</code>, <code>/api/bons-livraison</code>, <code>/api/facture-fournisseurs</code>, <code>/api/factures-proforma</code>, <code>/api/v1/facturation/bon-receptions</code>, <code>/api/v1/facturation/note-credits</code> — 64 opérations) + <code>billing-legacy-payments-controller</code> (<code>/api/paiement</code>).</li>
+</ul>
+<p>Ce chantier <strong>supprime une vulnérabilité critique plutôt que de la corriger</strong> : voir preuve ci-dessous. C'est aussi une simplification nette — environ 1 200 lignes de logique paiement/webhook maison disparaissent du périmètre TiiBnTick.</p>
+<h2 id="pourquoi-cest-aussi-un-correctif-de-securite-pas-seulement-un-refactor">Pourquoi c'est aussi un correctif de sécurité (pas seulement un refactor)</h2>
+<p>Preuve relevée dans <code>PaymentWebhookController.java</code> (<code>billing/tnt-billing-wallet/src/main/java/.../adapter/in/web/</code>) :</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Provider</th>
+<th>Ligne</th>
+<th>État réel de la vérification</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Stripe</td>
+<td><code>PaymentWebhookController.java:101-116</code></td>
+<td><strong>Aucune vérification de signature.</strong> Le commentaire dit littéralement « Stripe signature verification would use stripe-java SDK in production » — le SDK n'est pas utilisé, le corps JSON brut est parsé directement (<code>parseStripeEvent</code>). N'importe qui peut POST <code>{"type":"payment_intent.succeeded", ...}</code> et faire confirmer un paiement.</td>
+</tr>
+<tr>
+<td>MTN MoMo</td>
+<td><code>PaymentWebhookController.java:120-137</code> (<code>verifyMtnSignature</code>)</td>
+<td>HMAC-SHA256 vérifié <strong>seulement si l'en-tête <code>X-MTN-Signature</code> est présent</strong> ; s'il est absent, la requête est acceptée sans vérification (<code>// MTN sandbox may not send signatures — allow in non-production</code>, ligne 123).</td>
+</tr>
+<tr>
+<td>Orange Money</td>
+<td><code>PaymentWebhookController.java:74-95</code></td>
+<td><strong>Zéro vérification.</strong> Le contrôleur fait confiance au corps <code>OrangeCallbackRequest</code> tel quel.</td>
+</tr>
+</tbody>
+</table></div>
+<p>Le Kernel expose déjà <code>POST /api/payments/orders/callbacks/{provider}</code> avec un en-tête <code>Stripe-Signature</code> documenté dans son propre swagger — la vérification de signature devient la responsabilité d'une équipe qui possède réellement l'intégration provider. <strong>Supprimer le contrôleur maison élimine la faille au lieu de la patcher.</strong></p>
+<h2 id="inventaire-du-code-actuel-concerne">Inventaire du code actuel concerné</h2>
+<h3 id="billingtnt-billing-wallet-a-restructurer-en-profondeur"><code>billing/tnt-billing-wallet</code> — à restructurer en profondeur</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Fichier</th>
+<th>Lignes</th>
+<th>Sort</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>adapter/in/web/PaymentWebhookController.java</code></td>
+<td>177</td>
+<td><strong>Supprimé.</strong> Remplacé par la relation directe Kernel↔Kernel (le Kernel reçoit et traite lui-même les callbacks provider).</td>
+</tr>
+<tr>
+<td><code>adapter/out/momo/StripeAdapter.java</code></td>
+<td>72</td>
+<td><strong>Supprimé.</strong></td>
+</tr>
+<tr>
+<td><code>adapter/out/momo/MtnMoMoAdapter.java</code></td>
+<td>111</td>
+<td><strong>Supprimé.</strong></td>
+</tr>
+<tr>
+<td><code>adapter/out/momo/OrangeMoneyAdapter.java</code></td>
+<td>47</td>
+<td><strong>Supprimé.</strong></td>
+</tr>
+<tr>
+<td><code>application/port/out/IMoMoPaymentPort.java</code></td>
+<td>—</td>
+<td><strong>Supprimé</strong> (port devenu sans objet — plus d'implémentation locale de dispatch provider).</td>
+</tr>
+<tr>
+<td><code>config/StripeProperties.java</code>, <code>MtnMoMoProperties.java</code>, <code>OrangeMoneyProperties.java</code></td>
+<td>—</td>
+<td><strong>Supprimés</strong> avec leurs entrées <code>application.yml</code> (clés API/secrets provider ne doivent plus résider dans TiiBnTick Core).</td>
+</tr>
+<tr>
+<td><code>adapter/in/web/dto/request/{Orange,Mtn}CallbackRequest.java</code></td>
+<td>—</td>
+<td><strong>Supprimés.</strong></td>
+</tr>
+<tr>
+<td><code>application/service/WalletService.java</code> (481 lignes)</td>
+<td>—</td>
+<td><strong>Conservé mais réduit.</strong> Le ledger local (<code>Wallet</code>, <code>WalletTransaction</code>, <code>PaymentIntent</code>, <code>getOrCreateWallet</code>, <code>creditWallet</code>, <code>debitWallet</code>, <code>initiatePayment</code>, <code>handlePaymentCallback</code>, <code>refundPayment</code>, <code>freezeWallet</code>) est remplacé par des appels au Kernel <code>payment-controller</code>. La logique <strong>métier TiiBnTick</strong> sans équivalent Kernel est conservée : <code>splitMissionRevenue</code> (répartition plateforme/organisation/sous-livreur), <code>creditCommission</code>, <code>transferSubDelivererCommission</code>, l'ancrage blockchain (<code>anchorPaymentCommit</code> → <code>tnt-trust-core</code>), les notifications de confirmation/échec.</td>
+</tr>
+<tr>
+<td><code>adapter/out/redis/RedisIdempotencyStore.java</code></td>
+<td>—</td>
+<td><strong>Conservé</strong> — l'idempotence côté TiiBnTick (déduplication de commandes entrantes) reste utile même si le Kernel gère sa propre idempotence de paiement.</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="billingtnt-billing-invoice-perimetre-a-clarifier-voir-question-ouverte-ci-dessous"><code>billing/tnt-billing-invoice</code> — périmètre à clarifier (voir « Question ouverte » ci-dessous)</h3>
+<p><code>InvoiceController.java</code> (110 lignes) gère la facturation <strong>mission/livraison</strong> propre à TiiBnTick (numérotation <code>TNT-FACT-{agence}-{année}-{séquence}</code>, PDF, note de crédit). Ce n'est pas strictement le même objet que les « documents commerciaux legacy » du Kernel (bons de commande/livraison/achat, factures fournisseurs/proforma, notes de crédit, bons de réception) qui semblent relever d'un module ERP/comptabilité fournisseur générique côté Kernel. Voir section Question ouverte.</p>
+<p><strong>Correctif de sécurité indépendant à faire dans ce module quel que soit l'arbitrage</strong> : <code>InvoiceController.java:78,88,105</code> — <code>cancel</code>, <code>markPaid</code>, <code>issueCreditNote</code> acceptent le tenant depuis l'en-tête client <code>X-Tenant-Id</code> au lieu du JWT (<code>TntSecurityContext</code>). C'est l'instance concrète du finding IDOR critique de l'<a href="../audit-7-system-design.html">Audit n°7</a> sur ce module précis — à corriger dans ce chantier, indépendamment de la délégation Kernel.</p>
+<h3 id="modules-dependants-impact-a-verifier-ne-pas-casser">Modules dépendants (impact à vérifier, ne pas casser)</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Fichier</th>
+<th>Dépendance actuelle</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>trust/tnt-trust-core</code></td>
+<td><code>adapter/out/wallet/PaymentAnchorAdapter.java</code></td>
+<td>Implémente <code>IPaymentAnchorPort</code> (owned par <code>tnt-billing-wallet</code>, pattern d'inversion standard du repo). Consomme les événements <code>PaymentConfirmed</code> pour ancrer sur la blockchain. <strong>Doit continuer de fonctionner</strong> — si la confirmation de paiement vient désormais du Kernel plutôt que de <code>WalletService.handleSuccessfulPayment</code>, le point d'entrée qui publie <code>PaymentConfirmed</code> doit être identifié dans le nouveau flux (webhook Kernel→TiiBnTick, ou polling <code>GET /api/payments/orders/{id}</code>).</td>
+</tr>
+<tr>
+<td><code>business/tnt-accounting-core</code></td>
+<td><code>adapter/in/messaging/BillingEventAccountingConsumer.java</code></td>
+<td>Consomme les événements de facturation/paiement Kafka. Vérifier que les topics ne changent pas de forme après la migration.</td>
+</tr>
+<tr>
+<td><code>coreBackend/tnt-market-back-core</code></td>
+<td><code>application/service/MarketOrderApplicationService.java</code></td>
+<td>Utilise le wallet pour le paiement des commandes e-commerce — à rebrancher sur les nouveaux appels Kernel.</td>
+</tr>
+<tr>
+<td><code>tnt-bootstrap</code></td>
+<td><code>config/TntKafkaTopicsConfig.java</code>, <code>config/trustnoop/NoOpPaymentAnchorPort.java</code>, <code>config/TntModuleRegistry.java</code></td>
+<td>Wiring à mettre à jour si des beans/qualifiers disparaissent (ex. <code>IMoMoPaymentPort</code> n'a plus d'implémentation à câbler).</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="architecture-cible">Architecture cible</h2>
+<p>Suivre <strong>exactement</strong> le pattern déjà établi dans le repo pour les proxies Kernel (voir <code>tnt-bootstrap/.../bridge/KernelBridgeConfig.java</code> et <code>foundation/tnt-platform-gateway-core/.../adapter/out/kernel/KernelAuthGatewayAdapter.java</code>) :</p>
+<ol>
+<li><strong>Un bean <code>WebClient</code> nommé de plus dans <code>KernelBridgeConfig</code></strong> (<code>tnt-bootstrap</code>), ex. <code>kernelPaymentWebClient</code> — même base URL/credentials que les autres, pas de nouvelle configuration réseau.</li>
+<li><strong>Un ou plusieurs adaptateurs <code>adapter/out/kernel/KernelPaymentGatewayAdapter</code></strong> dans <code>tnt-billing-wallet</code>, implémentant les ports existants (<code>IWalletUseCase</code> pour les opérations conservées) ou un nouveau port <code>IKernelPaymentGatewayPort</code> pour les opérations pures de proxy (create wallet, pay, recharge, transactions).</li>
+<li><strong>Réponses désenveloppées via <code>KernelResponses</code></strong> (<code>tnt-common-core</code>), comme tous les autres adaptateurs Kernel du repo (cf. mémoire <em>Kernel Facade Migration 2026-07-08</em> — ne pas reproduire le bug historique où l'enveloppe de réponse était sautée).</li>
+<li><strong>Pour <code>billing-legacy-documents-controller</code> (64 opérations, 7 types de documents)</strong> : réutiliser la <strong>technique de codegen en masse déjà validée sur <code>tnt-hrm-core</code></strong> (voir mémoire <em>Bulk Kernel Proxy Codegen Technique</em>) — extraction des endpoints via <code>awk</code> depuis <code>docs/kernel-api/endpoints.md:4224-4702</code>, génération d'un contrôleur passthrough par type de document (<code>JsonNode</code> brut, comme HRM), validation par un smoke test de chargement de contexte. Ne pas mapper manuellement 64 endpoints à la main.</li>
+<li><strong>Aucun secret provider (clé Stripe, secret webhook MTN, credentials Orange) ne doit plus exister dans <code>tnt-billing-wallet</code></strong> ni dans <code>application.yml</code> de <code>tnt-bootstrap</code> — ces credentials appartiennent désormais exclusivement à la configuration Kernel.</li>
+</ol>
+<h2 id="mapping-des-endpoints-kernel-utilises">Mapping des endpoints Kernel utilisés</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Besoin TiiBnTick</th>
+<th>Endpoint Kernel</th>
+<th>Remplace</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Créer un wallet</td>
+<td><code>POST /api/payments/wallets</code></td>
+<td><code>WalletService.createAndSaveWallet</code></td>
+</tr>
+<tr>
+<td>Lire un wallet / solde</td>
+<td><code>GET /api/payments/wallets/{walletId}</code>, <code>GET /api/payments/wallets/owner/{ownerId}</code></td>
+<td><code>WalletService.getOrCreateWallet</code>, <code>getBalance</code></td>
+</tr>
+<tr>
+<td>Vérifier la capacité d'opérer</td>
+<td><code>GET /api/payments/wallets/{walletId}/can-operate</code></td>
+<td>Logique de solde disponible dans <code>Wallet.availableBalance()</code></td>
+</tr>
+<tr>
+<td>Débiter/payer</td>
+<td><code>POST /api/payments/wallets/{walletId}/pay</code> (<code>TransactionRequest</code>)</td>
+<td><code>WalletService.debitWallet</code>, <code>initiatePayment</code> (partie débit direct)</td>
+</tr>
+<tr>
+<td>Recharger</td>
+<td><code>POST /api/payments/wallets/{walletId}/recharge</code> (<code>WalletRechargeRequest</code>)</td>
+<td><code>WalletService.creditWallet</code> (recharge externe)</td>
+</tr>
+<tr>
+<td>Historique transactions</td>
+<td><code>GET /api/payments/wallets/{walletId}/transactions</code></td>
+<td><code>WalletService.getTransactionHistory</code></td>
+</tr>
+<tr>
+<td>Initier un paiement provider (Mobile Money/Stripe)</td>
+<td><code>POST /api/payments/orders</code> (<code>InitiatePaymentRequest</code>)</td>
+<td><code>WalletService.initiatePayment</code> → <code>dispatchToProvider</code></td>
+</tr>
+<tr>
+<td>Callback provider (signature vérifiée côté Kernel)</td>
+<td><code>POST /api/payments/orders/callbacks/{provider}</code></td>
+<td><code>PaymentWebhookController</code> (supprimé)</td>
+</tr>
+<tr>
+<td>Suivre un paiement en cours</td>
+<td><code>POST /api/payments/orders/{id}/refresh</code>, <code>GET /api/payments/orders/{id}</code></td>
+<td><code>WalletService.handlePaymentCallback</code> (partie polling/refresh)</td>
+</tr>
+<tr>
+<td>Documents commerciaux (bons, factures fournisseurs, proforma, notes de crédit)</td>
+<td><code>billing-legacy-documents-controller</code> (7 types × CRUD + <code>payments/bank</code> + <code>payments/cashier</code> + <code>sync/accounting-invoice</code> + <code>sync/cashier-bill</code>)</td>
+<td>Toute réimplémentation locale équivalente envisagée</td>
+</tr>
+<tr>
+<td>Paiements legacy liés aux documents</td>
+<td><code>billing-legacy-payments-controller</code> (<code>/api/paiement</code>)</td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="question-ouverte-a-trancher-avant-limplementation">Question ouverte à trancher avant l'implémentation</h2>
+<p><strong>Le mapping entre <code>tnt-billing-invoice</code> (facturation mission TiiBnTick, numérotation <code>TNT-FACT-*</code>) et <code>billing-legacy-documents-controller</code> (documents commerciaux génériques du Kernel) n'est pas 1:1 évident</strong> depuis la seule lecture du swagger. Deux options, à trancher en ADR avant de toucher au code :</p>
+<ul>
+<li><strong>Option A — Substitution</strong> : les factures mission TiiBnTick deviennent des <code>factures-proforma</code> ou un type dédié piloté par le Kernel ; <code>tnt-billing-invoice</code> devient un thin wrapper autour du proxy Kernel + génération PDF locale.</li>
+<li><strong>Option B — Coexistence</strong> : <code>tnt-billing-invoice</code> reste le système de facturation mission (domaine métier propre, numérotation propre), et le proxy <code>billing-legacy-documents-controller</code> est utilisé uniquement là où TiiBnTick a un besoin réel de documents commerciaux génériques (ex. achats internes, bons de livraison fournisseur pour <code>tnt-inventory-core</code>/<code>tnt-accounting-core</code>) sans toucher à <code>tnt-billing-invoice</code>.</li>
+</ul>
+<p>Recommandation par défaut : <strong>Option B</strong>, car rien dans l'audit n'indique que la facturation mission (spécifique logistique) doit disparaître au profit d'un module ERP générique — mais c'est à confirmer par l'utilisateur avant d'entamer le sous-chantier facturation (le sous-chantier paiement/wallet, lui, est sans ambiguïté et peut démarrer immédiatement).</p>
+<p><strong>Décision (2026-07-18, par l'utilisateur) : Option B — Coexistence.</strong> <code>tnt-billing-invoice</code> reste intégralement le système de facturation mission TiiBnTick (numérotation <code>TNT-FACT-*</code>, PDF, note de crédit) — non substitué par le Kernel. Le proxy <code>billing-legacy-documents-controller</code> (étape 8) sera généré et utilisé uniquement pour les besoins réels de documents commerciaux génériques (achats internes, bons de livraison fournisseur pour <code>tnt-inventory-core</code>/<code>tnt-accounting-core</code>), sans jamais toucher au code ou au domaine de <code>tnt-billing-invoice</code>.</p>
+<blockquote>
+<p><strong>Correction (2026-07-18)</strong> : l'agent ayant traité le sous-chantier wallet avait conclu à tort que <code>payment-gateway-controller</code>/<code>/api/payments/orders/**</code> n'existaient pas dans le Kernel — vérification directe par l'utilisateur dans <code>docs/kernel-api/endpoints.md</code> et <code>openapi.json</code> : <strong>le contrôleur existe bel et bien</strong>, avec ses 5 opérations (<code>GET /api/payments/orders</code> liste/historique, <code>POST /api/payments/orders</code> initiation, <code>POST /api/payments/orders/callbacks/{provider}</code> callback signé Stripe/MyCoolPay, <code>GET /api/payments/orders/{id}</code> lecture, <code>POST /api/payments/orders/{id}/refresh</code> refresh). Le mapping d'endpoints initial de ce chantier était donc correct. Les étapes 4 et 5 ci-dessous, précédemment bloquées sur cette fausse prémisse, sont débloquées.</p>
+</blockquote>
+<h2 id="etapes-dimplementation-ordre-recommande">Étapes d'implémentation (ordre recommandé)</h2>
+<ul>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>1. ADR courte</strong> : trancher la question ouverte ci-dessus (Option A/B) et documenter la décision dans ce fichier. Tranché : Option B (coexistence), 2026-07-18.</li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>2. Ajouter <code>kernelPaymentWebClient</code></strong> dans <code>KernelBridgeConfig</code> (tnt-bootstrap). Bean ajouté, même base URL/credentials que les autres. Vérifié : <code>tnt-bootstrap</code> compile.</li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>3. Construire <code>KernelPaymentGatewayAdapter</code></strong> implémentant les opérations wallet/pay/recharge/refresh, en réutilisant <code>KernelResponses</code>. Couvre exactement les 7 opérations confirmées dans le swagger Kernel (<code>payment-controller</code>) : create/get/get-by-owner/can-operate/pay/recharge/transactions. Les erreurs sur pay/recharge/can-operate <strong>propagent</strong> (pas de fail-open — ce sont des mouvements d'argent / une porte de sécurité avant débit). Voir la javadoc de <code>KernelWalletTransactionDto</code> pour une collision de nom de schéma côté Kernel découverte pendant l'implémentation (<code>TransactionRequest</code>/<code>TransactionResponse</code> réutilisés tels quels entre <code>payment-controller</code> et <code>blockchain-controller</code>/<code>bank-transaction-controller</code> — formes incompatibles). Vérifié : <code>KernelPaymentGatewayAdapterTest</code> (9 cas, MockWebServer).</li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>4. Rebrancher <code>WalletService</code></strong> : <code>dispatchToProvider</code> appelle désormais réellement <code>IKernelPaymentGatewayPort.initiateOrder</code> (<code>POST /api/payments/orders</code>, <code>payment-gateway-controller</code>) pour les canaux adossés à un vrai provider externe (<code>MTN_MOMO</code>/<code>ORANGE_MONEY</code> → <code>provider=MYCOOLPAY</code>, <code>method=MOBILE_MONEY</code> ; <code>STRIPE</code> → <code>provider=STRIPE</code>, <code>method=CARD</code> — mapping confirmé contre les enums du schéma <code>InitiatePaymentRequest</code> dans <code>openapi.json</code>, pas deviné). L'id d'ordre Kernel retourné est attaché au <code>PaymentIntent</code> (<code>PaymentIntent#attachProviderReference</code>, réutilise le champ <code>externalRef</code>) pour permettre la réconciliation de l'étape 5. Les erreurs d'initiation <strong>propagent</strong> (pas de fail-open — jamais laisser croire qu'un dispatch provider a eu lieu s'il a échoué). <code>CASH_ON_DELIVERY</code>/<code>WALLET</code> ne déclenchent aucun appel Kernel (pas de provider externe). Ce qui reste conservé tel quel, faute d'équivalent Kernel confirmé après re-vérification : freeze/unfreeze, réservation de solde, remboursement (<code>refundPayment</code>) — <code>payment-controller</code>/<code>payment-gateway-controller</code> n'exposent toujours rien pour ces trois opérations. <code>splitMissionRevenue</code>/<code>creditCommission</code>/<code>transferSubDelivererCommission</code>/ancrage trust/notifications inchangés. Vérifié : <code>KernelPaymentGatewayAdapterTest</code> (+4 cas <code>initiateOrder</code>/<code>refreshOrder</code>, 13/13) et <code>WalletServiceTest</code> (+2 cas dispatch Kernel, 9/9).</li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>5. Point d'entrée de confirmation de paiement — polling actif, pas de webhook.</strong> Re-vérification précise demandée par l'utilisateur : <code>docs/kernel-api/endpoints.md</code> (section <code>payment-gateway-controller</code>, ligne 9958) et <code>openapi.json</code> confirment bel et bien les 5 opérations <code>/api/payments/orders/**</code>, dont <code>POST /api/payments/orders/{id}/refresh</code>. Aucun webhook sortant Kernel→TiiBnTick n'est documenté nulle part dans le spec (recherché explicitement) — le mécanisme retenu est donc le polling actif via <code>refresh</code>, comme anticipé par le chantier. Implémenté : <code>WalletService.pollPendingProviderOrders()</code> (<code>@Scheduled(fixedDelayString = "${tnt.billing.wallet.kernel.order-poll-interval-ms:20000}")</code>, 20s par défaut — backoff raisonnable pour un flux où l'utilisateur attend un push USSD/redirect carte — gardé par ShedLock <code>@SchedulerLock</code> comme <code>ReconciliationService</code>, un seul poll actif par déploiement multi-instance). Chaque tick récupère les <code>PaymentIntent</code> <code>PENDING</code> porteurs d'un id d'ordre Kernel (<code>IPaymentIntentRepository#findAllPendingWithProviderReference</code>, nouvelle requête dérivée R2DBC), appelle <code>refreshOrder</code> (fail-open : une erreur de poll ne casse pas la boucle, retenté au tick suivant), et route un statut terminal vers le <strong>même</strong> chemin interne que l'ancien webhook (<code>applyProviderStatus</code>, extrait de <code>handlePaymentCallback</code>) — donc <code>tnt-trust-core</code>/<code>PaymentAnchorAdapter</code> continue de recevoir <code>PaymentConfirmed</code> exactement comme avant. La logique de reconciliation est isolée dans <code>reconcilePendingProviderOrders()</code> (sans l'assertion ShedLock) pour rester testable unitairement. Vérifié : <code>WalletServiceTest</code> (+2 cas, ordre confirmé → ancrage trust déclenché ; ordre encore en cours → aucune écriture).</li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>6. Supprimer</strong> <code>PaymentWebhookController</code>, <code>StripeAdapter</code>, <code>MtnMoMoAdapter</code>, <code>OrangeMoneyAdapter</code>, <code>IMoMoPaymentPort</code>, les <code>*Properties</code> provider et leurs entrées <code>application.yml</code>. Fait, y compris <code>MoMoPayload</code> (devenu orphelin) et les DTOs <code>OrangeCallbackRequest</code>/<code>MtnCallbackRequest</code>. <code>RedisIdempotencyStore</code> conservé. Vérifié : suite de tests <code>tnt-billing-wallet</code> verte (38/38), aucune référence résiduelle aux types supprimés ailleurs dans le repo (grep repo-wide).</li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>7. Corriger l'IDOR tenant</strong> de <code>InvoiceController.java</code> (<code>X-Tenant-Id</code> client → JWT) dans la foulée, indépendamment de l'arbitrage A/B. Les 5 occurrences du fichier (<code>generate</code>, <code>listByClient</code>, <code>cancel</code>, <code>markPaid</code>, <code>issueCreditNote</code> — lignes 43/70/78/88/105 avant correctif) résolvent désormais le tenant via <code>@CurrentUser TntUserIdentity</code> (JWT), plus jamais via l'en-tête client. Vérifié : nouveau <code>InvoiceControllerTest</code> — un en-tête <code>X-Tenant-Id</code> usurpé pointant vers un tenant tiers est ignoré, la commande dispatchée au service porte toujours le tenant du JWT (3/3 tests, reproduisent l'accès cross-tenant avant/après correctif) ; suite complète <code>tnt-billing-invoice</code> verte (20/20).</li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>8. Générer le proxy <code>billing-legacy-documents-controller</code></strong> via la technique de codegen HRM. Nouveau module <strong><code>business/tnt-legacy-documents-core</code></strong> (L4, package <code>com.yowyob.tiibntick.core.legacydocuments</code>), enregistré dans le <code>pom.xml</code> racine (<code>&lt;modules&gt;</code> + <code>&lt;dependencyManagement&gt;</code>). Même architecture que <code>tnt-hrm-core</code> : <code>AbstractLegacyDocumentProxyController</code> partagé, <code>IKernelLegacyDocumentGatewayPort</code>/<code>KernelLegacyDocumentGatewayAdapter</code> (proxy HTTP brut vers le <code>kernelWebClient</code> partagé, <code>JsonNode</code> opaque, enveloppe <code>KernelApiEnvelope</code> → <code>ApiResponse</code>), un contrôleur passthrough par type de document — 7 contrôleurs générés via script Python jetable (<code>gen_legacy_docs_controllers.py</code>, endpoints extraits manuellement de <code>docs/kernel-api/endpoints.md:4224-4702</code> et vérifiés un par un) : <code>BonCommandeController</code> (8 ops), <code>BonAchatController</code> (9), <code>BonLivraisonController</code> (11, avec <code>GET client/{idClient}</code> et <code>POST {id}/effectuer</code>), <code>FactureFournisseurController</code> (8), <code>FactureProformaController</code> (10), <code>BonReceptionController</code> (9), <code>NoteCreditController</code> (9) — <strong>64 opérations au total</strong>, correspondant exactement au compte annoncé par le chantier. Respecte strictement l'ADR Option B : ce module ne déclare aucune dépendance vers/depuis <code>tnt-billing-invoice</code> (vérifié par grep) et ne touche à aucun de ses fichiers. Vérifié : le module compile, et un test de chargement de contexte (<code>TntLegacyDocumentsAutoConfigurationTest</code>, <code>ReactiveWebApplicationContextRunner</code> avec un bean <code>kernelWebClient</code> de test) confirme que les 7 contrôleurs + l'adaptateur/service Kernel s'enregistrent correctement (1/1).</li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>9. Mettre à jour les modules dépendants</strong> (<code>tnt-market-back-core</code>, <code>tnt-accounting-core</code>, wiring <code>tnt-bootstrap</code>) et vérifier <code>mvn -pl billing/tnt-billing-wallet,billing/tnt-billing-invoice,trust/tnt-trust-core -am verify</code>. <strong>Statut (2026-07-19) :</strong> <code>tnt-market-back-core</code> n'appelle que le port <code>IWalletUseCase</code> (<code>debitWallet</code>/<code>creditCommission</code>, canal <code>WALLET</code> uniquement — jamais les adaptateurs provider supprimés), donc aucun changement de code n'était nécessaire, isolé par la frontière hexagonale ; vérifié via <code>mvn -pl coreBackend/tnt-market-back-core -am test</code> (vert). <code>tnt-accounting-core</code>/<code>tnt-trust-core</code> non cassés (topics/ports inchangés).</li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>10. Vérifier qu'aucun secret provider</strong> ne subsiste dans les fichiers de config versionnés (<code>application*.yml</code>, <code>docker-compose.yml</code>). Grep repo-wide sur les noms de variables d'env provider (MTN_<em>, ORANGE_</em>, STRIPE_*) : zéro occurrence restante.</li>
+</ul>
+<h2 id="note-de-verification-etapes-2-3-6-7-2026-07-18">Note de vérification (étapes 2, 3, 6, 7 — 2026-07-18)</h2>
+<p><code>mvn -pl billing/tnt-billing-wallet,billing/tnt-billing-invoice,trust/tnt-trust-core -am verify</code> → <strong>BUILD SUCCESS</strong>.</p>
+<ul>
+<li><code>tnt-billing-wallet</code> : 38/38 tests (dont les 9 nouveaux <code>KernelPaymentGatewayAdapterTest</code>).</li>
+<li><code>tnt-billing-invoice</code> : 20/20 tests (dont les 3 nouveaux <code>InvoiceControllerTest</code> reproduisant l'IDOR tenant).</li>
+<li><code>tnt-trust-core</code> : 61/61 tests, y compris <code>PaymentAnchorAdapterTest</code> — la chaîne <code>IPaymentAnchorPort</code> reste intacte (non modifiée par ce chantier).</li>
+</ul>
+<p>L'agent ayant réalisé ce sous-chantier travaillait dans un worktree isolé dont la base (<code>pom.xml</code> sans version pour <code>tnt-go-freelancer-point-back-core</code>, <code>trust/tnt-trust-core</code> absent des <code>&lt;modules&gt;</code>) était en retard sur <code>master</code> — ces deux manques étaient déjà résolus sur <code>master</code> au moment de la fusion et n'ont donc pas eu besoin d'être reportés ici.</p>
+<p>Un défaut pré-existant, sans lien avec ce chantier, a été identifié mais <strong>non corrigé</strong> (hors périmètre) : <code>coreBackend/tnt-go-freelancer-point-back-core/.../CommissionCoreService.java:96</code> ne compile pas (« local variables referenced from a lambda expression must be final or effectively final »), ce qui fait échouer un build <code>-am</code> incluant <code>tnt-bootstrap</code> en entier. Sans impact sur <code>tnt-billing-wallet</code>/<code>tnt-billing-invoice</code>/<code>tnt-trust-core</code>, qui compilent et passent leurs tests indépendamment de ce module. À vérifier séparément.</p>
+<h2 id="note-de-verification-etapes-4-5-2026-07-18">Note de vérification (étapes 4, 5 — 2026-07-18)</h2>
+<p>Travail réalisé dans un worktree isolé branché directement sur <code>master</code> (le worktree assigné à l'origine ne contenait pas l'historique de ce chantier ni les modules <code>tnt-go-freelancer-point-back-core</code>/<code>tnt-trust-core</code> à jour — écart déjà noté ci-dessus pour les étapes 2/3/6/7).</p>
+<p><code>mvn -pl billing/tnt-billing-wallet,billing/tnt-billing-invoice,trust/tnt-trust-core -am verify</code> → <strong>BUILD SUCCESS</strong>.</p>
+<ul>
+<li><code>tnt-billing-wallet</code> : <strong>48/48</strong> tests (dont les 4 nouveaux cas <code>KernelPaymentGatewayAdapterTest</code> sur <code>initiateOrder</code>/<code>refreshOrder</code> et les 4 nouveaux cas <code>WalletServiceTest</code> sur le dispatch Kernel et la réconciliation par polling).</li>
+<li><code>tnt-billing-invoice</code> : 27/27 tests (inchangé par ce sous-chantier).</li>
+<li><code>tnt-trust-core</code> : 71/71 tests (inchangé par ce sous-chantier — <code>IPaymentAnchorPort</code>/<code>PaymentAnchorAdapter</code> non touchés, <code>PaymentConfirmed</code> toujours publié par le même chemin interne).</li>
+</ul>
+<p>Vérifié également : aucune référence résiduelle à <code>payment-gateway-controller</code>/<code>/api/payments/orders</code> en dehors de <code>IKernelPaymentGatewayPort</code>/<code>KernelPaymentGatewayAdapter</code>/<code>WalletService</code> (grep repo-wide).</p>
+<p>Ambiguïtés rencontrées et tranchées avec prudence (documentées dans le code) :
+- <code>InitiatePaymentRequest.clientId</code>/<code>serviceCode</code> sont volontairement <strong>omis</strong> du corps envoyé à <code>POST /api/payments/orders</code> : leur sémantique exacte (vs. l'en-tête <code>X-Client-Id</code> déjà envoyé par <code>kernelPaymentWebClient</code>) n'est pas confirmée par le schéma Kernel, et les deux champs sont optionnels — aucune conséquence fonctionnelle à les omettre plutôt que deviner.
+- Le statut <code>PaymentOrderResponse.status</code> n'a pas d'enum documenté (comme <code>KernelWalletTransactionDto.status</code> à l'étape 3) — même heuristique de classification best-effort reprise (<code>isSuccess</code>/<code>isFailure</code>, penchant vers « encore en attente » pour toute valeur non reconnue).
+- Le champ à utiliser comme <code>financialTransactionId</code> lors de la confirmation via polling n'est pas nommé explicitement dans le swagger comme tel : <code>providerReference</code> est utilisé (avec repli sur l'<code>id</code> de l'ordre Kernel si absent), car c'est le champ le plus proche sémantiquement d'une référence de transaction fournisseur.</p>
+<h2 id="note-de-verification-etape-8-2026-07-18">Note de vérification (étape 8 — 2026-07-18)</h2>
+<p><code>mvn -pl business/tnt-legacy-documents-core -am verify</code> → <strong>BUILD SUCCESS</strong>. <code>tnt-legacy-documents-core</code> (nouveau module) : 1/1 test — <code>TntLegacyDocumentsAutoConfigurationTest</code>, chargement de contexte confirmant les 7 contrôleurs + l'adaptateur/service Kernel s'enregistrent correctement.</p>
+<p>Vérifié également : <code>tnt-legacy-documents-core</code> ne déclare aucune dépendance Maven vers/depuis <code>tnt-billing-invoice</code> (grep sur les deux <code>pom.xml</code>), et l'ensemble <code>billing/tnt-billing-wallet,billing/tnt-billing-invoice,trust/tnt-trust-core,business/tnt-legacy-documents-core</code> continue de passer <code>mvn ... -am verify</code> (48/27/71/1 tests, 0 échec).</p>
+<h2 id="ce-que-ce-chantier-ne-couvre-pas">Ce que ce chantier ne couvre pas</h2>
+<ul>
+<li>La correction des ~40 contrôleurs de mutation sans autorisation ni les ~139 <code>findById</code> sans filtre tenant ailleurs dans le repo (<code>coreBackend/</code> notamment) — c'est un chantier distinct de l'<a href="../audit-7-system-design.html">Audit n°7</a>, à traiter en parallèle.</li>
+<li>L'alignement des noms de topics Kafka (<a href="../audit-5-kafka.html">Audit n°5</a>) — orthogonal, mais à vérifier si les événements de paiement Kernel introduisent de nouveaux topics à intégrer au référentiel unique recommandé.</li>
+</ul>
+<footer>Audit technique TiiBnTick — généré à partir de l'analyse du code source réel. Chaque constat référence les fichiers et lignes concernés.</footer>
+</main>
+</div>
+
+<script type="module">
+  try {
+    const m = await import("https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs");
+    const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    m.default.initialize({ startOnLoad: true, theme: dark ? "dark" : "neutral", securityLevel: "loose" });
+  } catch (e) {
+    document.querySelectorAll(".mermaid").forEach(el => {
+      el.style.textAlign = "left";
+      el.innerHTML = "<div style='color:var(--muted);font-size:.75rem;margin-bottom:.5rem'>⚠ Diagramme Mermaid (connexion internet requise pour le rendu) — source :</div><pre>" + el.textContent.replace(/&/g,"&amp;").replace(/</g,"&lt;") + "</pre>";
+    });
+  }
+</script>
+
+</body>
+</html>

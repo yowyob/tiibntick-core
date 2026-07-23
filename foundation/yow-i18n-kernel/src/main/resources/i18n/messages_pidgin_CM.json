@@ -29,5 +29,33 @@
   "blockchain.delivery.confirmed": "Cargo {{package_id}} delivery don enter blockchain forever.",
 
   "account.welcome": "Welcome for TiiBnTick, {{name}}!",
-  "account.otp.sent": "Your code na {{otp}}. E go expire for {{duration}} minutes."
+  "account.otp.sent": "Your code na {{otp}}. E go expire for {{duration}} minutes.",
+
+  "notify.freelancer_org.verified": "🎉 Congrats! Dem don verify your organization {{orgId}} (KYC level {{kycLevel}}). You fit take mission now for TiiBnTick.",
+  "notify.freelancer_org.kyc_level_upgraded": "✅ Dem don upgrade KYC level for organization {{orgId}}: e don reach level {{kycLevel}} now. New features don dey.",
+  "notify.freelancer_org.kyc_rejected": "❌ Dem reject the KYC verification for organization {{orgId}}. Reason na {{reason}}. Abeg send new documents.",
+  "notify.freelancer_org.suspended": "⚠️ Dem don suspend your organization {{orgId}}. Reason na {{reason}}. Contact support make dem explain more.",
+  "notify.freelancer_org.unsuspended": "✅ Dem don remove the suspension for your organization {{orgId}}. You fit continue your work.",
+  "notify.freelancer_org.mission_assigned": "📦 Dem don assign mission to your organization {{freelancerOrgId}}. Delivery number na {{deliveryId}}.",
+  "notify.sub_deliverer.mission_assigned": "🏍️ New mission {{deliveryId}} don land for organization {{orgId}}. Prepare for pickup.",
+  "notify.billing.template_applied": "💼 Billing policy don ready from template {{templateCode}} by {{actorId}}. Policy ID na {{policyId}}.",
+
+  "incident.notification.incident.escalated": "{{title}} — {{body}} (Incident {{incidentId}})",
+  "incident.notification.incident.driver.proposal": "{{title}} — {{body}} (Incident {{incidentId}})",
+  "incident.notification.incident.auto.failed": "{{title}} — {{body}} (Incident {{incidentId}})",
+  "incident.notification.agency.handling.started": "{{title}} — {{body}} (Incident {{incidentId}})",
+  "incident.notification.incident.created": "{{title}} — {{body}} (Incident {{incidentId}})",
+  "incident.notification.interagency.coop.requested": "{{title}} — {{body}} (Incident {{incidentId}})",
+  "incident.notification.interagency.coop.updated": "{{title}} — {{body}} (Incident {{incidentId}})",
+  "incident.notification.handover.confirmed": "{{title}} — {{body}} (Incident {{incidentId}})",
+  "incident.notification.driver.mission.assigned": "{{title}} — {{body}} (Incident {{incidentId}})",
+
+  "CLIENT_QUOTE_RECEIVED": "{{providerName}} don send you quote for your request {{quoteRequestId}}.",
+  "PROVIDER_NEW_QUOTE_REQUEST": "New quote request don land from {{clientCity}} (ref. {{quoteRequestId}}).",
+  "ORDER_CONFIRMED": "{{providerName}} don confirm your order {{orderId}}.",
+  "ORDER_PAID": "Dem don pay for order {{orderId}}: {{amountXaf}} XAF.",
+  "ORDER_COMPLETED": "Your order {{orderId}} don finish.",
+  "REVIEW_PUBLISHED": "New review {{reviewId}} don publish: {{rating}}/5.",
+  "LISTING_APPROVED": "Dem don approve your listing {{listingId}}.",
+  "LISTING_REJECTED": "Dem reject your listing {{listingId}}. Reason na {{reason}}."
 }

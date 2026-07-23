@@ -20,6 +20,7 @@ import reactor.core.publisher.Mono;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @Tag(name = "Agency ERP Billing", description = "Billing policy, estimate and invoice lifecycle")
 @RestController
@@ -29,6 +30,7 @@ public class BillingController {
     private final BillingService billingService;
 
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/agencies/{agencyId}/billing-policies")
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Create billing policy")
     public Mono<ApiResponse<PolicyResponse>> createPolicy(
@@ -44,6 +46,7 @@ public class BillingController {
     }
 
     @PatchMapping("/api/v1/tenants/{tenantId}/agency-registry/billing-policies/{policyId}/activate")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Activate billing policy")
     public Mono<ApiResponse<PolicyResponse>> activatePolicy(
             @PathVariable UUID tenantId, @PathVariable UUID policyId) {
@@ -53,6 +56,7 @@ public class BillingController {
     }
 
     @PatchMapping("/api/v1/tenants/{tenantId}/agency-registry/billing-policies/{policyId}/archive")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Archive billing policy")
     public Mono<ApiResponse<PolicyResponse>> archivePolicy(
             @PathVariable UUID tenantId, @PathVariable UUID policyId) {
@@ -81,6 +85,7 @@ public class BillingController {
     }
 
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/billing/estimate")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Estimate billing")
     public Mono<ApiResponse<BillingService.EstimateResult>> estimate(
             @PathVariable UUID tenantId,
@@ -90,6 +95,7 @@ public class BillingController {
     }
 
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/missions/{missionId}/invoice")
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Generate mission invoice")
     public Mono<ApiResponse<InvoiceResponse>> generateInvoice(

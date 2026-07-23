@@ -1,8 +1,11 @@
 package com.yowyob.tiibntick.core.media.adapter.in.rest;
 
+import com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser;
+import com.yowyob.tiibntick.core.auth.domain.model.TntUserIdentity;
 import com.yowyob.tiibntick.core.media.domain.MediaFileId;
 import com.yowyob.tiibntick.core.media.domain.MediaType;
 import com.yowyob.tiibntick.core.media.port.inbound.IUploadMediaUseCase;
+import io.swagger.v3.oas.annotations.Parameter;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -34,7 +37,7 @@ public class MediaRestController {
 
     @PostMapping(value = "/upload", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
     public Mono<UploadResponse> upload(
-            @RequestHeader("X-Tenant-Id") String tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestHeader(value = "X-User-Id", required = false) String userId,
             @RequestParam("mediaType") String mediaType,
             @RequestParam(value = "category", required = false) String category,
@@ -51,7 +54,7 @@ public class MediaRestController {
                     return bytes;
                 })
                 .flatMap(data -> uploadUseCase.upload(
-                                tenantId,
+                                currentUser.tenantId().toString(),
                                 userId,
                                 type,
                                 mimeType,

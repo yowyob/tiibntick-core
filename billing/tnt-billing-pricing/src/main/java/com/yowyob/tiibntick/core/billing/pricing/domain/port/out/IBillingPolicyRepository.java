@@ -25,6 +25,20 @@ public interface IBillingPolicyRepository {
 
     Mono<BillingPolicy> findById(UUID id);
 
+    /**
+     * Finds a policy by ID, scoped to a tenant.
+     *
+     * <p>Audit n°7 · #5 (IDOR) — callers resolving a single policy by ID on behalf of an
+     * authenticated caller MUST use this method (never the unscoped {@link #findById}) so
+     * that a caller cannot read or mutate another tenant's billing policy by guessing or
+     * enumerating UUIDs.
+     *
+     * @param id       the policy UUID
+     * @param tenantId the tenant the policy must belong to
+     * @return the matching policy, or empty if not found or owned by a different tenant
+     */
+    Mono<BillingPolicy> findByIdAndTenantId(UUID id, UUID tenantId);
+
     Mono<BillingPolicy> findDefaultByTenantId(UUID tenantId);
 
     Flux<BillingPolicy> findByTenantId(UUID tenantId);

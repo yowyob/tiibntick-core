@@ -18,6 +18,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.Objects;
 import java.util.UUID;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Application service for deliverer profile lifecycle management.
@@ -52,6 +53,7 @@ public class DelivererService implements ICreateDelivererProfileUseCase, IFindDe
      */
     @Override
     @RequirePermission(resource = "actor", action = "write")
+    @Transactional
     public Mono<DelivererProfile> createDelivererProfile(CreateDelivererProfileCommand command) {
         Objects.requireNonNull(command, "command must not be null");
         return delivererRepository.existsByActorId(command.tenantId(), command.actorId())

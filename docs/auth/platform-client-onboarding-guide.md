@@ -115,7 +115,7 @@ curl https://core.tiibntick.io/api/v1/admin/scope-registry -H "Authorization: Be
 
 ### Catalogue complet des scopes — les seules valeurs acceptées aujourd'hui
 
-`ScopeResourceDefinition` (`PlatformScopeRegistry`) recense **3 ressources**, chacune avec une seule action possible (`*`) — soit **4 valeurs de scope valides au total**, pas une de plus :
+`ScopeResourceDefinition` (`PlatformScopeRegistry`) recense **5 ressources**, chacune avec une seule action possible (`*`) — soit **6 valeurs de scope valides au total**, pas une de plus :
 
 | Scope | Ressource couverte | Endpoints concrets couverts |
 |---|---|---|
@@ -123,19 +123,40 @@ curl https://core.tiibntick.io/api/v1/admin/scope-registry -H "Authorization: Be
 | `AUTH:*` | `AUTH` — Bloc A (proxy `auth-controller`/`auth-oidc-controller` du Kernel) | `POST /api/v1/auth/login`, `/register`, `/sign-up`, `/otp`, `/otp/verify`, `/mfa/*`, `/forgot-password`, `/reset-password`, `/discover-contexts`, `/select-context`, etc. (`PlatformAuthController`) + `/.well-known/**`, `/oauth2/**` (`PlatformAuthOidcController`, en réalité public, voir §8) |
 | `SSO:*` | `SSO` — Bloc B (handshake YowYob SSO) | `POST /api/v1/sso/context/resolve`, `/token/exchange`, `/yowyob/launch` (`PlatformSsoController`) |
 | `ONBOARDING:*` | `ONBOARDING` — Bloc C (orchestration onboarding agence) | `/api/v1/onboarding/agency/applications/**` (`PlatformAgencyOnboardingController`, module `tnt-administration-core`) |
+| `DISPUTE:*` | `DISPUTE` — appels serveur-à-serveur de `tnt-dispute-core` (Audit n°7 · #4, 2026-07-18) | `/api/v1/disputes/**` (`DisputeController`, `EvidenceController`, `MediationController`) — **pas** un proxy sous `/api/v1/platform/**`, ce sont les endpoints natifs du module, en double-authentification JWT-ou-Client-Id/Api-Key (voir encadré ci-dessous) |
+| `SALES:*` | `SALES` — appels serveur-à-serveur de `tnt-sales-core` (Audit n°7 · #4, 2026-07-18) | `/api/sales/orders/**` (`SalesOrderController`) — même remarque que `DISPUTE:*` |
 
-**Aucun autre scope n'existe** — ni `DELIVERY:*`, ni `BILLING:*`, ni aucun scope par module métier : ce sont des exemples illustratifs du design (§2.6), pas des valeurs réellement acceptées tant qu'un proxy métier curé n'est pas construit (aucun ne l'est à ce jour). Envoyer un scope inconnu à `PUT .../permissions` (ex. `"DELIVERY:read"`) échoue avec `400` / code `PLATFORM_INVALID_SCOPE` — la requête entière est rejetée, aucun scope n'est appliqué partiellement.
+**Aucun autre scope n'existe** — ni `DELIVERY:*`, ni `BILLING:*`, ni aucun autre scope par module métier : ce sont des exemples illustratifs du design (§2.6), pas des valeurs réellement acceptées tant qu'un proxy métier curé n'est pas construit (aucun ne l'est à ce jour, en dehors de `DISPUTE`/`SALES` ci-dessus). Envoyer un scope inconnu à `PUT .../permissions` (ex. `"DELIVERY:read"`) échoue avec `400` / code `PLATFORM_INVALID_SCOPE` — la requête entière est rejetée, aucun scope n'est appliqué partiellement.
 
-Combinaisons possibles avec les 3 ressources actuelles (au lieu du méta-scope `*`) :
+Combinaisons possibles avec les 5 ressources actuelles (au lieu du méta-scope `*`) :
 - `["AUTH:*"]` — uniquement authentification
 - `["SSO:*"]` — uniquement SSO
 - `["ONBOARDING:*"]` — uniquement onboarding
-- `["AUTH:*", "SSO:*"]` — auth + SSO, pas onboarding
-- `["AUTH:*", "ONBOARDING:*"]` — auth + onboarding, pas SSO
-- `["SSO:*", "ONBOARDING:*"]` — SSO + onboarding, pas auth
-- `["AUTH:*", "SSO:*", "ONBOARDING:*"]` — équivalent fonctionnel à `["*"]` tant qu'aucun module métier n'existe, mais **pas recommandé** : le jour où un proxy métier est ajouté au registre, `*` le couvre automatiquement alors que la liste explicite non.
+- `["DISPUTE:*"]` — uniquement appels serveur-à-serveur vers tnt-dispute-core
+- `["SALES:*"]` — uniquement appels serveur-à-serveur vers tnt-sales-core
+- toute autre combinaison des 5 (ex. `["DISPUTE:*", "SALES:*"]` pour `tnt-agency-back-core`, voir encadré ci-dessous)
+- `["AUTH:*", "SSO:*", "ONBOARDING:*", "DISPUTE:*", "SALES:*"]` — équivalent fonctionnel à `["*"]` tant qu'aucun autre module métier n'existe, mais **pas recommandé** : le jour où un nouveau proxy/module est ajouté au registre, `*` le couvre automatiquement alors que la liste explicite non.
 
 > Quand un module métier (ex. `DELIVERY`) obtiendra un proxy curé (`/api/v1/platform/delivery/**`), `PlatformScopeRegistry` gagnera une nouvelle entrée avec ses vraies actions (`read`, `write`, ...) — mise à jour de ce guide requise à ce moment-là, pas avant.
+
+> **`DISPUTE`/`SALES` ne sont PAS des proxies `/api/v1/platform/**`.** Contrairement à `AUTH`/`SSO`/`ONBOARDING`, ces deux scopes protègent les endpoints natifs de `tnt-dispute-core` et `tnt-sales-core` eux-mêmes, via une chaîne de sécurité dédiée (`TntPlatformGatewaySecurityConfig`, `@Order(11)`) qui accepte **soit** un JWT utilisateur final **soit** ce scope — jamais l'en-tête `X-Tenant-Id` seul. Ce mécanisme existe parce que `coreBackend/tnt-agency-back-core` appelle ces deux modules serveur-à-serveur (flux déclenchés par Kafka, sans session utilisateur à transmettre) ; voir `docs/audits/remediation/phase-0-critical.md` (Audit n°7 · #4) pour le contexte complet.
+>
+> **Enregistrement de `tnt-agency-back-core` comme client interne** (une fois par environnement) :
+> ```bash
+> curl -X POST https://core.tiibntick.io/api/v1/admin/platform-clients \
+>   -H "Authorization: Bearer $ADMIN_JWT" -H "Content-Type: application/json" \
+>   -d '{ "name": "TNT Agency Back Core (internal)", "platformCode": "AGENCY", "environment": "PROD",
+>         "description": "Server-to-server caller for tnt-dispute-core/tnt-sales-core (Kafka-driven mission/dispute flows)",
+>         "contactEmail": "ops@tnt-agency.io" }'
+> # scope down from the default "*" grant — this identity should ONLY reach dispute/sales:
+> curl -X PUT https://core.tiibntick.io/api/v1/admin/platform-clients/{id}/permissions \
+>   -H "Authorization: Bearer $ADMIN_JWT" -H "Content-Type: application/json" \
+>   -d '{ "scopes": ["DISPUTE:*", "SALES:*"] }'
+> # issue the key, then set TNT_AGENCY_PLATFORM_CLIENT_ID / TNT_AGENCY_PLATFORM_API_KEY on the
+> # tnt-agency-back-core deployment (see coreBackend/tnt-agency-back-core's AgencyPlatformClientConfig) —
+> # NOT a new secret elsewhere: that client already sends X-Client-Id/X-Api-Key as default headers on
+> # every outbound call once these two env vars are non-blank.
+> ```
 
 ---
 

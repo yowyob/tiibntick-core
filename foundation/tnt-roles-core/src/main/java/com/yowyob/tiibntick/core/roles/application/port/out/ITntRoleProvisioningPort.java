@@ -65,4 +65,29 @@ public interface ITntRoleProvisioningPort {
      * @param userId   user whose cache should be invalidated
      */
     Mono<Void> invalidatePermissionCache(UUID tenantId, UUID userId);
+
+    /**
+     * Deletes a TiiBnTick role from the Kernel's role store.
+     *
+     * @param tenantId     tenant scope the role was provisioned under
+     * @param kernelRoleId the Kernel-side role UUID (see {@link #findRoleId})
+     */
+    Mono<Void> deleteRole(UUID tenantId, UUID kernelRoleId);
+
+    /**
+     * Checks whether a role known to still be provisioned in the Kernel (by its Kernel-side
+     * id) actually still exists there. Used by {@code KernelRoleReconciliationJob} — unlike
+     * {@link #roleExists(UUID, String)}, which lists all roles for a tenant, this targets a
+     * single already-known id via {@code GET /api/roles/{id}}, so it never has to look at
+     * roles TiiBnTick doesn't already know about (the Kernel hosts roles from other Yowyob
+     * solutions that must not be enumerated here).
+     *
+     * @param tenantId     tenant scope the role was provisioned under
+     * @param kernelRoleId the Kernel-side role UUID
+     * @return {@code true} if the Kernel confirms the role exists, {@code false} on a 404.
+     *         On any other error (Kernel unreachable, etc.) resolves to {@code true} —
+     *         fail-safe: reconciliation must never re-provision a role just because the
+     *         existence check itself failed transiently.
+     */
+    Mono<Boolean> roleExistsById(UUID tenantId, UUID kernelRoleId);
 }

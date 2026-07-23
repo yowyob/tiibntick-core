@@ -26,6 +26,16 @@ public interface BillingPolicyR2dbcRepository
 
     Flux<BillingPolicyEntity> findByTenantId(UUID tenantId);
 
+    /**
+     * Finds a policy by ID scoped to a tenant (Audit n°7 · #5 — IDOR fix).
+     *
+     * @param id       the policy UUID
+     * @param tenantId the tenant the policy must belong to
+     * @return the matching entity, or empty if not found or owned by a different tenant
+     */
+    @Query("SELECT * FROM pricing.billing_policy WHERE id = :id AND tenant_id = :tenantId")
+    Mono<BillingPolicyEntity> findByIdAndTenantId(UUID id, UUID tenantId);
+
     @Query("SELECT * FROM pricing.billing_policy WHERE tenant_id = :tenantId AND status = 'ACTIVE'")
     Flux<BillingPolicyEntity> findActiveByTenantId(UUID tenantId);
 

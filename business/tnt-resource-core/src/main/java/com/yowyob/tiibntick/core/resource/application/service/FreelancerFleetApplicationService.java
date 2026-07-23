@@ -15,6 +15,7 @@ import com.yowyob.tiibntick.core.resource.domain.model.FreelancerVehicle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -70,6 +71,7 @@ public class FreelancerFleetApplicationService implements
      * <p>Enforces the 3-vehicle fleet cap per FreelancerOrg before saving.
      * Checks for duplicate plate number within the same org.
      */
+    @Transactional
     @Override
     public Mono<FreelancerVehicle> addVehicle(AddFreelancerVehicleCommand cmd) {
         log.info("Adding vehicle to FreelancerOrg fleet: orgId={} plate={}",
@@ -126,6 +128,7 @@ public class FreelancerFleetApplicationService implements
 
     // ── AssignFreelancerVehicleToMissionUseCase ───────────────────────────
 
+    @Transactional
     @Override
     public Mono<FreelancerVehicle> assignToMission(AssignFreelancerVehicleToMissionCommand cmd) {
         log.info("Assigning FreelancerVehicle {} to mission {}", cmd.vehicleId(), cmd.missionId());
@@ -140,6 +143,7 @@ public class FreelancerFleetApplicationService implements
 
     // ── ReleaseFreelancerVehicleFromMissionUseCase ────────────────────────
 
+    @Transactional
     @Override
     public Mono<FreelancerVehicle> releaseFromMission(UUID vehicleId, String missionId) {
         log.info("Releasing FreelancerVehicle {} from mission {}", vehicleId, missionId);

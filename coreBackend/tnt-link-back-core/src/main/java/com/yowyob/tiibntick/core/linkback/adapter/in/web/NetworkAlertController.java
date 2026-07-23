@@ -3,6 +3,7 @@ package com.yowyob.tiibntick.core.linkback.adapter.in.web;
 import com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser;
 import com.yowyob.tiibntick.core.auth.domain.model.TntUserIdentity;
 import com.yowyob.tiibntick.core.geo.domain.model.GeoPoint;
+import com.yowyob.tiibntick.core.linkback.adapter.in.web.ratelimit.NearbyRateLimiter;
 import com.yowyob.tiibntick.core.linkback.adapter.in.web.request.ReportNetworkAlertRequest;
 import com.yowyob.tiibntick.core.linkback.adapter.in.web.response.NetworkAlertResponse;
 import com.yowyob.tiibntick.core.linkback.adapter.in.web.response.NetworkAlertResponseMapper;
@@ -11,6 +12,7 @@ import com.yowyob.tiibntick.core.linkback.application.port.in.QueryNetworkAlerts
 import com.yowyob.tiibntick.core.linkback.application.port.in.ReportNetworkAlertUseCase;
 import com.yowyob.tiibntick.core.linkback.application.port.in.ResolveNetworkAlertUseCase;
 import com.yowyob.tiibntick.core.linkback.application.port.in.command.ReportNetworkAlertCommand;
+import com.yowyob.tiibntick.core.linkback.domain.exception.NearbyRateLimitExceededException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -28,6 +30,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * Generic Link business API for community-reported network alerts — the single
@@ -54,9 +57,11 @@ public class NetworkAlertController {
     private final ConfirmNetworkAlertUseCase confirmUseCase;
     private final ResolveNetworkAlertUseCase resolveUseCase;
     private final QueryNetworkAlertsUseCase queryUseCase;
+    private final NearbyRateLimiter nearbyRateLimiter;
 
     @Operation(summary = "Report a new network alert (pothole, flooding, road closure...)")
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     public Mono<NetworkAlertResponse> report(
             @Valid @RequestBody ReportNetworkAlertRequest request,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
@@ -72,6 +77,7 @@ public class NetworkAlertController {
 
     @Operation(summary = "Confirm (community upvote) an existing alert")
     @PostMapping("/{alertId}/confirm")
+    @PreAuthorize("isAuthenticated()")
     public Mono<NetworkAlertResponse> confirm(
             @PathVariable UUID alertId,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
@@ -81,6 +87,7 @@ public class NetworkAlertController {
 
     @Operation(summary = "Resolve an alert (issue has been fixed / no longer relevant)")
     @PostMapping("/{alertId}/resolve")
+    @PreAuthorize("isAuthenticated()")
     public Mono<NetworkAlertResponse> resolve(
             @PathVariable UUID alertId,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
@@ -96,15 +103,20 @@ public class NetworkAlertController {
         return queryUseCase.findById(currentUser.tenantId(), alertId).map(NetworkAlertResponseMapper::toResponse);
     }
 
-    @Operation(summary = "Find active alerts near a location")
+    @Operation(summary = "Find active alerts near a location (capped at "
+            + "NetworkAlertR2dbcRepository.MAX_NEARBY_RESULTS results, throttled per user — Phase 0 stop-gap)")
     @GetMapping("/nearby")
     public Flux<NetworkAlertResponse> nearby(
             @RequestParam double lat,
             @RequestParam double lng,
             @RequestParam(defaultValue = "5") double radiusKm,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
-        return queryUseCase.findActiveNearby(currentUser.tenantId(), GeoPoint.of(lat, lng), radiusKm)
-                .map(NetworkAlertResponseMapper::toResponse);
+        return nearbyRateLimiter.tryAcquire(currentUser.tenantId(), currentUser.userId(), "alerts")
+                .flatMapMany(allowed -> allowed
+                        ? queryUseCase.findActiveNearby(currentUser.tenantId(), GeoPoint.of(lat, lng), radiusKm)
+                                .map(NetworkAlertResponseMapper::toResponse)
+                        : Flux.error(new NearbyRateLimitExceededException(
+                                "Too many /nearby requests — please slow down and try again shortly")));
     }
 
     private UUID resolveActorId(TntUserIdentity currentUser) {

@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plan — Plan d'implémentation — vue d'ensemble · Audit TiiBnTick</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --text: #1c2430; --muted: #5b6675;
+  --border: #e3e7ec; --accent: #0f5fa8; --accent-soft: #e8f1fa;
+  --code-bg: #f0f2f5; --sidebar-bg: #101823; --sidebar-text: #c7d0dc;
+  --crit: #c62828; --high: #e65100; --med: #f9a825; --low: #2e7d32;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1319; --panel: #161d27; --text: #dbe2ea; --muted: #8b97a5;
+    --border: #263140; --accent: #5aa2e0; --accent-soft: #17273a;
+    --code-bg: #1d2733; --sidebar-bg: #0a0f15; --sidebar-text: #a9b4c0;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--bg); color: var(--text); line-height: 1.65; }
+.layout { display: flex; min-height: 100vh; }
+nav.sidebar { width: 270px; flex-shrink: 0; background: var(--sidebar-bg);
+  color: var(--sidebar-text); padding: 1.4rem 1rem; position: sticky; top: 0;
+  height: 100vh; overflow-y: auto; }
+nav.sidebar .brand { font-size: 1.05rem; font-weight: 700; color: #fff;
+  margin-bottom: .2rem; }
+nav.sidebar .brand small { display:block; font-weight: 400; color: var(--sidebar-text);
+  font-size: .75rem; margin-top: .2rem; }
+nav.sidebar ul { list-style: none; padding: 0; margin: 1.2rem 0; }
+nav.sidebar li a { display: block; color: var(--sidebar-text); text-decoration: none;
+  padding: .45rem .6rem; border-radius: 6px; font-size: .86rem; }
+nav.sidebar li a:hover { background: rgba(255,255,255,.08); color: #fff; }
+nav.sidebar li a.active { background: var(--accent); color: #fff; }
+nav.sidebar .section-label { text-transform: uppercase; letter-spacing: .08em;
+  font-size: .68rem; color: #6b7683; margin: 1.4rem 0 .4rem .4rem; }
+main { flex: 1; min-width: 0; padding: 2.2rem 3rem 4rem; max-width: 1100px; }
+header.page { border-bottom: 1px solid var(--border); padding-bottom: 1.2rem;
+  margin-bottom: 1.6rem; }
+header.page .kicker { color: var(--accent); font-weight: 600; font-size: .85rem;
+  text-transform: uppercase; letter-spacing: .06em; }
+header.page h1 { margin: .25rem 0 .4rem; font-size: 1.9rem; }
+header.page .meta { color: var(--muted); font-size: .85rem; }
+h2 { margin-top: 2.4rem; padding-bottom: .35rem; border-bottom: 1px solid var(--border);
+  font-size: 1.35rem; }
+h3 { margin-top: 1.8rem; font-size: 1.08rem; }
+h4 { margin-top: 1.4rem; font-size: .98rem; }
+a { color: var(--accent); }
+code { background: var(--code-bg); padding: .12em .38em; border-radius: 4px;
+  font-size: .84em; font-family: "JetBrains Mono", Consolas, monospace; }
+pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem; overflow-x: auto; font-size: .82rem; line-height: 1.5; }
+pre code { background: none; padding: 0; }
+.table-wrap { overflow-x: auto; margin: 1rem 0; border: 1px solid var(--border);
+  border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: .85rem; background: var(--panel); }
+th, td { border-bottom: 1px solid var(--border); padding: .55rem .75rem; text-align: left;
+  vertical-align: top; }
+th { background: var(--accent-soft); color: var(--text); font-weight: 600;
+  white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+blockquote { border-left: 4px solid var(--accent); background: var(--accent-soft);
+  margin: 1rem 0; padding: .7rem 1rem; border-radius: 0 8px 8px 0; }
+blockquote p { margin: .3rem 0; }
+.badge { display: inline-block; padding: .1em .6em; border-radius: 999px;
+  font-size: .74rem; font-weight: 700; color: #fff; white-space: nowrap; }
+.badge.crit { background: var(--crit); } .badge.high { background: var(--high); }
+.badge.med { background: var(--med); color: #333; } .badge.low { background: var(--low); }
+.mermaid { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem; margin: 1rem 0; text-align: center; overflow-x: auto; }
+.toc { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem 1.4rem; margin: 1.4rem 0; font-size: .88rem; }
+.toc > ul { margin: .3rem 0; padding-left: 1.1rem; }
+.toc .toctitle { font-weight: 700; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1rem; margin: 1.4rem 0; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1.1rem 1.2rem; text-decoration: none; color: var(--text); display: block; }
+.card:hover { border-color: var(--accent); }
+.card .icon { font-size: 1.5rem; }
+.card h3 { margin: .4rem 0 .2rem; font-size: 1rem; }
+.card p { margin: 0; color: var(--muted); font-size: .82rem; }
+.stat-row { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1.2rem 0; }
+.stat { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: .8rem 1.2rem; min-width: 130px; }
+.stat .num { font-size: 1.6rem; font-weight: 800; }
+.stat .lbl { font-size: .74rem; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .05em; }
+.stat.crit .num { color: var(--crit); } .stat.high .num { color: var(--high); }
+.stat.med .num { color: var(--med); } .stat.low .num { color: var(--low); }
+footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border);
+  color: var(--muted); font-size: .78rem; }
+.progress-block { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1rem 1.2rem; margin: 1rem 0 1.6rem; }
+.progress-block .progress-label { display: flex; justify-content: space-between; align-items: baseline;
+  font-size: .85rem; margin-bottom: .5rem; }
+.progress-block .progress-label b { font-size: 1rem; }
+.progress-bar-track { background: var(--code-bg); border-radius: 999px; height: .6rem; overflow: hidden; }
+.progress-bar-fill { height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--low), var(--accent)); transition: width .3s ease; }
+.progress-note { font-size: .72rem; color: var(--muted); margin-top: .5rem; }
+li:has(> input.task-checkbox) { list-style: none; margin-left: -1.4rem; padding-left: .3rem;
+  display: list-item; }
+input.task-checkbox { width: 1rem; height: 1rem; margin-right: .5rem; vertical-align: middle;
+  accent-color: var(--accent); }
+li:has(> input.task-checkbox:checked) { color: var(--muted); }
+li:has(> input.task-checkbox:checked) code { opacity: .75; }
+@media (max-width: 900px) {
+  .layout { flex-direction: column; }
+  nav.sidebar { width: 100%; height: auto; position: static; }
+  main { padding: 1.4rem 1.2rem 3rem; }
+}
+@media print { nav.sidebar { display: none; } main { padding: 0; } }
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar"><div class="brand">TiiBnTick Core<small>Audit technique — juillet 2026</small></div>
+<ul><li><a href="../index.html">🏠 Accueil</a></li>
+<li><a href="../executive-summary.html">📋 Résumé exécutif global</a></li>
+</ul><div class="section-label">Rapports d'audit</div><ul>
+<li><a href="../audit-1-architecture.html">🏛️ Audit n°1 — Architecture globale</a></li>
+<li><a href="../audit-2-inter-modules.html">🔗 Audit n°2 — Connexions inter-modules</a></li>
+<li><a href="../audit-3-yow-event-kernel.html">📨 Audit n°3 — yow-event-kernel</a></li>
+<li><a href="../audit-4-yow-i18n-kernel.html">🌍 Audit n°4 — yow-i18n-kernel</a></li>
+<li><a href="../audit-5-kafka.html">🧵 Audit n°5 — Kafka</a></li>
+<li><a href="../audit-6-scalabilite.html">📈 Audit n°6 — Scalabilité</a></li>
+<li><a href="../audit-7-system-design.html">🧭 Audit n°7 — System Design & Sécurité</a></li>
+</ul><div class="section-label">Plan de remédiation</div><ul>
+<li><a href="implementation-plan.html" class="active">🗂️ Plan — Plan d'implémentation — vue d'ensemble</a></li>
+<li><a href="phase-0-critical.html">🚨 P0 — Phase 0 — Bloquant production</a></li>
+<li><a href="phase-1-hardening.html">🛡️ P1 — Phase 1 — Durcissement</a></li>
+<li><a href="phase-2-target-architecture.html">🚀 P2 — Phase 2 — Architecture cible</a></li>
+<li><a href="workstream-payment-billing-kernel-delegation.html">💳 Chantier — Délégation paiement/facturation au Kernel</a></li>
+</ul></nav>
+<main>
+<header class="page">
+  <div class="kicker">Plan</div>
+  <h1>🗂️ Plan d'implémentation — vue d'ensemble</h1>
+  <div class="meta">Plan d'implémentation — document vivant, mis à jour à chaque décision. Voir <code>docs/audits/raw/</code> pour le constat figé.</div>
+</header>
+<div class="progress-block">
+  <div class="progress-label"><span>Progression globale du plan (P0 + P1 + P2 + chantier paiement)</span><b>55 / 159 (35%)</b></div>
+  <div class="progress-bar-track"><div class="progress-bar-fill" style="width:35%"></div></div>
+  <div class="progress-note">Lecture seule : ces cases reflètent l'état du fichier Markdown versionné dans git au moment de la génération. On les coche en éditant le <code>.md</code> (IDE ou <code>- [x]</code> par commit), jamais depuis cette page — régénérer avec <code>python3 docs/audits/build_reports.py</code> après un commit pour mettre à jour l'affichage.</div>
+</div>
+<div class="toc"><div class="toc"><span class="toctitle">Sommaire</span><ul>
+<li><a href="#comment-lire-ce-plan">Comment lire ce plan</a></li>
+<li><a href="#pourquoi-trois-phases-et-pas-une-liste-plate">Pourquoi trois phases et pas une liste plate</a></li>
+<li><a href="#sequencement-recommande">Séquencement recommandé</a></li>
+<li><a href="#table-de-correspondance-complete-audit-phase">Table de correspondance complète — audit → phase</a></li>
+<li><a href="#decisions-darchitecture-actees-pendant-ce-plan">Décisions d'architecture actées pendant ce plan</a></li>
+<li><a href="#liens-directs">Liens directs</a></li>
+</ul>
+</div>
+</div>
+<h1 id="plan-dimplementation-vue-densemble">Plan d'implémentation — vue d'ensemble</h1>
+<p>Ce document est le point d'entrée du <strong>plan de remédiation complet</strong> de TiiBnTick Core, construit à partir de l'intégralité des 7 audits techniques (<a href="../index.html">portail des audits</a>) sans aucune omission : les <strong>145 constats individuels</strong> relevés (17 en architecture, 10 en connexions inter-modules, 22 sur yow-event-kernel, 24 sur yow-i18n-kernel, 20 sur Kafka, 27 sur la scalabilité, 25 sur system design &amp; sécurité) sont chacun repris comme un item cochable dans l'une des trois phases ci-dessous, plus le chantier transverse de délégation paiement/facturation. Rien n'est laissé de côté silencieusement : un constat non retenu pour une action immédiate est explicitement classé, jamais simplement absent.</p>
+<blockquote>
+<p><strong>Mode d'emploi des cases à cocher.</strong> La source de vérité est le Markdown versionné dans git — chaque case <code>- [ ]</code>/<code>- [x]</code> se coche dans l'IDE et se committe, comme n'importe quel changement de code. La page HTML (régénérée via <code>python3 docs/audits/build_reports.py</code>) affiche l'état du fichier au moment du build et une barre de progression calculée automatiquement. <strong>Les cases sont en lecture seule dans le navigateur</strong> — la page est un tableau de bord qui reflète l'avancement réel de l'équipe, pas un outil de saisie.</p>
+</blockquote>
+<h2 id="comment-lire-ce-plan">Comment lire ce plan</h2>
+<pre><code>implementation-plan.md          ← vous êtes ici : vue d'ensemble, séquencement, glossaire des ID
+├── phase-0-critical.md         ← bloquant production (3-5 sem.)
+│   └── workstream-payment-billing-kernel-delegation.md   ← détail du chantier B de la Phase 0
+├── phase-1-hardening.md        ← durcissement (1-3 mois, après Phase 0)
+└── phase-2-target-architecture.md  ← trajectoire long terme (3-18 mois, conditionnelle)
+</code></pre>
+<p>Chaque item porte l'étiquette <strong><code>[Audit n°X · ID]</code></strong> — l'ID (A1, P1, P-01, S1, #1…) renvoie au tableau « Problèmes détectés » du rapport d'audit source, où se trouve la preuve complète (extrait de code, ligne exacte, raisonnement). Ce plan ne répète pas les preuves déjà écrites dans les audits ; il les organise en séquence d'exécution.</p>
+<h2 id="pourquoi-trois-phases-et-pas-une-liste-plate">Pourquoi trois phases et pas une liste plate</h2>
+<p>Une liste unique de 145 items serait exhaustive mais inexploitable : elle mélangerait une faille de paiement critique avec un champ <code>final</code> manquant. Le séquencement en phases répond à une seule question à chaque étape : <strong>qu'est-ce qui doit être vrai avant que la suite ait du sens ?</strong></p>
+<ul>
+<li><strong>Phase 0</strong> répond à <em>« qu'est-ce qui empêche d'ouvrir la production sans risque inacceptable »</em> — fraude financière, fuite de données inter-tenant, flux métier cassés, corruption de données au premier scale-out. Tout le reste peut attendre que ceci soit vrai.</li>
+<li><strong>Phase 1</strong> répond à <em>« qu'est-ce qui doit être vrai avant une montée en charge significative »</em> — résilience, observabilité, isolation tenant en profondeur, et le premier chantier produit structurant (Link temps réel).</li>
+<li><strong>Phase 2</strong> répond à <em>« qu'est-ce qui prépare l'échelle sans être payé avant d'en avoir besoin »</em> — infrastructure distribuée, partitionnement, extraction de services, sous condition de traction réelle.</li>
+</ul>
+<h2 id="sequencement-recommande">Séquencement recommandé</h2>
+<ol>
+<li><strong>Semaines 1–5 : Phase 0</strong>, chantiers A à G en parallèle par des personnes différentes (ils sont indépendants entre eux, sauf le chantier B qui est le plus gros et peut démarrer immédiatement sur son sous-chantier wallet pendant que l'ADR facturation se discute).</li>
+<li><strong>Mois 2–4 : Phase 1</strong>, en commençant par le chantier G (Link BFF + temps réel) car c'est le chantier produit le plus visible et le plus long ; les chantiers A, C, D, E, F peuvent progresser en parallèle par équipe.</li>
+<li><strong>Mois 3–18 : Phase 2</strong>, déclenchée par la charge réelle observée, pas par le calendrier — ne pas anticiper l'infrastructure distribuée (Chantier H/I/J) avant que Phase 0+1 soient stabilisées en production et que des métriques réelles justifient l'investissement.</li>
+</ol>
+<h2 id="table-de-correspondance-complete-audit-phase">Table de correspondance complète — audit → phase</h2>
+<p>Cette table garantit qu'aucun des 145 constats n'a été oublié. Les compteurs sont calculés automatiquement depuis les fichiers de phase (voir la barre de progression globale ci-dessus dans la version HTML).</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Audit source</th>
+<th>Nombre de constats</th>
+<th>Répartition</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../audit-1-architecture.html">Audit n°1 — Architecture globale</a></td>
+<td>17 (A1–A17)</td>
+<td>5 en Phase 0 (A1,A2,A3,A5<em>,A6 — corrections rapides), 5 en Phase 1 (A4,A5</em><em>,A7,A13,A16,A17 — </em>cf. note), 7 en Phase 2 (A8,A9,A10,A11,A12,A14,A15)</td>
+</tr>
+<tr>
+<td><a href="../audit-2-inter-modules.html">Audit n°2 — Connexions inter-modules</a></td>
+<td>10 (P1–P10)</td>
+<td>4 en Phase 0 (P1,P3,P4,P5 — dédupliqués avec A2/EK/A7), 3 en Phase 1 (P2,P6,P7 + reco 8), 3 en Phase 2 (P8,P9,P10 + reco 7)</td>
+</tr>
+<tr>
+<td><a href="../audit-3-yow-event-kernel.html">Audit n°3 — yow-event-kernel</a></td>
+<td>22 (P1–P22)</td>
+<td>6 en Phase 0 (P1–P6 + PR1 décision), 5 en Phase 1 (P7–P11 + PR4/PR5/PR6), 11 en Phase 2 (P12–P22, chantier L conditionnel)</td>
+</tr>
+<tr>
+<td><a href="../audit-4-yow-i18n-kernel.html">Audit n°4 — yow-i18n-kernel</a></td>
+<td>24 (P-1–P-24)</td>
+<td>3 en Phase 0 (P-1,P-2,P-21 — messages cassés en prod), 5 en Phase 1 (P-4,P-5,P-6,P-7,P-12,P-19,P-22,P-23 — Money + locale), 13 en Phase 2 (le reste — hygiène, référentiels, ADR taux de change)</td>
+</tr>
+<tr>
+<td><a href="../audit-5-kafka.html">Audit n°5 — Kafka</a></td>
+<td>20 (P-01–P-20)</td>
+<td>3 en Phase 0 (P-01,P-02,P-03), 8 en Phase 1 (P-04–P-08,P-17,P-20b,P-20d), 5 en Phase 2 (P-09,P-10,P-11,P-13,P-16)</td>
+</tr>
+<tr>
+<td><a href="../audit-6-scalabilite.html">Audit n°6 — Scalabilité</a></td>
+<td>27 (S1–S27)</td>
+<td>6 en Phase 0 (S1–S5,S14 + mitigation S25), 12 en Phase 1 (S6,S7,S9,S10,S11,S12,S15,S17,S18,S20,S24,S25,S26,S27 — dont le chantier Link complet), 9 en Phase 2 (S8,S13,S16,S19,S21,S22 + reco 13/16)</td>
+</tr>
+<tr>
+<td><a href="../audit-7-system-design.html">Audit n°7 — System Design &amp; Sécurité</a></td>
+<td>25 (#1–#25)</td>
+<td>10 en Phase 0 (#1–#10,#15,#16,#19,#23 — sécurité + paiement), 9 en Phase 1 (#11–#14,#17,#18,#22,#24,#25), 4 en Phase 2 (#12<em>,#13,#14</em>,#20,#21 — *dédupliqués avec Phase 1)</td>
+</tr>
+</tbody>
+</table></div>
+<p><em>Notes de dédoublonnage : plusieurs audits observent le même fait sous un angle différent (ex. <code>tnt-actor-core→tnt-incident-core</code> est à la fois A2 dans l'audit architecture et P1 dans l'audit inter-modules ; le mismatch <code>mission.status</code> est P6 dans l'audit event-kernel et fait partie de P-01 dans l'audit Kafka). Chaque fait n'a </em><em>qu'un seul checkbox exécutable</em><em> dans le plan, mais référence systématiquement tous les audits qui l'ont observé — voir les fichiers de phase pour le détail exact des références croisées.</em></p>
+<h2 id="decisions-darchitecture-actees-pendant-ce-plan">Décisions d'architecture actées pendant ce plan</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Date</th>
+<th>Décision</th>
+<th>Détail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>17/07/2026</td>
+<td>TiiBnTick Core délègue entièrement les paiements et la facturation au Kernel</td>
+<td><a href="workstream-payment-billing-kernel-delegation.html">Chantier dédié</a></td>
+</tr>
+<tr>
+<td>18/07/2026</td>
+<td>ADR tranchée : <code>yow-event-kernel</code> réhabilité comme voie unique (Option A)</td>
+<td><a href="phase-0-critical.html#chantier-c-evenementiel-kafka-flux-casses">Phase 0, chantier C</a></td>
+</tr>
+<tr>
+<td>18/07/2026</td>
+<td>ADR tranchée : <code>tnt-billing-invoice</code> coexiste avec <code>billing-legacy-documents-controller</code> (Option B)</td>
+<td><a href="workstream-payment-billing-kernel-delegation.html#question-ouverte-a-trancher-avant-limplementation">Chantier paiement, question ouverte</a></td>
+</tr>
+<tr>
+<td>—</td>
+<td>Décision actée : BFF Link + temps réel par tuiles geohash, réutilisant <code>tnt-realtime-core</code></td>
+<td><a href="phase-1-hardening.html#chantier-g-link-bff-temps-reel-par-tuiles-geohash-priorite-n1-de-la-phase-1">Phase 1, chantier G</a></td>
+</tr>
+<tr>
+<td>—</td>
+<td>Principe directeur : rester monolithe modulaire, extraire seulement sous condition de traction mesurée</td>
+<td><a href="phase-2-target-architecture.html">Phase 2</a></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="liens-directs">Liens directs</h2>
+<ul>
+<li><a href="phase-0-critical.html">Phase 0 — Bloquant production</a></li>
+<li><a href="phase-1-hardening.html">Phase 1 — Durcissement</a></li>
+<li><a href="phase-2-target-architecture.html">Phase 2 — Architecture cible</a></li>
+<li><a href="workstream-payment-billing-kernel-delegation.html">Chantier — Délégation paiement/facturation au Kernel</a></li>
+<li><a href="index.html">README du dossier remediation</a></li>
+</ul>
+<footer>Audit technique TiiBnTick — généré à partir de l'analyse du code source réel. Chaque constat référence les fichiers et lignes concernés.</footer>
+</main>
+</div>
+
+<script type="module">
+  try {
+    const m = await import("https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs");
+    const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    m.default.initialize({ startOnLoad: true, theme: dark ? "dark" : "neutral", securityLevel: "loose" });
+  } catch (e) {
+    document.querySelectorAll(".mermaid").forEach(el => {
+      el.style.textAlign = "left";
+      el.innerHTML = "<div style='color:var(--muted);font-size:.75rem;margin-bottom:.5rem'>⚠ Diagramme Mermaid (connexion internet requise pour le rendu) — source :</div><pre>" + el.textContent.replace(/&/g,"&amp;").replace(/</g,"&lt;") + "</pre>";
+    });
+  }
+</script>
+
+</body>
+</html>

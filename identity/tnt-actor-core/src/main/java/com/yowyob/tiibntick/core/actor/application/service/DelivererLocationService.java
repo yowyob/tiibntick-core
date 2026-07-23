@@ -16,6 +16,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.Objects;
 import java.util.UUID;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class DelivererLocationService implements IUpdateActorLocationUseCase, IGetAvailableDeliverersNearUseCase {
@@ -33,6 +34,7 @@ public class DelivererLocationService implements IUpdateActorLocationUseCase, IG
     }
 
     @Override
+    @Transactional
     public Mono<Void> updateLocation(UpdateActorLocationCommand command) {
         Objects.requireNonNull(command, "command must not be null");
         ActorLocation newLocation = ActorLocation.of(

@@ -29,5 +29,33 @@
   "blockchain.delivery.confirmed": "Livraison du colis {{package_id}} enregistrée de façon immuable.",
 
   "account.welcome": "Bienvenue sur TiiBnTick, {{name}} !",
-  "account.otp.sent": "Votre code de vérification est {{otp}}. Valable {{duration}} minutes."
+  "account.otp.sent": "Votre code de vérification est {{otp}}. Valable {{duration}} minutes.",
+
+  "notify.freelancer_org.verified": "🎉 Félicitations ! Votre organisation {{orgId}} a été vérifiée (niveau KYC {{kycLevel}}). Vous pouvez maintenant accepter des missions sur TiiBnTick.",
+  "notify.freelancer_org.kyc_level_upgraded": "✅ Niveau KYC amélioré pour l'organisation {{orgId}} : certifiée niveau {{kycLevel}}. Nouvelles fonctionnalités disponibles.",
+  "notify.freelancer_org.kyc_rejected": "❌ La vérification KYC de l'organisation {{orgId}} a été rejetée. Raison : {{reason}}. Veuillez soumettre de nouveaux documents.",
+  "notify.freelancer_org.suspended": "⚠️ Votre organisation {{orgId}} a été suspendue. Raison : {{reason}}. Contactez le support pour plus d'informations.",
+  "notify.freelancer_org.unsuspended": "✅ La suspension de votre organisation {{orgId}} a été levée. Vous pouvez reprendre vos activités.",
+  "notify.freelancer_org.mission_assigned": "📦 Mission assignée à votre organisation {{freelancerOrgId}}. Référence livraison : {{deliveryId}}.",
+  "notify.sub_deliverer.mission_assigned": "🏍️ Nouvelle mission {{deliveryId}} assignée pour l'organisation {{orgId}}. Préparez-vous pour le ramassage.",
+  "notify.billing.template_applied": "💼 Politique tarifaire créée à partir du template {{templateCode}} par {{actorId}}. ID politique : {{policyId}}.",
+
+  "incident.notification.incident.escalated": "{{title}} — {{body}} (Incident {{incidentId}})",
+  "incident.notification.incident.driver.proposal": "{{title}} — {{body}} (Incident {{incidentId}})",
+  "incident.notification.incident.auto.failed": "{{title}} — {{body}} (Incident {{incidentId}})",
+  "incident.notification.agency.handling.started": "{{title}} — {{body}} (Incident {{incidentId}})",
+  "incident.notification.incident.created": "{{title}} — {{body}} (Incident {{incidentId}})",
+  "incident.notification.interagency.coop.requested": "{{title}} — {{body}} (Incident {{incidentId}})",
+  "incident.notification.interagency.coop.updated": "{{title}} — {{body}} (Incident {{incidentId}})",
+  "incident.notification.handover.confirmed": "{{title}} — {{body}} (Incident {{incidentId}})",
+  "incident.notification.driver.mission.assigned": "{{title}} — {{body}} (Incident {{incidentId}})",
+
+  "CLIENT_QUOTE_RECEIVED": "Vous avez reçu un devis de {{providerName}} pour votre demande {{quoteRequestId}}.",
+  "PROVIDER_NEW_QUOTE_REQUEST": "Nouvelle demande de devis de {{clientCity}} (réf. {{quoteRequestId}}).",
+  "ORDER_CONFIRMED": "Votre commande {{orderId}} a été confirmée par {{providerName}}.",
+  "ORDER_PAID": "Paiement reçu pour la commande {{orderId}} : {{amountXaf}} XAF.",
+  "ORDER_COMPLETED": "Votre commande {{orderId}} a été finalisée.",
+  "REVIEW_PUBLISHED": "Nouvel avis {{reviewId}} publié : {{rating}}/5.",
+  "LISTING_APPROVED": "Votre annonce {{listingId}} a été approuvée.",
+  "LISTING_REJECTED": "Votre annonce {{listingId}} a été rejetée. Raison : {{reason}}."
 }

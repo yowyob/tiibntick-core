@@ -8,6 +8,7 @@ import com.yowyob.tiibntick.core.geo.domain.event.RoadNodeCreatedEvent;
 import com.yowyob.tiibntick.core.geo.domain.exception.GeoNotFoundException;
 import com.yowyob.tiibntick.core.geo.domain.model.*;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -36,6 +37,7 @@ public class RoadNetworkService implements IManageRoadNetworkUseCase {
     }
 
     @Override
+    @Transactional
     public Mono<RoadNode> createNode(UUID tenantId, NodeType type, GeoPoint coordinates,
                                      String name, String cityCode, Integer capacitySlots) {
         RoadNode node = RoadNode.create(tenantId, type, coordinates, name, cityCode, capacitySlots);

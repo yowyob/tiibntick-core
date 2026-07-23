@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.yowyob.tiibntick.core</groupId>
+        <artifactId>tiibntick-core-parent</artifactId>
+        <version>0.0.1</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>tnt-legacy-documents-core</artifactId>
+    <packaging>jar</packaging>
+    <name>TiiBnTick — tnt-legacy-documents-core</name>
+    <description>
+        L4 Business — Kernel billing-legacy-documents-controller gateway: opaque JSON proxy
+        toward the Yowyob Kernel's generic commercial-document HTTP surface (bons de
+        commande/achat/livraison, factures fournisseurs/proforma, bons de réception, notes
+        de crédit — 64 operations across 7 document types, see docs/kernel-api/endpoints.md,
+        lines 4224-4702). No business logic or persistence of its own.
+
+        Coexistence ADR (docs/audits/remediation/workstream-payment-billing-kernel-delegation.md,
+        Option B, decided 2026-07-18): this module is deliberately separate from
+        tnt-billing-invoice, which remains the system of record for TiiBnTick's own mission
+        billing (TNT-FACT-* numbering, PDF, credit notes) — this proxy is only for generic
+        commercial-document needs (internal purchases, supplier delivery notes for
+        tnt-inventory-core/tnt-accounting-core). It must never be used as a substitute for,
+        or gain a dependency edge to/from, tnt-billing-invoice.
+
+        Layer L4 — Business (a module legitimately consumed by other L4 modules —
+        tnt-inventory-core, tnt-accounting-core — must itself stay at L4 or below per the
+        strict layering rule in the root CLAUDE.md). Author: MANFOUO Braun.
+    </description>
+
+    <dependencies>
+
+        <!-- ── tnt-common-core: ApiResponse/ErrorDetail envelope ── -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-common-core</artifactId>
+        </dependency>
+
+        <!-- ── Spring WebFlux (WebClient for KernelBridge + REST controllers) ── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+
+        <!-- ── Jackson ── -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+
+        <!-- ── Lombok ── -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- ── Documentation API ── -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- ── Test ── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

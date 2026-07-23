@@ -187,6 +187,19 @@
             <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- Testcontainers core + JUnit 5 integration — needed directly for the generic
+             Redis container used by NearbyRateLimiterIntegrationTest (@Testcontainers/@Container),
+             same pattern as tnt-realtime-core's Redis integration tests. -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
 
     </dependencies>
 

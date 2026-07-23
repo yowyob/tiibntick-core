@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
 import java.util.Objects;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class FreelancerAssociationService
@@ -29,6 +30,7 @@ public class FreelancerAssociationService
     }
 
     @Override
+    @Transactional
     public Mono<FreelancerProfile> associate(AssociateFreelancerCommand command) {
         Objects.requireNonNull(command, "command must not be null");
         return freelancerRepository.findByActorId(command.tenantId(), command.freelancerActorId())
@@ -45,6 +47,7 @@ public class FreelancerAssociationService
     }
 
     @Override
+    @Transactional
     public Mono<FreelancerProfile> dissociate(DissociateFreelancerCommand command) {
         Objects.requireNonNull(command, "command must not be null");
         return freelancerRepository.findByActorId(command.tenantId(), command.freelancerActorId())

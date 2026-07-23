@@ -1,5 +1,8 @@
 package com.yowyob.tiibntick.core.notify.adapter.in.web;
 
+import com.yowyob.kernel.i18n.domain.enums.SupportedLanguage;
+import com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser;
+import com.yowyob.tiibntick.core.auth.domain.model.TntUserIdentity;
 import com.yowyob.tiibntick.core.notify.application.port.in.IManageNotificationPreferencesUseCase;
 import com.yowyob.tiibntick.core.notify.application.port.in.IManageNotificationProvidersUseCase;
 import com.yowyob.tiibntick.core.notify.application.port.in.IManageNotificationRemindersUseCase;
@@ -18,6 +21,7 @@ import com.yowyob.tiibntick.core.notify.domain.model.NotificationReminder;
 import com.yowyob.tiibntick.core.notify.domain.model.NotificationTemplateConfig;
 import com.yowyob.tiibntick.core.notify.domain.vo.NotificationModel;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -78,19 +82,19 @@ public class NotificationController {
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAnyRole('AGENCY_MANAGER','BRANCH_MANAGER','SUPPORT_AGENT','TNT_ADMIN')")
     public Mono<Notification> send(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestHeader(value = "X-Organization-Id", required = false) UUID organizationId,
             @Valid @RequestBody SendNotificationRequest request) {
         NotificationModel model = new NotificationModel(
                 request.templateKey(),
-                request.targetLanguage() != null ? request.targetLanguage() : "fr",
+                request.targetLanguage() != null ? request.targetLanguage() : SupportedLanguage.FR_CM.getTag(),
                 request.parameters() != null ? request.parameters() : Map.of(),
                 request.priority() != null
                         ? NotificationPriority.valueOf(request.priority())
                         : NotificationPriority.NORMAL);
 
         return sendNotificationUseCase.send(
-                tenantId.toString(),
+                currentUser.tenantId().toString(),
                 organizationId != null ? organizationId.toString() : null,
                 request.recipientId(),
                 request.targetDestination(),
@@ -136,23 +140,23 @@ public class NotificationController {
     @GetMapping("/preferences/{userId}")
     @PreAuthorize("hasAnyRole('CLIENT','PERMANENT_DELIVERER','FREELANCER','SUPPORT_AGENT','TNT_ADMIN')")
     public Mono<NotificationPreference> getPreferences(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestHeader(value = "X-Organization-Id", required = false) UUID organizationId,
             @PathVariable String userId) {
-        return managePreferencesUseCase.getPreferences(tenantId.toString(), orgOrNull(organizationId), userId);
+        return managePreferencesUseCase.getPreferences(currentUser.tenantId().toString(), orgOrNull(organizationId), userId);
     }
 
     @Operation(summary = "Save or update notification preferences for a user")
     @PutMapping("/preferences/{userId}")
     @PreAuthorize("hasAnyRole('CLIENT','PERMANENT_DELIVERER','FREELANCER','TNT_ADMIN')")
     public Mono<NotificationPreference> savePreferences(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestHeader(value = "X-Organization-Id", required = false) UUID organizationId,
             @PathVariable String userId,
             @Valid @RequestBody UpdatePreferencesRequest body) {
         NotificationPreference pref = new NotificationPreference(
                 userId,
-                tenantId.toString(),
+                currentUser.tenantId().toString(),
                 orgOrNull(organizationId),
                 body.activeChannels() != null ? body.activeChannels() : java.util.Set.of(),
                 body.preferredLanguage(),
@@ -169,11 +173,11 @@ public class NotificationController {
     @PostMapping("/preferences/{userId}/disable/{channel}")
     @PreAuthorize("hasAnyRole('CLIENT','PERMANENT_DELIVERER','FREELANCER','TNT_ADMIN')")
     public Mono<NotificationPreference> disableChannel(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestHeader(value = "X-Organization-Id", required = false) UUID organizationId,
             @PathVariable String userId,
             @PathVariable String channel) {
-        return managePreferencesUseCase.disableChannel(tenantId.toString(), orgOrNull(organizationId), userId,
+        return managePreferencesUseCase.disableChannel(currentUser.tenantId().toString(), orgOrNull(organizationId), userId,
                 NotificationChannel.valueOf(channel));
     }
 
@@ -181,11 +185,11 @@ public class NotificationController {
     @PostMapping("/preferences/{userId}/enable/{channel}")
     @PreAuthorize("hasAnyRole('CLIENT','PERMANENT_DELIVERER','FREELANCER','TNT_ADMIN')")
     public Mono<NotificationPreference> enableChannel(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestHeader(value = "X-Organization-Id", required = false) UUID organizationId,
             @PathVariable String userId,
             @PathVariable String channel) {
-        return managePreferencesUseCase.enableChannel(tenantId.toString(), orgOrNull(organizationId), userId,
+        return managePreferencesUseCase.enableChannel(currentUser.tenantId().toString(), orgOrNull(organizationId), userId,
                 NotificationChannel.valueOf(channel));
     }
 
@@ -193,11 +197,11 @@ public class NotificationController {
     @PatchMapping("/preferences/{userId}/language")
     @PreAuthorize("hasAnyRole('CLIENT','PERMANENT_DELIVERER','FREELANCER','TNT_ADMIN')")
     public Mono<NotificationPreference> changeLanguage(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestHeader(value = "X-Organization-Id", required = false) UUID organizationId,
             @PathVariable String userId,
             @RequestParam String localeTag) {
-        return managePreferencesUseCase.changeLanguage(tenantId.toString(), orgOrNull(organizationId), userId,
+        return managePreferencesUseCase.changeLanguage(currentUser.tenantId().toString(), orgOrNull(organizationId), userId,
                 localeTag);
     }
 
@@ -210,66 +214,66 @@ public class NotificationController {
     @GetMapping("/providers")
     @PreAuthorize("hasRole('TNT_ADMIN')")
     public Flux<NotificationProviderConfig> listProviders(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestHeader(value = "X-Organization-Id", required = false) UUID organizationId) {
-        return manageProvidersUseCase.listProviders(tenantId.toString(), orgOrNull(organizationId));
+        return manageProvidersUseCase.listProviders(currentUser.tenantId().toString(), orgOrNull(organizationId));
     }
 
     @Operation(summary = "Configure a physical delivery provider on the Kernel notification engine")
     @PostMapping("/providers")
     @PreAuthorize("hasRole('TNT_ADMIN')")
     public Mono<NotificationProviderConfig> saveProvider(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestHeader(value = "X-Organization-Id", required = false) UUID organizationId,
             @Valid @RequestBody NotificationProviderConfig config) {
-        return manageProvidersUseCase.saveProvider(tenantId.toString(), orgOrNull(organizationId), config);
+        return manageProvidersUseCase.saveProvider(currentUser.tenantId().toString(), orgOrNull(organizationId), config);
     }
 
     @Operation(summary = "List message templates registered on the Kernel notification engine")
     @GetMapping("/templates")
     @PreAuthorize("hasRole('TNT_ADMIN')")
     public Flux<NotificationTemplateConfig> listTemplates(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestHeader(value = "X-Organization-Id", required = false) UUID organizationId) {
-        return manageTemplatesUseCase.listTemplates(tenantId.toString(), orgOrNull(organizationId));
+        return manageTemplatesUseCase.listTemplates(currentUser.tenantId().toString(), orgOrNull(organizationId));
     }
 
     @Operation(summary = "Register or update a message template on the Kernel notification engine")
     @PostMapping("/templates")
     @PreAuthorize("hasRole('TNT_ADMIN')")
     public Mono<NotificationTemplateConfig> saveTemplate(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestHeader(value = "X-Organization-Id", required = false) UUID organizationId,
             @Valid @RequestBody NotificationTemplateConfig config) {
-        return manageTemplatesUseCase.saveTemplate(tenantId.toString(), orgOrNull(organizationId), config);
+        return manageTemplatesUseCase.saveTemplate(currentUser.tenantId().toString(), orgOrNull(organizationId), config);
     }
 
     @Operation(summary = "List reminders scheduled on the Kernel notification engine")
     @GetMapping("/reminders")
     @PreAuthorize("hasAnyRole('SUPPORT_AGENT','TNT_ADMIN')")
     public Flux<NotificationReminder> listReminders(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestHeader(value = "X-Organization-Id", required = false) UUID organizationId) {
-        return manageRemindersUseCase.listReminders(tenantId.toString(), orgOrNull(organizationId));
+        return manageRemindersUseCase.listReminders(currentUser.tenantId().toString(), orgOrNull(organizationId));
     }
 
     @Operation(summary = "Schedule a future notification on the Kernel notification engine")
     @PostMapping("/reminders")
     @PreAuthorize("hasAnyRole('SUPPORT_AGENT','TNT_ADMIN')")
     public Mono<NotificationReminder> scheduleReminder(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestHeader(value = "X-Organization-Id", required = false) UUID organizationId,
             @Valid @RequestBody NotificationReminder reminder) {
-        return manageRemindersUseCase.scheduleReminder(tenantId.toString(), orgOrNull(organizationId), reminder);
+        return manageRemindersUseCase.scheduleReminder(currentUser.tenantId().toString(), orgOrNull(organizationId), reminder);
     }
 
     @Operation(summary = "List raw delivery records tracked by the Kernel notification engine (troubleshooting)")
     @GetMapping("/kernel-deliveries")
     @PreAuthorize("hasRole('TNT_ADMIN')")
     public Flux<NotificationDeliveryRecord> listKernelDeliveries(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestHeader(value = "X-Organization-Id", required = false) UUID organizationId) {
-        return viewKernelDeliveriesUseCase.listKernelDeliveries(tenantId.toString(), orgOrNull(organizationId));
+        return viewKernelDeliveriesUseCase.listKernelDeliveries(currentUser.tenantId().toString(), orgOrNull(organizationId));
     }
 
     private static String orgOrNull(UUID organizationId) {

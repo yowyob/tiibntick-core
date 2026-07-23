@@ -1,9 +1,7 @@
 package com.yowyob.tiibntick.core.incident.config;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
-import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,7 +12,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Kafka producer and consumer factory configuration for tnt-incident-core.
+ * Kafka consumer factory configuration for tnt-incident-core.
+ *
+ * <p>The former {@code incidentKafkaTemplate}/{@code incidentKafkaProducerFactory} producer
+ * beans were removed with the Chantier C · Audit n°3 · P5 outbox migration:
+ * {@code IncidentKafkaEventPublisher} now enqueues events through yow-event-kernel's
+ * transactional outbox instead of sending via {@code KafkaTemplate}. Only the consumer side
+ * (inbound events from other modules) remains configured here.
  *
  * <p>Part of the tnt-incident-core module - TiiBnTick Logistics Layer.
  *
@@ -28,23 +32,6 @@ public class IncidentKafkaConfig {
 
     @Value("${spring.kafka.bootstrap-servers:localhost:9092}")
     private String bootstrapServers;
-
-    @Bean("incidentKafkaProducerFactory")
-    public ProducerFactory<String, String> incidentProducerFactory() {
-        Map<String, Object> props = new HashMap<>();
-        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
-        props.put(ProducerConfig.ACKS_CONFIG, "all");
-        props.put(ProducerConfig.RETRIES_CONFIG, 3);
-        return new DefaultKafkaProducerFactory<>(props);
-    }
-
-    @Bean("incidentKafkaTemplate")
-    public KafkaTemplate<String, String> kafkaTemplate() {
-        return new KafkaTemplate<>(incidentProducerFactory());
-    }
 
     @Bean("incidentConsumerFactory")
     public ConsumerFactory<String, String> incidentConsumerFactory() {

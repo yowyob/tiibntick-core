@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @Tag(name = "GOFP — Commissions", description = "API métier générique — Commissions et paiements")
 @RestController
@@ -21,6 +22,7 @@ public class CommissionCoreController {
 
     @Operation(summary = "Traiter la commission d'une livraison complétée")
     @PostMapping("/delivery/{deliveryId}/process")
+    @PreAuthorize("isAuthenticated()")
     public Mono<PaymentEntity> process(@PathVariable UUID deliveryId) {
         return commissionUseCase.processDeliveryCompletion(deliveryId);
     }

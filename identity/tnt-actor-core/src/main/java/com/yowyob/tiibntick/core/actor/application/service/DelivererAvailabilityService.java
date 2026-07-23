@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
 import java.util.Objects;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class DelivererAvailabilityService
@@ -29,6 +30,7 @@ public class DelivererAvailabilityService
     }
 
     @Override
+    @Transactional
     public Mono<DelivererProfile> assignMission(AssignMissionCommand command) {
         Objects.requireNonNull(command, "command must not be null");
         return delivererRepository.findByActorId(command.tenantId(), command.delivererActorId())

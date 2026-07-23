@@ -11,6 +11,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @Tag(name = "GOFP — Besoins de livraison", description = "API métier générique — Besoins clients")
 @RestController
@@ -21,6 +22,7 @@ public class DeliveryNeedCoreController {
     private final IDeliveryNeedUseCase deliveryNeedUseCase;
 
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<DeliveryNeedEntity> create(@RequestBody DeliveryNeedEntity need) {
         return deliveryNeedUseCase.createDeliveryNeed(need);
@@ -37,10 +39,12 @@ public class DeliveryNeedCoreController {
 
     @Operation(summary = "Assigner une livraison à un besoin")
     @PatchMapping("/{id}/assign/{deliveryId}")
+    @PreAuthorize("isAuthenticated()")
     public Mono<DeliveryNeedEntity> assign(@PathVariable UUID id, @PathVariable UUID deliveryId) {
         return deliveryNeedUseCase.assignDelivery(id, deliveryId);
     }
 
     @PatchMapping("/{id}/cancel")
+    @PreAuthorize("isAuthenticated()")
     public Mono<DeliveryNeedEntity> cancel(@PathVariable UUID id) { return deliveryNeedUseCase.cancel(id); }
 }

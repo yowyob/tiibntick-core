@@ -23,6 +23,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /** Port of tnt-agency {@code IntakeController}. */
 @Tag(name = "Agency ERP Intake", description = "Client shipment intake queue")
@@ -42,6 +43,7 @@ public class IntakeController {
     }
 
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/intake-requests")
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Submit a client shipment request (mobile)")
     public Mono<ApiResponse<IntakeResponse>> submit(
@@ -66,6 +68,7 @@ public class IntakeController {
     }
 
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/intake-requests/{intakeId}/approve")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Approve intake — creates mission, optional assign + hub deposit")
     public Mono<ApiResponse<IntakeStatusResponse>> approve(
             @PathVariable UUID tenantId,
@@ -81,6 +84,7 @@ public class IntakeController {
     }
 
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/intake-requests/{intakeId}/reject")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Reject a client intake request")
     public Mono<ApiResponse<IntakeStatusResponse>> reject(
             @PathVariable UUID tenantId,
@@ -93,6 +97,7 @@ public class IntakeController {
     }
 
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/agencies/{agencyId}/intake-requests/walk-in")
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Walk-in intake — submit + approve in one call")
     public Mono<ApiResponse<IntakeStatusResponse>> walkIn(

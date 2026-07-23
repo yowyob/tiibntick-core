@@ -20,6 +20,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * Agency ERP compliance endpoints: client disputes (litiges) and delivery incidents.
@@ -89,6 +90,7 @@ public class ComplianceController {
     }
 
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/agencies/{agencyId}/claims")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Submit a client claim (opens a dispute + emits a claim event)")
     public Mono<ApiResponse<ClaimResponse>> submitClaim(
             @PathVariable UUID tenantId,

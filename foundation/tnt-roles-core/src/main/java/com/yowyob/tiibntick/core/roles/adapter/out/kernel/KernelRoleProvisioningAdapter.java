@@ -110,6 +110,48 @@ public class KernelRoleProvisioningAdapter implements ITntRoleProvisioningPort {
         return Mono.empty();
     }
 
+    @Override
+    public Mono<Void> deleteRole(UUID tenantId, UUID kernelRoleId) {
+        return kernelWebClient
+                .delete()
+                .uri("/api/roles/{id}", kernelRoleId)
+                .header("X-Tenant-Id", tenantId.toString())
+                .retrieve()
+                .bodyToMono(Void.class)
+                .doOnSuccess(v -> log.info("Deleted TiiBnTick role {} for tenant {}", kernelRoleId, tenantId))
+                .onErrorResume(WebClientResponseException.class, e -> {
+                    if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
+                        // Role already gone on the Kernel side — idempotent, treat as success
+                        log.debug("Role {} not found in Kernel (404) — already deleted, skipping.", kernelRoleId);
+                        return Mono.empty();
+                    }
+                    return Mono.error(TntRoleException.deletionFailed(kernelRoleId, e));
+                })
+                .onErrorResume(e -> !(e instanceof TntRoleException),
+                        e -> Mono.error(TntRoleException.deletionFailed(kernelRoleId, e)));
+    }
+
+    @Override
+    public Mono<Boolean> roleExistsById(UUID tenantId, UUID kernelRoleId) {
+        return kernelWebClient
+                .get()
+                .uri("/api/roles/{id}", kernelRoleId)
+                .header("X-Tenant-Id", tenantId.toString())
+                .retrieve()
+                .bodyToMono(Void.class)
+                .thenReturn(true)
+                .onErrorResume(WebClientResponseException.NotFound.class, e -> {
+                    log.debug("Role {} not found in Kernel (404) during reconciliation.", kernelRoleId);
+                    return Mono.just(false);
+                })
+                .onErrorResume(e -> {
+                    log.warn("Could not check role existence by id {} for tenant {}: {} — assuming it still " +
+                                    "exists (fail-safe: reconciliation must not re-provision on a transient error)",
+                            kernelRoleId, tenantId, e.getMessage());
+                    return Mono.just(true);
+                });
+    }
+
     // ─── Private helpers ─────────────────────────────────────────────────────
 
     private Mono<Void> doProvision(UUID tenantId, TntRoleDefinition definition) {

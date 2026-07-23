@@ -1,9 +1,7 @@
 package com.yowyob.tiibntick.core.tp.config;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
-import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,23 +23,6 @@ public class TntTpKafkaConfig {
 
     @Value("${tnt.kafka.consumer.groups.tp-core:tnt-tp-core-group}")
     private String consumerGroup;
-
-    @Bean
-    public ProducerFactory<String, String> tntTpProducerFactory() {
-        return new DefaultKafkaProducerFactory<>(Map.of(
-                ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers,
-                ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class,
-                ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class,
-                ProducerConfig.ACKS_CONFIG, "all",
-                ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "true",
-                ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, "1"
-        ));
-    }
-
-    @Bean
-    public KafkaTemplate<String, String> tntTpKafkaTemplate() {
-        return new KafkaTemplate<>(tntTpProducerFactory());
-    }
 
     @Bean
     public ConsumerFactory<String, String> tntTpConsumerFactory() {

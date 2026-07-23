@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audit n°7 — System Design & Sécurité · Audit TiiBnTick</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --text: #1c2430; --muted: #5b6675;
+  --border: #e3e7ec; --accent: #0f5fa8; --accent-soft: #e8f1fa;
+  --code-bg: #f0f2f5; --sidebar-bg: #101823; --sidebar-text: #c7d0dc;
+  --crit: #c62828; --high: #e65100; --med: #f9a825; --low: #2e7d32;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1319; --panel: #161d27; --text: #dbe2ea; --muted: #8b97a5;
+    --border: #263140; --accent: #5aa2e0; --accent-soft: #17273a;
+    --code-bg: #1d2733; --sidebar-bg: #0a0f15; --sidebar-text: #a9b4c0;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--bg); color: var(--text); line-height: 1.65; }
+.layout { display: flex; min-height: 100vh; }
+nav.sidebar { width: 270px; flex-shrink: 0; background: var(--sidebar-bg);
+  color: var(--sidebar-text); padding: 1.4rem 1rem; position: sticky; top: 0;
+  height: 100vh; overflow-y: auto; }
+nav.sidebar .brand { font-size: 1.05rem; font-weight: 700; color: #fff;
+  margin-bottom: .2rem; }
+nav.sidebar .brand small { display:block; font-weight: 400; color: var(--sidebar-text);
+  font-size: .75rem; margin-top: .2rem; }
+nav.sidebar ul { list-style: none; padding: 0; margin: 1.2rem 0; }
+nav.sidebar li a { display: block; color: var(--sidebar-text); text-decoration: none;
+  padding: .45rem .6rem; border-radius: 6px; font-size: .86rem; }
+nav.sidebar li a:hover { background: rgba(255,255,255,.08); color: #fff; }
+nav.sidebar li a.active { background: var(--accent); color: #fff; }
+nav.sidebar .section-label { text-transform: uppercase; letter-spacing: .08em;
+  font-size: .68rem; color: #6b7683; margin: 1.4rem 0 .4rem .4rem; }
+main { flex: 1; min-width: 0; padding: 2.2rem 3rem 4rem; max-width: 1100px; }
+header.page { border-bottom: 1px solid var(--border); padding-bottom: 1.2rem;
+  margin-bottom: 1.6rem; }
+header.page .kicker { color: var(--accent); font-weight: 600; font-size: .85rem;
+  text-transform: uppercase; letter-spacing: .06em; }
+header.page h1 { margin: .25rem 0 .4rem; font-size: 1.9rem; }
+header.page .meta { color: var(--muted); font-size: .85rem; }
+h2 { margin-top: 2.4rem; padding-bottom: .35rem; border-bottom: 1px solid var(--border);
+  font-size: 1.35rem; }
+h3 { margin-top: 1.8rem; font-size: 1.08rem; }
+h4 { margin-top: 1.4rem; font-size: .98rem; }
+a { color: var(--accent); }
+code { background: var(--code-bg); padding: .12em .38em; border-radius: 4px;
+  font-size: .84em; font-family: "JetBrains Mono", Consolas, monospace; }
+pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem; overflow-x: auto; font-size: .82rem; line-height: 1.5; }
+pre code { background: none; padding: 0; }
+.table-wrap { overflow-x: auto; margin: 1rem 0; border: 1px solid var(--border);
+  border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: .85rem; background: var(--panel); }
+th, td { border-bottom: 1px solid var(--border); padding: .55rem .75rem; text-align: left;
+  vertical-align: top; }
+th { background: var(--accent-soft); color: var(--text); font-weight: 600;
+  white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+blockquote { border-left: 4px solid var(--accent); background: var(--accent-soft);
+  margin: 1rem 0; padding: .7rem 1rem; border-radius: 0 8px 8px 0; }
+blockquote p { margin: .3rem 0; }
+.badge { display: inline-block; padding: .1em .6em; border-radius: 999px;
+  font-size: .74rem; font-weight: 700; color: #fff; white-space: nowrap; }
+.badge.crit { background: var(--crit); } .badge.high { background: var(--high); }
+.badge.med { background: var(--med); color: #333; } .badge.low { background: var(--low); }
+.mermaid { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem; margin: 1rem 0; text-align: center; overflow-x: auto; }
+.toc { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem 1.4rem; margin: 1.4rem 0; font-size: .88rem; }
+.toc > ul { margin: .3rem 0; padding-left: 1.1rem; }
+.toc .toctitle { font-weight: 700; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1rem; margin: 1.4rem 0; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1.1rem 1.2rem; text-decoration: none; color: var(--text); display: block; }
+.card:hover { border-color: var(--accent); }
+.card .icon { font-size: 1.5rem; }
+.card h3 { margin: .4rem 0 .2rem; font-size: 1rem; }
+.card p { margin: 0; color: var(--muted); font-size: .82rem; }
+.stat-row { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1.2rem 0; }
+.stat { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: .8rem 1.2rem; min-width: 130px; }
+.stat .num { font-size: 1.6rem; font-weight: 800; }
+.stat .lbl { font-size: .74rem; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .05em; }
+.stat.crit .num { color: var(--crit); } .stat.high .num { color: var(--high); }
+.stat.med .num { color: var(--med); } .stat.low .num { color: var(--low); }
+footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border);
+  color: var(--muted); font-size: .78rem; }
+.progress-block { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1rem 1.2rem; margin: 1rem 0 1.6rem; }
+.progress-block .progress-label { display: flex; justify-content: space-between; align-items: baseline;
+  font-size: .85rem; margin-bottom: .5rem; }
+.progress-block .progress-label b { font-size: 1rem; }
+.progress-bar-track { background: var(--code-bg); border-radius: 999px; height: .6rem; overflow: hidden; }
+.progress-bar-fill { height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--low), var(--accent)); transition: width .3s ease; }
+.progress-note { font-size: .72rem; color: var(--muted); margin-top: .5rem; }
+li:has(> input.task-checkbox) { list-style: none; margin-left: -1.4rem; padding-left: .3rem;
+  display: list-item; }
+input.task-checkbox { width: 1rem; height: 1rem; margin-right: .5rem; vertical-align: middle;
+  accent-color: var(--accent); }
+li:has(> input.task-checkbox:checked) { color: var(--muted); }
+li:has(> input.task-checkbox:checked) code { opacity: .75; }
+@media (max-width: 900px) {
+  .layout { flex-direction: column; }
+  nav.sidebar { width: 100%; height: auto; position: static; }
+  main { padding: 1.4rem 1.2rem 3rem; }
+}
+@media print { nav.sidebar { display: none; } main { padding: 0; } }
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar"><div class="brand">TiiBnTick Core<small>Audit technique — juillet 2026</small></div>
+<ul><li><a href="index.html">🏠 Accueil</a></li>
+<li><a href="executive-summary.html">📋 Résumé exécutif global</a></li>
+</ul><div class="section-label">Rapports d'audit</div><ul>
+<li><a href="audit-1-architecture.html">🏛️ Audit n°1 — Architecture globale</a></li>
+<li><a href="audit-2-inter-modules.html">🔗 Audit n°2 — Connexions inter-modules</a></li>
+<li><a href="audit-3-yow-event-kernel.html">📨 Audit n°3 — yow-event-kernel</a></li>
+<li><a href="audit-4-yow-i18n-kernel.html">🌍 Audit n°4 — yow-i18n-kernel</a></li>
+<li><a href="audit-5-kafka.html">🧵 Audit n°5 — Kafka</a></li>
+<li><a href="audit-6-scalabilite.html">📈 Audit n°6 — Scalabilité</a></li>
+<li><a href="audit-7-system-design.html" class="active">🧭 Audit n°7 — System Design & Sécurité</a></li>
+</ul><div class="section-label">Plan de remédiation</div><ul>
+<li><a href="remediation/implementation-plan.html">🗂️ Plan — Plan d'implémentation — vue d'ensemble</a></li>
+<li><a href="remediation/phase-0-critical.html">🚨 P0 — Phase 0 — Bloquant production</a></li>
+<li><a href="remediation/phase-1-hardening.html">🛡️ P1 — Phase 1 — Durcissement</a></li>
+<li><a href="remediation/phase-2-target-architecture.html">🚀 P2 — Phase 2 — Architecture cible</a></li>
+<li><a href="remediation/workstream-payment-billing-kernel-delegation.html">💳 Chantier — Délégation paiement/facturation au Kernel</a></li>
+</ul></nav>
+<main>
+<header class="page">
+  <div class="kicker">Audit n°7</div>
+  <h1>🧭 System Design & Sécurité</h1>
+  <div class="meta">Projet TiiBnTick Core · dépôt <code>tiibntick-core</code> (34 modules Maven, y compris <code>trust/tnt-trust-core</code>) · Audit réalisé le 16 juillet 2026</div>
+</header>
+
+<div class="toc"><div class="toc"><span class="toctitle">Sommaire</span><ul>
+<li><a href="#1-resume-executif">1. Résumé exécutif</a></li>
+<li><a href="#2-ce-qui-est-bien-concu-avec-preuves">2. Ce qui est bien conçu (avec preuves)</a><ul>
+<li><a href="#21-hexagonal-ports-adapters-reel-pas-cosmetique">2.1 Hexagonal / ports &amp; adapters — réel, pas cosmétique</a></li>
+<li><a href="#22-regle-de-layering-stricte-verifiee-dans-les-poms">2.2 Règle de layering stricte, vérifiée dans les POMs</a></li>
+<li><a href="#23-securite-plateforme-tnt-platform-gateway-core-conception-soignee">2.3 Sécurité plateforme (tnt-platform-gateway-core) — conception soignée</a></li>
+<li><a href="#24-conversion-jwt-defensive">2.4 Conversion JWT défensive</a></li>
+<li><a href="#25-messagerie-fiable">2.5 Messagerie fiable</a></li>
+<li><a href="#26-resilience-et-disponibilite-partielles-mais-reflechies">2.6 Résilience et disponibilité (partielles mais réfléchies)</a></li>
+<li><a href="#27-multi-tenancy-le-socle-existe">2.7 Multi-tenancy — le socle existe</a></li>
+<li><a href="#28-corebackend-core-backend-par-produit-temps-reel-bien-concu">2.8 coreBackend — « Core Backend » par produit, temps réel bien conçu</a></li>
+<li><a href="#29-pret-pour-lextraction-en-partie">2.9 Prêt pour l'extraction (en partie)</a></li>
+</ul>
+</li>
+<li><a href="#3-ce-qui-est-mal-concu-risques-futurs-system-design">3. Ce qui est mal conçu / risques futurs (System Design)</a><ul>
+<li><a href="#31-couplage-temporel-avec-le-kernel-http-non-maitrise-hors-trust">3.1 Couplage temporel avec le Kernel HTTP — non maîtrisé hors trust</a></li>
+<li><a href="#32-aucune-coordination-de-saga-explicite">3.2 Aucune coordination de saga explicite</a></li>
+<li><a href="#33-versioning-dapi-incoherent">3.3 Versioning d'API incohérent</a></li>
+<li><a href="#34-pas-dapi-gateway-ni-de-rate-limiting">3.4 Pas d'API gateway ni de rate limiting</a></li>
+<li><a href="#35-idempotence-des-mutations-http-non-generalisee">3.5 Idempotence des mutations HTTP non généralisée</a></li>
+<li><a href="#36-observabilite-tracing-probablement-inoperant">3.6 Observabilité : tracing probablement inopérant</a></li>
+<li><a href="#37-extraction-microservices-possible-mais-trois-freins-concrets">3.7 Extraction microservices : possible mais trois freins concrets</a></li>
+<li><a href="#38-corebackend-autorisation-quasi-absente-et-geo-non-scalable">3.8 coreBackend — autorisation quasi absente et géo non scalable</a></li>
+<li><a href="#39-disponibilite-points-restants">3.9 Disponibilité — points restants</a></li>
+</ul>
+</li>
+<li><a href="#4-securite-constats">4. Sécurité — constats</a><ul>
+<li><a href="#41-authnauthz">4.1 AuthN/AuthZ</a></li>
+<li><a href="#42-multi-tenancy-idor">4.2 Multi-tenancy / IDOR</a></li>
+<li><a href="#43-webhooks-de-paiement-tnt-billing-wallet">4.3 Webhooks de paiement (tnt-billing-wallet)</a></li>
+<li><a href="#44-secrets-configuration">4.4 Secrets &amp; configuration</a></li>
+<li><a href="#45-injections">4.5 Injections</a></li>
+<li><a href="#46-exposition-de-donnees-headers">4.6 Exposition de données / headers</a></li>
+</ul>
+</li>
+<li><a href="#5-problemes-detectes-tableau-recapitulatif">5. Problèmes détectés — tableau récapitulatif</a></li>
+<li><a href="#6-architecture-cible-feuille-de-route-priorisee">6. Architecture cible &amp; feuille de route priorisée</a><ul>
+<li><a href="#p0-quick-wins-securite-13-semaines-avant-toute-prod-ouverte">P0 — Quick wins sécurité (1–3 semaines, avant toute prod ouverte)</a></li>
+<li><a href="#p1-moyen-terme-13-mois">P1 — Moyen terme (1–3 mois)</a></li>
+<li><a href="#p1-bis-architecture-temps-reel-link-carte-live-par-utilisateur-decision-bff">P1 bis — Architecture temps réel Link (carte live par utilisateur) &amp; décision BFF</a></li>
+<li><a href="#p2-long-terme-618-mois-sous-condition-de-traction">P2 — Long terme (6–18 mois, sous condition de traction)</a></li>
+</ul>
+</li>
+<li><a href="#7-conclusion">7. Conclusion</a></li>
+</ul>
+</div>
+</div>
+<h1 id="audit-n7-system-design-securite-tiibntick-core">Audit n°7 — System Design &amp; Sécurité — TiiBnTick Core</h1>
+<p><strong>Date</strong> : 2026-07-17
+<strong>Périmètre</strong> : monolithe modulaire réactif, Spring Boot 4 WebFlux, R2DBC/PostgreSQL, Kafka, Redis, MinIO, Kernel Yowyob externe consommé en HTTP. Modules L0–L7 <strong>plus <code>coreBackend/</code></strong> : <code>tnt-agency-back-core</code> (agrégateur de 14 sous-modules événementiels, sans REST), <code>tnt-go-freelancer-point-back-core</code>, <code>tnt-link-back-core</code> (carto/temps réel Link), <code>tnt-market-back-core</code>.
+<strong>Méthode</strong> : lecture du code source (configurations de sécurité, contrôleurs, services, repositories, configuration applicative, docker-compose), recherches exhaustives par motifs (grep), échantillonnage vérifié. Chaque constat est étayé par un fichier:ligne.</p>
+<hr />
+<h2 id="1-resume-executif">1. Résumé exécutif</h2>
+<p>TiiBnTick Core présente une <strong>fondation architecturale nettement au-dessus de la moyenne</strong> pour un projet étudiant/startup : hexagonal réellement appliqué dans ~35 modules, règle de layering stricte documentée et respectée dans les POMs, outbox transactionnel + DLQ, circuit breakers sur le module trust, API keys plateforme hachées BCrypt avec rotation et audit, Kafka idempotent, probes liveness/readiness bien pensées.</p>
+<p>En revanche, l'audit révèle <strong>trois failles de sécurité critiques</strong> qui invalident aujourd'hui les garanties métier :</p>
+<ol>
+<li><strong>Les webhooks de paiement sont falsifiables</strong> (signature Stripe non vérifiée, signature MTN facultative, aucune vérification Orange) — un attaquant peut créditer un wallet sans payer.</li>
+<li><strong>Le tenant est fourni par le client</strong> via l'en-tête <code>X-Tenant-Id</code> dans 68 endpoints de 11 modules, jamais recoupé avec le JWT ; combiné à ~139 <code>findById</code> sans filtre tenant dans les repositories, l'isolation multi-tenant est <strong>contournable (IDOR cross-tenant)</strong>.</li>
+<li><strong>~40 contrôleurs exposant des mutations n'ont aucune annotation d'autorisation</strong> (<code>@RequirePermission</code>/<code>@PreAuthorize</code>) : tout JWT valide, quel que soit son rôle, peut par exemple marquer une facture payée ou créditer un wallet. Le problème est le plus aigu sur les <strong>Core Backend produits</strong> (<code>tnt-market-back-core</code> 0/9, <code>tnt-go-freelancer-point-back-core</code> 0/10, <code>tnt-link-back-core</code> 2/9), exposés sous <code>/api/v1/platform/**</code> où la chaîne plateforme termine en <code>permitAll()</code> → accès inter-produits non contrôlé.</li>
+</ol>
+<p>Côté system design, le monolithe modulaire est le <strong>bon choix</strong> pour une équipe de 3 ; le découpage en schémas PostgreSQL par module et la communication par événements rendent une extraction future plausible. Les principaux risques d'échelle sont : l'absence totale de rate limiting, le couplage temporel synchrone avec le Kernel (160 endpoints HRM proxifiés sans circuit breaker), l'absence de coordination de saga explicite entre livraison/facturation/wallet, et un pipeline de tracing probablement inopérant (mélange bridge OTel / reporter Brave).</p>
+<p><strong>Verdict</strong> : architecture saine, exécution sécurité incomplète. Les correctifs critiques (§6, P0) représentent ~2–3 semaines de travail et doivent précéder toute mise en production ouverte.</p>
+<hr />
+<h2 id="2-ce-qui-est-bien-concu-avec-preuves">2. Ce qui est bien conçu (avec preuves)</h2>
+<h3 id="21-hexagonal-ports-adapters-reel-pas-cosmetique">2.1 Hexagonal / ports &amp; adapters — réel, pas cosmétique</h3>
+<ul>
+<li>Structure <code>adapter/in</code>, <code>adapter/out</code>, <code>application/port/{in,out}</code>, <code>domain/</code> vérifiée sur échantillon (geo, delivery, billing-*, platform-gateway). Ex. : <code>logistics/tnt-geo-core/.../application/port/out/IServiceZoneRepository.java</code> implémenté par <code>adapter/out/persistence/R2dbcServiceZoneRepository.java:28</code>.</li>
+<li>Les ports sortants sont des interfaces (<code>IServiceZoneRepository</code>, <code>IIdempotencyStore</code>, <code>IBlockchainProofPort</code>), les adaptateurs Kafka/R2DBC/MinIO sont substituables.</li>
+</ul>
+<h3 id="22-regle-de-layering-stricte-verifiee-dans-les-poms">2.2 Règle de layering stricte, vérifiée dans les POMs</h3>
+<ul>
+<li><code>logistics/tnt-delivery-core/pom.xml</code> ne dépend que de L0–L2 + geo/route/incident (même couche) ; <code>billing/tnt-billing-invoice/pom.xml</code> ne dépend que de tnt-auth-core, tnt-roles-core, tnt-tp-core, yow-event-kernel. Aucune dépendance montante détectée dans l'échantillon.</li>
+<li>Le pattern trust (le module haut dépend <em>vers le bas</em> et implémente le port du module bas) est une inversion de dépendance correcte à l'échelle des modules.</li>
+</ul>
+<h3 id="23-securite-plateforme-tnt-platform-gateway-core-conception-soignee">2.3 Sécurité plateforme (tnt-platform-gateway-core) — conception soignée</h3>
+<ul>
+<li>API keys <strong>hachées BCrypt</strong> avec <code>keyPrefix</code> pour lookup rapide : <code>domain/model/ApiKey.java:12</code>, vérification <code>PlatformClientAuthenticationService.java:109</code> (<code>hashingService.matches(rawApiKey, key.keyHash())</code>).</li>
+<li>Historique de rotation (<code>api_key_rotation_history</code>), audit de chaque tentative en fire-and-forget (<code>PlatformApiKeyWebFilter.java:80,90</code>) — n'ajoute pas de latence au chemin de réponse.</li>
+<li>Trois chaînes de sécurité ordonnées et <strong>documentées avec leurs pièges</strong> : <code>@Order(5)</code> public, <code>@Order(10)</code> API-key plateforme, <code>@Order(20)</code> JWT catch-all (<code>TntSecurityConfig.java:62-83</code>, note explicite sur le risque de court-circuit).</li>
+<li>Scopes <code>resource:action</code> évalués via <code>PermissionMatcher</code> partagé plutôt que <code>hasAuthority()</code> natif (wildcards gérés) — choix justifié dans la javadoc de <code>TntPlatformGatewaySecurityConfig.java:33-35</code>.</li>
+<li>Le filtre API-key n'est <strong>volontairement pas un <code>@Bean</code></strong> pour éviter l'enregistrement global WebFlux (<code>TntPlatformGatewaySecurityConfig.java:62-66</code>) — piège subtil correctement évité.</li>
+</ul>
+<h3 id="24-conversion-jwt-defensive">2.4 Conversion JWT défensive</h3>
+<ul>
+<li><code>TntSecurityConfig.java:285-310</code> : un <code>ROLE_OWNER</code>/<code>tenant:admin</code> Kernel n'est promu TNT_ADMIN <strong>que si</strong> le <code>tid</code> du JWT est le tenant système TiiBnTick — bloque l'élévation de privilèges par les propriétaires de tenants auto-enregistrés. Commentaire explicite du raisonnement.</li>
+</ul>
+<h3 id="25-messagerie-fiable">2.5 Messagerie fiable</h3>
+<ul>
+<li>Producteur Kafka idempotent : <code>acks: all</code>, <code>enable.idempotence: true</code>, <code>max.in.flight.requests.per.connection: 1</code> (<code>tnt-bootstrap/src/main/resources/application.yml:46-50</code>) ; consommateur <code>read_committed</code>, auto-commit désactivé (l.54-58).</li>
+<li><strong>Outbox transactionnel + dead-letter + registre de schémas d'événements</strong> dans <code>foundation/yow-event-kernel/.../adapter/persistence/repository/</code> (<code>R2dbcOutboxEntryRepository</code>, <code>R2dbcDeadLetterRepository</code>, <code>R2dbcEventSchemaRepository</code>).</li>
+<li>Idempotence de consommation côté wallet : <code>RedisIdempotencyStore</code> (SET NX/EX) <code>billing/tnt-billing-wallet/.../adapter/out/redis/RedisIdempotencyStore.java:14-23</code>.</li>
+</ul>
+<h3 id="26-resilience-et-disponibilite-partielles-mais-reflechies">2.6 Résilience et disponibilité (partielles mais réfléchies)</h3>
+<ul>
+<li>Circuit breakers + time limiters + retry Resilience4j sur les deux chemins trust (<code>application.yml:160-186</code>), avec séparation write (Kafka) / read (REST) argumentée.</li>
+<li><code>server.shutdown: graceful</code> (<code>application.yml:96</code>), probes liveness/readiness activées, readiness = <code>readinessState,r2dbc,redis,kafka</code> avec <strong>exclusion délibérée et documentée du trust gateway</strong> pour ne pas sortir le pod de rotation quand la blockchain est indisponible (<code>application.yml:113-121</code>).</li>
+<li>docker-compose : healthchecks sur tous les services, <code>depends_on: condition: service_healthy</code> (<code>docker-compose.yml:274-284</code>).</li>
+</ul>
+<h3 id="27-multi-tenancy-le-socle-existe">2.7 Multi-tenancy — le socle existe</h3>
+<ul>
+<li><code>TntSecurityContext</code> dérivé du JWT via autorités synthétiques <code>TENANT_&lt;uuid&gt;</code>/<code>ACTOR_&lt;uuid&gt;</code> (<code>TntSecurityContextService.java:97-130</code>), pattern MDC de logs corrélés <code>[%X{requestId}] [%X{tenantId}]</code> (<code>application.yml:391</code>).</li>
+<li>Les requêtes DatabaseClient échantillonnées utilisent des <strong>paramètres liés</strong> (aucune concaténation de valeurs utilisateur trouvée) : <code>R2dbcServiceZoneRepository.java:60-98</code>.</li>
+</ul>
+<h3 id="28-corebackend-core-backend-par-produit-temps-reel-bien-concu">2.8 coreBackend — « Core Backend » par produit, temps réel bien conçu</h3>
+<ul>
+<li>Les 4 modules <code>coreBackend/</code> sont les backends métier par produit plateforme (Agency, Go, Link, Market). <code>tnt-agency-back-core</code> est lui-même un <strong>agrégateur de 14 sous-modules Maven</strong> (<code>tnt-agency-intake-core</code>, <code>-assignment-core</code>, <code>-billing-core</code>, <code>-eventing-core</code>, <code>-workforce-core</code>…), pilotés par événements Kafka, sans contrôleur REST au sommet — découpage propre par capacité.</li>
+<li><strong><code>tnt-link-back-core</code> est délibérément un Core Backend « générique », pas un BFF</strong> : ses contrôleurs renvoient des réponses non « screen-shaped » et la javadoc anticipe explicitement un <strong>BFF Link séparé</strong> comme consommateur (<code>ParcelTrackingController.java:16-18</code> « the single entry point the Link BFF calls […] BFF talks only to its product's Core Backend » ; <code>ParcelTrackingResponse.java:8</code> « that adaptation belongs to the Link BFF, not this Core Backend » ; <code>ActorIdentityController.java:24,48</code>, <code>LinkBoardController.java:35</code>, <code>NetworkNodeController.java:50</code>). L'intention d'architecture Frontend → BFF → Core Backend est donc <strong>déjà inscrite dans le code</strong>.</li>
+<li><strong><code>tnt-realtime-core</code> (L3) contient un moteur temps réel de bonne facture, réutilisable</strong> : WebSocket réactif WebFlux (<code>adapter/in/websocket/TntStompWebSocketHandler.java</code>), SSE (<code>adapter/in/sse/SseController.java</code>, <code>FluxSseEmitter</code>), ingestion GPS REST (<code>adapter/in/rest/GpsPingRestController.java</code>), présence Redis (<code>RedisPresenceRepository</code>), publication Kafka des événements (GPS/ETA/geofence/presence, <code>KafkaRealtimeEventPublisher</code>). <strong>Point fort décisif</strong> : <code>adapter/out/websocket/RedisTopicMessageListener.java:17-19</code> implémente déjà le <strong>fan-out multi-instances via Redis pub/sub</strong> — « quand une instance JVM publie un broadcast sur Redis, toutes les instances ré-émettent vers le topic STOMP correspondant ». C'est exactement le pattern qui permet de scaler horizontalement une passerelle WebSocket stateless.</li>
+</ul>
+<h3 id="29-pret-pour-lextraction-en-partie">2.9 Prêt pour l'extraction (en partie)</h3>
+<ul>
+<li>Schéma PostgreSQL par module (ex. <code>tnt_geography</code>, <code>tnt_trust</code>), Liquibase par module ; « pyramide » de ConnectionFactory (kernel / core / 6 plateformes) déjà séparée dans <code>TntDataSourceConfig.java:73-151</code> — la migration vers des bases physiques distinctes est prévue par construction.</li>
+<li><code>maven-enforcer-plugin</code> interdit le driver JDBC en scope compile (réactivité end-to-end préservée).</li>
+</ul>
+<hr />
+<h2 id="3-ce-qui-est-mal-concu-risques-futurs-system-design">3. Ce qui est mal conçu / risques futurs (System Design)</h2>
+<h3 id="31-couplage-temporel-avec-le-kernel-http-non-maitrise-hors-trust">3.1 Couplage temporel avec le Kernel HTTP — non maîtrisé hors trust</h3>
+<ul>
+<li><code>business/tnt-hrm-core</code> proxifie <strong>160 endpoints</strong> Kernel en <code>JsonNode</code> brut (<code>HrmEmployeeController.java:40-57</code> et 15 autres contrôleurs), de manière <strong>synchrone, sans circuit breaker ni time limiter</strong> : Resilience4j n'est configuré que pour <code>trustEventGateway*</code> (<code>application.yml:160-186</code>). Une panne ou une latence du Kernel se propage directement à tous les appels HRM, auth-gateway, SSO, onboarding — et consomme des connexions/mémoire côté Core.</li>
+<li>Les proxys HRM exposent des chemins <code>/api/employees/**</code> (hors <code>/api/v1</code>, voir §3.3) et ne portent <strong>aucune autorisation locale</strong> : la protection repose entièrement sur le Kernel aval.</li>
+</ul>
+<h3 id="32-aucune-coordination-de-saga-explicite">3.2 Aucune coordination de saga explicite</h3>
+<ul>
+<li><code>grep -rn "saga"</code> sur <code>*/src/main/java</code> : <strong>0 résultat</strong>. Le flux livraison → facturation → wallet est chorégraphié par événements Kafka (topics <code>tnt.delivery.package.delivered</code>, <code>tnt.billing.wallet.events</code>, <code>application.yml:317-334</code>) sans orchestrateur, sans étapes de compensation identifiables, sans suivi d'état de bout en bout. En cas d'échec partiel (facture générée, paiement wallet échoué), aucun mécanisme visible ne ramène le système à un état cohérent.</li>
+<li>Atténuant : l'outbox + l'idempotence wallet limitent les doublons ; mais la compensation reste à concevoir.</li>
+</ul>
+<h3 id="33-versioning-dapi-incoherent">3.3 Versioning d'API incohérent</h3>
+<ul>
+<li>Coexistence de <code>/api/v1/**</code> (majorité), <code>/billing/wallet</code>, <code>/billing/cost</code>, <code>/billing/webhooks</code>, <code>/tnt/trust</code> (relevé exhaustif des <code>@RequestMapping</code>) et <code>/api/employees/**</code> etc. pour les 160 proxys HRM. Impossible de versionner ou de router proprement derrière une gateway sans réécriture.</li>
+</ul>
+<h3 id="34-pas-dapi-gateway-ni-de-rate-limiting">3.4 Pas d'API gateway ni de rate limiting</h3>
+<ul>
+<li><code>grep -rn "RateLimit|Bucket4j|RequestRateLimiter"</code> : aucun code de rate limiting (seul un commentaire sur Nominatim). Aucun frontal (le README/compose expose l'app directement, TLS terminé « au niveau Nginx/LB » — <code>application.yml:527</code> — mais aucune conf de limitation n'existe).</li>
+<li>Conséquence : brute-force possible sur <code>/api/v1/auth/**</code> et sur <code>X-Api-Key</code> ; de plus la vérification BCrypt (coûteuse en CPU) sur chaque tentative rend l'endpoint lui-même un vecteur de DoS.</li>
+</ul>
+<h3 id="35-idempotence-des-mutations-http-non-generalisee">3.5 Idempotence des mutations HTTP non généralisée</h3>
+<ul>
+<li>Le seul store d'idempotence est interne au wallet (<code>RedisIdempotencyStore</code>). Aucun support d'en-tête <code>Idempotency-Key</code> sur les POST métier (<code>grep -rn "Idempotency"</code> : uniquement wallet + sync). Un retry client sur <code>POST /generate</code> (facture) ou une re-livraison Kafka hors wallet peut dupliquer des écritures.</li>
+</ul>
+<h3 id="36-observabilite-tracing-probablement-inoperant">3.6 Observabilité : tracing probablement inopérant</h3>
+<ul>
+<li><code>tnt-bootstrap/pom.xml:363-367</code> associe <code>micrometer-tracing-bridge-otel</code> avec <code>zipkin-reporter-brave</code>. Le reporter Brave ne s'enregistre pas sur le bridge OTel (il faudrait <code>opentelemetry-exporter-zipkin</code> ou basculer sur <code>bridge-brave</code>). Sauf dépendance transitive non vue, <strong>aucune span n'est exportée vers Zipkin</strong> malgré la config <code>management.zipkin.tracing.endpoint</code> (<code>application.yml:132-134</code>). Les logs corrélés (<code>requestId</code>/<code>tenantId</code> MDC) existent, mais la propagation MDC en contexte réactif (WebFlux) n'a pas de configuration <code>context-propagation</code> visible — à vérifier en runtime.</li>
+</ul>
+<h3 id="37-extraction-microservices-possible-mais-trois-freins-concrets">3.7 Extraction microservices : possible mais trois freins concrets</h3>
+<ol>
+<li><strong>Base Kernel accédée en direct</strong> en mode monolithe (<code>KERNEL_DB_HOST</code> par défaut = la propre DB du Core, <code>docker-compose.yml:237-238</code> et note <code>application.yml:515-517</code>) — un module extrait devrait reproduire cet accès ou tout basculer en HTTP.</li>
+<li><strong>Beans partagés par tnt-bootstrap</strong> (<code>tntKafkaTemplate</code>, <code>tntObjectMapper</code>, fallbacks <code>@ConditionalOnMissingBean</code>) : chaque module extrait devra ré-héberger sa config — prévu, mais non testé.</li>
+<li><strong>8 ConnectionFactory sur la même instance PostgreSQL</strong> (<code>TntDataSourceConfig.java:59</code> : « 8 factories (kernel + core + 6 platforms) ») : le dimensionnement des pools est couplé au <code>max_connections</code> partagé ; en cas d'extraction, la même config sur-allouera des connexions.</li>
+<li>En revanche : pas de transaction R2DBC cross-schéma détectée dans l'échantillon, pas de FK cross-module documentée — le découpage par schéma tient.</li>
+</ol>
+<h3 id="38-corebackend-autorisation-quasi-absente-et-geo-non-scalable">3.8 coreBackend — autorisation quasi absente et géo non scalable</h3>
+<ul>
+<li><strong>Autorisation quasi inexistante sur les Core Backend produits</strong> : <code>tnt-market-back-core</code> = <strong>0</strong> <code>@RequirePermission</code>/<code>@PreAuthorize</code>/<code>@RequirePlatformScope</code> sur 9 contrôleurs ; <code>tnt-go-freelancer-point-back-core</code> = 0 sur 10 ; <code>tnt-link-back-core</code> = 2 seulement sur 9. Ces contrôleurs sont exposés sous <code>/api/v1/platform/market/**</code> et <code>/api/v1/platform/link/**</code>, précisément le préfixe où la chaîne plateforme termine en <code>permitAll()</code> (§4.1). Combinaison aggravante avec le constat #6/#15.</li>
+<li><strong>Requêtes géo non scalables</strong> : <code>tnt-link-back-core/.../NetworkAlertR2dbcRepository.java:17-20</code> fait un <code>WHERE latitude BETWEEN … AND longitude BETWEEN …</code> (bounding box) <strong>sans index spatial</strong> (pas de PostGIS GIST, pas de geohash). <code>DaoZonePersistenceAdapter</code> fait du <code>containingPoint</code> par balayage. À l'échelle carto Link (millions de points, requêtes viewport à chaque pan/zoom), ces scans séquentiels s'effondrent.</li>
+<li><strong>Aucun temps réel dans Link lui-même</strong> : <code>tnt-link-back-core</code> est 100 % requête/réponse REST (aucun WebSocket/SSE). Or le besoin métier Link (« chaque utilisateur voit SA carte se mettre à jour en temps réel ») exige un canal poussé. Le moteur existe dans <code>tnt-realtime-core</code> mais n'est pas branché sur Link → <strong>écart fonctionnel à combler</strong> (voir §6, architecture temps réel).</li>
+</ul>
+<h3 id="39-disponibilite-points-restants">3.9 Disponibilité — points restants</h3>
+<ul>
+<li>Panne Kernel = indisponibilité de tous les proxys (auth gateway, SSO, onboarding, HRM) sans dégradation gracieuse (pas de CB, §3.1). La readiness n'inclut pas le Kernel (choix défendable : ne pas sortir le pod), mais aucun health indicator sélectif ne protège les routes proxy.</li>
+<li>Kafka mono-broker en dev (<code>KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1</code>, <code>docker-compose.yml:106-108</code>) ; la prod prévoit RF=3 (<code>application.yml:555-556</code>) — correct si le cluster suit.</li>
+</ul>
+<hr />
+<h2 id="4-securite-constats">4. Sécurité — constats</h2>
+<h3 id="41-authnauthz">4.1 AuthN/AuthZ</h3>
+<ul>
+<li><strong>[CRITIQUE] Mutations sans contrôle d'autorisation</strong> : 47 fichiers seulement utilisent <code>@RequirePermission</code> (et 18 <code>@PreAuthorize</code>) pour 136 <code>@RestController</code>. L'analyse « contrôleur avec @Post/@Put/@Delete/@Patch mais aucune annotation d'autorisation » retourne <strong>~40 contrôleurs</strong>, dont : <code>billing/tnt-billing-wallet/.../WalletController.java</code>, <code>billing/tnt-billing-invoice/.../InvoiceController.java</code> (le service a <code>@RequirePermission(invoice:read)</code> sur les lectures, mais <code>mark-paid</code>/<code>cancel</code> côté contrôleur reposent sur le seul service — à vérifier méthode par méthode), les <strong>16 contrôleurs HRM</strong>, <code>ProductController</code>, <code>VehicleController</code>, <code>EquipmentController</code>, et les 10+ contrôleurs <code>coreBackend/tnt-go-freelancer-point-back-core</code>. Derrière le catch-all <code>@Order(20)</code>, <strong>tout JWT authentifié</strong> (n'importe quel rôle CLIENT) atteint ces mutations.</li>
+<li><strong>[ÉLEVÉ] Mode dev = admin total sur un flag</strong> : <code>tnt.auth.allow-anonymous-context=true</code> fait injecter un token avec <code>ROLE_TNT_ADMIN</code> + tous les rôles et permissions (<code>TntSecurityConfig.java:150-206</code>). Une erreur de variable d'environnement (<code>TNT_AUTH_ALLOW_ANONYMOUS</code>) en prod ouvre tout. Aucun garde-fou (ex. refus si profil <code>prod</code>).</li>
+<li><strong>[ÉLEVÉ] Webhooks inaccessibles ou non authentifiés</strong> : <code>/billing/webhooks/**</code> n'est ni dans <code>PUBLIC_PATHS</code> (<code>TntSecurityConfig.java:62-83</code>) ni dans la chaîne plateforme → la chaîne JWT exige un token que MTN/Orange/Stripe n'enverront jamais. En l'état, les callbacks échouent en 401 en prod ; le contournement naturel (les rendre publics) est dangereux tant que §4.3 n'est pas corrigé.</li>
+<li><strong>[MOYEN] <code>/api/v1/platform/**</code> sans exigence de scope</strong> : <code>TntPlatformGatewaySecurityConfig.java:88-92</code> termine par <code>.anyExchange().permitAll()</code> après le filtre API-key. Les contrôleurs Market (<code>/api/v1/platform/market/**</code>, 10 mappings) et Link (8 mappings) existent déjà : <strong>tout client plateforme authentifié</strong> (ex. Agency) peut appeler les endpoints Market/Link d'un autre produit. Le commentaire (l.41-44) considérait le préfixe « réservé, aucun proxy n'existe encore » — c'est périmé.</li>
+<li><strong>[CRITIQUE] Core Backend produits sans autorisation</strong> : <code>tnt-market-back-core</code> (0 annotation sur 9 contrôleurs), <code>tnt-go-freelancer-point-back-core</code> (0/10), <code>tnt-link-back-core</code> (2/9). Exposés sous <code>/api/v1/platform/{market,link}/**</code>, ils héritent du <code>permitAll()</code> de la chaîne plateforme (§4.1) : tout client plateforme authentifié — ou, si la route n'est pas couverte par le filtre API-key, tout appelant — atteint ces mutations sans contrôle de rôle ni de scope.</li>
+<li><strong>[MOYEN] Actuator</strong> : <code>/actuator/prometheus</code> est public (<code>TntSecurityConfig.java:66</code>) — divulgation de métriques internes (noms de topics, URIs, volumétrie). Le profil défaut expose aussi <code>env,beans,loggers</code> (<code>application.yml:106</code>) derrière JWT simple (sans rôle admin requis) ; le profil prod les retire (l.533-536) — bien.</li>
+</ul>
+<h3 id="42-multi-tenancy-idor">4.2 Multi-tenancy / IDOR</h3>
+<ul>
+<li><strong>[CRITIQUE] Tenant fourni par le client</strong> : 68 occurrences de <code>@RequestHeader("X-Tenant-Id")</code> dans 11 modules (billing-invoice 5, billing-report 7, accounting 14, product 6, resource 5, sales 13, notify 13, etc.). Aucun code dans <code>tnt-auth-core</code> ne recoupe ce header avec l'autorité <code>TENANT_&lt;uuid&gt;</code> du JWT (<code>grep "X-Tenant-Id" foundation/tnt-auth-core</code> : 0 résultat). Un utilisateur authentifié du tenant A lit/écrit les données du tenant B en changeant un header.</li>
+<li><strong>[CRITIQUE] <code>findById</code> sans tenant</strong> : 139 signatures/appels <code>findById</code> sans variante tenant dans les repositories. Cas prouvé de bout en bout : <code>GET /{invoiceId}</code> → <code>InvoiceController.java:49-52</code> (aucun tenant) → <code>InvoiceService.getById</code> → <code>invoiceRepository.findById(invoiceId)</code> (<code>InvoiceService.java:112</code>) ; idem <code>getPdfUrl</code> (<code>InvoiceController.java:95-98</code>), <code>getByNumber</code>, et le même motif dans <code>BillingPolicyService</code> (11 appels), <code>DslRuleService</code> (5), <code>PricingEngineService</code>, <code>LoyaltyDiscountService</code>, <code>ReconciliationService</code>. Les UUID v4 ne sont pas une défense (fuite par logs, factures PDF, énumération via d'autres endpoints).</li>
+<li>Contre-exemple sain : <code>R2dbcServiceZoneRepository.findById(id, tenantId)</code> filtre le tenant… <strong>sauf si <code>tenantId</code> est null</strong>, auquel cas le filtre disparaît silencieusement (<code>R2dbcServiceZoneRepository.java:89-99</code>) — le fallback permissif est le mauvais défaut.</li>
+</ul>
+<h3 id="43-webhooks-de-paiement-tnt-billing-wallet">4.3 Webhooks de paiement (tnt-billing-wallet)</h3>
+<ul>
+<li><strong>[CRITIQUE] Stripe : signature lue mais jamais vérifiée</strong> — <code>PaymentWebhookController.java:101-116</code> : « <em>Stripe signature verification would use stripe-java SDK in production. Simplified</em> » puis parsing direct du body. Forger un <code>payment_intent.succeeded</code> suffit à confirmer un paiement.</li>
+<li><strong>[CRITIQUE] MTN : l'absence de signature vaut acceptation</strong> — <code>verifyMtnSignature</code> retourne <code>true</code> si le header <code>X-MTN-Signature</code> est absent (<code>PaymentWebhookController.java:121-126</code>, « MTN sandbox may not send signatures — allow in non-production » — mais aucun test de profil n'est fait).</li>
+<li><strong>[CRITIQUE] Orange : aucune vérification</strong> — <code>handleOrangeCallback</code> (<code>PaymentWebhookController.java:74-95</code>) construit <code>ConfirmPaymentCommand</code> directement depuis le body.</li>
+</ul>
+<h3 id="44-secrets-configuration">4.4 Secrets &amp; configuration</h3>
+<ul>
+<li><strong>[ÉLEVÉ] Défauts faibles embarqués comme fallback</strong> (silencieux si l'env var manque en prod) : DB <code>tiibntick_pass</code> (<code>application.yml:25,37</code>), MinIO <code>minioadmin/minioadmin123</code> (<code>application.yml:266-267</code>, <code>docker-compose.yml:134-135,243-244</code>), HMAC QR <code>changeme-use-strong-random-256bit-value-in-production</code> (<code>application.yml:269</code>), Grafana <code>admin/tiibntick_grafana</code> (<code>docker-compose.yml:194-195</code>), <code>TNT_KERNEL_API_KEY</code> défaut vide (<code>application.yml:574</code>). Aucun fail-fast au démarrage.</li>
+<li><strong>[ÉLEVÉ] Swagger UI + api-docs activés en prod</strong> — <code>application.yml:541-545</code> avec le commentaire « <em>We will need to disable Swagger UI in production</em> » : cartographie complète de l'API offerte à l'attaquant.</li>
+<li><strong>[BIEN]</strong> JWT : validation signature via JWKS distant (<code>jwk-set-uri</code>, <code>application.yml:79-83</code>), expiration gérée par Spring ; clé privée prod montée en secret Docker (<code>application.yml:584-586</code>). Point d'attention : <code>iss</code> non validé (choix documenté l.76-78, le Kernel émet un <code>iss</code> non-URL) — acceptable si le JWKS est le bon, à re-vérifier si plusieurs émetteurs partagent la clé.</li>
+</ul>
+<h3 id="45-injections">4.5 Injections</h3>
+<ul>
+<li><strong>[BIEN]</strong> Aucune concaténation de valeurs utilisateur dans le SQL trouvée : les usages <code>DatabaseClient</code> échantillonnés (geo, sync, billing-report, sequences) utilisent des binds nommés ; la seule concaténation trouvée est un fragment constant <code>" AND tenant_id = :tenantId"</code> (<code>R2dbcServiceZoneRepository.java:90</code>). Pas de SpEL dynamique construit depuis des entrées utilisateur détecté.</li>
+<li><strong>[FAIBLE]</strong> MinIO : les <code>objectKey</code> sont construits côté serveur (<code>MinioStorageClient.java:68-155</code>) ; pas de path traversal évident, mais aucune validation centralisée des noms de fichiers uploadés n'a été observée — à couvrir par un test.</li>
+</ul>
+<h3 id="46-exposition-de-donnees-headers">4.6 Exposition de données / headers</h3>
+<ul>
+<li><strong>[MOYEN]</strong> <code>TntGlobalExceptionHandler</code> renvoie <code>ex.getMessage()</code> dans les <code>ProblemDetail</code> (l.29-40) et <code>InvoiceExceptionHandler</code> ajoute des propriétés internes — verbosité modérée, acceptable si les messages domaine restent neutres, mais aucune revue systématique des messages n'existe.</li>
+<li><strong>[MOYEN]</strong> Aucun header de sécurité HTTP configuré (pas de <code>headers()</code> dans les chaînes : HSTS, CSP, X-Content-Type-Options absents ; <code>grep headers( tnt-bootstrap</code> : 0). À traiter idéalement au frontal.</li>
+<li><strong>[FAIBLE]</strong> CORS : <code>allowCredentials=true</code> avec origins configurables et défauts localhost (<code>TntSecurityConfig.java:217-232</code>) — correct tant que <code>CORS_ALLOWED_ORIGINS</code> prod ne contient pas de wildcard.</li>
+<li><strong>[FAIBLE]</strong> <code>X-Forwarded-For</code> pris tel quel pour l'audit IP (<code>PlatformApiKeyWebFilter.java:106-113</code>) — spoofable, fausse les logs d'audit.</li>
+</ul>
+<hr />
+<h2 id="5-problemes-detectes-tableau-recapitulatif">5. Problèmes détectés — tableau récapitulatif</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>Problème</th>
+<th>Localisation (preuve)</th>
+<th>Criticité</th>
+<th>Impact</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Signature Stripe non vérifiée</td>
+<td><code>PaymentWebhookController.java:101-116</code></td>
+<td><span class="badge crit">Critique</span></td>
+<td>Confirmation de paiement forgeable → crédit wallet gratuit</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Signature MTN facultative (absente ⇒ acceptée)</td>
+<td><code>PaymentWebhookController.java:121-126</code></td>
+<td><span class="badge crit">Critique</span></td>
+<td>Idem #1, il suffit d'omettre le header</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Callback Orange sans aucune vérification</td>
+<td><code>PaymentWebhookController.java:74-95</code></td>
+<td><span class="badge crit">Critique</span></td>
+<td>Idem #1</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Tenant pris du header client <code>X-Tenant-Id</code> (68 endpoints, 11 modules), jamais recoupé au JWT</td>
+<td>ex. <code>InvoiceController.java:43,70,78,88,105</code> ; grep global</td>
+<td><span class="badge crit">Critique</span></td>
+<td>Usurpation de tenant : lecture/écriture cross-tenant</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>findById</code> sans filtre tenant (139 occurrences) — IDOR prouvé sur factures/PDF/policies/règles DSL</td>
+<td><code>InvoiceService.java:112,163,184,205,243</code> ; <code>BillingPolicyService.java:70-262</code> ; <code>DslRuleService.java:60-110</code></td>
+<td><span class="badge crit">Critique</span></td>
+<td>Fuite de données inter-tenant par UUID</td>
+</tr>
+<tr>
+<td>6</td>
+<td>~40 contrôleurs de mutation sans <code>@RequirePermission</code>/<code>@PreAuthorize</code> (wallet, invoice, HRM×16, product, resource, gofp×10…)</td>
+<td>liste §4.1 ; ex. <code>WalletController.java</code>, <code>HrmEmployeeController.java:50-57</code></td>
+<td><span class="badge crit">Critique</span></td>
+<td>Tout JWT (rôle CLIENT inclus) peut muter des données métier</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Webhooks <code>/billing/webhooks/**</code> derrière la chaîne JWT → 401 pour les providers</td>
+<td><code>TntSecurityConfig.java:62-83</code> (absents de PUBLIC_PATHS)</td>
+<td><span class="badge high">Élevé</span></td>
+<td>Paiements cassés en prod, ou ouverture sauvage pour « faire marcher »</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Secrets par défaut en fallback silencieux (DB, MinIO, HMAC QR, Grafana, kernel api-key vide)</td>
+<td><code>application.yml:25,266-269,574</code> ; <code>docker-compose.yml:134-135,194-195</code></td>
+<td><span class="badge high">Élevé</span></td>
+<td>Déploiement prod avec credentials connus si env var oubliée</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Mode dev <code>allow-anonymous-context</code> = injection ROLE_TNT_ADMIN, sans garde-fou de profil</td>
+<td><code>TntSecurityConfig.java:150-206</code></td>
+<td><span class="badge high">Élevé</span></td>
+<td>Un flag mal positionné ouvre l'admin total</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Swagger UI + api-docs activés en prod</td>
+<td><code>application.yml:541-545</code></td>
+<td><span class="badge high">Élevé</span></td>
+<td>Reconnaissance complète de la surface d'attaque</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Aucun rate limiting (auth, API-key BCrypt, onboarding)</td>
+<td>grep global : 0 résultat</td>
+<td><span class="badge high">Élevé</span></td>
+<td>Brute-force + DoS CPU (BCrypt par tentative)</td>
+</tr>
+<tr>
+<td>12</td>
+<td>160 proxys Kernel synchrones sans circuit breaker/timeout dédié</td>
+<td><code>business/tnt-hrm-core/.../Hrm*Controller.java</code> ; resilience4j = trust uniquement (<code>application.yml:160-186</code>)</td>
+<td><span class="badge high">Élevé</span></td>
+<td>Panne/latence Kernel propagée, épuisement ressources</td>
+</tr>
+<tr>
+<td>13</td>
+<td>Aucune saga/compensation livraison→facturation→wallet</td>
+<td>grep "saga" : 0 ; topics <code>application.yml:317-334</code></td>
+<td><span class="badge high">Élevé</span></td>
+<td>Incohérences financières en échec partiel, réconciliation manuelle</td>
+</tr>
+<tr>
+<td>14</td>
+<td>Tracing Zipkin probablement muet : <code>bridge-otel</code> + <code>zipkin-reporter-brave</code></td>
+<td><code>tnt-bootstrap/pom.xml:363-367</code></td>
+<td><span class="badge med">Moyen</span></td>
+<td>Pas de traces distribuées malgré la config ; debug prod difficile</td>
+</tr>
+<tr>
+<td>15</td>
+<td><code>/api/v1/platform/**</code> sans scope requis (Market/Link déjà déployés)</td>
+<td><code>TntPlatformGatewaySecurityConfig.java:88-92</code> vs mappings market/link</td>
+<td><span class="badge med">Moyen</span></td>
+<td>Accès croisé entre produits plateforme</td>
+</tr>
+<tr>
+<td>16</td>
+<td><code>/actuator/prometheus</code> public ; <code>env,beans,loggers</code> exposés (profil défaut)</td>
+<td><code>TntSecurityConfig.java:66</code> ; <code>application.yml:106</code></td>
+<td><span class="badge med">Moyen</span></td>
+<td>Fuite d'informations opérationnelles</td>
+</tr>
+<tr>
+<td>17</td>
+<td>Versioning API incohérent (<code>/billing/*</code>, <code>/tnt/trust</code>, <code>/api/employees</code> hors <code>/api/v1</code>)</td>
+<td>relevé complet des <code>@RequestMapping</code> §3.3</td>
+<td><span class="badge med">Moyen</span></td>
+<td>Routage/gateway/versionnement futurs compliqués</td>
+</tr>
+<tr>
+<td>18</td>
+<td>Pas d'idempotence HTTP générale (Idempotency-Key) hors wallet</td>
+<td>grep §3.5</td>
+<td><span class="badge med">Moyen</span></td>
+<td>Doubles écritures sur retries</td>
+</tr>
+<tr>
+<td>19</td>
+<td>Fallback permissif : <code>findById(id, null)</code> géo saute le filtre tenant</td>
+<td><code>R2dbcServiceZoneRepository.java:89-99</code></td>
+<td><span class="badge med">Moyen</span></td>
+<td>Bypass tenant si un appelant passe null</td>
+</tr>
+<tr>
+<td>20</td>
+<td>Messages d'erreur <code>ex.getMessage()</code> dans ProblemDetail, pas de headers sécurité HTTP</td>
+<td><code>TntGlobalExceptionHandler.java:29-40</code> ; chaînes sans <code>headers()</code></td>
+<td><span class="badge low">Faible</span></td>
+<td>Fuite d'infos modérée ; durcissement à faire au frontal</td>
+</tr>
+<tr>
+<td>21</td>
+<td><code>X-Forwarded-For</code> non validé pour l'audit</td>
+<td><code>PlatformApiKeyWebFilter.java:106-113</code></td>
+<td><span class="badge low">Faible</span></td>
+<td>Logs d'audit falsifiables</td>
+</tr>
+<tr>
+<td>22</td>
+<td>8 pools R2DBC sur une instance PG partagée, dimensionnement manuel</td>
+<td><code>TntDataSourceConfig.java:59</code></td>
+<td><span class="badge low">Faible</span></td>
+<td>Épuisement <code>max_connections</code> sous charge</td>
+</tr>
+<tr>
+<td>23</td>
+<td>Core Backend produits quasi sans autorisation : market 0/9, gofp 0/10, link 2/9 contrôleurs annotés</td>
+<td><code>coreBackend/tnt-market-back-core</code>, <code>-go-freelancer-point-back-core</code>, <code>-link-back-core</code></td>
+<td><span class="badge crit">Critique</span></td>
+<td>Sous <code>/api/v1/platform/**</code> (permitAll §15), accès inter-produits non contrôlé</td>
+</tr>
+<tr>
+<td>24</td>
+<td>Requêtes carto par bounding box sans index spatial</td>
+<td><code>NetworkAlertR2dbcRepository.java:17-20</code> ; <code>DaoZonePersistenceAdapter.java:45</code></td>
+<td><span class="badge high">Élevé</span></td>
+<td>Scans séquentiels ; carte Link inutilisable à l'échelle</td>
+</tr>
+<tr>
+<td>25</td>
+<td>Aucun canal temps réel dans Link (moteur existant dans tnt-realtime-core non branché)</td>
+<td><code>tnt-link-back-core</code> (0 WS/SSE) vs <code>tnt-realtime-core/adapter/in/{websocket,sse}</code></td>
+<td><span class="badge med">Moyen</span></td>
+<td>Besoin métier « carte live par utilisateur » non couvert</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="6-architecture-cible-feuille-de-route-priorisee">6. Architecture cible &amp; feuille de route priorisée</h2>
+<p>Principe directeur : <strong>rester monolithe modulaire</strong> (équipe de 3, un seul déployable, opérabilité maîtrisée) et investir dans ce qui rend le monolithe (a) sûr, (b) horizontalement scalable, (c) extractible plus tard. Un monolithe WebFlux stateless derrière un LB, avec PostgreSQL répliqué et Kafka partitionné, porte réalistement des millions d'utilisateurs actifs ; « centaines de millions » ne se joue pas maintenant, il se prépare en gardant les coutures propres.</p>
+<h3 id="p0-quick-wins-securite-13-semaines-avant-toute-prod-ouverte">P0 — Quick wins sécurité (1–3 semaines, avant toute prod ouverte)</h3>
+<ol>
+<li><strong>Webhooks</strong> : vérification stricte des signatures Stripe (SDK officiel), MTN (rejet si header absent hors profil dev), Orange (secret partagé/allowlist IP) ; sortir <code>/billing/webhooks/**</code> dans une chaîne dédiée publique-mais-signée. <em>Impact : ferme la faille financière n°1 ; effort ~3 j.</em></li>
+<li><strong>Tenant depuis le JWT, pas du header</strong> : résolveur central (étendre <code>@CurrentUser</code>/<code>TntSecurityContext</code>) et suppression des 68 <code>@RequestHeader("X-Tenant-Id")</code> (ou validation systématique header == claim, en une classe filtre). <em>Impact : élimine l'usurpation de tenant ; effort ~1 sem.</em></li>
+<li><strong>Autorisation des mutations</strong> : passe systématique <code>@RequirePermission</code> sur les ~40 contrôleurs listés ; règle d'archi testée (ArchUnit) « toute méthode @Post/@Put/@Delete/@Patch doit porter une annotation d'autorisation ». <em>Impact : ferme l'escalade horizontale ; effort ~1 sem., test pérenne.</em></li>
+<li><strong>Config durcie</strong> : fail-fast au démarrage prod si secret = valeur par défaut ; <code>springdoc.enabled=false</code> en prod ; retirer <code>/actuator/prometheus</code> du public (auth réseau ou token scrape) ; refuser <code>allow-anonymous-context=true</code> quand profil prod. <em>Effort ~2 j.</em></li>
+<li><strong>Scopes <code>/api/v1/platform/**</code></strong> : exiger <code>MARKET:*</code>/<code>LINK:*</code> par bloc comme pour AUTH/SSO/ONBOARDING. <em>Effort ~1 j.</em></li>
+</ol>
+<h3 id="p1-moyen-terme-13-mois">P1 — Moyen terme (1–3 mois)</h3>
+<ol>
+<li><strong>Isolation tenant en profondeur</strong> : soit critère tenant obligatoire dans une couche repository commune, soit <strong>PostgreSQL Row-Level Security</strong> par schéma (une policy <code>tenant_id = current_setting(...)</code>) — RLS est le meilleur rapport garantie/effort ici et couvre les 139 <code>findById</code>. Supprimer les fallbacks <code>tenantId == null</code>. <em>Impact : IDOR structurellement impossible ; effort 2–4 sem.</em></li>
+<li><strong>Frontal API gateway léger</strong> (nginx/Traefik ou Spring Cloud Gateway) : TLS, rate limiting (par IP + par client-id, compteurs Redis), headers de sécurité (HSTS, X-Content-Type-Options), normalisation des logs d'accès. <em>Impact : anti-brute-force/DoS + point de contrôle unique ; effort ~2 sem.</em></li>
+<li><strong>Résilience Kernel</strong> : WebClient partagé avec timeouts, circuit breaker et bulkhead Resilience4j pour tous les proxys (HRM, auth, SSO) ; réponse 503 propre + métrique dédiée. <em>Impact : une panne Kernel dégrade au lieu d'abattre ; effort ~1 sem.</em></li>
+<li><strong>Tracing réparé</strong> : aligner <code>micrometer-tracing-bridge-otel</code> + <code>opentelemetry-exporter-zipkin</code> (ou tout-Brave), vérifier la propagation contexte réactif ; tester une trace HTTP→Kafka→consumer. <em>Effort ~3 j.</em></li>
+<li><strong>Idempotence &amp; versioning</strong> : généraliser un filtre <code>Idempotency-Key</code> (Redis SET NX, réponse rejouée) sur les POST financiers ; migrer <code>/billing/*</code>, <code>/tnt/trust</code>, <code>/api/employees</code> sous <code>/api/v1</code> avec redirections temporaires. <em>Effort ~2 sem.</em></li>
+<li><strong>Saga documentée</strong> : formaliser le flux delivery→invoice→wallet en chorégraphie avec états persistés (table <code>fulfillment_progress</code> alimentée par les événements) + compensations explicites (annulation facture, remboursement wallet) + alerte sur saga bloquée. Pas besoin d'un orchestrateur lourd. <em>Effort 2–3 sem.</em></li>
+</ol>
+<h3 id="p1-bis-architecture-temps-reel-link-carte-live-par-utilisateur-decision-bff">P1 bis — Architecture temps réel Link (carte live par utilisateur) &amp; décision BFF</h3>
+<p><strong>Problème posé</strong> : chaque utilisateur Link visualise une carte qui doit se rafraîchir en temps réel (positions de livreurs, alertes réseau, zones), pour potentiellement des millions d'utilisateurs simultanés, chacun sur SA vue. Deux questions : (a) faut-il un BFF ? (b) comment pousser le temps réel sans effondrer le système ?</p>
+<p><strong>(a) Décision BFF — OUI pour Link, et le code l'anticipe déjà.</strong>
+- <code>tnt-link-back-core</code> est conçu comme Core Backend <em>générique</em> (réponses non « screen-shaped », voir §2.8) ; la javadoc désigne explicitement un « Link BFF » comme unique consommateur. Introduire ce BFF n'est donc pas un ajout gratuit mais la concrétisation d'une frontière déjà dessinée.
+- <strong>Rôle du BFF Link</strong> : (1) agrégation/adaptation aux écrans (composer node + alerte + zone en une réponse), (2) <strong>terminaison du canal temps réel</strong> (WebSocket/SSE côté client), (3) gestion des abonnements viewport (voir plus bas), (4) throttling/debounce par utilisateur. Le BFF ne contient <strong>aucune logique métier</strong> : il parle au Core Backend (REST) et au bus temps réel.
+- <strong>Anti-pattern à éviter</strong> : ré-implémenter un moteur WebSocket dans le BFF. Il faut <strong>réutiliser/extraire <code>tnt-realtime-core</code></strong> (STOMP + fan-out Redis pub/sub déjà en place, §2.8) comme socle du canal poussé — le BFF est un client de ce moteur, pas un second moteur.
+- <strong>Alternative écartée</strong> : exposer le Core Backend directement au frontend (pas de BFF). Rejetée car cela remonterait la logique de composition d'écran et de gestion d'abonnement viewport dans le client mobile/web (couplage fort, N appels/écran, versionnement impossible) — exactement ce que les commentaires du code cherchent à éviter.</p>
+<p><strong>(b) Modèle temps réel scalable — abonnement par tuiles géographiques (geohash) + fan-out borné.</strong>
+- <strong>Découpage en tuiles</strong> : indexer chaque entité mobile/alerte par un préfixe <strong>geohash</strong> (précision 5–6 ≈ 1–5 km). Les producteurs (<code>GpsPingRestController</code>, alertes) publient l'événement sur un canal <code>tile:{geohash}</code> (Redis pub/sub sharded, ou topic Kafka partitionné par tuile).
+- <strong>Abonnement viewport</strong> : à l'ouverture/déplacement de la carte, le client déclare au BFF les tuiles couvrant son viewport ; le BFF (via le moteur realtime) n'abonne la connexion WebSocket <strong>qu'aux canaux de ces tuiles</strong>. Résultat : un utilisateur ne reçoit que les événements de sa zone, pas du monde entier → fan-out borné et prévisible. Un livreur qui bouge publie sur 1 tuile ; seuls les utilisateurs regardant cette tuile sont notifiés.
+- <strong>Chargement initial</strong> : la requête « points dans le viewport » doit passer par un <strong>index spatial</strong> — remplacer les <code>latitude/longitude BETWEEN</code> (constat #24) par PostGIS <code>geometry</code> + index <strong>GIST</strong> (<code>ST_DWithin</code>/<code>ST_Contains</code>) ou, a minima, un index sur préfixe geohash. Sans cela, chaque pan/zoom déclenche un scan séquentiel.
+- <strong>Passerelle WebSocket stateless</strong> : le fan-out Redis multi-instances de <code>RedisTopicMessageListener</code> (§2.8) permet déjà de faire tourner N instances de passerelle derrière un LB sticky (ou sessions WS non-sticky avec Redis). Pour l'échelle « millions de connexions », prévoir un <strong>tier passerelle dédié</strong> (scale indépendant du reste), Redis en cluster avec pub/sub sharded, et un budget mémoire par connexion maîtrisé (backpressure Reactor, déjà natif WebFlux).
+- <strong>Débit / coût</strong> : debounce des positions GPS (ex. 1 màj/2–5 s par livreur), agrégation par tuile côté producteur, et delta-encoding (n'émettre que les entités entrées/sorties/déplacées de la tuile) pour éviter de renvoyer tout le viewport à chaque tick.
+- <strong>Trajectoire d'extraction</strong> : à terme, la passerelle temps réel (moteur <code>tnt-realtime-core</code> + BFF) est un excellent premier candidat microservice (profil de charge — connexions longues, CPU I/O — radicalement différent du CRUD transactionnel), sans toucher aux Core Backend.</p>
+<p><em>Impact : couvre le besoin métier « carte live par utilisateur » à coût de fan-out borné ; réutilise l'existant (realtime-core) au lieu de le réécrire ; effort ~3–4 sem. pour le MVP tuiles+BFF Link, + l'index spatial (#24) en prérequis.</em></p>
+<h3 id="p2-long-terme-618-mois-sous-condition-de-traction">P2 — Long terme (6–18 mois, sous condition de traction)</h3>
+<ol>
+<li><strong>Scalabilité lecture</strong> : réplicas PostgreSQL en lecture + routage R2DBC lecture/écriture ; cache Redis sur les lectures chaudes (policies pricing, zones géo). <em>Impact : ×5–10 sur le débit lecture.</em></li>
+<li><strong>Extraction sélective</strong> : premiers candidats = <strong>tnt-billing-wallet</strong> (frontière financière, schéma dédié, idempotence déjà en place, communication événementielle) puis <strong>tnt-realtime-core</strong> (GPS/SSE, profil de charge très différent). Les coreBackend (Agency/Go/Link/Market) sont déjà quasi autonomes (ConnectionFactory dédiées). Prérequis : #6, #9, contrats d'événements versionnés (le registre de schémas de yow-event-kernel est l'atout à exploiter).</li>
+<li><strong>Partitionnement des données</strong> : partition par <code>tenant_id</code> (ou hash) sur les tables volumineuses (missions, positions GPS, événements) ; archivage froid vers MinIO/parquet.</li>
+<li><strong>Kafka en cluster</strong> (3 brokers min, RF=3 partout), consumer groups dimensionnés par partition ; envisager le compactage pour les topics d'état.</li>
+<li><strong>Multi-AZ / DR</strong> : le monolithe stateless se réplique trivialement ; l'effort porte sur PostgreSQL (failover managé) et MinIO (erasure coding/site replication).</li>
+</ol>
+<hr />
+<h2 id="7-conclusion">7. Conclusion</h2>
+<p>Le système est <strong>architecturalement mûr mais opérationnellement vulnérable</strong>. La discipline hexagonale, le layering vérifié dans les POMs, l'outbox, l'idempotence wallet et la conception du gateway plateforme témoignent d'un vrai savoir-faire — rare à ce stade. Mais les trois failles critiques (webhooks falsifiables, tenant contrôlé par le client + IDOR massif, mutations sans autorisation) signifient qu'<strong>en l'état, ni l'argent ni l'isolation des clients ne sont protégés</strong> : le P0 (2–3 semaines) est un prérequis absolu à toute exposition publique.</p>
+<p>Pour l'ambition d'échelle : ne pas éclater en microservices maintenant. Le chemin rationnel pour 3 développeurs est monolithe durci (P0) → gateway + RLS + résilience Kernel + tracing (P1) → réplicas/partitionnement et extraction ciblée wallet/realtime (P2). Les coutures nécessaires (schémas par module, événements, ports) existent déjà ; c'est l'exécution sécurité et l'outillage d'exploitation qui doivent rattraper la conception.</p>
+<hr />
+<p><em>Audit réalisé par analyse statique du code au commit courant (branche <code>master</code>, HEAD c1c1732). Les constats « absence de X » s'appuient sur des recherches exhaustives par motifs ; toute pièce de code hors dépôt (Kernel RT-comops) est hors périmètre.</em></p>
+<footer>Audit technique TiiBnTick — généré à partir de l'analyse du code source réel. Chaque constat référence les fichiers et lignes concernés.</footer>
+</main>
+</div>
+
+<script type="module">
+  try {
+    const m = await import("https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs");
+    const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    m.default.initialize({ startOnLoad: true, theme: dark ? "dark" : "neutral", securityLevel: "loose" });
+  } catch (e) {
+    document.querySelectorAll(".mermaid").forEach(el => {
+      el.style.textAlign = "left";
+      el.innerHTML = "<div style='color:var(--muted);font-size:.75rem;margin-bottom:.5rem'>⚠ Diagramme Mermaid (connexion internet requise pour le rendu) — source :</div><pre>" + el.textContent.replace(/&/g,"&amp;").replace(/</g,"&lt;") + "</pre>";
+    });
+  }
+</script>
+
+</body>
+</html>

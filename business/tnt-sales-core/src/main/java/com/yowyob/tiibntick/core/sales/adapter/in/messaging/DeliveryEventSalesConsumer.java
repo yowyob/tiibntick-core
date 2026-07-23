@@ -2,6 +2,7 @@ package com.yowyob.tiibntick.core.sales.adapter.in.messaging;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yowyob.tiibntick.common.kafka.TntTopics;
 import com.yowyob.tiibntick.core.sales.application.service.SalesApplicationService;
 import com.yowyob.tiibntick.core.sales.domain.model.ReturnReason;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -34,7 +35,7 @@ public class DeliveryEventSalesConsumer {
         this.objectMapper = objectMapper;
     }
 
-    @KafkaListener(topics = "tnt.delivery.mission.started", groupId = "tnt-sales-core-delivery")
+    @KafkaListener(topics = TntTopics.DELIVERY_MISSION_STARTED, groupId = "tnt-sales-core-delivery", containerFactory = "salesKafkaListenerContainerFactory")
     public void onMissionStarted(ConsumerRecord<String, String> record) {
         parseAndProcess(record.value(), node -> {
             UUID tenantId = uuid(node, "tenantId");
@@ -45,7 +46,7 @@ public class DeliveryEventSalesConsumer {
         });
     }
 
-    @KafkaListener(topics = "tnt.delivery.mission.completed", groupId = "tnt-sales-core-delivery")
+    @KafkaListener(topics = TntTopics.DELIVERY_MISSION_COMPLETED, groupId = "tnt-sales-core-delivery", containerFactory = "salesKafkaListenerContainerFactory")
     public void onMissionCompleted(ConsumerRecord<String, String> record) {
         parseAndProcess(record.value(), node -> {
             UUID tenantId = uuid(node, "tenantId");
@@ -56,7 +57,7 @@ public class DeliveryEventSalesConsumer {
         });
     }
 
-    @KafkaListener(topics = "tnt.delivery.mission.failed", groupId = "tnt-sales-core-delivery")
+    @KafkaListener(topics = TntTopics.DELIVERY_MISSION_FAILED, groupId = "tnt-sales-core-delivery", containerFactory = "salesKafkaListenerContainerFactory")
     public void onMissionFailed(ConsumerRecord<String, String> record) {
         parseAndProcess(record.value(), node -> {
             UUID tenantId  = uuid(node, "tenantId");

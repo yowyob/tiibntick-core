@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
 import java.util.Objects;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class RelayOperatorService implements ICreateRelayOperatorProfileUseCase {
@@ -32,6 +33,7 @@ public class RelayOperatorService implements ICreateRelayOperatorProfileUseCase 
     }
 
     @Override
+    @Transactional
     public Mono<RelayOperatorProfile> createRelayOperatorProfile(CreateRelayOperatorProfileCommand command) {
         Objects.requireNonNull(command, "command must not be null");
         return relayOperatorRepository.existsByActorId(command.tenantId(), command.actorId())

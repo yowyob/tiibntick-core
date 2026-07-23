@@ -1,15 +1,11 @@
 package com.yowyob.tiibntick.core.trust.adapter.in.web.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.yowyob.tiibntick.core.trust.domain.model.valueobject.CustodyTransferRecord;
-import com.yowyob.tiibntick.core.trust.domain.model.enums.CustodyTransferType;
 import com.yowyob.tiibntick.core.trust.domain.model.valueobject.DeliveryProofRecord;
-import com.yowyob.tiibntick.core.trust.domain.model.valueobject.DIDDocument;
+import jakarta.validation.constraints.NotBlank;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 // ── Delivery Proof Request ──────────────────────────────────────────────────
 
@@ -21,12 +17,12 @@ import java.util.List;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record DeliveryProofRequest(
-        @JsonProperty("proofId") String proofId,
-        @JsonProperty("missionId") String missionId,
-        @JsonProperty("packageId") String packageId,
-        @JsonProperty("actorId") String actorId,
+        @JsonProperty("proofId") @NotBlank(message = "proofId is required") String proofId,
+        @JsonProperty("missionId") @NotBlank(message = "missionId is required") String missionId,
+        @JsonProperty("packageId") @NotBlank(message = "packageId is required") String packageId,
+        @JsonProperty("actorId") @NotBlank(message = "actorId is required") String actorId,
         @JsonProperty("tenantId") String tenantId,
-        @JsonProperty("photoHash") String photoHash,
+        @JsonProperty("photoHash") @NotBlank(message = "photoHash is required") String photoHash,
         @JsonProperty("signatureHash") String signatureHash,
         @JsonProperty("gpsLat") double gpsLat,
         @JsonProperty("gpsLng") double gpsLng,
@@ -34,10 +30,13 @@ public record DeliveryProofRequest(
 
     /**
      * Converts this request to a {@link DeliveryProofRecord} domain value object.
+     *
+     * @param authenticatedTenantId the tenant ID resolved from the caller's JWT —
+     *                              always wins over any {@code tenantId} present in the request body.
      */
-    public DeliveryProofRecord toDomain() {
+    public DeliveryProofRecord toDomain(final String authenticatedTenantId) {
         return new DeliveryProofRecord(
-                proofId, missionId, packageId, actorId, tenantId,
+                proofId, missionId, packageId, actorId, authenticatedTenantId,
                 photoHash, signatureHash, gpsLat, gpsLng,
                 confirmedAt != null
                         ? LocalDateTime.parse(confirmedAt)

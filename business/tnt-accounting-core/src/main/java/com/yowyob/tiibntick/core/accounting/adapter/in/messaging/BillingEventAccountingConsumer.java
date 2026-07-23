@@ -2,6 +2,7 @@ package com.yowyob.tiibntick.core.accounting.adapter.in.messaging;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yowyob.tiibntick.common.kafka.TntTopics;
 import com.yowyob.tiibntick.core.accounting.application.port.in.JournalEntryLineCommand;
 import com.yowyob.tiibntick.core.accounting.application.port.in.PostJournalEntryCommand;
 import com.yowyob.tiibntick.core.accounting.application.service.AccountingApplicationService;
@@ -21,8 +22,8 @@ import java.util.UUID;
  *
  * Topics consumed:
  *   - tnt.billing.invoice.paid        → Debit 411000 (Client), Credit 704000 (Livraison revenue)
- *   - tnt.billing.commission.calculated → Debit 651000 (Commission charge), Credit 481000 (Commission payable)
- *   - tnt.billing.payment.confirmed   → Debit 521100/521200 (MoMo), Credit 411000 (Client)
+ *   - tnt.billing.wallet.commission.calculated → Debit 651000 (Commission charge), Credit 481000 (Commission payable)
+ *   - tnt.billing.wallet.payment.confirmed   → Debit 521100/521200 (MoMo), Credit 411000 (Client)
  *
  * Author: MANFOUO Braun
  */
@@ -41,7 +42,7 @@ public class BillingEventAccountingConsumer {
         this.objectMapper = objectMapper;
     }
 
-    @KafkaListener(topics = "tnt.billing.invoice.paid", groupId = "tnt-accounting-core")
+    @KafkaListener(topics = TntTopics.BILLING_INVOICE_PAID, groupId = "tnt-accounting-core", containerFactory = "accountingKafkaListenerContainerFactory")
     public void onInvoicePaid(ConsumerRecord<String, String> record) {
         try {
             JsonNode node = objectMapper.readTree(record.value());
@@ -70,7 +71,7 @@ public class BillingEventAccountingConsumer {
         }
     }
 
-    @KafkaListener(topics = "tnt.billing.commission.calculated", groupId = "tnt-accounting-core")
+    @KafkaListener(topics = TntTopics.BILLING_WALLET_COMMISSION_CALCULATED, groupId = "tnt-accounting-core", containerFactory = "accountingKafkaListenerContainerFactory")
     public void onCommissionCalculated(ConsumerRecord<String, String> record) {
         try {
             JsonNode node = objectMapper.readTree(record.value());
@@ -99,7 +100,7 @@ public class BillingEventAccountingConsumer {
         }
     }
 
-    @KafkaListener(topics = "tnt.billing.payment.confirmed", groupId = "tnt-accounting-core")
+    @KafkaListener(topics = TntTopics.BILLING_WALLET_PAYMENT_CONFIRMED, groupId = "tnt-accounting-core", containerFactory = "accountingKafkaListenerContainerFactory")
     public void onPaymentConfirmed(ConsumerRecord<String, String> record) {
         try {
             JsonNode node = objectMapper.readTree(record.value());
@@ -140,7 +141,7 @@ public class BillingEventAccountingConsumer {
      * When a delivery is assigned to a FreelancerOrg, pre-records a suspense entry
      * on account 706-FRL-{orgId} (Revenue from services — pending confirmation).
      */
-    @KafkaListener(topics = "tnt.delivery.freelancer_org.assigned", groupId = "tnt-accounting-core")
+    @KafkaListener(topics = TntTopics.DELIVERY_FREELANCER_ORG_ASSIGNED, groupId = "tnt-accounting-core", containerFactory = "accountingKafkaListenerContainerFactory")
     public void onFreelancerOrgAssigned(ConsumerRecord<String, String> record) {
         try {
             JsonNode node = objectMapper.readTree(record.value());
@@ -185,7 +186,7 @@ public class BillingEventAccountingConsumer {
      * - Debit 411-FRL-{orgId} (Client AR), Credit 706-FRL-{orgId} (Revenue)
      * - Debit 706-FRL-{orgId}, Credit 421-FRL-{orgId} (Sub-deliverer payable)
      */
-    @KafkaListener(topics = "tnt.billing.wallet.split_executed", groupId = "tnt-accounting-core")
+    @KafkaListener(topics = TntTopics.BILLING_WALLET_SPLIT_EXECUTED, groupId = "tnt-accounting-core", containerFactory = "accountingKafkaListenerContainerFactory")
     public void onWalletSplitExecuted(ConsumerRecord<String, String> record) {
         try {
             JsonNode node = objectMapper.readTree(record.value());

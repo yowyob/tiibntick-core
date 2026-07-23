@@ -44,6 +44,12 @@ public class DslRuleRepositoryAdapter implements IDslRuleRepository {
     }
 
     @Override
+    public Mono<DslRule> findByIdAndTenantId(UUID id, UUID tenantId) {
+        return r2dbcRepository.findByIdAndTenantId(id, tenantId)
+                .map(mapper::toDomain);
+    }
+
+    @Override
     public Flux<DslRule> findByPolicyIdOrderByPriorityAsc(UUID policyId) {
         return r2dbcRepository.findByPolicyIdOrderByPriorityAsc(policyId)
                 .map(mapper::toDomain);
@@ -52,6 +58,18 @@ public class DslRuleRepositoryAdapter implements IDslRuleRepository {
     @Override
     public Flux<DslRule> findActiveByPolicyIdOrderByPriorityAsc(UUID policyId) {
         return r2dbcRepository.findActiveByPolicyIdOrderByPriorityAsc(policyId)
+                .map(mapper::toDomain);
+    }
+
+    @Override
+    public Flux<DslRule> findByPolicyIdAndTenantIdOrderByPriorityAsc(UUID policyId, UUID tenantId) {
+        return r2dbcRepository.findByPolicyIdAndTenantIdOrderByPriorityAsc(policyId, tenantId)
+                .map(mapper::toDomain);
+    }
+
+    @Override
+    public Flux<DslRule> findActiveByPolicyIdAndTenantIdOrderByPriorityAsc(UUID policyId, UUID tenantId) {
+        return r2dbcRepository.findActiveByPolicyIdAndTenantIdOrderByPriorityAsc(policyId, tenantId)
                 .map(mapper::toDomain);
     }
 

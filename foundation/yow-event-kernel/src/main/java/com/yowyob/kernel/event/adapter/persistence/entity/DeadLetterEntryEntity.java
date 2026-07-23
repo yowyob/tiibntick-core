@@ -30,7 +30,7 @@ import java.time.LocalDateTime;
  * );
  * }</pre>
  */
-@Table("event_bus.dead_letter_entries")
+@Table(name = "dead_letter_entries", schema = "event_bus")
 public class DeadLetterEntryEntity {
 
     @Id

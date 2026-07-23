@@ -8,6 +8,7 @@ import com.yowyob.tiibntick.core.geo.domain.event.TrafficConditionChangedEvent;
 import com.yowyob.tiibntick.core.geo.domain.exception.GeoNotFoundException;
 import com.yowyob.tiibntick.core.geo.domain.model.*;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
@@ -105,6 +106,7 @@ public class CostFunctionService implements IComputeCostUseCase {
     /**
      * Updates traffic factor for an arc and publishes an event if the change is significant.
      */
+    @Transactional
     public Mono<RoadArc> updateTrafficAndPublishIfSignificant(RoadArcId arcId, UUID tenantId,
                                                                double newFactor) {
         return arcRepository.findById(arcId, tenantId)

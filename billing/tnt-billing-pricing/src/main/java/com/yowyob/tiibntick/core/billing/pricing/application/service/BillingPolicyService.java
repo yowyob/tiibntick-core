@@ -66,8 +66,8 @@ public class BillingPolicyService implements IBillingPolicyUseCase {
     }
 
     @Override
-    public Mono<BillingPolicy> updatePolicy(BillingPolicy policy) {
-        return policyRepository.findById(policy.getId())
+    public Mono<BillingPolicy> updatePolicy(BillingPolicy policy, UUID tenantId) {
+        return policyRepository.findByIdAndTenantId(policy.getId(), tenantId)
                 .switchIfEmpty(Mono.error(new BillingPolicyNotFoundException(policy.getId())))
                 .flatMap(existing -> {
                     BillingPolicy updated = existing.toBuilder()
@@ -93,8 +93,8 @@ public class BillingPolicyService implements IBillingPolicyUseCase {
     }
 
     @Override
-    public Mono<BillingPolicy> activatePolicy(UUID policyId) {
-        return policyRepository.findById(policyId)
+    public Mono<BillingPolicy> activatePolicy(UUID policyId, UUID tenantId) {
+        return policyRepository.findByIdAndTenantId(policyId, tenantId)
                 .switchIfEmpty(Mono.error(new BillingPolicyNotFoundException(policyId)))
                 .flatMap(policy -> policyRepository.save(policy.activate()))
                 .flatMap(activated -> anchorActivation(activated).thenReturn(activated));
@@ -137,22 +137,22 @@ public class BillingPolicyService implements IBillingPolicyUseCase {
     }
 
     @Override
-    public Mono<BillingPolicy> deactivatePolicy(UUID policyId) {
-        return policyRepository.findById(policyId)
+    public Mono<BillingPolicy> deactivatePolicy(UUID policyId, UUID tenantId) {
+        return policyRepository.findByIdAndTenantId(policyId, tenantId)
                 .switchIfEmpty(Mono.error(new BillingPolicyNotFoundException(policyId)))
                 .flatMap(policy -> policyRepository.save(policy.deactivate()));
     }
 
     @Override
-    public Mono<BillingPolicy> archivePolicy(UUID policyId) {
-        return policyRepository.findById(policyId)
+    public Mono<BillingPolicy> archivePolicy(UUID policyId, UUID tenantId) {
+        return policyRepository.findByIdAndTenantId(policyId, tenantId)
                 .switchIfEmpty(Mono.error(new BillingPolicyNotFoundException(policyId)))
                 .flatMap(policy -> policyRepository.save(policy.archive()));
     }
 
     @Override
-    public Mono<BillingPolicy> findById(UUID policyId) {
-        return policyRepository.findById(policyId)
+    public Mono<BillingPolicy> findById(UUID policyId, UUID tenantId) {
+        return policyRepository.findByIdAndTenantId(policyId, tenantId)
                 .switchIfEmpty(Mono.error(new BillingPolicyNotFoundException(policyId)));
     }
 
@@ -174,12 +174,10 @@ public class BillingPolicyService implements IBillingPolicyUseCase {
     }
 
     @Override
-    public Mono<Void> deletePolicy(UUID policyId) {
-        return policyRepository.existsById(policyId)
-                .flatMap(exists -> {
-                    if (!exists) return Mono.error(new BillingPolicyNotFoundException(policyId));
-                    return policyRepository.deleteById(policyId);
-                });
+    public Mono<Void> deletePolicy(UUID policyId, UUID tenantId) {
+        return policyRepository.findByIdAndTenantId(policyId, tenantId)
+                .switchIfEmpty(Mono.error(new BillingPolicyNotFoundException(policyId)))
+                .flatMap(policy -> policyRepository.deleteById(policyId));
     }
 
     // Multi-owner support ─────────────────────────────────────────────
@@ -235,8 +233,8 @@ public class BillingPolicyService implements IBillingPolicyUseCase {
 
     @Override
     public Mono<BillingPolicy> assignPolicyToOrg(UUID policyId, String orgId,
-                                                   PolicyOwnerType ownerType) {
-        return policyRepository.findById(policyId)
+                                                   PolicyOwnerType ownerType, UUID tenantId) {
+        return policyRepository.findByIdAndTenantId(policyId, tenantId)
                 .switchIfEmpty(Mono.error(new BillingPolicyNotFoundException(policyId)))
                 .flatMap(policy -> {
                     BillingPolicy updated = policy.toBuilder()
@@ -259,7 +257,10 @@ public class BillingPolicyService implements IBillingPolicyUseCase {
     @Override
     public Mono<BigDecimal> computeOperationalCost(UUID policyId, PricingContext ctx,
                                                      FleetCostParameters fleetParams) {
-        return policyRepository.findById(policyId)
+        // Audit n°7 · #5 (IDOR) — the pricing context already carries the caller's tenantId
+        // (set by the controller from JWT), so we scope the policy lookup with it here
+        // without changing this port method's signature.
+        return policyRepository.findByIdAndTenantId(policyId, ctx.getTenantId())
                 .switchIfEmpty(Mono.error(new BillingPolicyNotFoundException(policyId)))
                 .map(policy -> {
                     FleetCostParameters params = fleetParams != null

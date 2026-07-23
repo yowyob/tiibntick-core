@@ -13,6 +13,7 @@ import com.yowyob.tiibntick.core.incident.port.outbound.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
@@ -66,6 +67,7 @@ public class IncidentEscalationService implements IEscalateIncidentUseCase,
      * @return the cancelled incident
      */
     @Override
+    @Transactional
     public Mono<Incident> execute(EscalateIncidentCommand command) {
         return incidentRepository.findById(command.getIncidentId())
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Incident not found")))
@@ -93,6 +95,7 @@ public class IncidentEscalationService implements IEscalateIncidentUseCase,
     }
 
     @Override
+    @Transactional
     public Mono<Incident> execute(UUID incidentId, UUID closedByActorId) {
         return incidentRepository.findById(incidentId)
                 .flatMap(incident -> {
@@ -107,6 +110,7 @@ public class IncidentEscalationService implements IEscalateIncidentUseCase,
     }
 
     @Override
+    @Transactional
     public Mono<Incident> execute(UUID incidentId, UUID cancelledByActorId, String reason) {
         return incidentRepository.findById(incidentId)
                 .flatMap(incident -> {

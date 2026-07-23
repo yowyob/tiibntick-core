@@ -32,7 +32,7 @@ import java.time.LocalDateTime;
  * );
  * }</pre>
  */
-@Table("event_bus.event_schemas")
+@Table(name = "event_schemas", schema = "event_bus")
 public class EventSchemaEntity {
 
     @Id

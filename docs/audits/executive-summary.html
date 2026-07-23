@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Synthèse — Résumé exécutif global · Audit TiiBnTick</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --text: #1c2430; --muted: #5b6675;
+  --border: #e3e7ec; --accent: #0f5fa8; --accent-soft: #e8f1fa;
+  --code-bg: #f0f2f5; --sidebar-bg: #101823; --sidebar-text: #c7d0dc;
+  --crit: #c62828; --high: #e65100; --med: #f9a825; --low: #2e7d32;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1319; --panel: #161d27; --text: #dbe2ea; --muted: #8b97a5;
+    --border: #263140; --accent: #5aa2e0; --accent-soft: #17273a;
+    --code-bg: #1d2733; --sidebar-bg: #0a0f15; --sidebar-text: #a9b4c0;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--bg); color: var(--text); line-height: 1.65; }
+.layout { display: flex; min-height: 100vh; }
+nav.sidebar { width: 270px; flex-shrink: 0; background: var(--sidebar-bg);
+  color: var(--sidebar-text); padding: 1.4rem 1rem; position: sticky; top: 0;
+  height: 100vh; overflow-y: auto; }
+nav.sidebar .brand { font-size: 1.05rem; font-weight: 700; color: #fff;
+  margin-bottom: .2rem; }
+nav.sidebar .brand small { display:block; font-weight: 400; color: var(--sidebar-text);
+  font-size: .75rem; margin-top: .2rem; }
+nav.sidebar ul { list-style: none; padding: 0; margin: 1.2rem 0; }
+nav.sidebar li a { display: block; color: var(--sidebar-text); text-decoration: none;
+  padding: .45rem .6rem; border-radius: 6px; font-size: .86rem; }
+nav.sidebar li a:hover { background: rgba(255,255,255,.08); color: #fff; }
+nav.sidebar li a.active { background: var(--accent); color: #fff; }
+nav.sidebar .section-label { text-transform: uppercase; letter-spacing: .08em;
+  font-size: .68rem; color: #6b7683; margin: 1.4rem 0 .4rem .4rem; }
+main { flex: 1; min-width: 0; padding: 2.2rem 3rem 4rem; max-width: 1100px; }
+header.page { border-bottom: 1px solid var(--border); padding-bottom: 1.2rem;
+  margin-bottom: 1.6rem; }
+header.page .kicker { color: var(--accent); font-weight: 600; font-size: .85rem;
+  text-transform: uppercase; letter-spacing: .06em; }
+header.page h1 { margin: .25rem 0 .4rem; font-size: 1.9rem; }
+header.page .meta { color: var(--muted); font-size: .85rem; }
+h2 { margin-top: 2.4rem; padding-bottom: .35rem; border-bottom: 1px solid var(--border);
+  font-size: 1.35rem; }
+h3 { margin-top: 1.8rem; font-size: 1.08rem; }
+h4 { margin-top: 1.4rem; font-size: .98rem; }
+a { color: var(--accent); }
+code { background: var(--code-bg); padding: .12em .38em; border-radius: 4px;
+  font-size: .84em; font-family: "JetBrains Mono", Consolas, monospace; }
+pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem; overflow-x: auto; font-size: .82rem; line-height: 1.5; }
+pre code { background: none; padding: 0; }
+.table-wrap { overflow-x: auto; margin: 1rem 0; border: 1px solid var(--border);
+  border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: .85rem; background: var(--panel); }
+th, td { border-bottom: 1px solid var(--border); padding: .55rem .75rem; text-align: left;
+  vertical-align: top; }
+th { background: var(--accent-soft); color: var(--text); font-weight: 600;
+  white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+blockquote { border-left: 4px solid var(--accent); background: var(--accent-soft);
+  margin: 1rem 0; padding: .7rem 1rem; border-radius: 0 8px 8px 0; }
+blockquote p { margin: .3rem 0; }
+.badge { display: inline-block; padding: .1em .6em; border-radius: 999px;
+  font-size: .74rem; font-weight: 700; color: #fff; white-space: nowrap; }
+.badge.crit { background: var(--crit); } .badge.high { background: var(--high); }
+.badge.med { background: var(--med); color: #333; } .badge.low { background: var(--low); }
+.mermaid { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem; margin: 1rem 0; text-align: center; overflow-x: auto; }
+.toc { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem 1.4rem; margin: 1.4rem 0; font-size: .88rem; }
+.toc > ul { margin: .3rem 0; padding-left: 1.1rem; }
+.toc .toctitle { font-weight: 700; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1rem; margin: 1.4rem 0; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1.1rem 1.2rem; text-decoration: none; color: var(--text); display: block; }
+.card:hover { border-color: var(--accent); }
+.card .icon { font-size: 1.5rem; }
+.card h3 { margin: .4rem 0 .2rem; font-size: 1rem; }
+.card p { margin: 0; color: var(--muted); font-size: .82rem; }
+.stat-row { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1.2rem 0; }
+.stat { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: .8rem 1.2rem; min-width: 130px; }
+.stat .num { font-size: 1.6rem; font-weight: 800; }
+.stat .lbl { font-size: .74rem; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .05em; }
+.stat.crit .num { color: var(--crit); } .stat.high .num { color: var(--high); }
+.stat.med .num { color: var(--med); } .stat.low .num { color: var(--low); }
+footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border);
+  color: var(--muted); font-size: .78rem; }
+.progress-block { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1rem 1.2rem; margin: 1rem 0 1.6rem; }
+.progress-block .progress-label { display: flex; justify-content: space-between; align-items: baseline;
+  font-size: .85rem; margin-bottom: .5rem; }
+.progress-block .progress-label b { font-size: 1rem; }
+.progress-bar-track { background: var(--code-bg); border-radius: 999px; height: .6rem; overflow: hidden; }
+.progress-bar-fill { height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--low), var(--accent)); transition: width .3s ease; }
+.progress-note { font-size: .72rem; color: var(--muted); margin-top: .5rem; }
+li:has(> input.task-checkbox) { list-style: none; margin-left: -1.4rem; padding-left: .3rem;
+  display: list-item; }
+input.task-checkbox { width: 1rem; height: 1rem; margin-right: .5rem; vertical-align: middle;
+  accent-color: var(--accent); }
+li:has(> input.task-checkbox:checked) { color: var(--muted); }
+li:has(> input.task-checkbox:checked) code { opacity: .75; }
+@media (max-width: 900px) {
+  .layout { flex-direction: column; }
+  nav.sidebar { width: 100%; height: auto; position: static; }
+  main { padding: 1.4rem 1.2rem 3rem; }
+}
+@media print { nav.sidebar { display: none; } main { padding: 0; } }
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar"><div class="brand">TiiBnTick Core<small>Audit technique — juillet 2026</small></div>
+<ul><li><a href="index.html">🏠 Accueil</a></li>
+<li><a href="executive-summary.html" class="active">📋 Résumé exécutif global</a></li>
+</ul><div class="section-label">Rapports d'audit</div><ul>
+<li><a href="audit-1-architecture.html">🏛️ Audit n°1 — Architecture globale</a></li>
+<li><a href="audit-2-inter-modules.html">🔗 Audit n°2 — Connexions inter-modules</a></li>
+<li><a href="audit-3-yow-event-kernel.html">📨 Audit n°3 — yow-event-kernel</a></li>
+<li><a href="audit-4-yow-i18n-kernel.html">🌍 Audit n°4 — yow-i18n-kernel</a></li>
+<li><a href="audit-5-kafka.html">🧵 Audit n°5 — Kafka</a></li>
+<li><a href="audit-6-scalabilite.html">📈 Audit n°6 — Scalabilité</a></li>
+<li><a href="audit-7-system-design.html">🧭 Audit n°7 — System Design & Sécurité</a></li>
+</ul><div class="section-label">Plan de remédiation</div><ul>
+<li><a href="remediation/implementation-plan.html">🗂️ Plan — Plan d'implémentation — vue d'ensemble</a></li>
+<li><a href="remediation/phase-0-critical.html">🚨 P0 — Phase 0 — Bloquant production</a></li>
+<li><a href="remediation/phase-1-hardening.html">🛡️ P1 — Phase 1 — Durcissement</a></li>
+<li><a href="remediation/phase-2-target-architecture.html">🚀 P2 — Phase 2 — Architecture cible</a></li>
+<li><a href="remediation/workstream-payment-billing-kernel-delegation.html">💳 Chantier — Délégation paiement/facturation au Kernel</a></li>
+</ul></nav>
+<main>
+<header class="page">
+  <div class="kicker">Synthèse</div>
+  <h1>📋 Résumé exécutif global</h1>
+  <div class="meta">Projet TiiBnTick Core · dépôt <code>tiibntick-core</code> (34 modules Maven, y compris <code>trust/tnt-trust-core</code>) · Audit réalisé le 16 juillet 2026</div>
+</header>
+
+<div class="toc"><div class="toc"><span class="toctitle">Sommaire</span><ul>
+<li><a href="#resume-executif">Résumé exécutif</a></li>
+<li><a href="#chiffres-cles">Chiffres clés</a></li>
+<li><a href="#risques-majeurs-transverses">Risques majeurs (transverses)</a><ul>
+<li><a href="#1-securite-des-paiements-et-du-multi-tenant-critique">1. Sécurité des paiements et du multi-tenant — Critique</a></li>
+<li><a href="#2-chaines-evenementielles-cassees-critique">2. Chaînes événementielles cassées — Critique</a></li>
+<li><a href="#3-scale-out-impossible-en-letat-critique">3. Scale-out impossible en l'état — Critique</a></li>
+<li><a href="#4-link-le-temps-reel-cartographique-nexiste-pas-encore-eleve">4. Link : le temps réel cartographique n'existe pas encore — Élevé</a></li>
+<li><a href="#5-derive-de-la-couche-corebackend-eleve">5. Dérive de la couche coreBackend — Élevé</a></li>
+<li><a href="#6-gouvernance-et-i18n-moyen">6. Gouvernance et i18n — Moyen</a></li>
+</ul>
+</li>
+<li><a href="#points-forts-confirmes">Points forts confirmés</a></li>
+<li><a href="#feuille-de-route-priorisee">Feuille de route priorisée</a></li>
+<li><a href="#conclusion">Conclusion</a></li>
+</ul>
+</div>
+</div>
+<h1 id="synthese-executive-audit-technique-tiibntick-core">Synthèse exécutive — Audit technique TiiBnTick Core</h1>
+<h2 id="resume-executif">Résumé exécutif</h2>
+<p>Sept audits spécialisés ont été menés sur l'intégralité du dépôt <code>tiibntick-core</code> : <strong>52 modules Maven</strong> (34 modules « historiques » L0–L7 <strong>plus les 18 modules/sous-modules de <code>coreBackend/</code></strong> — <code>tnt-agency-back-core</code>, <code>tnt-go-freelancer-point-back-core</code>, <code>tnt-link-back-core</code>, <code>tnt-market-back-core</code>), soit ~2 800 fichiers Java, l'ensemble des configurations Spring/Docker/Liquibase, les scripts, les tests et la documentation.</p>
+<p><strong>Verdict global : une fondation architecturale authentiquement solide, mais une exécution incomplète qui interdit toute mise en production ouverte en l'état.</strong> Le cœur L0–L6 applique réellement l'architecture hexagonale et le DDD (agrégats riches, ports/adapters disciplinés, migration Kernel HTTP-only vérifiée). En revanche : des failles de sécurité critiques (paiements falsifiables, isolation tenant contournable), une architecture événementielle largement cassée (~20 topics consommés sans producteur), un scale-out multi-instances aujourd'hui <strong>impossible</strong> sans corruption de données, et une couche <code>coreBackend/</code> qui dérive hors de tous les standards du projet (zéro test, autorisation absente).</p>
+<p>La cible « centaines de millions d'utilisateurs » n'est pas atteignable avec l'architecture actuelle, mais la trajectoire proposée (feuille de route P0→P2 ci-dessous, architecture cible détaillée dans l'<a href="audit-7-system-design.html">Audit n°7</a>) est réaliste : durcir le monolithe modulaire d'abord, extraire ensuite les axes de charge (Link temps réel via BFF + fan-out geohash).</p>
+<h2 id="chiffres-cles">Chiffres clés</h2>
+<div class="stat-row">
+<div class="stat crit"><div class="num">15+</div><div class="lbl">Constats critiques</div></div>
+<div class="stat high"><div class="num">35+</div><div class="lbl">Constats élevés</div></div>
+<div class="stat"><div class="num">52</div><div class="lbl">Modules audités</div></div>
+<div class="stat"><div class="num">112/223</div><div class="lbl">Dépendances mortes</div></div>
+<div class="stat"><div class="num">~20</div><div class="lbl">Topics Kafka orphelins</div></div>
+<div class="stat"><div class="num">0</div><div class="lbl">Test sur coreBackend</div></div>
+</div>
+
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Audit</th>
+<th>Rapport</th>
+<th>Problèmes relevés</th>
+<th>Verdict en une phrase</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>n°1</td>
+<td><a href="audit-1-architecture.html">Architecture globale</a></td>
+<td>17</td>
+<td>Cœur hexagonal/DDD authentique et discipliné ; risque = dérive de la couche <code>coreBackend/</code>.</td>
+</tr>
+<tr>
+<td>n°2</td>
+<td><a href="audit-2-inter-modules.html">Connexions inter-modules</a></td>
+<td>112 dép. mortes, 2 violations</td>
+<td>Graphe acyclique et layering globalement tenu, mais 50 % des arêtes Maven sont mortes.</td>
+</tr>
+<tr>
+<td>n°3</td>
+<td><a href="audit-3-yow-event-kernel.html">yow-event-kernel</a></td>
+<td>22</td>
+<td>Module 100 % mort (0 import) ; toute la plateforme fait de l'événementiel ad-hoc à côté.</td>
+</tr>
+<tr>
+<td>n°4</td>
+<td><a href="audit-4-yow-i18n-kernel.html">yow-i18n-kernel</a></td>
+<td>24</td>
+<td>Quasi inutilisé ; projet mono-langue FR et mono-devise XAF de fait, jusque dans les API.</td>
+</tr>
+<tr>
+<td>n°5</td>
+<td><a href="audit-5-kafka.html">Kafka</a></td>
+<td>20</td>
+<td>Fondations saines (acks/idempotence) mais chaînes cassées : ~20 topics sans producteur.</td>
+</tr>
+<tr>
+<td>n°6</td>
+<td><a href="audit-6-scalabilite.html">Scalabilité</a></td>
+<td>27 (6 critiques)</td>
+<td>Scale-out multi-instances impossible en l'état ; Link plafonne à ~10⁴ utilisateurs.</td>
+</tr>
+<tr>
+<td>n°7</td>
+<td><a href="audit-7-system-design.html">System Design &amp; Sécurité</a></td>
+<td>25</td>
+<td>Conception saine, exécution sécurité incomplète ; P0 prérequis absolu avant prod.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="risques-majeurs-transverses">Risques majeurs (transverses)</h2>
+<h3 id="1-securite-des-paiements-et-du-multi-tenant-critique">1. Sécurité des paiements et du multi-tenant — <span class="badge crit">Critique</span></h3>
+<p>Les webhooks de paiement sont falsifiables (signature Stripe non vérifiée, MTN facultative, Orange absente) : n'importe qui peut marquer une facture comme payée. <strong>Décision actée le 17/07/2026 :</strong> plutôt que de patcher ces vérifications, TiiBnTick Core délègue entièrement les paiements et la facturation au Kernel (<code>payment-controller</code>, <code>payment-gateway-controller</code>, <code>billing-legacy-documents-controller</code>) — voir le <a href="remediation/workstream-payment-billing-kernel-delegation.html">chantier dédié</a>. L'identité du tenant est par ailleurs acceptée depuis l'en-tête client <code>X-Tenant-Id</code> sur 68 endpoints et ~139 requêtes <code>findById</code> ne filtrent pas par tenant (IDOR cross-tenant). Environ 40 contrôleurs de mutation n'ont aucun contrôle d'autorisation — le pire sur les backends produits (<code>market</code> 0/9, <code>gofp</code> 0/10, <code>link</code> 2/9) placés derrière un <code>permitAll()</code>. <strong>Impact métier : fraude financière directe, fuite de données inter-clients.</strong> → Détails et correctifs : <a href="audit-7-system-design.html">Audit n°7</a>, <a href="remediation/phase-0-critical.html">Phase 0</a>.</p>
+<h3 id="2-chaines-evenementielles-cassees-critique">2. Chaînes événementielles cassées — <span class="badge crit">Critique</span></h3>
+<p>Des flux métier entiers ne fonctionnent pas de bout en bout parce que producteurs et consommateurs n'utilisent pas les mêmes noms de topics (<code>mission.status-changed</code> vs <code>mission.status.changed</code>, <code>wallet.payment-confirmed</code> vs <code>wallet.payment.confirmed</code>, etc.) et que des événements attendus ne sont jamais émis (<code>mission.completed</code>, <code>invoice.paid</code>, <code>compensation.paid</code>). Facturation, comptabilité, boucle litige→remboursement, temps réel mission et ERP Agency sont concernés. <code>auto.create.topics.enable=true</code> masque le problème en créant silencieusement les topics orphelins. Par ailleurs <code>yow-event-kernel</code> — qui contient précisément l'outbox, la DLQ et l'idempotence qui manquent partout — est mort (0 import). → <a href="audit-3-yow-event-kernel.html">Audit n°3</a>, <a href="audit-5-kafka.html">Audit n°5</a>.</p>
+<h3 id="3-scale-out-impossible-en-letat-critique">3. Scale-out impossible en l'état — <span class="badge crit">Critique</span></h3>
+<p>Lancer une deuxième instance aujourd'hui <strong>corromprait des données</strong> : séquence de références litiges en <code>AtomicInteger</code> par JVM, ~10 <code>@Scheduled</code> sans verrou distribué, réconciliation wallet et caches RBAC en <code>ConcurrentHashMap</code> locaux. Le pool R2DBC primaire est limité à 10 connexions pour ~30 schémas sur un PostgreSQL unique ; aucun read replica, aucune pagination sur les listings à forte volumétrie, SPOF sur chaque brique d'infra (Kafka mono-broker RF=1, Redis, MinIO, Postgres). Les appels au Kernel Yowyob n'ont ni timeout ni circuit breaker (hors trust). → <a href="audit-6-scalabilite.html">Audit n°6</a>.</p>
+<h3 id="4-link-le-temps-reel-cartographique-nexiste-pas-encore-eleve">4. Link : le temps réel cartographique n'existe pas encore — <span class="badge high">Élevé</span></h3>
+<p><code>tnt-link-back-core</code> — destiné à des millions d'utilisateurs avec des mises à jour temps réel individualisées par carte — fonctionne aujourd'hui à 100 % en <strong>polling REST</strong> de bounding-box, sans WebSocket/SSE, sans Kafka/Redis, sans requête PostGIS ni index spatial. Plafond estimé : ~10⁴ utilisateurs. La recommandation consolidée (justifiée dans l'<a href="audit-7-system-design.html">Audit n°7</a>) : <strong>oui au BFF Link</strong> consommant tiibntick-core et servant frontend + mobile, avec abonnements par tuiles geohash et fan-out borné réutilisant le moteur <code>tnt-realtime-core</code> (Redis pub/sub multi-instances) déjà présent dans le dépôt — plutôt que construire un second moteur temps réel.</p>
+<h3 id="5-derive-de-la-couche-corebackend-eleve">5. Dérive de la couche coreBackend — <span class="badge high">Élevé</span></h3>
+<p>Les 4 backends produits (~630 classes, un tiers du réacteur) sont hors du modèle de couches documenté, sans aucun test, avec des standards dégradés (contrôleurs court-circuitant les ports, DTOs web retournés par les services, RBAC déclaré mais jamais appliqué). Chaque correctif a pourtant déjà son modèle exemplaire ailleurs dans le dépôt (trust, sync, realtime). → <a href="audit-1-architecture.html">Audit n°1</a>, <a href="audit-2-inter-modules.html">Audit n°2</a>.</p>
+<h3 id="6-gouvernance-et-i18n-moyen">6. Gouvernance et i18n — <span class="badge med">Moyen</span></h3>
+<p>50 % des dépendances Maven inter-modules sont mortes ; l'assemblage réel (<code>@ComponentScan</code> global) ne correspond pas à la doc (<code>@Import</code> par module) ; aucune règle d'architecture n'est exécutable en CI. Côté i18n : utilisateurs recevant « ⚠ Missing translation » par SMS/Email/Push, 6 classes <code>Money</code> dupliquées aux arrondis divergents, devise XAF câblée jusque dans les signatures d'API. → <a href="audit-2-inter-modules.html">Audit n°2</a>, <a href="audit-4-yow-i18n-kernel.html">Audit n°4</a>.</p>
+<h2 id="points-forts-confirmes">Points forts confirmés</h2>
+<ul>
+<li><strong>Hexagonal/DDD réels</strong> sur L0–L6 : agrégats riches, ports = interfaces, domaine sans Spring ni entités R2DBC, aucun adapter→adapter inter-modules.</li>
+<li><strong>Migration Kernel HTTP-only vérifiée</strong> : zéro dépendance Maven RT-comops résiduelle.</li>
+<li><strong>Modules exemplaires réutilisables comme modèles internes</strong> : <code>tnt-trust-core</code> (ports inversés, circuit breakers, retry <code>SKIP LOCKED</code>), <code>tnt-sync-core</code> (seule vraie DLQ), <code>tnt-realtime-core</code> (fan-out Redis multi-instances), outbox <code>SKIP LOCKED</code>.</li>
+<li><strong>Kafka bien configuré à la base</strong> : acks=all + idempotence producteur quasi partout, auto-commit désactivé, provisioning central des topics (RF 3 en prod).</li>
+<li><strong>Sécurité plateforme</strong> : API keys BCrypt + rotation + audit, double chaîne d'authentification propre.</li>
+<li><strong>Hygiène de code</strong> : dette marquée quasi nulle (14 TODO), 388 index en base, Dockerfile production-grade, graphe de dépendances acyclique.</li>
+</ul>
+<h2 id="feuille-de-route-priorisee">Feuille de route priorisée</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Priorité</th>
+<th>Horizon</th>
+<th>Actions</th>
+<th>Impact attendu</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>P0 — bloquant prod</strong></td>
+<td>3–5 sem.</td>
+<td><strong>Mise à jour du 17/07/2026 :</strong> délégation complète des paiements et de la facturation au Kernel (<code>payment-controller</code>/<code>payment-gateway-controller</code>/<code>billing-legacy-documents-controller</code>) — supprime la vulnérabilité webhook au lieu de la patcher ; tenant depuis le JWT uniquement + filtre tenant sur les requêtes sensibles ; autorisation sur les ~40 contrôleurs non protégés ; référentiel unique des topics dans <code>tnt-common-core</code> + alignement des noms + <code>auto.create.topics=false</code> ; correction des désérialiseurs par défaut ; les 6 correctifs multi-instances (séquence litiges en DB, ShedLock, caches distribués) ; messages i18n cassés en production. Détail exhaustif et cases à cocher : <a href="remediation/phase-0-critical.html">Phase 0 du plan d'implémentation</a>.</td>
+<td>Élimine la fraude paiement à la racine, l'IDOR cross-tenant, répare les flux métier cassés, débloque le scale-out.</td>
+</tr>
+<tr>
+<td><strong>P1 — durcissement</strong></td>
+<td>1–3 mois</td>
+<td>BFF Link + temps réel par tuiles geohash ; RLS multi-tenant ; résilience Kernel généralisée ; DLQ/outbox/idempotence Kafka ; pagination et read replica ; unification <code>Money</code> et résolution de locale. Détail : <a href="remediation/phase-1-hardening.html">Phase 1</a>.</td>
+<td>Couvre le besoin produit Link à l'échelle ; élimine les IDOR structurellement ; rend le monolithe observable.</td>
+</tr>
+<tr>
+<td><strong>P2 — architecture cible</strong></td>
+<td>3–18 mois, sous condition de traction</td>
+<td>Kubernetes + HPA, cluster Kafka, réplicas et partitionnement, extraction sélective (wallet, temps réel) si la charge le justifie. Détail : <a href="remediation/phase-2-target-architecture.html">Phase 2</a>.</td>
+<td>Trajectoire réaliste vers des centaines de millions d'utilisateurs sans sur-investissement prématuré.</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Séquencement recommandé :</strong> rester en monolithe modulaire durci (P0+P1) avant toute extraction microservices ; n'extraire en P2 que ce que la charge mesurée justifie (Link temps réel en premier). Chaque recommandation est justifiée, localisée et chiffrée dans le rapport d'audit correspondant.</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>Le projet a une colonne vertébrale rare pour un projet de cette taille : une architecture hexagonale réellement appliquée, un graphe de modules acyclique et des modèles internes exemplaires. Ce qui manque n'est pas de la conception mais de l'<strong>achèvement</strong> : brancher ce qui est débranché (événements, i18n, event-kernel), protéger ce qui est exposé (paiements, tenant, coreBackend), et lever les verrous connus du scale-out. Le P0 est un prérequis absolu avant toute production ouverte ; avec P0+P1 réalisés, la plateforme est saine pour croître, et P2 trace une route réaliste vers l'échelle visée.</p>
+<footer>Audit technique TiiBnTick — généré à partir de l'analyse du code source réel. Chaque constat référence les fichiers et lignes concernés.</footer>
+</main>
+</div>
+
+<script type="module">
+  try {
+    const m = await import("https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs");
+    const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    m.default.initialize({ startOnLoad: true, theme: dark ? "dark" : "neutral", securityLevel: "loose" });
+  } catch (e) {
+    document.querySelectorAll(".mermaid").forEach(el => {
+      el.style.textAlign = "left";
+      el.innerHTML = "<div style='color:var(--muted);font-size:.75rem;margin-bottom:.5rem'>⚠ Diagramme Mermaid (connexion internet requise pour le rendu) — source :</div><pre>" + el.textContent.replace(/&/g,"&amp;").replace(/</g,"&lt;") + "</pre>";
+    });
+  }
+</script>
+
+</body>
+</html>

@@ -46,7 +46,7 @@ public class IntakeService {
         return agencyRegistry.getById(tenantId, agencyId)
                 .zipWith(branchService.getById(tenantId, branchId))
                 .map(t -> new IntakeContextResponse(
-                        t.getT1().id(), t.getT1().name(),
+                        t.getT1().getId(), t.getT1().getName(),
                         t.getT2().id(), t.getT2().name(),
                         formatBranchAddress(t.getT2())));
     }

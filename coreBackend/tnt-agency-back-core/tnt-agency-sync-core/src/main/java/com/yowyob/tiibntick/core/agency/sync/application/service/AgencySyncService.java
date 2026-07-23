@@ -5,6 +5,7 @@ import com.yowyob.tiibntick.core.agency.org.application.service.AgencyRegistrySe
 import com.yowyob.tiibntick.core.agency.sync.adapter.in.web.dto.SyncPullResult;
 import com.yowyob.tiibntick.core.agency.sync.adapter.out.persistence.DeviceRegistrationR2dbcRepository;
 import com.yowyob.tiibntick.core.agency.sync.adapter.out.persistence.entity.DeviceRegistrationEntity;
+import com.yowyob.tiibntick.core.agency.sync.application.offline.AgencyOfflinePushGuard;
 import com.yowyob.tiibntick.core.sync.adapter.in.rest.dto.OfflineOpDto;
 import com.yowyob.tiibntick.core.sync.adapter.in.rest.dto.SyncPullResponse;
 import com.yowyob.tiibntick.core.sync.adapter.in.rest.dto.SyncPushRequest;
@@ -40,6 +41,7 @@ public class AgencySyncService {
     private final IDuckDbSchemaProvider schemaProvider;
     private final DeviceRegistrationR2dbcRepository deviceRepo;
     private final AgencyRegistryService agencyRegistry;
+    private final AgencyOfflinePushGuard offlinePushGuard;
     private final ObjectMapper objectMapper;
 
     public Mono<SyncPullResult> pull(PullInput input) {
@@ -73,12 +75,16 @@ public class AgencySyncService {
 
     @Transactional
     public Mono<SyncPushResponse> push(PushInput input) {
-        List<OfflineOpDto> operations = input.operations().stream()
-                .map(this::toOfflineOp)
-                .toList();
-        SyncPushRequest request = new SyncPushRequest(input.syncToken(), operations);
         return agencyRegistry.getById(input.tenantId(), input.agencyId())
-                .then(processSyncBatch.processSyncBatch(
+                .then(offlinePushGuard.validateBeforeBatch(
+                        input.tenantId(), input.agencyId(), input.operations()))
+                .then(Mono.fromCallable(() -> {
+                    List<OfflineOpDto> operations = input.operations().stream()
+                            .map(this::toOfflineOp)
+                            .toList();
+                    return new SyncPushRequest(input.syncToken(), operations);
+                }))
+                .flatMap(request -> processSyncBatch.processSyncBatch(
                         input.userId().toString(),
                         input.tenantId().toString(),
                         input.deviceId(),

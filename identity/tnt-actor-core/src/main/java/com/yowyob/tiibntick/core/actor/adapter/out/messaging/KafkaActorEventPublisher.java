@@ -2,6 +2,8 @@ package com.yowyob.tiibntick.core.actor.adapter.out.messaging;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yowyob.kernel.event.application.port.in.PublishEventUseCase;
+import com.yowyob.kernel.event.domain.model.DomainEventEnvelope;
 import com.yowyob.tiibntick.core.actor.application.port.out.IActorEventPublisher;
 import com.yowyob.tiibntick.core.actor.domain.event.ActorLocationUpdatedEvent;
 import com.yowyob.tiibntick.core.actor.domain.event.ActorStatusChangedEvent;
@@ -12,25 +14,27 @@ import com.yowyob.tiibntick.core.actor.domain.event.FreelancerDissociatedEvent;
 import com.yowyob.tiibntick.core.actor.domain.event.FreelancerOrgLinkedEvent;
 import com.yowyob.tiibntick.core.actor.domain.event.FreelancerOrgUnlinkedEvent;
 import com.yowyob.tiibntick.core.actor.domain.event.KycValidatedEvent;
-import org.apache.kafka.clients.producer.ProducerRecord;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.UUID;
+
 /**
- * Kafka implementation of {@link IActorEventPublisher}.
+ * Outbox-backed implementation of {@link IActorEventPublisher}.
  *
- * <p>All actor domain events are serialized as JSON and published to their
- * respective Kafka topics using the reactive producer template.
- *
- * <h3> additions</h3>
- * <ul>
- *   <li>{@link #TOPIC_FREELANCER_ORG_LINKED} — {@code tnt.actor.freelancer.org.linked}</li>
- *   <li>{@link #TOPIC_FREELANCER_ORG_UNLINKED} — {@code tnt.actor.freelancer.org.unlinked}</li>
- * </ul>
+ * <p>Chantier C · Audit n°3 · P5 (identity domain): delegates to
+ * {@link PublishEventUseCase} (yow-event-kernel's transactional outbox) instead of a
+ * direct {@code KafkaTemplate.send()}. The envelope is persisted in the caller's
+ * R2DBC transaction and relayed to Kafka asynchronously by {@code OutboxPollerService}
+ * with retry/DLQ — the previous {@code onErrorResume(Mono.empty())} silent-loss
+ * behaviour is gone. The Kafka message body remains the raw event JSON, so existing
+ * consumers are unaffected.
  *
  * @author MANFOUO Braun
  */
@@ -51,49 +55,59 @@ public class KafkaActorEventPublisher implements IActorEventPublisher {
     /**  — published when a freelancer's FreelancerOrganization link is removed. */
     static final String TOPIC_FREELANCER_ORG_UNLINKED   = "tnt.actor.freelancer.org.unlinked";
 
-    private final KafkaTemplate<String, String> kafkaTemplate;
+    private static final String AGGREGATE_TYPE = "Actor";
+    private static final String SOLUTION_CODE = "TNT";
+
+    private final PublishEventUseCase publishEventUseCase;
     private final ObjectMapper objectMapper;
 
     public KafkaActorEventPublisher(
-            @Qualifier("actorKafkaTemplate") KafkaTemplate<String, String> kafkaTemplate,
+            PublishEventUseCase publishEventUseCase,
             @Qualifier("tntAuthObjectMapper") ObjectMapper objectMapper) {
-        this.kafkaTemplate = kafkaTemplate;
+        this.publishEventUseCase = publishEventUseCase;
         this.objectMapper = objectMapper;
     }
 
     @Override
     public Mono<Void> publishActorStatusChanged(ActorStatusChangedEvent event) {
-        return send(TOPIC_ACTOR_STATUS_CHANGED, event.actorId().toString(), event);
+        return enqueue(TOPIC_ACTOR_STATUS_CHANGED, event.eventId(), event.actorId(),
+                event.tenantId(), event.occurredAt(), event);
     }
 
     @Override
     public Mono<Void> publishLocationUpdated(ActorLocationUpdatedEvent event) {
-        return send(TOPIC_ACTOR_LOCATION_UPDATED, event.actorId().toString(), event);
+        return enqueue(TOPIC_ACTOR_LOCATION_UPDATED, event.eventId(), event.actorId(),
+                event.tenantId(), event.occurredAt(), event);
     }
 
     @Override
     public Mono<Void> publishBadgeEarned(BadgeEarnedEvent event) {
-        return send(TOPIC_BADGE_EARNED, event.actorId().toString(), event);
+        return enqueue(TOPIC_BADGE_EARNED, event.eventId(), event.actorId(),
+                event.tenantId(), event.occurredAt(), event);
     }
 
     @Override
     public Mono<Void> publishFreelancerAssociated(FreelancerAssociatedEvent event) {
-        return send(TOPIC_FREELANCER_ASSOCIATED, event.freelancerActorId().toString(), event);
+        return enqueue(TOPIC_FREELANCER_ASSOCIATED, event.eventId(), event.freelancerActorId(),
+                event.tenantId(), event.occurredAt(), event);
     }
 
     @Override
     public Mono<Void> publishFreelancerDissociated(FreelancerDissociatedEvent event) {
-        return send(TOPIC_FREELANCER_DISSOCIATED, event.freelancerActorId().toString(), event);
+        return enqueue(TOPIC_FREELANCER_DISSOCIATED, event.eventId(), event.freelancerActorId(),
+                event.tenantId(), event.occurredAt(), event);
     }
 
     @Override
     public Mono<Void> publishKycValidated(KycValidatedEvent event) {
-        return send(TOPIC_KYC_VALIDATED, event.actorId().toString(), event);
+        return enqueue(TOPIC_KYC_VALIDATED, event.eventId(), event.actorId(),
+                event.tenantId(), event.occurredAt(), event);
     }
 
     @Override
     public Mono<Void> publishMissionAssigned(DelivererMissionAssignedEvent event) {
-        return send(TOPIC_MISSION_ASSIGNED, event.delivererActorId().toString(), event);
+        return enqueue(TOPIC_MISSION_ASSIGNED, event.eventId(), event.delivererActorId(),
+                event.tenantId(), event.occurredAt(), event);
     }
 
     // FreelancerOrganization link events ─────────────────────────────
@@ -101,25 +115,38 @@ public class KafkaActorEventPublisher implements IActorEventPublisher {
     /** {@inheritDoc} */
     @Override
     public Mono<Void> publishFreelancerOrgLinked(FreelancerOrgLinkedEvent event) {
-        return send(TOPIC_FREELANCER_ORG_LINKED, event.actorId().toString(), event);
+        return enqueue(TOPIC_FREELANCER_ORG_LINKED, event.eventId(), event.actorId(),
+                event.tenantId(), event.occurredAt(), event);
     }
 
     /** {@inheritDoc} */
     @Override
     public Mono<Void> publishFreelancerOrgUnlinked(FreelancerOrgUnlinkedEvent event) {
-        return send(TOPIC_FREELANCER_ORG_UNLINKED, event.actorId().toString(), event);
+        return enqueue(TOPIC_FREELANCER_ORG_UNLINKED, event.eventId(), event.actorId(),
+                event.tenantId(), event.occurredAt(), event);
     }
 
     // ── Private helper ─────────────────────────────────────────────────────────
 
-    private Mono<Void> send(String topic, String key, Object payload) {
+    private Mono<Void> enqueue(String topic, UUID eventId, UUID aggregateId,
+                               UUID tenantId, Instant occurredAt, Object payload) {
         return Mono.fromCallable(() -> serialize(payload))
-                .flatMap(json -> Mono.fromFuture(
-                        kafkaTemplate.send(new ProducerRecord<>(topic, key, json))))
+                .map(json -> DomainEventEnvelope.wrap()
+                        .correlationId(eventId.toString())
+                        .eventType(payload.getClass().getSimpleName())
+                        .aggregateId(aggregateId.toString())
+                        .aggregateType(AGGREGATE_TYPE)
+                        .tenantId(tenantId.toString())
+                        .solutionCode(SOLUTION_CODE)
+                        .payload(json)
+                        .kafkaTopic(topic)
+                        .occurredAt(LocalDateTime.ofInstant(occurredAt, ZoneOffset.UTC))
+                        .build())
+                .flatMap(publishEventUseCase::publish)
+                .doOnSuccess(v -> log.debug("Enqueued {} to outbox for topic {}",
+                        payload.getClass().getSimpleName(), topic))
                 .doOnError(ex -> log.error(
-                        "Failed to publish event to topic {}: {}", topic, ex.getMessage()))
-                .onErrorResume(ex -> Mono.empty())
-                .then();
+                        "Failed to enqueue event to outbox for topic {}: {}", topic, ex.getMessage()));
     }
 
     private String serialize(Object obj) {

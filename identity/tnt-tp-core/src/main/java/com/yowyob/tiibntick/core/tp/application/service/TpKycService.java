@@ -18,6 +18,7 @@ import reactor.core.publisher.Mono;
 
 import java.time.Instant;
 import java.util.UUID;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Application service for KYC (Know Your Customer) document management.
@@ -45,6 +46,7 @@ public class TpKycService {
      * Rejects submission if a pending review already exists or profile is already approved.
      */
     @RequirePermission(resource = "actor", action = "write")
+    @Transactional
     public Mono<KycRecord> submit(SubmitKycCommand command) {
         return profileRepository.findByThirdPartyId(command.tenantId(), command.thirdPartyId())
                 .switchIfEmpty(Mono.error(new TntThirdPartyNotFoundException(command.thirdPartyId())))
@@ -82,6 +84,7 @@ public class TpKycService {
      * Approves a KYC record and updates the client profile status.
      */
     @RequirePermission(resource = "actor", action = "approve")
+    @Transactional
     public Mono<KycRecord> approve(ApproveKycCommand command) {
         return kycRecordRepository.findById(command.kycRecordId())
                 .switchIfEmpty(Mono.error(new TntThirdPartyNotFoundException(
@@ -113,6 +116,7 @@ public class TpKycService {
      * Rejects a KYC record with an explanatory reason.
      */
     @RequirePermission(resource = "actor", action = "approve")
+    @Transactional
     public Mono<KycRecord> reject(RejectKycCommand command) {
         return kycRecordRepository.findById(command.kycRecordId())
                 .switchIfEmpty(Mono.error(new TntThirdPartyNotFoundException(

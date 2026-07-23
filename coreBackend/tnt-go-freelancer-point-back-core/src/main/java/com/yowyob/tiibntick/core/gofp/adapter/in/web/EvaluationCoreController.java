@@ -11,6 +11,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @Tag(name = "GOFP — Évaluations", description = "API métier générique — Notations post-livraison")
 @RestController
@@ -22,6 +23,7 @@ public class EvaluationCoreController {
 
     @Operation(summary = "Client note le livreur")
     @PostMapping("/client-rates-freelancer")
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<EvaluationEntity> clientRatesFreelancer(
             @RequestParam UUID deliveryId,
@@ -34,6 +36,7 @@ public class EvaluationCoreController {
 
     @Operation(summary = "Livreur note le client")
     @PostMapping("/freelancer-rates-client")
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<EvaluationEntity> freelancerRatesClient(
             @RequestParam UUID deliveryId,

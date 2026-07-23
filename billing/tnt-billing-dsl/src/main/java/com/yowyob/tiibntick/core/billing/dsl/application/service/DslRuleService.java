@@ -56,8 +56,8 @@ public class DslRuleService implements IDslRuleUseCase {
     }
 
     @Override
-    public Mono<DslRule> updateRule(DslRule rule) {
-        return repository.findById(rule.getId())
+    public Mono<DslRule> updateRule(DslRule rule, UUID tenantId) {
+        return repository.findByIdAndTenantId(rule.getId(), tenantId)
                 .switchIfEmpty(Mono.error(new DslRuleNotFoundException(rule.getId())))
                 .flatMap(existing -> Mono.fromCallable(() -> {
                     List<ValidationError> errors = validatorService.validateRule(rule);
@@ -74,40 +74,40 @@ public class DslRuleService implements IDslRuleUseCase {
     }
 
     @Override
-    public Mono<DslRule> findById(UUID ruleId) {
-        return repository.findById(ruleId)
+    public Mono<DslRule> findById(UUID ruleId, UUID tenantId) {
+        return repository.findByIdAndTenantId(ruleId, tenantId)
                 .switchIfEmpty(Mono.error(new DslRuleNotFoundException(ruleId)));
     }
 
     @Override
-    public Flux<DslRule> findActiveByPolicyId(UUID policyId) {
-        return repository.findActiveByPolicyIdOrderByPriorityAsc(policyId);
+    public Flux<DslRule> findActiveByPolicyId(UUID policyId, UUID tenantId) {
+        return repository.findActiveByPolicyIdAndTenantIdOrderByPriorityAsc(policyId, tenantId);
     }
 
     @Override
-    public Flux<DslRule> findAllByPolicyId(UUID policyId) {
-        return repository.findByPolicyIdOrderByPriorityAsc(policyId);
+    public Flux<DslRule> findAllByPolicyId(UUID policyId, UUID tenantId) {
+        return repository.findByPolicyIdAndTenantIdOrderByPriorityAsc(policyId, tenantId);
     }
 
     @Override
-    public Mono<DslRule> activateRule(UUID ruleId) {
-        return repository.findById(ruleId)
+    public Mono<DslRule> activateRule(UUID ruleId, UUID tenantId) {
+        return repository.findByIdAndTenantId(ruleId, tenantId)
                 .switchIfEmpty(Mono.error(new DslRuleNotFoundException(ruleId)))
                 .map(DslRule::activate)
                 .flatMap(repository::save);
     }
 
     @Override
-    public Mono<DslRule> deactivateRule(UUID ruleId) {
-        return repository.findById(ruleId)
+    public Mono<DslRule> deactivateRule(UUID ruleId, UUID tenantId) {
+        return repository.findByIdAndTenantId(ruleId, tenantId)
                 .switchIfEmpty(Mono.error(new DslRuleNotFoundException(ruleId)))
                 .map(DslRule::deactivate)
                 .flatMap(repository::save);
     }
 
     @Override
-    public Mono<Void> deleteRule(UUID ruleId) {
-        return repository.findById(ruleId)
+    public Mono<Void> deleteRule(UUID ruleId, UUID tenantId) {
+        return repository.findByIdAndTenantId(ruleId, tenantId)
                 .switchIfEmpty(Mono.error(new DslRuleNotFoundException(ruleId)))
                 .flatMap(rule -> {
                     pricingEngine.invalidateCache(ruleId.toString());
@@ -133,7 +133,10 @@ public class DslRuleService implements IDslRuleUseCase {
 
     @Override
     public Mono<EvaluationResult> evaluate(UUID policyId, PricingContext ctx) {
-        return repository.findActiveByPolicyIdOrderByPriorityAsc(policyId)
+        // Audit n°7 · #5 (IDOR) — PricingContext already carries the caller's tenantId;
+        // scope the rule lookup with it so a caller cannot evaluate (and thereby infer)
+        // another tenant's DSL rules by supplying an arbitrary policyId.
+        return repository.findActiveByPolicyIdAndTenantIdOrderByPriorityAsc(policyId, ctx.getTenantId())
                 .collectList()
                 .flatMap(rules -> Mono.fromCallable(() ->
                         pricingEngine.evaluate(rules, ctx, DEFAULT_CURRENCY)))

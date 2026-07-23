@@ -111,6 +111,7 @@ desktop.ini
 *.p12
 *.jks
 *.keystore
+*.pyc
 
 secrets/
 credentials/
@@ -272,3 +273,5 @@ artifacts/
 
 !.gitkeep
 !coreBackend
+docs/diagrams/
+docs/images/

@@ -12,6 +12,7 @@ import com.yowyob.tiibntick.core.gofp.domain.model.enums.DeliveryStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -73,6 +74,9 @@ public class DeliveryCoreService implements IDeliveryUseCase {
     }
 
     @Override
+    // Chantier C · Audit n°3 · P5: the delivery save and the outbox envelope written by
+    // IGofpEventPublisher must commit atomically.
+    @Transactional
     public Mono<DeliveryEntity> completeDelivery(UUID deliveryId, Double lat, Double lon) {
         return findOrThrow(deliveryId).flatMap(d -> {
             d.setStatus(DeliveryStatus.DELIVERED.name());

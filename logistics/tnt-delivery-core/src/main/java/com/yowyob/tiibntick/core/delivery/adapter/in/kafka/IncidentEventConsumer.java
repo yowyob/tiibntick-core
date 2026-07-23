@@ -2,6 +2,7 @@ package com.yowyob.tiibntick.core.delivery.adapter.in.kafka;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yowyob.tiibntick.common.kafka.TntTopics;
 import com.yowyob.tiibntick.core.delivery.application.port.out.DeliveryEventPublisher;
 import com.yowyob.tiibntick.core.delivery.application.port.out.DeliveryRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -64,9 +65,9 @@ public class IncidentEventConsumer {
      * @param record the Kafka consumer record
      */
     @KafkaListener(
-            topics = "tnt.incident.resolved",
+            topics = TntTopics.INCIDENT_RESOLVED,
             groupId = "${spring.kafka.consumer.group-id:tiibntick-core}",
-            containerFactory = "kafkaListenerContainerFactory")
+            containerFactory = "deliveryKafkaListenerContainerFactory")
     public void onIncidentResolved(ConsumerRecord<String, String> record) {
         log.info("Received tnt.incident.resolved — key={}", record.key());
         processIncidentResolutionEvent(record.value(), "tnt.incident.resolved");
@@ -81,9 +82,9 @@ public class IncidentEventConsumer {
      * @param record the Kafka consumer record
      */
     @KafkaListener(
-            topics = "tnt.incident.closed",
+            topics = TntTopics.INCIDENT_CLOSED,
             groupId = "${spring.kafka.consumer.group-id:tiibntick-core}",
-            containerFactory = "kafkaListenerContainerFactory")
+            containerFactory = "deliveryKafkaListenerContainerFactory")
     public void onIncidentClosed(ConsumerRecord<String, String> record) {
         log.debug("Received tnt.incident.closed — key={}", record.key());
         // On closure, also resume any still-paused deliveries (idempotent fallback)

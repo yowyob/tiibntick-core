@@ -23,6 +23,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @Tag(name = "Agency ERP Branches", description = "Agency branch management")
 @RestController
@@ -42,6 +43,7 @@ public class AgencyBranchController {
     }
 
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/agencies/{agencyId}/branches")
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Create a branch")
     public Mono<ApiResponse<AgencyBranchResponse>> create(
@@ -71,6 +73,7 @@ public class AgencyBranchController {
     }
 
     @PatchMapping("/api/v1/tenants/{tenantId}/agency-registry/branches/{branchId}")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Update a branch")
     public Mono<ApiResponse<AgencyBranchResponse>> update(
             @PathVariable UUID tenantId,
@@ -91,6 +94,7 @@ public class AgencyBranchController {
     }
 
     @PatchMapping("/api/v1/tenants/{tenantId}/agency-registry/branches/{branchId}/manager")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Assign branch manager")
     public Mono<ApiResponse<AgencyBranchResponse>> assignManager(
             @PathVariable UUID tenantId,
@@ -100,6 +104,7 @@ public class AgencyBranchController {
     }
 
     @DeleteMapping("/api/v1/tenants/{tenantId}/agency-registry/branches/{branchId}/manager")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Clear branch manager")
     public Mono<ApiResponse<AgencyBranchResponse>> clearManager(
             @PathVariable UUID tenantId,
@@ -108,6 +113,7 @@ public class AgencyBranchController {
     }
 
     @PatchMapping("/api/v1/tenants/{tenantId}/agency-registry/branches/{branchId}/status")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Change branch status")
     public Mono<ApiResponse<AgencyBranchResponse>> changeStatus(
             @PathVariable UUID tenantId,
@@ -117,6 +123,7 @@ public class AgencyBranchController {
     }
 
     @DeleteMapping("/api/v1/tenants/{tenantId}/agency-registry/branches/{branchId}")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Close a branch")
     public Mono<ApiResponse<Void>> close(
             @PathVariable UUID tenantId,

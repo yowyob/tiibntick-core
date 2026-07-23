@@ -13,13 +13,11 @@ import com.yowyob.tiibntick.core.dispute.infrastructure.adapter.out.persistence.
 import com.yowyob.tiibntick.core.dispute.infrastructure.adapter.out.persistence.entity.DisputeEscalationEntity;
 import com.yowyob.tiibntick.core.dispute.infrastructure.adapter.out.persistence.entity.DisputeEventEntity;
 import com.yowyob.tiibntick.core.dispute.infrastructure.adapter.out.persistence.mapper.DisputePersistenceMapper;
-import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import java.time.Duration;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -52,21 +50,6 @@ public class DisputeRepositoryAdapter implements IDisputeRepository {
         this.commentRepo = commentRepo;
         this.escalationRepo = escalationRepo;
         this.objectMapper = objectMapper;
-    }
-
-    @PostConstruct
-    public void initReferenceSequence() {
-        disputeRepo.findMaxReferenceSequence()
-                .doOnNext(max -> {
-                    DisputeReference.initSequence(max);
-                    log.info("Dispute reference sequence initialized to {}", max);
-                })
-                .timeout(Duration.ofSeconds(5))
-                .onErrorResume(e -> {
-                    log.warn("Could not initialize dispute reference sequence, starting at 0: {}", e.getMessage());
-                    return Mono.empty();
-                })
-                .block(Duration.ofSeconds(6));
     }
 
     @Override

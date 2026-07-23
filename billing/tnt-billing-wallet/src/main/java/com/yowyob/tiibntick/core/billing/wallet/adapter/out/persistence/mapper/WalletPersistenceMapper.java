@@ -1,10 +1,12 @@
 package com.yowyob.tiibntick.core.billing.wallet.adapter.out.persistence.mapper;
 
 import com.yowyob.tiibntick.core.billing.wallet.adapter.out.persistence.entity.PaymentIntentEntity;
+import com.yowyob.tiibntick.core.billing.wallet.adapter.out.persistence.entity.ReconciliationEntity;
 import com.yowyob.tiibntick.core.billing.wallet.adapter.out.persistence.entity.WalletEntity;
 import com.yowyob.tiibntick.core.billing.wallet.adapter.out.persistence.entity.WalletTransactionEntity;
 import com.yowyob.tiibntick.core.billing.wallet.domain.enums.PaymentChannel;
 import com.yowyob.tiibntick.core.billing.wallet.domain.enums.PaymentIntentStatus;
+import com.yowyob.tiibntick.core.billing.wallet.domain.enums.ReconciliationStatus;
 import com.yowyob.tiibntick.core.billing.wallet.domain.enums.TransactionType;
 import com.yowyob.tiibntick.core.billing.wallet.domain.enums.WalletOwnerType;
 import com.yowyob.tiibntick.core.billing.wallet.domain.enums.WalletStatus;
@@ -32,7 +34,10 @@ import org.mapstruct.*;
         PaymentChannel.class,
         TransactionStatus.class,
         PaymentIntentId.class,
-        PaymentIntentStatus.class
+        PaymentIntentStatus.class,
+        ReconciliationId.class,
+        ReconciliationStatus.class,
+        java.time.YearMonth.class
     }
 )
 public interface WalletPersistenceMapper {
@@ -102,4 +107,27 @@ public interface WalletPersistenceMapper {
     @Mapping(target = "status", expression = "java(PaymentIntentStatus.valueOf(entity.getStatus()))")
     @Mapping(target = "metadata", ignore = true)
     PaymentIntent toDomain(PaymentIntentEntity entity);
+
+    // ── ReconciliationRecord ──────────────────────────────────────────────
+
+    @Mapping(target = "id", expression = "java(record.getId().value())")
+    @Mapping(target = "tenantId", source = "tenantId")
+    @Mapping(target = "periodYear", expression = "java(record.getPeriod().getYear())")
+    @Mapping(target = "periodMonth", expression = "java(record.getPeriod().getMonthValue())")
+    @Mapping(target = "walletTotal", expression = "java(record.getWalletTotal().amount())")
+    @Mapping(target = "bankStatementTotal", expression = "java(record.getBankStatementTotal().amount())")
+    @Mapping(target = "discrepancy", expression = "java(record.getDiscrepancy().amount())")
+    @Mapping(target = "currency", expression = "java(record.getWalletTotal().currencyCode())")
+    @Mapping(target = "status", expression = "java(record.getStatus().name())")
+    @Mapping(target = "isNew", ignore = true)
+    ReconciliationEntity toEntity(ReconciliationRecord record);
+
+    @Mapping(target = "id", expression = "java(ReconciliationId.of(entity.getId()))")
+    @Mapping(target = "tenantId", source = "tenantId")
+    @Mapping(target = "period", expression = "java(YearMonth.of(entity.getPeriodYear(), entity.getPeriodMonth()))")
+    @Mapping(target = "walletTotal", expression = "java(Money.of(entity.getWalletTotal(), entity.getCurrency()))")
+    @Mapping(target = "bankStatementTotal", expression = "java(Money.of(entity.getBankStatementTotal(), entity.getCurrency()))")
+    @Mapping(target = "discrepancy", expression = "java(Money.of(entity.getDiscrepancy(), entity.getCurrency()))")
+    @Mapping(target = "status", expression = "java(ReconciliationStatus.valueOf(entity.getStatus()))")
+    ReconciliationRecord toDomain(ReconciliationEntity entity);
 }

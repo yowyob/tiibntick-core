@@ -2,6 +2,7 @@ package com.yowyob.tiibntick.core.notify.infrastructure.messaging;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yowyob.kernel.i18n.domain.enums.SupportedLanguage;
 import com.yowyob.tiibntick.core.notify.application.port.in.ISendNotificationUseCase;
 import com.yowyob.tiibntick.core.notify.config.NotifyProperties;
 import com.yowyob.tiibntick.core.notify.domain.enums.NotificationChannel;
@@ -96,7 +97,7 @@ public class FreelancerOrgKafkaEventConsumer {
             // Notify OWNER — we use orgId as recipientId (resolved to ownerActorId by
             // preference layer)
             NotificationModel model = new NotificationModel(
-                    templateKey, "fr",
+                    templateKey, SupportedLanguage.FR_CM.getTag(),
                     Map.of("orgId", nullSafe(orgId), "kycLevel", nullSafe(kycLevel)),
                     NotificationPriority.HIGH);
 
@@ -118,7 +119,7 @@ public class FreelancerOrgKafkaEventConsumer {
             String orgId = jsonText(json, "orgId");
             String reason = jsonText(json, "reason");
             NotificationModel model = new NotificationModel(
-                    "notify.freelancer_org.kyc_rejected", "fr",
+                    "notify.freelancer_org.kyc_rejected", SupportedLanguage.FR_CM.getTag(),
                     Map.of("orgId", nullSafe(orgId), "reason", nullSafe(reason)),
                     NotificationPriority.HIGH);
             return notificationUseCase.send(tenantId, organizationId, orgId, orgId, model, NotificationChannel.PUSH_FCM)
@@ -138,7 +139,7 @@ public class FreelancerOrgKafkaEventConsumer {
             String orgId = jsonText(json, "orgId");
             String reason = jsonText(json, "reason");
             NotificationModel model = new NotificationModel(
-                    "notify.freelancer_org.suspended", "fr",
+                    "notify.freelancer_org.suspended", SupportedLanguage.FR_CM.getTag(),
                     Map.of("orgId", nullSafe(orgId), "reason", nullSafe(reason)),
                     NotificationPriority.HIGH);
             return notificationUseCase.send(tenantId, organizationId, orgId, orgId, model, NotificationChannel.PUSH_FCM)
@@ -157,7 +158,7 @@ public class FreelancerOrgKafkaEventConsumer {
             String organizationId = resolveOrganizationId(json);
             String orgId = jsonText(json, "orgId");
             NotificationModel model = new NotificationModel(
-                    "notify.freelancer_org.unsuspended", "fr",
+                    "notify.freelancer_org.unsuspended", SupportedLanguage.FR_CM.getTag(),
                     Map.of("orgId", nullSafe(orgId)),
                     NotificationPriority.NORMAL);
             return notificationUseCase.send(tenantId, organizationId, orgId, orgId, model, NotificationChannel.PUSH_FCM)
@@ -183,7 +184,7 @@ public class FreelancerOrgKafkaEventConsumer {
 
             // Notify the org about mission assignment
             NotificationModel modelOrg = new NotificationModel(
-                    "notify.freelancer_org.mission_assigned", "fr",
+                    "notify.freelancer_org.mission_assigned", SupportedLanguage.FR_CM.getTag(),
                     Map.of("deliveryId", nullSafe(deliveryId),
                             "freelancerOrgId", nullSafe(freelancerOrgId)),
                     NotificationPriority.HIGH);
@@ -196,7 +197,7 @@ public class FreelancerOrgKafkaEventConsumer {
                 String subDelivererId = jsonText(json, "deliveryPersonId");
                 if (subDelivererId != null && !subDelivererId.isBlank()) {
                     NotificationModel modelSub = new NotificationModel(
-                            "notify.sub_deliverer.mission_assigned", "fr",
+                            "notify.sub_deliverer.mission_assigned", SupportedLanguage.FR_CM.getTag(),
                             Map.of("deliveryId", nullSafe(deliveryId),
                                     "orgId", nullSafe(freelancerOrgId)),
                             NotificationPriority.HIGH);
@@ -223,7 +224,7 @@ public class FreelancerOrgKafkaEventConsumer {
             String templateCode = jsonText(json, "templateCode");
             String policyId = jsonText(json, "policyId");
             NotificationModel model = new NotificationModel(
-                    "notify.billing.template_applied", "fr",
+                    "notify.billing.template_applied", SupportedLanguage.FR_CM.getTag(),
                     Map.of("actorId", nullSafe(actorId),
                             "templateCode", nullSafe(templateCode),
                             "policyId", nullSafe(policyId)),

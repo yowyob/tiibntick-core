@@ -2,6 +2,7 @@ package com.yowyob.tiibntick.core.agency.fleet.application.mapper;
 
 import com.yowyob.tiibntick.core.agency.fleet.adapter.out.persistence.entity.VehicleEntity;
 import com.yowyob.tiibntick.core.agency.fleet.domain.Vehicle;
+import com.yowyob.tiibntick.core.agency.fleet.domain.vo.VehicleSource;
 import com.yowyob.tiibntick.core.agency.fleet.domain.vo.VehicleStatus;
 import com.yowyob.tiibntick.core.agency.fleet.domain.vo.VehicleType;
 
@@ -25,6 +26,9 @@ public final class FleetMapper {
         e.setAssignedAt(v.getAssignedAt());
         e.setMaintenanceStartedAt(v.getMaintenanceStartedAt());
         e.setCoreVehicleId(v.getCoreVehicleId());
+        e.setSource(v.getSource() != null ? v.getSource().name() : VehicleSource.AGENCY.name());
+        e.setFleetmanVehicleId(v.getFleetmanVehicleId());
+        e.setLastSyncedAt(v.getLastSyncedAt());
         e.setCreatedAt(v.getCreatedAt());
         e.setUpdatedAt(v.getUpdatedAt());
         e.setVersion(v.getVersion());
@@ -32,6 +36,10 @@ public final class FleetMapper {
     }
 
     public static Vehicle toDomain(VehicleEntity e) {
+        VehicleSource source = VehicleSource.AGENCY;
+        if (e.getSource() != null && !e.getSource().isBlank()) {
+            source = VehicleSource.valueOf(e.getSource());
+        }
         return new Vehicle(
                 e.getId(), e.getTenantId(), e.getAgencyId(), e.getBranchId(),
                 e.getAssignedDelivererId(), e.getLicensePlate(), e.getBrand(), e.getModel(),
@@ -39,6 +47,7 @@ public final class FleetMapper {
                 VehicleType.valueOf(e.getVehicleType()),
                 VehicleStatus.valueOf(e.getStatus()),
                 e.getAssignedAt(), e.getMaintenanceStartedAt(), e.getCoreVehicleId(),
+                source, e.getFleetmanVehicleId(), e.getLastSyncedAt(),
                 e.getCreatedAt(), e.getUpdatedAt(),
                 e.getVersion() != null ? e.getVersion() : 0L);
     }

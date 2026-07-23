@@ -2,32 +2,43 @@ package com.yowyob.tiibntick.core.trust.adapter.out.messaging;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.micrometer.core.instrument.MeterRegistry;
+import com.yowyob.kernel.event.application.port.in.PublishEventBatchUseCase;
+import com.yowyob.kernel.event.application.port.in.PublishEventUseCase;
+import com.yowyob.kernel.event.domain.model.DomainEventEnvelope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 import com.yowyob.tiibntick.core.trust.domain.model.valueobject.LogisticTrustEvent;
 import com.yowyob.tiibntick.core.trust.domain.service.TrustEventEnvelopeMapper;
 import com.yowyob.tiibntick.core.trust.application.port.out.TrustEventPublisherPort;
 
 import java.util.List;
-import java.util.Map;
 
 /**
- * Kafka Adapter — {@code KafkaTrustEventPublisherAdapter}.
+ * Outbox-backed adapter — {@code KafkaTrustEventPublisherAdapter}.
  *
- * <p>Implements {@link TrustEventPublisherPort} by serializing
- * {@link LogisticTrustEvent} instances into the standard
- * {@code TrustEventKafkaMessage} JSON format and publishing them to the
- * {@code yow.trust.events} topic.
+ * <p>Chantier C · Audit n°3 · P5 migration (see
+ * {@code docs/audits/remediation/chantier-c-p5-inventory.md}): implements
+ * {@link TrustEventPublisherPort} by delegating to {@link PublishEventUseCase}/
+ * {@link PublishEventBatchUseCase} (yow-event-kernel's transactional outbox)
+ * instead of sending to Kafka directly. Envelopes are persisted in the same DB
+ * transaction as the business write (see the {@code @Transactional} boundaries
+ * in the trust chain services), and {@code OutboxPollerService} relays them to
+ * Kafka asynchronously with retry/DLQ — an anchoring record can no longer be
+ * saved while its trust event is silently lost.
  *
- * <h3>Message Structure</h3>
- * <p>The Kafka message JSON conforms to the {@code TrustEventKafkaMessage}
- * contract of {@code yow-trust-event}:
+ * <p>This supersedes the module's previous bespoke resilience mechanism
+ * (availability guard + {@code trustEventGatewayWrite} circuit breaker +
+ * {@code trust_retry_queue} drain, §15 of the Trust connexion design): the
+ * outbox provides the same no-event-lost guarantee with strictly stronger
+ * atomicity, so that mechanism has been removed.
+ *
+ * <h3>Message Structure — unchanged wire format</h3>
+ * <p>The Kafka message body is still the exact {@code TrustEventKafkaMessage}
+ * JSON contract of {@code yow-trust-event}, produced by
+ * {@link TrustEventEnvelopeMapper}:
  * <pre>
  * {
  *   "correlationId":  "uuid",
@@ -41,13 +52,17 @@ import java.util.Map;
  *   "occurredAt":     "2025-01-01T12:00:00"
  * }
  * </pre>
+ * Only the transport changed (outbox instead of direct {@code KafkaTemplate}),
+ * so the consuming {@code yow-trust-event} Kernel microservice requires no change.
  *
  * <h3>Message Key</h3>
- * <p>The Kafka message key is the {@code entityId}, ensuring that all events
- * for the same entity are routed to the same Kafka partition (ordering guarantee).
+ * <p>The Kafka message key is still the {@code entityId} (the envelope's
+ * {@code kafkaPartitionKey} defaults to its {@code aggregateId}), ensuring that
+ * all events for the same entity are routed to the same Kafka partition
+ * (ordering guarantee).
  *
  * @author MANFOUO Braun
- * @version 1.0
+ * @version 2.0
  */
 @Component
 public class KafkaTrustEventPublisherAdapter implements TrustEventPublisherPort {
@@ -57,100 +72,71 @@ public class KafkaTrustEventPublisherAdapter implements TrustEventPublisherPort 
     /** Kafka topic consumed by yow-trust-event. */
     public static final String TRUST_EVENTS_TOPIC = "yow.trust.events";
 
-    private final KafkaTemplate<String, String> kafkaTemplate;
+    private static final String SOLUTION_CODE = LogisticTrustEvent.SOLUTION_CODE;
+
+    private final PublishEventUseCase publishEventUseCase;
+    private final PublishEventBatchUseCase publishEventBatchUseCase;
     private final ObjectMapper objectMapper;
-    private final MeterRegistry meterRegistry;
 
     public KafkaTrustEventPublisherAdapter(
-            @Qualifier("tntTrustKafkaTemplate") final KafkaTemplate<String, String> kafkaTemplate,
-            final ObjectMapper objectMapper,
-            final MeterRegistry meterRegistry) {
-        this.kafkaTemplate = kafkaTemplate;
+            final PublishEventUseCase publishEventUseCase,
+            final PublishEventBatchUseCase publishEventBatchUseCase,
+            final ObjectMapper objectMapper) {
+        this.publishEventUseCase = publishEventUseCase;
+        this.publishEventBatchUseCase = publishEventBatchUseCase;
         this.objectMapper = objectMapper;
-        this.meterRegistry = meterRegistry;
     }
 
     /** {@inheritDoc} */
     @Override
     public Mono<Void> publish(final LogisticTrustEvent event) {
-        return Mono.fromRunnable(() -> doPublish(event))
-                .subscribeOn(Schedulers.boundedElastic())
-                .then();
+        return Mono.fromCallable(() -> toOutboxEnvelope(event))
+                .flatMap(publishEventUseCase::publish)
+                .doOnSuccess(v -> log.debug("Enqueued trust event to outbox — correlationId={}, type={}",
+                        event.getCorrelationId(), event.getLogisticEventType()))
+                .doOnError(ex -> log.error("Failed to enqueue trust event to outbox — correlationId={}",
+                        event.getCorrelationId(), ex));
     }
 
     /** {@inheritDoc} */
     @Override
     public Mono<Void> publishAll(final List<LogisticTrustEvent> events) {
-        return events.stream()
-                .reduce(Mono.<Void>empty(),
-                        (acc, e) -> acc.then(publish(e)),
-                        (a, b) -> a.then(b));
-    }
-
-    /**
-     * Serializes a {@link LogisticTrustEvent} into the wire-format JSON envelope,
-     * without sending it. Used by {@code LogisticEventPublisherService} to persist
-     * the exact payload that would have been sent to Kafka into the local
-     * {@code trust_retry_queue} when the gateway is degraded (see resilience §15
-     * of the Trust connexion design — {@code TNT_CORE_Connexion_Trust_Module.md}).
-     *
-     * @param event the logistic trust event to serialize
-     * @return the JSON envelope string, ready to be republished verbatim via {@link #republish}
-     */
-    public String toEnvelopeJson(final LogisticTrustEvent event) throws JsonProcessingException {
-        return objectMapper.writeValueAsString(TrustEventEnvelopeMapper.toEnvelope(event));
-    }
-
-    /**
-     * Re-sends a previously-serialized envelope verbatim to {@value #TRUST_EVENTS_TOPIC}.
-     * Used exclusively by {@code TrustRetryQueueDrainer} to drain
-     * {@code trust_retry_queue} rows once {@code yow-trust-event}/Kafka connectivity
-     * is confirmed available again — bypasses {@link LogisticTrustEvent} entirely
-     * since the retry queue stores the wire envelope, not the domain object.
-     *
-     * @param messageKey  the Kafka partition key (the original {@code entityId})
-     * @param messageJson the pre-serialized JSON envelope
-     * @return a {@link Mono} completing when the Kafka send has been acknowledged
-     */
-    public Mono<Void> republish(final String messageKey, final String messageJson) {
-        return Mono.fromFuture(() -> kafkaTemplate.send(TRUST_EVENTS_TOPIC, messageKey, messageJson))
-                .doOnNext(result -> log.debug("Retry-queue drain: republished to Kafka — key={}, offset={}",
-                        messageKey, result.getRecordMetadata().offset()))
-                .subscribeOn(Schedulers.boundedElastic())
+        if (events == null || events.isEmpty()) {
+            return Mono.empty();
+        }
+        return Flux.fromIterable(events)
+                .map(this::toOutboxEnvelope)
+                .collectList()
+                .flatMap(publishEventBatchUseCase::publishAll)
                 .then();
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
     /**
-     * Serializes and sends the event to Kafka.
-     * Uses the {@code entityId} as the message key to guarantee per-entity ordering.
+     * Wraps a {@link LogisticTrustEvent} into the outbox's
+     * {@link DomainEventEnvelope}. The envelope payload is the exact same
+     * {@code TrustEventKafkaMessage} JSON previously sent directly to Kafka;
+     * the envelope's own metadata only drives outbox routing (topic, partition
+     * key, tenant, correlation id).
      */
-    private void doPublish(final LogisticTrustEvent event) {
+    private DomainEventEnvelope toOutboxEnvelope(final LogisticTrustEvent event) {
         try {
-            final Map<String, Object> message = TrustEventEnvelopeMapper.toEnvelope(event);
-            final String json = objectMapper.writeValueAsString(message);
-
-            // Key = entityId → same-partition ordering for the same entity
-            kafkaTemplate.send(TRUST_EVENTS_TOPIC, event.getEntityId(), json)
-                    .whenComplete((result, ex) -> {
-                        if (ex != null) {
-                            log.error("Failed to publish event correlationId={}: {}",
-                                    event.getCorrelationId(), ex.getMessage());
-                            meterRegistry.counter("tnt.trust.kafka.publish.error",
-                                    "type", event.getLogisticEventType().name()).increment();
-                        } else {
-                            log.debug("Published to Kafka — correlationId={}, offset={}",
-                                    event.getCorrelationId(),
-                                    result.getRecordMetadata().offset());
-                        }
-                    });
-
-        } catch (final Exception e) {
-            log.error("Failed to serialize LogisticTrustEvent correlationId={}: {}",
-                    event.getCorrelationId(), e.getMessage());
-            throw new RuntimeException("Kafka publish failed for correlationId="
-                    + event.getCorrelationId(), e);
+            final String payload = objectMapper.writeValueAsString(TrustEventEnvelopeMapper.toEnvelope(event));
+            return DomainEventEnvelope.wrap()
+                    .correlationId(event.getCorrelationId())
+                    .eventType(event.toKernelEventType())
+                    .aggregateId(event.getEntityId())
+                    .aggregateType(event.getEntityType())
+                    .tenantId(event.getTenantId())
+                    .solutionCode(SOLUTION_CODE)
+                    .payload(payload)
+                    .kafkaTopic(TRUST_EVENTS_TOPIC)
+                    .occurredAt(event.getOccurredAt())
+                    .build();
+        } catch (final JsonProcessingException e) {
+            throw new IllegalStateException(
+                    "Cannot serialize LogisticTrustEvent correlationId=" + event.getCorrelationId(), e);
         }
     }
 }

@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -109,6 +110,7 @@ public class AccountingApplicationService implements
      * (best-effort — failure proceeds without a link), validates balance, posts, and
      * persists the entry. Account balances are updated reactively after posting.</p>
      */
+    @Transactional
     @Override
     public Mono<JournalEntry> postJournalEntry(PostJournalEntryCommand command) {
         int year = LocalDate.now().getYear();
@@ -296,6 +298,7 @@ public class AccountingApplicationService implements
 
     // ─── CloseAccountingPeriodUseCase ─────────────────────────────────────────
 
+    @Transactional
     @Override
     public Mono<AccountingPeriod> closePeriod(UUID tenantId, int year, int month, String closedByUserId) {
         return accountingPeriodRepository.findByTenantIdAndYearAndMonth(tenantId, year, month)

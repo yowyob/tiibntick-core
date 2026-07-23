@@ -1,14 +1,18 @@
 package com.yowyob.tiibntick.core.resource.adapter.in.web;
 
+import com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser;
+import com.yowyob.tiibntick.core.auth.domain.model.TntUserIdentity;
 import com.yowyob.tiibntick.core.resource.application.port.in.*;
 import com.yowyob.tiibntick.core.resource.domain.model.Equipment;
 import com.yowyob.tiibntick.core.resource.domain.model.EquipmentStatus;
 import com.yowyob.tiibntick.core.resource.domain.model.EquipmentType;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -37,11 +41,12 @@ public class EquipmentController {
     @Operation(summary = "Register new equipment")
     @PostMapping("/api/resources/equipment")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("isAuthenticated()")
     public Mono<Equipment> createEquipment(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestBody CreateEquipmentRequest body) {
         CreateEquipmentCommand cmd = new CreateEquipmentCommand(
-                tenantId,
+                currentUser.tenantId(),
                 body.organizationId() != null ? UUID.fromString(body.organizationId()) : null,
                 body.agencyId() != null ? UUID.fromString(body.agencyId()) : null,
                 EquipmentType.valueOf(body.type()),
@@ -55,30 +60,31 @@ public class EquipmentController {
     @Operation(summary = "Get equipment by ID")
     @GetMapping("/api/resources/equipment/{equipmentId}")
     public Mono<Equipment> getEquipment(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @PathVariable UUID equipmentId) {
-        return getEquipmentUseCase.getEquipment(tenantId, equipmentId);
+        return getEquipmentUseCase.getEquipment(currentUser.tenantId(), equipmentId);
     }
 
     @Operation(summary = "List equipment for a branch")
     @GetMapping("/api/resources/branches/{branchId}/equipment")
     public Flux<Equipment> listByBranch(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @PathVariable UUID branchId,
             @RequestParam(required = false) String status) {
         EquipmentStatus statusFilter = status != null ? EquipmentStatus.valueOf(status) : null;
-        return listEquipmentByBranchUseCase.listByBranch(tenantId, branchId, statusFilter);
+        return listEquipmentByBranchUseCase.listByBranch(currentUser.tenantId(), branchId, statusFilter);
     }
 
     @Operation(summary = "Assign equipment to a user or branch")
     @PostMapping("/api/resources/equipment/{equipmentId}/assign")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("isAuthenticated()")
     public Mono<Void> assignEquipment(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @PathVariable UUID equipmentId,
             @RequestBody AssignEquipmentRequest body) {
         AssignEquipmentCommand cmd = new AssignEquipmentCommand(
-                tenantId,
+                currentUser.tenantId(),
                 equipmentId,
                 body.userId() != null ? UUID.fromString(body.userId()) : null);
         return assignEquipmentUseCase.assignEquipment(cmd).then();
@@ -87,10 +93,11 @@ public class EquipmentController {
     @Operation(summary = "Unassign equipment from its current user")
     @DeleteMapping("/api/resources/equipment/{equipmentId}/assign")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("isAuthenticated()")
     public Mono<Void> unassignEquipment(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @PathVariable UUID equipmentId) {
-        return unassignEquipmentUseCase.unassignEquipment(tenantId, equipmentId).then();
+        return unassignEquipmentUseCase.unassignEquipment(currentUser.tenantId(), equipmentId).then();
     }
 
     // ── Request DTOs ──────────────────────────────────────────────────────────

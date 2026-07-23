@@ -24,6 +24,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * Generic Market API for provider reviews — clients rate providers after a
@@ -42,6 +43,7 @@ public class ProviderReviewController {
 
     @Operation(summary = "Submit a review for a provider following a completed order")
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<ProviderReviewResponse> submit(@Valid @RequestBody SubmitReviewCommand command) {
         return reviewUseCase.submitReview(command);
@@ -49,6 +51,7 @@ public class ProviderReviewController {
 
     @Operation(summary = "Approve (publish) a pending review")
     @PostMapping("/{id}/approve")
+    @PreAuthorize("isAuthenticated()")
     public Mono<ProviderReviewResponse> approve(
             @PathVariable UUID id,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
@@ -57,6 +60,7 @@ public class ProviderReviewController {
 
     @Operation(summary = "Reject a pending review")
     @PostMapping("/{id}/reject")
+    @PreAuthorize("isAuthenticated()")
     public Mono<ProviderReviewResponse> reject(
             @PathVariable UUID id,
             @RequestParam String reason,
@@ -66,6 +70,7 @@ public class ProviderReviewController {
 
     @Operation(summary = "Flag a published review for re-moderation")
     @PostMapping("/{id}/flag")
+    @PreAuthorize("isAuthenticated()")
     public Mono<ProviderReviewResponse> flag(
             @PathVariable UUID id,
             @RequestParam String reason,

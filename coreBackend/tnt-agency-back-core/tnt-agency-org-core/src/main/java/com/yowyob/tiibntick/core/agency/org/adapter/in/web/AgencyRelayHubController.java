@@ -20,6 +20,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * Relay hub configuration and hub-ops (parcel index → inventory-core).
@@ -42,6 +43,7 @@ public class AgencyRelayHubController {
     }
 
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/agencies/{agencyId}/hubs")
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Create a relay hub")
     public Mono<ApiResponse<AgencyRelayHubResponse>> create(
@@ -66,6 +68,7 @@ public class AgencyRelayHubController {
     }
 
     @PatchMapping("/api/v1/tenants/{tenantId}/agency-registry/hubs/{hubId}")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Configure a relay hub")
     public Mono<ApiResponse<AgencyRelayHubResponse>> configure(
             @PathVariable UUID tenantId,
@@ -78,6 +81,7 @@ public class AgencyRelayHubController {
     }
 
     @PatchMapping("/api/v1/tenants/{tenantId}/agency-registry/hubs/{hubId}/branch")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Attach hub to a branch")
     public Mono<ApiResponse<AgencyRelayHubResponse>> attachToBranch(
             @PathVariable UUID tenantId,
@@ -87,6 +91,7 @@ public class AgencyRelayHubController {
     }
 
     @PatchMapping("/api/v1/tenants/{tenantId}/agency-registry/hubs/{hubId}/status")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Open or close a hub")
     public Mono<ApiResponse<AgencyRelayHubResponse>> changeStatus(
             @PathVariable UUID tenantId,

@@ -22,11 +22,23 @@ public class HubParcelExpiryService {
     private final HubOccupancyService occupancyService;
     private final AgencyEventPublisher eventPublisher;
 
+    /** Process expired parcels for one tenant (manual API). */
     @Transactional
     public Mono<Integer> processExpired(UUID tenantId) {
         Instant now = Instant.now();
         return parcelRepo.findByTenantIdAndStatusAndWithdrawalDeadlineBefore(
                         tenantId, ParcelStatus.DEPOSITED.name(), now)
+                .map(HubParcelMapper::toDomain)
+                .flatMap(record -> expireOne(record, now))
+                .count()
+                .map(Long::intValue);
+    }
+
+    /** Process expired parcels across all tenants (scheduled job). */
+    @Transactional
+    public Mono<Integer> processExpiredAllTenants() {
+        Instant now = Instant.now();
+        return parcelRepo.findByStatusAndWithdrawalDeadlineBefore(ParcelStatus.DEPOSITED.name(), now)
                 .map(HubParcelMapper::toDomain)
                 .flatMap(record -> expireOne(record, now))
                 .count()

@@ -40,6 +40,12 @@
 
     <dependencies>
 
+        <!-- ── tnt-auth-core (Foundation L1 — security context, @CurrentUser) ── -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-auth-core</artifactId>
+        </dependency>
+
         <!-- ── Kernel Yowyob (RT-comops) ── -->
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>
@@ -171,6 +177,27 @@
             <groupId>org.testcontainers</groupId>
             <artifactId>kafka</artifactId>
             <scope>test</scope>
+        </dependency>
+        <!-- @Testcontainers/@Container annotations for DisputeReferenceSequenceAdapterIntegrationTest
+             (Chantier D · Audit n°6 · S1) — same artifact tnt-trust-core uses for its own
+             Liquibase-changelog-end-to-end Postgres integration test. -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- @SchedulerLock annotation (Chantier D · Audit n°6 · S2) — distributed lock around
+             this module's @Scheduled job(s); LockProvider bean lives centrally in
+             tnt-bootstrap's TntSchedulerLockConfig. -->
+        <dependency>
+            <groupId>net.javacrumbs.shedlock</groupId>
+            <artifactId>shedlock-spring</artifactId>
         </dependency>
 
     </dependencies>

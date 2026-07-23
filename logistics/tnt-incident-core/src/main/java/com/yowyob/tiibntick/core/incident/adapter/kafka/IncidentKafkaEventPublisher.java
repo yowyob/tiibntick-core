@@ -1,17 +1,34 @@
 package com.yowyob.tiibntick.core.incident.adapter.kafka;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yowyob.kernel.event.application.port.in.PublishEventUseCase;
+import com.yowyob.kernel.event.domain.model.DomainEventEnvelope;
 import com.yowyob.tiibntick.core.incident.domain.event.IncidentDomainEvents.*;
 import com.yowyob.tiibntick.core.incident.port.outbound.IIncidentEventPublisher;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
+
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.UUID;
 
 /**
- * Kafka implementation of IIncidentEventPublisher publishing all twelve domain events to their dedicated topics.
+ * Outbox-backed implementation of {@link IIncidentEventPublisher} publishing all twelve
+ * domain events to their dedicated topics.
+ *
+ * <p>Chantier C · Audit n°3 · P5 (see {@code docs/audits/remediation/chantier-c-p5-inventory.md}):
+ * delegates to {@link PublishEventUseCase} (yow-event-kernel's transactional outbox) instead of
+ * sending to Kafka directly via {@code KafkaTemplate} (which was fire-and-forget: the send future
+ * was never even awaited). Envelopes are persisted in the same DB transaction as the business
+ * write (see the {@code @Transactional} boundaries in the incident application services), and
+ * {@code OutboxPollerService} relays them to Kafka asynchronously with retry/DLQ.
+ *
+ * <p>The Kafka wire format is unchanged: each event is still serialized as the raw domain event
+ * JSON with the incident id as the record key — only the transport changed, so existing
+ * consumers require no change.
  *
  * <p>Part of the tnt-incident-core module - TiiBnTick Logistics Layer.
  *
@@ -19,18 +36,20 @@ import reactor.core.scheduler.Schedulers;
  * @version 0.0.1
  * @since TiiBnTick Core 0.0.1
  */
-
 @Slf4j
 @Component
 public class IncidentKafkaEventPublisher implements IIncidentEventPublisher {
 
-    private final KafkaTemplate<String, String> kafkaTemplate;
+    private static final String AGGREGATE_TYPE = "Incident";
+    private static final String SOLUTION_CODE = "TNT";
+
+    private final PublishEventUseCase publishEventUseCase;
     private final ObjectMapper objectMapper;
 
     public IncidentKafkaEventPublisher(
-            @Qualifier("incidentKafkaTemplate") KafkaTemplate<String, String> kafkaTemplate,
+            PublishEventUseCase publishEventUseCase,
             @Qualifier("incidentObjectMapper") ObjectMapper objectMapper) {
-        this.kafkaTemplate = kafkaTemplate;
+        this.publishEventUseCase = publishEventUseCase;
         this.objectMapper = objectMapper;
     }
 
@@ -47,95 +66,98 @@ public class IncidentKafkaEventPublisher implements IIncidentEventPublisher {
     private static final String TOPIC_INTERAGENCY_REQ   = "tnt.incident.interagency.requested";
     private static final String TOPIC_INTERAGENCY_DONE  = "tnt.incident.interagency.completed";
 
-    /**
-     * Publishes an {@link com.yowyob.tiibntick.core.incident.domain.event.IncidentDomainEvents.IncidentCreatedEvent}
-     * to the {@code tnt.incident.created} Kafka topic.
-     *
-     * @param event the domain event to publish
-     */
-    /**
-     * Publishes an {@link com.yowyob.tiibntick.core.incident.domain.event.IncidentDomainEvents.IncidentResolvedEvent}
-     * to the {@code tnt.incident.resolved} Kafka topic.
-     *
-     * @param event the domain event to publish
-     */
-    /**
-     * Publishes an {@link com.yowyob.tiibntick.core.incident.domain.event.IncidentDomainEvents.IncidentClosedEvent}
-     * to the {@code tnt.incident.closed} Kafka topic.
-     *
-     * @param event the domain event to publish
-     */
-    /**
-     * Publishes an escalation-to-dispute event to the {@code tnt.incident.escalated.to.dispute} topic.
-     * This triggers automatic dispute creation in tnt-dispute-core.
-     *
-     * @param event the domain event to publish
-     */
     @Override
     public Mono<Void> publish(IncidentCreatedEvent event) {
-        return send(TOPIC_CREATED, event.getIncidentId().toString(), event);
+        return enqueue(TOPIC_CREATED, event.getEventId(), event.getIncidentId(),
+                event.getTenantId(), event.getOccurredAt(), event);
     }
 
     @Override
     public Mono<Void> publish(IncidentStatusChangedEvent event) {
-        return send(TOPIC_STATUS_CHANGED, event.getIncidentId().toString(), event);
+        return enqueue(TOPIC_STATUS_CHANGED, event.getEventId(), event.getIncidentId(),
+                event.getTenantId(), event.getOccurredAt(), event);
     }
 
     @Override
     public Mono<Void> publish(IncidentTriagedEvent event) {
-        return send(TOPIC_TRIAGED, event.getIncidentId().toString(), event);
+        return enqueue(TOPIC_TRIAGED, event.getEventId(), event.getIncidentId(),
+                event.getTenantId(), event.getOccurredAt(), event);
     }
 
     @Override
     public Mono<Void> publish(IncidentDriverAssignedEvent event) {
-        return send(TOPIC_DRIVER_ASSIGNED, event.getIncidentId().toString(), event);
+        return enqueue(TOPIC_DRIVER_ASSIGNED, event.getEventId(), event.getIncidentId(),
+                event.getTenantId(), event.getOccurredAt(), event);
     }
 
     @Override
     public Mono<Void> publish(HandoverCompletedEvent event) {
-        return send(TOPIC_HANDOVER_DONE, event.getIncidentId().toString(), event);
+        return enqueue(TOPIC_HANDOVER_DONE, event.getEventId(), event.getIncidentId(),
+                event.getTenantId(), event.getOccurredAt(), event);
     }
 
     @Override
     public Mono<Void> publish(IncidentResolvedEvent event) {
-        return send(TOPIC_RESOLVED, event.getIncidentId().toString(), event);
+        return enqueue(TOPIC_RESOLVED, event.getEventId(), event.getIncidentId(),
+                event.getTenantId(), event.getOccurredAt(), event);
     }
 
     @Override
     public Mono<Void> publish(IncidentClosedEvent event) {
-        return send(TOPIC_CLOSED, event.getIncidentId().toString(), event);
+        return enqueue(TOPIC_CLOSED, event.getEventId(), event.getIncidentId(),
+                event.getTenantId(), event.getOccurredAt(), event);
     }
 
     @Override
     public Mono<Void> publish(IncidentCancelledEvent event) {
-        return send(TOPIC_CANCELLED, event.getIncidentId().toString(), event);
+        return enqueue(TOPIC_CANCELLED, event.getEventId(), event.getIncidentId(),
+                event.getTenantId(), event.getOccurredAt(), event);
     }
 
     @Override
     public Mono<Void> publish(IncidentEscalatedEvent event) {
-        return send(TOPIC_ESCALATED, event.getIncidentId().toString(), event);
+        return enqueue(TOPIC_ESCALATED, event.getEventId(), event.getIncidentId(),
+                event.getTenantId(), event.getOccurredAt(), event);
     }
 
     @Override
     public Mono<Void> publish(IncidentEscalatedToDisputeEvent event) {
-        return send(TOPIC_ESCALATED_DISPUTE, event.getIncidentId().toString(), event);
+        return enqueue(TOPIC_ESCALATED_DISPUTE, event.getEventId(), event.getIncidentId(),
+                event.getTenantId(), event.getOccurredAt(), event);
     }
 
     @Override
     public Mono<Void> publish(InterAgencyCoopRequestedEvent event) {
-        return send(TOPIC_INTERAGENCY_REQ, event.getIncidentId().toString(), event);
+        return enqueue(TOPIC_INTERAGENCY_REQ, event.getEventId(), event.getIncidentId(),
+                event.getTenantId(), event.getOccurredAt(), event);
     }
 
     @Override
     public Mono<Void> publish(InterAgencyCoopCompletedEvent event) {
-        return send(TOPIC_INTERAGENCY_DONE, event.getIncidentId().toString(), event);
+        return enqueue(TOPIC_INTERAGENCY_DONE, event.getEventId(), event.getIncidentId(),
+                event.getTenantId(), event.getOccurredAt(), event);
     }
 
-    private Mono<Void> send(String topic, String key, Object payload) {
-        return Mono.fromCallable(() -> {
-            String json = objectMapper.writeValueAsString(payload);
-            kafkaTemplate.send(topic, key, json);
-            return null;
-        }).subscribeOn(Schedulers.boundedElastic()).then();
+    private Mono<Void> enqueue(String topic, UUID eventId, UUID incidentId,
+                               UUID tenantId, Instant occurredAt, Object event) {
+        return Mono.fromCallable(() -> objectMapper.writeValueAsString(event))
+                .map(payload -> DomainEventEnvelope.wrap()
+                        .correlationId(eventId != null ? eventId.toString() : UUID.randomUUID().toString())
+                        .eventType(event.getClass().getSimpleName())
+                        .aggregateId(incidentId.toString())
+                        .aggregateType(AGGREGATE_TYPE)
+                        .tenantId(tenantId.toString())
+                        .solutionCode(SOLUTION_CODE)
+                        .payload(payload)
+                        .kafkaTopic(topic)
+                        .occurredAt(occurredAt != null
+                                ? LocalDateTime.ofInstant(occurredAt, ZoneOffset.UTC)
+                                : LocalDateTime.now(ZoneOffset.UTC))
+                        .build())
+                .flatMap(publishEventUseCase::publish)
+                .doOnSuccess(v -> log.debug("Enqueued event={} incidentId={} topic={} to outbox",
+                        event.getClass().getSimpleName(), incidentId, topic))
+                .doOnError(ex -> log.error("Failed to enqueue event={} incidentId={} to outbox: {}",
+                        event.getClass().getSimpleName(), incidentId, ex.getMessage()));
     }
 }

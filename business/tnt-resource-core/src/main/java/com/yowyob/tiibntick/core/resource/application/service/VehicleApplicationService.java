@@ -9,6 +9,7 @@ import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -80,6 +81,7 @@ public class VehicleApplicationService implements
 
     // ── CreateVehicleUseCase ──────────────────────────────────────────────────
 
+    @Transactional
     @Override
     @RequirePermission(resource = "resource", action = "write")
     public Mono<Vehicle> createVehicle(CreateVehicleCommand cmd) {
@@ -113,6 +115,7 @@ public class VehicleApplicationService implements
      * in the Kernel. A WARN is logged if the actor cannot be verified — the assignment
      * still proceeds to support offline-first logistics contexts.</p>
      */
+    @Transactional
     @Override
     @RequirePermission(resource = "resource", action = "reserve")
     public Mono<Vehicle> assignVehicle(AssignVehicleCommand cmd) {
@@ -147,6 +150,7 @@ public class VehicleApplicationService implements
 
     // ── UnassignVehicleUseCase ────────────────────────────────────────────────
 
+    @Transactional
     @Override
     @RequirePermission(resource = "resource", action = "reserve")
     public Mono<Vehicle> unassignVehicle(UUID tenantId, UUID vehicleId) {
@@ -165,6 +169,7 @@ public class VehicleApplicationService implements
 
     // ── SendVehicleToMaintenanceUseCase ───────────────────────────────────────
 
+    @Transactional
     @Override
     @RequirePermission(resource = "resource", action = "write")
     public Mono<Vehicle> sendToMaintenance(SendVehicleToMaintenanceCommand cmd) {
@@ -207,6 +212,7 @@ public class VehicleApplicationService implements
 
     // ── RetireVehicleUseCase ──────────────────────────────────────────────────
 
+    @Transactional
     @Override
     public Mono<Vehicle> retireVehicle(UUID tenantId, UUID vehicleId) {
         return loadVehicle(tenantId, vehicleId)
@@ -229,6 +235,7 @@ public class VehicleApplicationService implements
 
     // ── UpdateVehicleLocationUseCase ──────────────────────────────────────────
 
+    @Transactional
     @Override
     public Mono<Void> updateLocation(UpdateVehicleLocationCommand cmd) {
         return locationPort.updateLocation(cmd.vehicleId(), cmd.latitude(), cmd.longitude())

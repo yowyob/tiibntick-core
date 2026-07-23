@@ -52,7 +52,10 @@ public class PricingEngineService implements IPricingUseCase {
 
     @Override
     public Mono<PriceEvaluation> evaluatePolicy(UUID policyId, PricingContext ctx) {
-        return policyRepository.findById(policyId)
+        // Audit n°7 · #5 (IDOR) — PricingContext already carries the caller's tenantId
+        // (set by the controller from JWT); scope the policy lookup with it so a caller
+        // cannot evaluate — and thereby infer the pricing rules of — another tenant's policy.
+        return policyRepository.findByIdAndTenantId(policyId, ctx.getTenantId())
                 .switchIfEmpty(Mono.error(
                         new com.yowyob.tiibntick.core.billing.pricing.domain.exception
                                 .BillingPolicyNotFoundException(policyId)))

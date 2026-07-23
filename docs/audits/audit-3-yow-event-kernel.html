@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audit n°3 — yow-event-kernel · Audit TiiBnTick</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --text: #1c2430; --muted: #5b6675;
+  --border: #e3e7ec; --accent: #0f5fa8; --accent-soft: #e8f1fa;
+  --code-bg: #f0f2f5; --sidebar-bg: #101823; --sidebar-text: #c7d0dc;
+  --crit: #c62828; --high: #e65100; --med: #f9a825; --low: #2e7d32;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1319; --panel: #161d27; --text: #dbe2ea; --muted: #8b97a5;
+    --border: #263140; --accent: #5aa2e0; --accent-soft: #17273a;
+    --code-bg: #1d2733; --sidebar-bg: #0a0f15; --sidebar-text: #a9b4c0;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--bg); color: var(--text); line-height: 1.65; }
+.layout { display: flex; min-height: 100vh; }
+nav.sidebar { width: 270px; flex-shrink: 0; background: var(--sidebar-bg);
+  color: var(--sidebar-text); padding: 1.4rem 1rem; position: sticky; top: 0;
+  height: 100vh; overflow-y: auto; }
+nav.sidebar .brand { font-size: 1.05rem; font-weight: 700; color: #fff;
+  margin-bottom: .2rem; }
+nav.sidebar .brand small { display:block; font-weight: 400; color: var(--sidebar-text);
+  font-size: .75rem; margin-top: .2rem; }
+nav.sidebar ul { list-style: none; padding: 0; margin: 1.2rem 0; }
+nav.sidebar li a { display: block; color: var(--sidebar-text); text-decoration: none;
+  padding: .45rem .6rem; border-radius: 6px; font-size: .86rem; }
+nav.sidebar li a:hover { background: rgba(255,255,255,.08); color: #fff; }
+nav.sidebar li a.active { background: var(--accent); color: #fff; }
+nav.sidebar .section-label { text-transform: uppercase; letter-spacing: .08em;
+  font-size: .68rem; color: #6b7683; margin: 1.4rem 0 .4rem .4rem; }
+main { flex: 1; min-width: 0; padding: 2.2rem 3rem 4rem; max-width: 1100px; }
+header.page { border-bottom: 1px solid var(--border); padding-bottom: 1.2rem;
+  margin-bottom: 1.6rem; }
+header.page .kicker { color: var(--accent); font-weight: 600; font-size: .85rem;
+  text-transform: uppercase; letter-spacing: .06em; }
+header.page h1 { margin: .25rem 0 .4rem; font-size: 1.9rem; }
+header.page .meta { color: var(--muted); font-size: .85rem; }
+h2 { margin-top: 2.4rem; padding-bottom: .35rem; border-bottom: 1px solid var(--border);
+  font-size: 1.35rem; }
+h3 { margin-top: 1.8rem; font-size: 1.08rem; }
+h4 { margin-top: 1.4rem; font-size: .98rem; }
+a { color: var(--accent); }
+code { background: var(--code-bg); padding: .12em .38em; border-radius: 4px;
+  font-size: .84em; font-family: "JetBrains Mono", Consolas, monospace; }
+pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem; overflow-x: auto; font-size: .82rem; line-height: 1.5; }
+pre code { background: none; padding: 0; }
+.table-wrap { overflow-x: auto; margin: 1rem 0; border: 1px solid var(--border);
+  border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: .85rem; background: var(--panel); }
+th, td { border-bottom: 1px solid var(--border); padding: .55rem .75rem; text-align: left;
+  vertical-align: top; }
+th { background: var(--accent-soft); color: var(--text); font-weight: 600;
+  white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+blockquote { border-left: 4px solid var(--accent); background: var(--accent-soft);
+  margin: 1rem 0; padding: .7rem 1rem; border-radius: 0 8px 8px 0; }
+blockquote p { margin: .3rem 0; }
+.badge { display: inline-block; padding: .1em .6em; border-radius: 999px;
+  font-size: .74rem; font-weight: 700; color: #fff; white-space: nowrap; }
+.badge.crit { background: var(--crit); } .badge.high { background: var(--high); }
+.badge.med { background: var(--med); color: #333; } .badge.low { background: var(--low); }
+.mermaid { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem; margin: 1rem 0; text-align: center; overflow-x: auto; }
+.toc { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem 1.4rem; margin: 1.4rem 0; font-size: .88rem; }
+.toc > ul { margin: .3rem 0; padding-left: 1.1rem; }
+.toc .toctitle { font-weight: 700; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1rem; margin: 1.4rem 0; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1.1rem 1.2rem; text-decoration: none; color: var(--text); display: block; }
+.card:hover { border-color: var(--accent); }
+.card .icon { font-size: 1.5rem; }
+.card h3 { margin: .4rem 0 .2rem; font-size: 1rem; }
+.card p { margin: 0; color: var(--muted); font-size: .82rem; }
+.stat-row { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1.2rem 0; }
+.stat { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: .8rem 1.2rem; min-width: 130px; }
+.stat .num { font-size: 1.6rem; font-weight: 800; }
+.stat .lbl { font-size: .74rem; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .05em; }
+.stat.crit .num { color: var(--crit); } .stat.high .num { color: var(--high); }
+.stat.med .num { color: var(--med); } .stat.low .num { color: var(--low); }
+footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border);
+  color: var(--muted); font-size: .78rem; }
+.progress-block { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1rem 1.2rem; margin: 1rem 0 1.6rem; }
+.progress-block .progress-label { display: flex; justify-content: space-between; align-items: baseline;
+  font-size: .85rem; margin-bottom: .5rem; }
+.progress-block .progress-label b { font-size: 1rem; }
+.progress-bar-track { background: var(--code-bg); border-radius: 999px; height: .6rem; overflow: hidden; }
+.progress-bar-fill { height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--low), var(--accent)); transition: width .3s ease; }
+.progress-note { font-size: .72rem; color: var(--muted); margin-top: .5rem; }
+li:has(> input.task-checkbox) { list-style: none; margin-left: -1.4rem; padding-left: .3rem;
+  display: list-item; }
+input.task-checkbox { width: 1rem; height: 1rem; margin-right: .5rem; vertical-align: middle;
+  accent-color: var(--accent); }
+li:has(> input.task-checkbox:checked) { color: var(--muted); }
+li:has(> input.task-checkbox:checked) code { opacity: .75; }
+@media (max-width: 900px) {
+  .layout { flex-direction: column; }
+  nav.sidebar { width: 100%; height: auto; position: static; }
+  main { padding: 1.4rem 1.2rem 3rem; }
+}
+@media print { nav.sidebar { display: none; } main { padding: 0; } }
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar"><div class="brand">TiiBnTick Core<small>Audit technique — juillet 2026</small></div>
+<ul><li><a href="index.html">🏠 Accueil</a></li>
+<li><a href="executive-summary.html">📋 Résumé exécutif global</a></li>
+</ul><div class="section-label">Rapports d'audit</div><ul>
+<li><a href="audit-1-architecture.html">🏛️ Audit n°1 — Architecture globale</a></li>
+<li><a href="audit-2-inter-modules.html">🔗 Audit n°2 — Connexions inter-modules</a></li>
+<li><a href="audit-3-yow-event-kernel.html" class="active">📨 Audit n°3 — yow-event-kernel</a></li>
+<li><a href="audit-4-yow-i18n-kernel.html">🌍 Audit n°4 — yow-i18n-kernel</a></li>
+<li><a href="audit-5-kafka.html">🧵 Audit n°5 — Kafka</a></li>
+<li><a href="audit-6-scalabilite.html">📈 Audit n°6 — Scalabilité</a></li>
+<li><a href="audit-7-system-design.html">🧭 Audit n°7 — System Design & Sécurité</a></li>
+</ul><div class="section-label">Plan de remédiation</div><ul>
+<li><a href="remediation/implementation-plan.html">🗂️ Plan — Plan d'implémentation — vue d'ensemble</a></li>
+<li><a href="remediation/phase-0-critical.html">🚨 P0 — Phase 0 — Bloquant production</a></li>
+<li><a href="remediation/phase-1-hardening.html">🛡️ P1 — Phase 1 — Durcissement</a></li>
+<li><a href="remediation/phase-2-target-architecture.html">🚀 P2 — Phase 2 — Architecture cible</a></li>
+<li><a href="remediation/workstream-payment-billing-kernel-delegation.html">💳 Chantier — Délégation paiement/facturation au Kernel</a></li>
+</ul></nav>
+<main>
+<header class="page">
+  <div class="kicker">Audit n°3</div>
+  <h1>📨 yow-event-kernel</h1>
+  <div class="meta">Projet TiiBnTick Core · dépôt <code>tiibntick-core</code> (34 modules Maven, y compris <code>trust/tnt-trust-core</code>) · Audit réalisé le 16 juillet 2026</div>
+</header>
+
+<div class="toc"><div class="toc"><span class="toctitle">Sommaire</span><ul>
+<li><a href="#1-resume-executif">1. Résumé exécutif</a></li>
+<li><a href="#2-etat-actuel-inventaire-du-module">2. État actuel — Inventaire du module</a><ul>
+<li><a href="#21-structure-60-fichiers-source-hexagonal-propre">2.1 Structure (60 fichiers source, hexagonal propre)</a></li>
+<li><a href="#22-api-publique">2.2 API publique</a></li>
+<li><a href="#23-configuration">2.3 Configuration</a></li>
+<li><a href="#24-tests">2.4 Tests</a></li>
+</ul>
+</li>
+<li><a href="#3-cartographie-dutilisation">3. Cartographie d'utilisation</a><ul>
+<li><a href="#31-constat-central">3.1 Constat central</a></li>
+<li><a href="#32-tableau-module-par-module">3.2 Tableau module par module</a></li>
+<li><a href="#33-diagramme-architecture-prevue-vs-reelle">3.3 Diagramme — architecture prévue vs réelle</a></li>
+</ul>
+</li>
+<li><a href="#4-qui-devrait-lutiliser-mais-ne-le-fait-pas">4. Qui devrait l'utiliser mais ne le fait pas</a></li>
+<li><a href="#5-inventaire-des-evenements">5. Inventaire des événements</a><ul>
+<li><a href="#51-definis-via-le-kernel">5.1 Définis via le kernel</a></li>
+<li><a href="#52-evenements-et-topics-du-monde-parallele">5.2 Événements et topics du monde parallèle</a></li>
+<li><a href="#53-publies-mais-jamais-consommes-dans-ce-depot">5.3 Publiés mais jamais consommés (dans ce dépôt)</a></li>
+<li><a href="#54-consommes-mais-jamais-declares-au-catalogue">5.4 Consommés mais jamais déclarés au catalogue</a></li>
+<li><a href="#55-rupture-de-flux-averee-nommage">5.5 Rupture de flux avérée (nommage)</a></li>
+<li><a href="#56-evenements-manquants-evidents">5.6 Événements manquants évidents</a></li>
+</ul>
+</li>
+<li><a href="#6-coherence-de-larchitecture-evenementielle">6. Cohérence de l'architecture événementielle</a></li>
+<li><a href="#7-points-positifs">7. Points positifs</a></li>
+<li><a href="#8-problemes-detectes-tableau-de-synthese">8. Problèmes détectés — tableau de synthèse</a></li>
+<li><a href="#9-details-et-preuves-des-problemes-majeurs">9. Détails et preuves des problèmes majeurs</a><ul>
+<li><a href="#p1-p2-le-module-ne-peut-pas-demarrer">P1-P2 — Le module ne peut pas démarrer</a></li>
+<li><a href="#p3-p4-il-serait-casse-sil-demarrait">P3-P4 — Il serait cassé s'il démarrait</a></li>
+<li><a href="#p5-le-vide-operationnel-perte-devenements-silencieuse">P5 — Le vide opérationnel : perte d'événements silencieuse</a></li>
+<li><a href="#p10-semantique-de-livraison-mal-etiquetee-dans-le-kernel-lui-meme">P10 — Sémantique de livraison mal étiquetée dans le kernel lui-même</a></li>
+<li><a href="#p22-contexte-la-seconde-abstraction-tntdomainevent">P22 (contexte) — La seconde abstraction : TntDomainEvent</a></li>
+</ul>
+</li>
+<li><a href="#10-recommandations-priorisees">10. Recommandations priorisées</a><ul>
+<li><a href="#pr1-decider-du-sort-du-module-critique-decision-darchitecture-a-arbitrer-avec-lequipe">PR1 — Décider du sort du module (Critique, décision d'architecture — à arbitrer avec l'équipe)</a></li>
+<li><a href="#pr2-corriger-la-rupture-de-topic-missionstatus-critique-immediat-independant-de-pr1">PR2 — Corriger la rupture de topic mission.status (Critique, immédiat, indépendant de PR1)</a></li>
+<li><a href="#pr3-si-option-a-rendre-le-module-demarrable-critique">PR3 — Si option A : rendre le module démarrable (Critique)</a></li>
+<li><a href="#pr4-stopper-la-perte-devenements-eleve-meme-sans-pr1">PR4 — Stopper la perte d'événements (Élevé, même sans PR1)</a></li>
+<li><a href="#pr5-unifier-lenveloppe-eleve">PR5 — Unifier l'enveloppe (Élevé)</a></li>
+<li><a href="#pr6-idempotence-consommateurs-eleve">PR6 — Idempotence consommateurs (Élevé)</a></li>
+<li><a href="#pr7-hygiene-moyenfaible">PR7 — Hygiène (Moyen/Faible)</a></li>
+</ul>
+</li>
+<li><a href="#11-conclusion-verdict">11. Conclusion — verdict</a></li>
+</ul>
+</div>
+</div>
+<h1 id="audit-n3-module-yow-event-kernel-l0-foundation">Audit n°3 — Module <code>yow-event-kernel</code> (L0 Foundation)</h1>
+<ul>
+<li><strong>Projet</strong> : TiiBnTick Core (<code>tiibntick-core</code>)</li>
+<li><strong>Module audité</strong> : <code>foundation/yow-event-kernel</code> — package <code>com.yowyob.kernel.event</code></li>
+<li><strong>Rôle annoncé</strong> (pom.xml, l.17-27) : « Bus événementiel transactionnel partagé par toutes les solutions TiiBnTick. Implémente le pattern Outbox, Kafka publishing pipeline, Avro schema registry, DLQ et event replay. Sera migré dans RT-comops (TSAFACK Savio) ultérieurement. »</li>
+<li><strong>Date de l'audit</strong> : 2026-07-17</li>
+<li><strong>Auditeur</strong> : Distributed Systems Engineer (audit statique exhaustif du code)</li>
+<li><strong>Périmètre</strong> : le module lui-même + les 33 autres modules du réacteur, y compris <code>coreBackend/</code> (tnt-agency-back-core et ses 10 sous-modules, tnt-go-freelancer-point-back-core, tnt-link-back-core, tnt-market-back-core)</li>
+</ul>
+<hr />
+<h2 id="1-resume-executif">1. Résumé exécutif</h2>
+<p><code>yow-event-kernel</code> est un module <strong>soigneusement conçu sur le papier mais totalement mort en pratique</strong>. Il définit une architecture événementielle sérieuse (outbox transactionnel, enveloppe standard avec correlation/causation IDs, DLQ, replay, registre de schémas Avro, idempotence Redis, métriques Micrometer) — mais :</p>
+<ol>
+<li><strong>Aucune classe du package <code>com.yowyob.kernel.event</code> n'est importée par un seul fichier Java des 33 autres modules</strong> (grep exhaustif : zéro occurrence hors du module), alors que <strong>21 <code>pom.xml</code> déclarent la dépendance Maven</strong>.</li>
+<li><strong>Le module ne peut même pas s'activer</strong> : le fichier <code>META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports</code> promis par la javadoc n'existe pas, le <code>@ComponentScan</code> pointe vers un package inexistant (<code>yowyob.kernel.event</code> au lieu de <code>com.yowyob.kernel.event</code>), et <code>tnt-bootstrap</code> ne l'importe pas.</li>
+<li><strong>Il serait cassé s'il s'activait</strong> : le port central <code>EventEnvelopeRepository</code> (event store) n'a <strong>aucune implémentation</strong>, et <strong>aucune migration Liquibase</strong> ne crée les 4 tables <code>event_bus.*</code> que ses entités R2DBC référencent.</li>
+<li><strong>Toute la plateforme fait de l'événementiel sans lui</strong> : ~24 modules publient sur Kafka via des publishers maison (<code>KafkaDeliveryEventPublisher</code>, <code>DisputeKafkaEventPublisher</code>, <code>KafkaAgencyEventPublisher</code>, etc.), en <strong>fire-and-forget sans outbox</strong>, avec <strong>au moins 3 formats d'enveloppe concurrents</strong>, aucune idempotence consommateur, et des divergences de nommage de topics qui <strong>cassent réellement des flux</strong> (producteur <code>tnt.delivery.mission.status-changed</code> vs consommateurs <code>tnt.delivery.mission.status.changed</code>).</li>
+<li>Une <strong>seconde abstraction événementielle partagée</strong> (<code>TntDomainEvent</code> dans <code>tnt-common-core</code>) concurrence le kernel — elle-même adoptée par un seul module (<code>tnt-agency-back-core</code>).</li>
+</ol>
+<p><strong>Verdict : le module ne joue aucun rôle dans l'architecture actuelle. Il est contourné à 100 %.</strong> Le risque principal n'est pas le module lui-même, mais le vide qu'il laisse : perte d'événements silencieuse, dualité d'enveloppes, absence d'atomicité DB+publication partout.</p>
+<hr />
+<h2 id="2-etat-actuel-inventaire-du-module">2. État actuel — Inventaire du module</h2>
+<h3 id="21-structure-60-fichiers-source-hexagonal-propre">2.1 Structure (60 fichiers source, hexagonal propre)</h3>
+<pre><code>com.yowyob.kernel.event
+├── domain/
+│   ├── model/        DomainEventEnvelope (agrégat, builder, machine à états),
+│   │                 OutboxEntry, DeadLetterEntry, EventSchema
+│   ├── vo/           EnvelopeId, OutboxEntryId, DeadLetterEntryId, SchemaId,
+│   │                 RetryPolicy (backoff exponentiel), KafkaTopicConfig, EventBusStats
+│   ├── enums/        EnvelopeStatus (PENDING/PUBLISHED/FAILED/RETRYING/DEAD),
+│   │                 OutboxStatus, DLQStatus, SchemaCompatibility
+│   └── SchemaCompatibilityViolationException
+├── application/
+│   ├── port/in/      PublishEventUseCase, PublishEventBatchUseCase, QueryEventUseCase,
+│   │                 QueryEventStatsUseCase, ManageSchemaUseCase, ProcessDeadLetterUseCase,
+│   │                 ReplayEventUseCase + commandes (PublishEventCommand, etc.)
+│   ├── port/out/     EventEnvelopeRepository, OutboxEntryRepository, DeadLetterRepository,
+│   │                 EventSchemaRepository, KafkaPublisherPort, KafkaTopicManagerPort,
+│   │                 EventIdempotencyStorePort, EventMetricsPort, OutboxPollerPort
+│   └── service/      EventPublisherService, OutboxPollerService, DeadLetterService,
+│                     ReplayEventService, SchemaRegistryService, EventQueryService, EventStatsService
+├── adapter/
+│   ├── kafka/        KafkaEventPublisher (headers X-Yow-*), KafkaTopicManagerAdapter (AdminClient)
+│   ├── cache/        RedisEventIdempotencyStore (SET NX EX)
+│   ├── persistence/  4 entités @Table(&quot;event_bus.*&quot;), 4 mappers MapStruct,
+│   │                 3 repositories R2DBC (outbox avec FOR UPDATE SKIP LOCKED)
+│   └── MicrometerEventMetrics
+└── config/           YowEventKernelAutoConfiguration, YowEventKernelProperties (yow.event.*)
+</code></pre>
+<h3 id="22-api-publique">2.2 API publique</h3>
+<ul>
+<li><strong>Enveloppe standard</strong> : <code>DomainEventEnvelope</code> — <code>envelopeId</code>, <code>correlationId</code>, <code>causationId</code>, <code>eventType</code>, <code>aggregateId</code>, <code>aggregateType</code>, <code>tenantId</code>, <code>solutionCode</code>, <code>payload</code> JSON, <code>schemaVersion</code>, <code>payloadHash</code> SHA-256, <code>kafkaTopic</code>, <code>kafkaPartitionKey</code> (défaut = aggregateId), statut + <code>retryCount</code> + verrou optimiste (<code>DomainEventEnvelope.java:35-134</code>).</li>
+<li><strong>Headers Kafka standardisés</strong> : <code>X-Yow-Envelope-Id</code>, <code>X-Yow-Correlation-Id</code>, <code>X-Yow-Solution-Code</code>, <code>X-Yow-Event-Type</code>, <code>X-Yow-Aggregate-Id</code>, <code>X-Yow-Aggregate-Type</code>, <code>X-Yow-Tenant-Id</code>, <code>X-Yow-Schema-Version</code>, <code>X-Yow-Replay</code> (<code>KafkaEventPublisher.java:48-58</code>).</li>
+<li><strong>Outbox</strong> : <code>PublishEventUseCase.publish()</code> persiste enveloppe + entrée outbox <code>@Transactional</code> ; <code>OutboxPollerService</code> (poller <code>@Scheduled</code> 1 s) publie vers Kafka, gère retry/DLQ.</li>
+<li><strong>Pas d'annotations</strong> (type <code>@DomainEventHandler</code>) ni de bus in-process : le module est purement un pipeline outbox→Kafka + administration (DLQ, replay, stats, schémas).</li>
+</ul>
+<h3 id="23-configuration">2.3 Configuration</h3>
+<ul>
+<li><code>YowEventKernelProperties</code> : <code>yow.event.outbox.batch-size</code> (50) et <code>yow.event.outbox.poll-interval-ms</code> (1000).</li>
+<li><code>application.yaml</code> embarqué dans le jar contenant uniquement <code>spring.application.name: yow-event-kernel</code>.</li>
+<li><strong>Aucun</strong> fichier <code>META-INF/spring/...AutoConfiguration.imports</code>, <strong>aucun</strong> changelog Liquibase (le pom déclare pourtant <code>liquibase-core</code>, l.91-92, « migrations DB schéma event_bus »).</li>
+</ul>
+<h3 id="24-tests">2.4 Tests</h3>
+<ul>
+<li>2 classes de tests <strong>unitaires du domaine uniquement</strong> (571 lignes) : <code>YowEventKernelDomainTest</code>, <code>YowEventKernelDomainExtendedTest</code> — machine à états de l'enveloppe, RetryPolicy, restore.</li>
+<li><code>YowEventKernelTestConfig</code> (35 lignes) : configuration Testcontainers <strong>jamais utilisée</strong> — aucun <code>*IntegrationTest</code>/<code>*IT</code> n'existe, alors que le pom embarque 4 dépendances Testcontainers (postgresql, kafka, junit-jupiter, redis).</li>
+<li><strong>Zéro test</strong> sur : adapters Kafka/Redis/R2DBC, services applicatifs, poller, autoconfiguration.</li>
+</ul>
+<hr />
+<h2 id="3-cartographie-dutilisation">3. Cartographie d'utilisation</h2>
+<h3 id="31-constat-central">3.1 Constat central</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Mesure</th>
+<th>Résultat</th>
+<th>Preuve</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Fichiers Java hors module important <code>com.yowyob.kernel.event</code></td>
+<td><strong>0</strong></td>
+<td><code>grep -rn "com.yowyob.kernel.event" --include="*.java"</code> hors <code>foundation/yow-event-kernel</code> → vide</td>
+</tr>
+<tr>
+<td><code>pom.xml</code> déclarant la dépendance <code>yow-event-kernel</code></td>
+<td><strong>21</strong></td>
+<td>grep sur tous les <code>pom.xml</code></td>
+</tr>
+<tr>
+<td>Modules qui publient sur Kafka <strong>sans</strong> le kernel</td>
+<td><strong>~24</strong></td>
+<td>grep <code>KafkaTemplate\|KafkaSender\|ReactiveKafkaProducerTemplate</code></td>
+</tr>
+<tr>
+<td>Modules qui consomment Kafka <strong>sans</strong> le kernel</td>
+<td><strong>17</strong></td>
+<td>grep <code>@KafkaListener\|ReactiveKafkaConsumerTemplate\|KafkaReceiver</code></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="32-tableau-module-par-module">3.2 Tableau module par module</h3>
+<p>Légende : <strong>Dep pom</strong> = dépendance Maven déclarée ; <strong>Classes utilisées</strong> = imports réels du package du kernel ; <strong>Prod/Cons</strong> = nombre de fichiers producteurs / consommateurs Kafka ad-hoc (hors tests).</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Dep pom</th>
+<th>Classes du kernel utilisées</th>
+<th>Prod. Kafka maison</th>
+<th>Cons. Kafka maison</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>foundation/tnt-common-core</td>
+<td>non</td>
+<td>aucune</td>
+<td>—</td>
+<td>— (définit <code>TntDomainEvent</code> concurrent)</td>
+</tr>
+<tr>
+<td>foundation/tnt-auth-core</td>
+<td>non</td>
+<td>aucune</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>foundation/tnt-roles-core</td>
+<td>non</td>
+<td>aucune</td>
+<td>—</td>
+<td>1</td>
+</tr>
+<tr>
+<td>foundation/tnt-platform-gateway-core</td>
+<td>non</td>
+<td>aucune</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>identity/tnt-actor-core</td>
+<td><strong>oui</strong> (commentaire pom : « DomainEvent, EventPublisher, Kafka bus » — faux)</td>
+<td>aucune</td>
+<td>2</td>
+<td>2</td>
+</tr>
+<tr>
+<td>identity/tnt-organization-core</td>
+<td><strong>oui</strong></td>
+<td>aucune</td>
+<td>— (Spring <code>ApplicationEventPublisher</code>, 2 fichiers)</td>
+<td>—</td>
+</tr>
+<tr>
+<td>identity/tnt-tp-core</td>
+<td><strong>oui</strong></td>
+<td>aucune</td>
+<td>2</td>
+<td>1</td>
+</tr>
+<tr>
+<td>identity/tnt-administration-core</td>
+<td>non</td>
+<td>aucune</td>
+<td>1</td>
+<td>—</td>
+</tr>
+<tr>
+<td>logistics/tnt-geo-core</td>
+<td><strong>oui</strong></td>
+<td>aucune</td>
+<td>2</td>
+<td>—</td>
+</tr>
+<tr>
+<td>logistics/tnt-route-core</td>
+<td><strong>oui</strong></td>
+<td>aucune</td>
+<td>2</td>
+<td>—</td>
+</tr>
+<tr>
+<td>logistics/tnt-delivery-core</td>
+<td><strong>oui</strong></td>
+<td>aucune</td>
+<td>2</td>
+<td>3</td>
+</tr>
+<tr>
+<td>logistics/tnt-dispute-core</td>
+<td><strong>oui</strong></td>
+<td>aucune</td>
+<td>4</td>
+<td>1</td>
+</tr>
+<tr>
+<td>logistics/tnt-incident-core</td>
+<td>non</td>
+<td>aucune</td>
+<td>1</td>
+<td>1</td>
+</tr>
+<tr>
+<td>logistics/tnt-realtime-core</td>
+<td><strong>oui</strong></td>
+<td>aucune</td>
+<td>2</td>
+<td>2</td>
+</tr>
+<tr>
+<td>logistics/tnt-sync-core</td>
+<td><strong>oui</strong></td>
+<td>aucune</td>
+<td>2</td>
+<td>1</td>
+</tr>
+<tr>
+<td>logistics/tnt-notify-core</td>
+<td><strong>oui</strong></td>
+<td>aucune</td>
+<td>1</td>
+<td>2</td>
+</tr>
+<tr>
+<td>logistics/tnt-media-core</td>
+<td><strong>oui</strong></td>
+<td>aucune</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>business/tnt-resource-core</td>
+<td><strong>oui</strong></td>
+<td>aucune</td>
+<td>1</td>
+<td>—</td>
+</tr>
+<tr>
+<td>business/tnt-product-core</td>
+<td>non</td>
+<td>aucune</td>
+<td>1 (<code>KafkaSender</code> brut)</td>
+<td>—</td>
+</tr>
+<tr>
+<td>business/tnt-inventory-core</td>
+<td><strong>oui</strong></td>
+<td>aucune</td>
+<td>1 (<code>KafkaSender</code> brut)</td>
+<td>—</td>
+</tr>
+<tr>
+<td>business/tnt-sales-core</td>
+<td><strong>oui</strong></td>
+<td>aucune</td>
+<td>1</td>
+<td>1</td>
+</tr>
+<tr>
+<td>business/tnt-accounting-core</td>
+<td><strong>oui</strong></td>
+<td>aucune</td>
+<td>1</td>
+<td>1</td>
+</tr>
+<tr>
+<td>billing/tnt-billing-dsl</td>
+<td><strong>oui</strong></td>
+<td>aucune</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>billing/tnt-billing-pricing</td>
+<td><strong>oui</strong></td>
+<td>aucune</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>billing/tnt-billing-cost</td>
+<td>non</td>
+<td>aucune</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>billing/tnt-billing-invoice</td>
+<td><strong>oui</strong></td>
+<td>aucune</td>
+<td>2</td>
+<td>1</td>
+</tr>
+<tr>
+<td>billing/tnt-billing-wallet</td>
+<td>non</td>
+<td>aucune</td>
+<td>2</td>
+<td>1</td>
+</tr>
+<tr>
+<td>billing/tnt-billing-report</td>
+<td><strong>oui</strong></td>
+<td>aucune</td>
+<td>—</td>
+<td>1</td>
+</tr>
+<tr>
+<td>billing/tnt-billing-templates</td>
+<td>non</td>
+<td>aucune</td>
+<td>2</td>
+<td>—</td>
+</tr>
+<tr>
+<td>trust/tnt-trust-core</td>
+<td>non</td>
+<td>aucune</td>
+<td>3 (+ file de retry Redis maison)</td>
+<td>1</td>
+</tr>
+<tr>
+<td>coreBackend/tnt-agency-back-core (10 sous-modules)</td>
+<td>non</td>
+<td>aucune</td>
+<td>3 (dont <code>tnt-agency-eventing-core</code>, module d'eventing maison complet)</td>
+<td>4</td>
+</tr>
+<tr>
+<td>coreBackend/tnt-market-back-core</td>
+<td>non</td>
+<td>aucune</td>
+<td>1</td>
+<td>1</td>
+</tr>
+<tr>
+<td>coreBackend/tnt-go-freelancer-point-back-core</td>
+<td><strong>oui</strong></td>
+<td>aucune</td>
+<td>1</td>
+<td>—</td>
+</tr>
+<tr>
+<td>coreBackend/tnt-link-back-core</td>
+<td>non</td>
+<td>aucune</td>
+<td>0</td>
+<td>0 (aucun événementiel)</td>
+</tr>
+<tr>
+<td>tnt-bootstrap</td>
+<td><strong>oui</strong></td>
+<td>aucune (ni <code>@Import</code> de <code>YowEventKernelAutoConfiguration</code> — <code>TntCoreConfig.java:31-44</code>)</td>
+<td>1</td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Cas <code>coreBackend/</code> (extension de périmètre)</strong> : aucun des 4 backends de plateforme n'utilise le kernel. <code>tnt-agency-back-core</code> a même construit son <strong>propre module d'eventing</strong> (<code>tnt-agency-eventing-core</code>) : <code>KafkaAgencyEventPublisher</code> publie des <code>TntDomainEvent</code> dans une enveloppe <code>Map&lt;String,Object&gt;</code> maison, avec routage de topics par <code>eventType</code> et — dixit sa propre javadoc — « <em>Publish failures are swallowed so they never fail the originating use case</em> » (fire-and-forget assumé). <code>tnt-go-freelancer-point-back-core</code> déclare la dépendance <code>yow-event-kernel</code> dans son pom (l.35) sans en importer une seule classe. <code>tnt-link-back-core</code> (120 fichiers Java) ne fait aucun événementiel.</p>
+<h3 id="33-diagramme-architecture-prevue-vs-reelle">3.3 Diagramme — architecture prévue vs réelle</h3>
+<pre class="mermaid">flowchart TB
+    subgraph PREVU["ARCHITECTURE PRÉVUE (jamais activée)"]
+        M1[Modules métier] -->|PublishEventUseCase| EK[yow-event-kernel]
+        EK -->|"outbox @Transactional"| DB[(event_bus.*<br/>tables inexistantes)]
+        EK -->|poller + retry + DLQ| K1[Kafka]
+    end
+    subgraph REEL["ARCHITECTURE RÉELLE (24 producteurs / 17 consommateurs)"]
+        D[tnt-delivery-core<br/>EventEnvelope maison] -->|"fire-and-forget<br/>.onErrorComplete()"| K2[Kafka]
+        DI[tnt-dispute-core] --> K2
+        AG["tnt-agency-eventing-core<br/>enveloppe Map maison<br/>(TntDomainEvent)"] --> K2
+        P["tnt-product/inventory<br/>KafkaSender brut"] --> K2
+        AUTRES[+ ~18 autres publishers maison] --> K2
+        K2 --> C1[17 modules consommateurs<br/>sans idempotence]
+    end
+    EK -.->|"0 import dans tout le dépôt<br/>21 poms déclarent pourtant la dépendance"| REEL
+</pre>
+<hr />
+<h2 id="4-qui-devrait-lutiliser-mais-ne-le-fait-pas">4. Qui devrait l'utiliser mais ne le fait pas</h2>
+<p><strong>Tous les producteurs/consommateurs d'événements du dépôt.</strong> Les cas les plus significatifs :</p>
+<ol>
+<li><strong><code>tnt-delivery-core</code></strong> — le module le plus critique (missions, colis). <code>KafkaDeliveryEventPublisher</code> réinvente une enveloppe privée <code>record EventEnvelope(eventType, aggregateId, tenantId, occurredAt, payload)</code> (<code>KafkaDeliveryEventPublisher.java:96-102</code>) — sans <code>correlationId</code>, sans <code>causationId</code>, sans version de schéma — et publie en best-effort avec <code>.onErrorComplete()</code> (l.64) : <strong>un échec Kafka = événement perdu sans trace</strong>, y compris pour <code>MissionStatusChangedEvent</code>.</li>
+<li><strong><code>tnt-agency-back-core</code></strong> — a construit un module entier (<code>tnt-agency-eventing-core</code>) qui duplique la responsabilité du kernel avec une 3ᵉ enveloppe (Map JSON) et l'avale des erreurs de publication.</li>
+<li><strong><code>tnt-dispute-core</code>, <code>tnt-incident-core</code>, <code>tnt-billing-wallet</code>, <code>tnt-trust-core</code>, etc.</strong> — chacun possède son publisher maison (<code>DisputeKafkaEventPublisher</code>, <code>IncidentKafkaEventPublisher</code>, …). <code>tnt-trust-core</code> a même réimplémenté sa propre file de retry (<code>TrustRetryQueueDrainer</code>/<code>TrustRetryDrainService</code>) — fonctionnalité que le kernel offre via outbox+DLQ.</li>
+<li><strong><code>tnt-product-core</code>, <code>tnt-inventory-core</code></strong> — descendent encore plus bas : <code>KafkaSender&lt;String,String&gt;</code> de reactor-kafka brut, sans enveloppe du tout.</li>
+<li><strong><code>tnt-organization-core</code></strong> — publie des événements Spring in-process (<code>ApplicationEventPublisher</code>) sans pont vers Kafka ni vers le kernel.</li>
+</ol>
+<hr />
+<h2 id="5-inventaire-des-evenements">5. Inventaire des événements</h2>
+<h3 id="51-definis-via-le-kernel">5.1 Définis via le kernel</h3>
+<p><strong>Aucun.</strong> Le kernel ne définit aucun type d'événement métier (par conception : il transporte des payloads JSON), et aucun module ne lui en confie.</p>
+<h3 id="52-evenements-et-topics-du-monde-parallele">5.2 Événements et topics du monde parallèle</h3>
+<ul>
+<li>~120 classes d'événements de domaine réparties dans 23 modules (<code>find */domain/event/*.java</code>) : delivery 15, agency-back 14, market-back 11, resource 11, actor 9, dispute 7, wallet 6, pricing 6, realtime 6, organization 6, etc.</li>
+<li>Catalogue de facto : <code>TntKafkaTopicsConfig</code> (tnt-bootstrap) déclare <strong>59 topics</strong> <code>NewTopic</code> — mais les noms sont re-dupliqués en littéraux dans chaque module.</li>
+</ul>
+<h3 id="53-publies-mais-jamais-consommes-dans-ce-depot">5.3 Publiés mais jamais consommés (dans ce dépôt)</h3>
+<p><strong>43 des 59 topics déclarés n'ont aucun <code>@KafkaListener</code> correspondant dans tout le dépôt</strong> (diff exhaustif déclarés/consommés), dont des transitions d'état majeures :
+<code>tnt.delivery.mission.created</code>, <code>tnt.delivery.package.delivered</code>, <code>tnt.delivery.package.picked-up</code>, les <strong>7 topics <code>tnt.dispute.*</code></strong> (opened, resolved, escalated, evidence-added, refund-initiated, compensation-paid, closed), <strong>9 topics <code>tnt.incident.*</code></strong> (created, triaged, driver.assigned, …), <code>tnt.billing.invoice.created</code>, <code>tnt.billing.wallet.credited/debited</code>, <code>tnt.notify.notification.delivered/failed</code>, <code>tnt.media.file.uploaded/deleted</code>, <code>tnt.sync.conflict.detected</code>… (Certains sont peut-être destinés à des consommateurs externes au dépôt, mais rien ne le documente.) On y trouve aussi <code>tnt.outbox.events</code> et <code>tnt.dlq</code> — topics visiblement prévus pour le kernel, alimentés par personne.</p>
+<h3 id="54-consommes-mais-jamais-declares-au-catalogue">5.4 Consommés mais jamais déclarés au catalogue</h3>
+<p>14+ topics écoutés sans être déclarés dans <code>TntKafkaTopicsConfig</code> : <code>tnt.delivery.mission.completed/started/failed</code>, <code>tnt.freelancer_org.created/verified/sub_deliverer.*</code>, <code>tnt.vehicle.assigned_to_mission/released_from_mission</code>, <code>tnt.billing.commission.calculated</code>, <code>tnt.billing.invoice.paid</code>, <code>tnt.roles.permission-changed</code>…</p>
+<h3 id="55-rupture-de-flux-averee-nommage">5.5 Rupture de flux avérée (nommage)</h3>
+<ul>
+<li><strong>Producteur</strong> : <code>tnt.delivery.mission.status-changed</code> (<code>KafkaDeliveryEventPublisher.java:33</code>, déclaré ainsi dans <code>TntKafkaTopicsConfig.java:37</code>).</li>
+<li><strong>Consommateurs</strong> : <code>tnt.delivery.mission.status.changed</code> (avec un point) dans <code>tnt-incident-core</code> (<code>IncidentEventConsumer.java:35</code>), <code>tnt-sync-core</code> (<code>EntityChangedEventConsumer.java:46,79</code>) et <code>tnt-realtime-core</code> (<code>RealtimeProperties.java:65</code>, <code>MissionStatusEventConsumer.java:50</code>). Seul <code>tnt-market-back-core</code> écoute la bonne variante (<code>MarketKafkaConsumer.java:33</code>).</li>
+<li><strong>Conséquence</strong> : les changements de statut de mission <strong>n'atteignent jamais</strong> incident, sync et realtime. C'est exactement la classe de bug qu'un catalogue de topics centralisé (rôle du kernel) élimine.</li>
+</ul>
+<h3 id="56-evenements-manquants-evidents">5.6 Événements manquants évidents</h3>
+<p>Sans event storming complet, deux absences ressortent : (1) <code>tnt-organization-core</code> (cycle de vie FreelancerOrganization) ne publie <strong>aucun</strong> événement Kafka — or <code>tnt-notify-core</code> écoute <code>tnt.admin.freelancer_org.*</code> et <code>tnt.freelancer_org.*</code> (produits ailleurs) ; (2) aucun événement d'échec de publication n'existe nulle part puisque les échecs sont avalés.</p>
+<hr />
+<h2 id="6-coherence-de-larchitecture-evenementielle">6. Cohérence de l'architecture événementielle</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Critère</th>
+<th>Dans le kernel (théorie)</th>
+<th>Dans la plateforme (réalité)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Enveloppe standard</td>
+<td>Oui — <code>DomainEventEnvelope</code> complet</td>
+<td><strong>Non</strong> — ≥3 formats : record privé delivery (5 champs), Map JSON agency, payloads nus (<code>KafkaSender</code>), + <code>TntDomainEvent</code></td>
+</tr>
+<tr>
+<td>Versioning de schéma</td>
+<td>Oui — <code>schemaVersion</code> + registre Avro</td>
+<td><strong>Non</strong> — aucun module ne versionne ses payloads</td>
+</tr>
+<tr>
+<td>Correlation / causation ID</td>
+<td>Oui — champs dédiés + headers</td>
+<td><strong>Non</strong> — aucun publisher maison ne les propage</td>
+</tr>
+<tr>
+<td>Tenant propagé</td>
+<td>Oui — champ + header <code>X-Yow-Tenant-Id</code></td>
+<td>Partiel — présent dans l'enveloppe delivery et agency, absent des payloads nus ; jamais en header</td>
+</tr>
+<tr>
+<td>Sérialisation cohérente</td>
+<td>JSON payload + Avro prévu (adapter Avro jamais écrit)</td>
+<td><strong>Non</strong> — Jackson par module (<code>deliveryObjectMapper</code>, mapper agency…), conventions divergentes</td>
+</tr>
+<tr>
+<td>Outbox / atomicité DB+publication</td>
+<td>Oui — <code>EventPublisherService</code> <code>@Transactional</code> + poller</td>
+<td><strong>Non, nulle part</strong> — publication directe dans le flux applicatif ; <code>.onErrorComplete()</code> (delivery l.64), « failures are swallowed » (agency)</td>
+</tr>
+<tr>
+<td>Garantie de livraison</td>
+<td>At-least-once (annoncée à tort « exactly-once »)</td>
+<td><strong>At-most-once de fait</strong> — perte silencieuse sur échec broker</td>
+</tr>
+<tr>
+<td>Idempotence consommateur</td>
+<td>Oui — <code>RedisEventIdempotencyStore</code> (SET NX EX)</td>
+<td><strong>Non</strong> — aucun consommateur ne déduplique par eventId</td>
+</tr>
+<tr>
+<td>DLQ / retry</td>
+<td>Oui — DLQ persistée + <code>RetryPolicy</code></td>
+<td>Quasi absent — <code>tnt-trust-core</code> a sa file Redis maison ; topic <code>tnt.sync.entity-changed.dlq</code> déclaré ; le reste : rien</td>
+</tr>
+<tr>
+<td>Replay</td>
+<td>Oui — <code>ReplayEventService</code> + header <code>X-Yow-Replay</code></td>
+<td><strong>Non</strong> — impossible, les événements ne sont persistés nulle part</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="7-points-positifs">7. Points positifs</h2>
+<ol>
+<li><strong>Conception domaine solide</strong> : machine à états explicite de l'enveloppe avec invariants (<code>markPublished</code>/<code>markFailed</code>/<code>scheduleRetry</code>, <code>DomainEventEnvelope.java:238-299</code>), factories <code>wrap()</code>/<code>restore()</code> séparant création et réhydratation, VOs typés (<code>EnvelopeId</code>, <code>RetryPolicy</code> record validé, <code>RetryPolicy.java:254-267</code>).</li>
+<li><strong>Vrai pattern outbox</strong> correctement pensé : écriture enveloppe+outbox dans la transaction appelante (<code>EventPublisherService.java</code>, <code>@Transactional</code>), poller avec <code>SELECT … FOR UPDATE SKIP LOCKED</code> (<code>R2dbcOutboxEntryRepository.java:47,57</code>) — le bon mécanisme pour le multi-instance.</li>
+<li><strong>Headers Kafka standardisés <code>X-Yow-*</code></strong> incluant tenant, corrélation, type et version de schéma — exactement ce qui manque au reste de la plateforme.</li>
+<li><strong>Idempotence atomique</strong> : <code>SET NX EX</code> Redis (<code>RedisEventIdempotencyStore.java:56-60</code>), sans race condition.</li>
+<li><strong>Observabilité prévue</strong> : compteurs/timers/gauges Micrometer tagués (eventType, solutionCode, tenantId), erreurs de métrique non propagées (<code>MicrometerEventMetrics.java</code>).</li>
+<li><strong>Autoconfiguration à la Spring Boot</strong> : tous les beans en <code>@ConditionalOnMissingBean</code>, surchageables par l'application hôte.</li>
+<li><strong>Tests domaine réels</strong> (571 lignes) couvrant la machine à états et les policies.</li>
+<li><strong>Documentation interne abondante</strong> (javadoc riche, intentions claires) — la vision est la bonne, y compris la cible de migration vers RT-comops.</li>
+</ol>
+<hr />
+<h2 id="8-problemes-detectes-tableau-de-synthese">8. Problèmes détectés — tableau de synthèse</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>Problème</th>
+<th>Localisation</th>
+<th>Criticité</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>P1</td>
+<td>Module jamais activé : pas de fichier <code>AutoConfiguration.imports</code>, pas d'<code>@Import</code> dans bootstrap</td>
+<td><code>src/main/resources/</code> (seul <code>application.yaml</code>) ; <code>TntCoreConfig.java:31-44</code></td>
+<td><span class="badge crit">Critique</span></td>
+</tr>
+<tr>
+<td>P2</td>
+<td><code>@ComponentScan</code> sur un package inexistant (<code>yowyob.kernel.event</code>)</td>
+<td><code>YowEventKernelAutoConfiguration.java:58</code></td>
+<td><span class="badge crit">Critique</span></td>
+</tr>
+<tr>
+<td>P3</td>
+<td>Port <code>EventEnvelopeRepository</code> (event store) sans aucune implémentation</td>
+<td><code>application/port/out/EventEnvelopeRepository.java</code> ; grep <code>implements EventEnvelopeRepository</code> → 0</td>
+<td><span class="badge crit">Critique</span></td>
+</tr>
+<tr>
+<td>P4</td>
+<td>Aucune migration DB pour les 4 tables <code>event_bus.*</code> référencées</td>
+<td><code>DomainEventEnvelopeEntity.java:47</code>, <code>OutboxEntryEntity.java:29</code>, <code>DeadLetterEntryEntity.java:33</code>, <code>EventSchemaEntity.java:35</code> ; 0 changelog dans le dépôt</td>
+<td><span class="badge crit">Critique</span></td>
+</tr>
+<tr>
+<td>P5</td>
+<td>100 % des flux événementiels contournent le kernel : fire-and-forget sans outbox, perte d'événements silencieuse</td>
+<td><code>KafkaDeliveryEventPublisher.java:64</code> (<code>.onErrorComplete()</code>) ; <code>KafkaAgencyEventPublisher</code> (« failures are swallowed ») ; ~24 modules</td>
+<td><span class="badge crit">Critique</span></td>
+</tr>
+<tr>
+<td>P6</td>
+<td>Divergence de topic producteur/consommateurs : <code>status-changed</code> vs <code>status.changed</code> → incident/sync/realtime ne reçoivent jamais les statuts de mission</td>
+<td><code>KafkaDeliveryEventPublisher.java:33</code> vs <code>IncidentEventConsumer.java:35</code>, <code>EntityChangedEventConsumer.java:46</code>, <code>RealtimeProperties.java:65</code></td>
+<td><span class="badge crit">Critique</span></td>
+</tr>
+<tr>
+<td>P7</td>
+<td>21 poms déclarent une dépendance jamais utilisée (dette, temps de build, fausse impression d'intégration — commentaires pom mensongers)</td>
+<td>ex. <code>identity/tnt-actor-core/pom.xml:36</code> (« DomainEvent, EventPublisher, Kafka bus »)</td>
+<td><span class="badge high">Élevé</span></td>
+</tr>
+<tr>
+<td>P8</td>
+<td>≥3 formats d'enveloppe concurrents + 2 abstractions partagées (<code>DomainEventEnvelope</code> vs <code>TntDomainEvent</code>) — aucune interopérabilité</td>
+<td><code>KafkaDeliveryEventPublisher.java:96-102</code> ; <code>tnt-common-core/.../TntDomainEvent.java</code> ; <code>KafkaAgencyEventPublisher.java:66-71</code></td>
+<td><span class="badge high">Élevé</span></td>
+</tr>
+<tr>
+<td>P9</td>
+<td>Aucune idempotence/déduplication côté consommateurs (17 modules) malgré livraison at-least-once de Kafka</td>
+<td>tous les <code>@KafkaListener</code> du dépôt</td>
+<td><span class="badge high">Élevé</span></td>
+</tr>
+<tr>
+<td>P10</td>
+<td>Javadoc contractuellement fausse : « exactly-once » (pipeline réellement at-least-once) ; « blocks until the reactive chain completes » (en réalité <code>subscribe()</code> fire-and-forget)</td>
+<td><code>DomainEventEnvelope.java:15</code> ; <code>OutboxPollerService.java:78-92</code></td>
+<td><span class="badge high">Élevé</span></td>
+</tr>
+<tr>
+<td>P11</td>
+<td>Catalogue de topics éclaté : 59 déclarés / 43 sans consommateur repo / 14+ consommés non déclarés ; littéraux dupliqués partout</td>
+<td><code>TntKafkaTopicsConfig.java</code> + diff exhaustif §5.3-5.4</td>
+<td><span class="badge high">Élevé</span></td>
+</tr>
+<tr>
+<td>P12</td>
+<td><code>yow.event.outbox.batch-size</code> défini mais ignoré (constante 50 codée en dur ; <code>YowEventKernelProperties</code> jamais injecté dans le poller)</td>
+<td><code>OutboxPollerService.java:50,110</code> vs <code>YowEventKernelProperties.java</code></td>
+<td><span class="badge med">Moyen</span></td>
+</tr>
+<tr>
+<td>P13</td>
+<td>Poller : <code>findById(envelopeId, null)</code> — tenantId non propagé alors que <code>entry.getTenantId()</code> est disponible</td>
+<td><code>OutboxPollerService.java:122</code></td>
+<td><span class="badge med">Moyen</span></td>
+</tr>
+<tr>
+<td>P14</td>
+<td>Contrôle de compatibilité Avro non implémenté : la javadoc référence un <code>AvroSchemaCompatibilityChecker</code> inexistant ; le code « trust the compatibility passed by the caller »</td>
+<td><code>SchemaRegistryService.java:23,49</code></td>
+<td><span class="badge med">Moyen</span></td>
+</tr>
+<tr>
+<td>P15</td>
+<td>Couplage inversé kernel→TiiBnTick : <code>@Qualifier("tntKafkaTemplate")</code> (bean défini par tnt-bootstrap) dans un module censé être générique Yowyob/RT-comops</td>
+<td><code>KafkaEventPublisher.java:60</code> ; idem <code>RedisEventIdempotencyStore.java:33</code></td>
+<td><span class="badge med">Moyen</span></td>
+</tr>
+<tr>
+<td>P16</td>
+<td><code>LocalDateTime</code> (sans fuseau) pour tous les horodatages d'un bus distribué — au lieu d'<code>Instant</code>/<code>OffsetDateTime</code></td>
+<td><code>DomainEventEnvelope.java:105-107</code>, <code>OutboxEntry.java:78-79</code></td>
+<td><span class="badge med">Moyen</span></td>
+</tr>
+<tr>
+<td>P17</td>
+<td>Enveloppe introuvable → entrée outbox marquée <code>PROCESSED</code> silencieusement (perte maquillée en succès)</td>
+<td><code>OutboxPollerService.java:209-214</code></td>
+<td><span class="badge med">Moyen</span></td>
+</tr>
+<tr>
+<td>P18</td>
+<td>Overlap de cycles de poll possible : <code>@Scheduled</code> + <code>subscribe()</code> asynchrone annule la garantie fixed-delay ; seul l'<code>AtomicBoolean</code> (mono-instance) protège</td>
+<td><code>OutboxPollerService.java:85-92,105</code></td>
+<td><span class="badge med">Moyen</span></td>
+</tr>
+<tr>
+<td>P19</td>
+<td><code>publishAll</code> : javadoc « single bulk-insert » mais implémentation en <code>flatMap</code> unitaire non ordonné ; renvoie le compte d'enveloppes, pas d'outbox</td>
+<td><code>EventPublisherService.java:75-100</code></td>
+<td><span class="badge low">Faible</span></td>
+</tr>
+<tr>
+<td>P20</td>
+<td><code>application.yaml</code> embarqué dans un jar bibliothèque (<code>spring.application.name</code>) — risque de collision de config avec l'app hôte</td>
+<td><code>src/main/resources/application.yaml</code></td>
+<td><span class="badge low">Faible</span></td>
+</tr>
+<tr>
+<td>P21</td>
+<td><code>@EnableScheduling</code> global dans une autoconfiguration de bibliothèque (effet de bord sur l'app hôte)</td>
+<td><code>YowEventKernelAutoConfiguration.java:56</code></td>
+<td><span class="badge low">Faible</span></td>
+</tr>
+<tr>
+<td>P22</td>
+<td>Aucun test d'intégration malgré 4 dépendances Testcontainers ; adapters et services 0 % couverts</td>
+<td>pom l.100-127 ; <code>src/test/</code> (3 fichiers)</td>
+<td><span class="badge low">Faible</span></td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="9-details-et-preuves-des-problemes-majeurs">9. Détails et preuves des problèmes majeurs</h2>
+<h3 id="p1-p2-le-module-ne-peut-pas-demarrer">P1-P2 — Le module ne peut pas démarrer</h3>
+<p>La javadoc de <code>YowEventKernelAutoConfiguration</code> (l.40-42) affirme : « <em>This class is discovered automatically by Spring Boot via the <code>META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports</code> file included in the module JAR</em> ». Or <code>src/main/resources/</code> ne contient <strong>que</strong> <code>application.yaml</code>. Sans ce fichier, <code>@AutoConfiguration</code> n'est jamais chargée. Aucun <code>@Import(YowEventKernelAutoConfiguration.class)</code> n'existe dans <code>tnt-bootstrap</code> (<code>TntCoreConfig.java:31-44</code> importe 12 configurations, pas celle-ci).</p>
+<p>Même si elle était chargée :</p>
+<pre><code class="language-java">// YowEventKernelAutoConfiguration.java:58
+@ComponentScan(basePackages = &quot;yowyob.kernel.event&quot;)   // ← package inexistant, il manque &quot;com.&quot;
+</code></pre>
+<p>Les adapters <code>@Component</code> (<code>KafkaEventPublisher</code>, <code>RedisEventIdempotencyStore</code>, <code>KafkaTopicManagerAdapter</code>, <code>MicrometerEventMetrics</code>) et les <code>@Repository</code> ne seraient donc <strong>jamais scannés</strong> — et les beans <code>@Bean</code> de la classe échoueraient faute de <code>EventEnvelopeRepository</code>, <code>KafkaPublisherPort</code>, etc.</p>
+<h3 id="p3-p4-il-serait-casse-sil-demarrait">P3-P4 — Il serait cassé s'il démarrait</h3>
+<ul>
+<li><code>adapter/persistence/repository/</code> contient <code>R2dbcOutboxEntryRepository</code>, <code>R2dbcDeadLetterRepository</code>, <code>R2dbcEventSchemaRepository</code> — <strong>pas de <code>R2dbcEventEnvelopeRepository</code></strong>, alors que 6 des 8 beans de l'autoconfiguration en dépendent. Le mapper <code>EventEnvelopeMapper</code> existe, orphelin.</li>
+<li>Les entités mappent <code>event_bus.domain_event_envelopes</code>, <code>event_bus.outbox_entries</code>, <code>event_bus.dead_letter_entries</code>, <code>event_bus.event_schemas</code>. Un grep <code>event_bus|outbox_entr|dead_letter</code> sur tous les <code>.xml/.sql/.yaml</code> du dépôt ne renvoie <strong>que</strong> le pom du module. Le schéma n'existe nulle part.</li>
+</ul>
+<h3 id="p5-le-vide-operationnel-perte-devenements-silencieuse">P5 — Le vide opérationnel : perte d'événements silencieuse</h3>
+<pre><code class="language-java">// KafkaDeliveryEventPublisher.java:59-66
+return serializeEvent(event)
+        .flatMap(payload -&gt; Mono.fromFuture(kafkaTemplate.send(topic, ...))
+                ...
+                .onErrorComplete()  // best-effort: notification failure must not block delivery
+                .then());
+</code></pre>
+<p>Un broker indisponible 30 s = tous les <code>MissionStatusChangedEvent</code> de la fenêtre perdus, sans persistance, sans retry, sans DLQ, sans alerte métier. Même philosophie côté agency (« <em>Publish failures are swallowed</em> »), et les erreurs de sérialisation retournent <code>Mono.empty()</code> (l.87-90). C'est un régime <strong>at-most-once</strong> sur des événements métier structurants — précisément ce que l'outbox du kernel devait empêcher.</p>
+<h3 id="p10-semantique-de-livraison-mal-etiquetee-dans-le-kernel-lui-meme">P10 — Sémantique de livraison mal étiquetée dans le kernel lui-même</h3>
+<ul>
+<li><code>DomainEventEnvelope.java:15</code> : « <em>durable, exactly-once delivery</em> ». Le pipeline réel (<code>OutboxPollerService.publishAndCommit</code>, l.135-160) publie sur Kafka <strong>puis</strong> met à jour la DB, sans transaction ni producteur idempotent/transactionnel Kafka : un crash entre les deux rejoue l'événement. C'est de l'at-least-once (ce que dit d'ailleurs correctement <code>OutboxEntry.java:61-63</code>).</li>
+<li><code>OutboxPollerService.java:78-82</code> : « <em>Delegates to poll() and blocks until the reactive chain completes. The @Scheduled fixed-delay semantics guarantee that the next cycle does not start until the current one finishes</em> » — faux : <code>scheduledPoll()</code> fait <code>poll().subscribe(...)</code> (l.85) et retourne immédiatement.</li>
+</ul>
+<h3 id="p22-contexte-la-seconde-abstraction-tntdomainevent">P22 (contexte) — La seconde abstraction : <code>TntDomainEvent</code></h3>
+<p><code>foundation/tnt-common-core/.../domain/event/TntDomainEvent.java</code> définit un contrat complet (eventId, eventType, aggregateId/type, tenantId, occurredAt, correlationId, sequenceNumber) accompagné de <code>TntDomainEventMetadata</code>. Sa javadoc (l.13-14) prétend : « <em>Concrete events are serialized via the Outbox pattern (in <code>tnt-kernel-core</code>) and published to Kafka topics defined in <code>yow-event-kernel</code></em> » — <strong>doublement faux</strong> : <code>tnt-kernel-core</code> n'existe pas dans ce dépôt, et <code>yow-event-kernel</code> ne définit aucun topic. Adoption réelle : <strong>uniquement <code>coreBackend/tnt-agency-back-core</code></strong> (16 fichiers). Les modules cœur (delivery, dispute, incident…) utilisent leurs propres interfaces locales (<code>DeliveryDomainEvent</code>, <code>MarketDomainEvent</code>…). La plateforme a donc <strong>deux standards d'événement partagés, tous deux quasi ignorés</strong>, plus une interface locale par module.</p>
+<hr />
+<h2 id="10-recommandations-priorisees">10. Recommandations priorisées</h2>
+<h3 id="pr1-decider-du-sort-du-module-critique-decision-darchitecture-a-arbitrer-avec-lequipe">PR1 — Décider du sort du module (Critique, décision d'architecture — à arbitrer avec l'équipe)</h3>
+<p>Deux options cohérentes ; l'entre-deux actuel (dépendance déclarée partout, code mort) est la pire :
+- <strong>Option A (recommandée)</strong> : réhabiliter <code>yow-event-kernel</code> comme unique voie de publication, dans le cadre de sa migration RT-comops prévue.
+- <strong>Option B</strong> : l'abandonner explicitement, retirer les 21 dépendances pom, et promouvoir <code>TntDomainEvent</code> + un publisher commun dans <code>tnt-common-core</code>.</p>
+<h3 id="pr2-corriger-la-rupture-de-topic-missionstatus-critique-immediat-independant-de-pr1">PR2 — Corriger la rupture de topic mission.status (Critique, immédiat, indépendant de PR1)</h3>
+<p>Aligner <code>tnt-incident-core</code>, <code>tnt-sync-core</code>, <code>tnt-realtime-core</code> sur <code>tnt.delivery.mission.status-changed</code> (ou inversement), et <strong>centraliser les noms de topics dans une classe de constantes partagée</strong> (<code>tnt-common-core</code>) référencée par producteurs, consommateurs et <code>TntKafkaTopicsConfig</code>.</p>
+<h3 id="pr3-si-option-a-rendre-le-module-demarrable-critique">PR3 — Si option A : rendre le module démarrable (Critique)</h3>
+<ol>
+<li>Créer <code>META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports</code> avec <code>com.yowyob.kernel.event.config.YowEventKernelAutoConfiguration</code>.</li>
+<li>Corriger <code>@ComponentScan(basePackages = "com.yowyob.kernel.event")</code>.</li>
+<li>Écrire <code>R2dbcEventEnvelopeRepository</code>.</li>
+<li>Écrire les changelogs Liquibase des 4 tables <code>event_bus.*</code> et les raccorder au master changelog de bootstrap.</li>
+<li>Supprimer le <code>@Qualifier("tntKafkaTemplate")</code> codé en dur (injecter un <code>KafkaTemplate</code> non qualifié, surchargeable) et l'<code>application.yaml</code> du jar.</li>
+<li>Ajouter les tests d'intégration Testcontainers déjà outillés dans le pom (outbox de bout en bout, DLQ, replay, crash entre publish et commit).</li>
+</ol>
+<h3 id="pr4-stopper-la-perte-devenements-eleve-meme-sans-pr1">PR4 — Stopper la perte d'événements (Élevé, même sans PR1)</h3>
+<p>Interdire <code>.onErrorComplete()</code>/avalage d'erreurs dans les publishers d'événements métier ; à minima logger en ERROR + métrique + retry ; à terme, brancher les publishers sur l'outbox du kernel (les modules gardent leur port <code>I...EventPublisher</code>, seul l'adapter change — le pattern trust/CLAUDE.md s'applique).</p>
+<h3 id="pr5-unifier-lenveloppe-eleve">PR5 — Unifier l'enveloppe (Élevé)</h3>
+<p>Une seule enveloppe (celle du kernel : correlationId, causationId, tenantId, schemaVersion, headers <code>X-Yow-*</code>) et un seul contrat (<code>TntDomainEvent</code> aligné dessus). Migrer les 3 formats existants ; documenter le versioning.</p>
+<h3 id="pr6-idempotence-consommateurs-eleve">PR6 — Idempotence consommateurs (Élevé)</h3>
+<p>Généraliser <code>checkAndMark(eventId)</code> (le <code>RedisEventIdempotencyStore</code> du kernel est prêt) dans les 17 modules consommateurs, en commençant par billing/wallet (risque financier des doublons).</p>
+<h3 id="pr7-hygiene-moyenfaible">PR7 — Hygiène (Moyen/Faible)</h3>
+<p>Corriger les javadocs mensongères (« exactly-once », fixed-delay, bulk-insert, imports file), injecter <code>YowEventKernelProperties</code> dans le poller (batch-size), propager <code>entry.getTenantId()</code> dans <code>processEntry</code>, passer les horodatages en <code>Instant</code>, implémenter ou retirer le contrôle de compatibilité Avro, remplacer le <code>PROCESSED</code> silencieux de <code>handleMissingEnvelope</code> par un statut d'erreur dédié, retirer <code>@EnableScheduling</code> au profit d'une activation conditionnelle.</p>
+<hr />
+<h2 id="11-conclusion-verdict">11. Conclusion — verdict</h2>
+<p><code>yow-event-kernel</code> est un <strong>excellent document d'architecture déguisé en module Maven</strong>. Sa conception (outbox, enveloppe riche, DLQ, replay, idempotence) est précisément ce dont la plateforme a besoin — la preuve : chaque module en a réimplémenté un fragment dégradé. Mais dans son état actuel, il est : jamais activé (P1-P2), inexécutable (P3-P4), et contourné par 100 % des flux événementiels (P5). Les 21 dépendances pom donnent une illusion d'intégration que le code dément totalement. Pendant ce temps, la plateforme réelle fonctionne en fire-and-forget sans garantie de livraison, avec trois enveloppes incompatibles, aucune idempotence, et au moins un flux inter-modules structurellement rompu par une faute de nommage de topic. <strong>Le module ne joue pas son rôle central ; il faut soit le réhabiliter et y raccorder les publishers existants (option recommandée, cohérente avec la migration RT-comops annoncée), soit l'assumer comme abandonné et le retirer — mais pas le laisser en l'état.</strong></p>
+<hr />
+<p><em>Audit réalisé par analyse statique exhaustive : inventaire complet des 60 sources du module, grep des imports sur les 34 modules (y compris coreBackend/), lecture intégrale des services/adapters du kernel, échantillonnage des publishers/consommateurs ad-hoc, diff exhaustif topics déclarés/consommés.</em></p>
+<footer>Audit technique TiiBnTick — généré à partir de l'analyse du code source réel. Chaque constat référence les fichiers et lignes concernés.</footer>
+</main>
+</div>
+
+<script type="module">
+  try {
+    const m = await import("https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs");
+    const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    m.default.initialize({ startOnLoad: true, theme: dark ? "dark" : "neutral", securityLevel: "loose" });
+  } catch (e) {
+    document.querySelectorAll(".mermaid").forEach(el => {
+      el.style.textAlign = "left";
+      el.innerHTML = "<div style='color:var(--muted);font-size:.75rem;margin-bottom:.5rem'>⚠ Diagramme Mermaid (connexion internet requise pour le rendu) — source :</div><pre>" + el.textContent.replace(/&/g,"&amp;").replace(/</g,"&lt;") + "</pre>";
+    });
+  }
+</script>
+
+</body>
+</html>

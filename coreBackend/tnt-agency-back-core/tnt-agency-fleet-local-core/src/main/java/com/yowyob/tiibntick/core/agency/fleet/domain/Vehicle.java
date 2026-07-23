@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.core.agency.fleet.domain;
 
+import com.yowyob.tiibntick.core.agency.fleet.domain.vo.VehicleSource;
 import com.yowyob.tiibntick.core.agency.fleet.domain.vo.VehicleStatus;
 import com.yowyob.tiibntick.core.agency.fleet.domain.vo.VehicleType;
 
@@ -23,6 +24,9 @@ public class Vehicle {
     private Instant assignedAt;
     private Instant maintenanceStartedAt;
     private UUID coreVehicleId;
+    private VehicleSource source;
+    private String fleetmanVehicleId;
+    private Instant lastSyncedAt;
     private final Instant createdAt;
     private Instant updatedAt;
     private long version;
@@ -31,6 +35,7 @@ public class Vehicle {
                    String licensePlate, String brand, String model, int year,
                    VehicleType vehicleType, VehicleStatus status,
                    Instant assignedAt, Instant maintenanceStartedAt, UUID coreVehicleId,
+                   VehicleSource source, String fleetmanVehicleId, Instant lastSyncedAt,
                    Instant createdAt, Instant updatedAt, long version) {
         this.id = id;
         this.tenantId = tenantId;
@@ -46,6 +51,9 @@ public class Vehicle {
         this.assignedAt = assignedAt;
         this.maintenanceStartedAt = maintenanceStartedAt;
         this.coreVehicleId = coreVehicleId;
+        this.source = source != null ? source : VehicleSource.AGENCY;
+        this.fleetmanVehicleId = fleetmanVehicleId;
+        this.lastSyncedAt = lastSyncedAt;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
         this.version = version;
@@ -54,9 +62,19 @@ public class Vehicle {
     public static Vehicle add(UUID id, UUID tenantId, UUID agencyId, UUID branchId,
                               String licensePlate, String brand, String model,
                               int year, VehicleType type, Instant now) {
+        return add(id, tenantId, agencyId, branchId, licensePlate, brand, model, year, type,
+                VehicleSource.AGENCY, null, now);
+    }
+
+    public static Vehicle add(UUID id, UUID tenantId, UUID agencyId, UUID branchId,
+                              String licensePlate, String brand, String model,
+                              int year, VehicleType type, VehicleSource source,
+                              String fleetmanVehicleId, Instant now) {
         return new Vehicle(id, tenantId, agencyId, branchId, null,
                 licensePlate, brand, model, year, type,
-                VehicleStatus.AVAILABLE, null, null, null, now, now, 0L);
+                VehicleStatus.AVAILABLE, null, null, null,
+                source != null ? source : VehicleSource.AGENCY, fleetmanVehicleId, now,
+                now, now, 0L);
     }
 
     public void assign(UUID delivererId, Instant now) {
@@ -111,6 +129,18 @@ public class Vehicle {
         this.updatedAt = now;
     }
 
+    public void linkFleetMan(String fleetmanVehicleId, VehicleSource source, Instant now) {
+        if (fleetmanVehicleId == null || fleetmanVehicleId.isBlank()) {
+            throw new IllegalArgumentException("fleetmanVehicleId is required");
+        }
+        this.fleetmanVehicleId = fleetmanVehicleId;
+        if (source != null) {
+            this.source = source;
+        }
+        this.lastSyncedAt = now;
+        this.updatedAt = now;
+    }
+
     public UUID getId() { return id; }
     public UUID getTenantId() { return tenantId; }
     public UUID getAgencyId() { return agencyId; }
@@ -125,6 +155,9 @@ public class Vehicle {
     public Instant getAssignedAt() { return assignedAt; }
     public Instant getMaintenanceStartedAt() { return maintenanceStartedAt; }
     public UUID getCoreVehicleId() { return coreVehicleId; }
+    public VehicleSource getSource() { return source; }
+    public String getFleetmanVehicleId() { return fleetmanVehicleId; }
+    public Instant getLastSyncedAt() { return lastSyncedAt; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
     public long getVersion() { return version; }

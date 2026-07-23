@@ -3,6 +3,7 @@ package com.yowyob.tiibntick.core.agency.billing.application.service;
 import com.yowyob.tiibntick.common.exception.TntNotFoundException;
 import com.yowyob.tiibntick.common.exception.TntValidationException;
 import com.yowyob.tiibntick.core.agency.assignment.application.service.MissionService;
+import com.yowyob.tiibntick.core.agency.assignment.domain.AgencyMission;
 import com.yowyob.tiibntick.core.agency.assignment.domain.vo.MissionStatus;
 import com.yowyob.tiibntick.core.agency.billing.adapter.out.clients.BillingEvaluatorPort;
 import com.yowyob.tiibntick.core.agency.billing.adapter.out.clients.BillingPolicyCorePort;
@@ -133,20 +134,22 @@ public class BillingService {
                 .switchIfEmpty(Mono.error(new TntNotFoundException(
                         "MISSION_NOT_FOUND", "Mission introuvable: " + missionId)))
                 .flatMap(mission -> {
-                    if (!MissionStatus.DELIVERED.name().equals(mission.status())) {
+                    if (MissionStatus.DELIVERED != mission.getStatus()) {
                         return Mono.error(new TntValidationException(
                                 "Only a DELIVERED mission can be invoiced"
                         ));
                     }
-                    if (!agencyId.equals(mission.agencyId())) {
+                    if (!agencyId.equals(mission.getAgencyId())) {
                         return Mono.error(new TntValidationException(
                                 "Mission does not belong to requested agency"
                         ));
                     }
                     return findActiveByAgency(tenantId, agencyId).defaultIfEmpty(null)
-                            .flatMap(policy -> resolveAmount(tenantId, agencyId, missionId, policy)
+                            .flatMap(policy -> resolveAmount(tenantId, agencyId, mission, policy)
                                     .flatMap(amount -> {
-                                        String currency = policy != null ? policy.getCurrency() : "XAF";
+                                        String currency = policy != null
+                                                ? policy.getCurrency()
+                                                : (mission.getQuotedCurrency() != null ? mission.getQuotedCurrency() : "XAF");
                                         return invoiceGeneration.generate(new InvoiceGenerationPort.InvoiceGenerationRequest(
                                                         tenantId, agencyId, missionId.toString(), null,
                                                         amount, currency, "Facture mission " + missionId
@@ -192,11 +195,17 @@ public class BillingService {
     public Mono<InvoiceDownloadResult> downloadInvoice(UUID tenantId, UUID invoiceId) {
         return getInvoice(tenantId, invoiceId)
                 .flatMap(invoice -> {
-                    String coreId = invoice.getCoreInvoiceId() != null
-                            ? invoice.getCoreInvoiceId().toString()
-                            : invoice.getReference();
-                    return invoiceGeneration.getPdfUrl(coreId)
-                            .defaultIfEmpty("")
+                    if (invoice.getCoreInvoiceId() == null) {
+                        return Mono.error(new TntValidationException(
+                                "PDF indisponible : cette facture n'est pas liée au moteur de facturation Core. "
+                                        + "Régénérez la facture une fois le billing Core joignable."
+                        ));
+                    }
+                    return invoiceGeneration.getPdfUrl(tenantId, invoice.getCoreInvoiceId().toString())
+                            .switchIfEmpty(Mono.error(new TntNotFoundException(
+                                    "PDF_UNAVAILABLE",
+                                    "Le PDF de cette facture est temporairement indisponible côté facturation. Réessayez dans un instant."
+                            )))
                             .map(url -> new InvoiceDownloadResult(invoice.getId(), url));
                 });
     }
@@ -210,22 +219,39 @@ public class BillingService {
                 )));
     }
 
-    private Mono<BigDecimal> resolveAmount(UUID tenantId, UUID agencyId, UUID missionId, BillingPolicy policy) {
-        if (policy == null) {
-            return Mono.just(BigDecimal.ZERO);
+    private Mono<BigDecimal> resolveAmount(
+            UUID tenantId,
+            UUID agencyId,
+            AgencyMission mission,
+            BillingPolicy policy) {
+        if (mission.getQuotedAmount() != null && mission.getQuotedAmount().compareTo(BigDecimal.ZERO) > 0) {
+            return Mono.just(mission.getQuotedAmount());
         }
+        if (policy == null) {
+            return Mono.error(new TntValidationException(
+                    "Impossible de facturer : ni montant devisé ni politique tarifaire active."
+            ));
+        }
+        double weightKg = mission.getWeightKg() != null && mission.getWeightKg() > 0 ? mission.getWeightKg() : 1.0;
+        if (mission.getDistanceKm() == null || mission.getDistanceKm() <= 0) {
+            return Mono.error(new TntValidationException(
+                    "Distance de livraison manquante pour calculer le montant. "
+                            + "Renseignez la distance sur la mission ou un montant devisé."
+            ));
+        }
+        double distanceKm = mission.getDistanceKm();
         UUID corePolicyId = resolveCorePolicyId(policy);
         return billingPricing.evaluate(new BillingPricingPort.PricingRequest(
-                        tenantId, agencyId, corePolicyId, missionId, 10.0, 1.0
+                        tenantId, agencyId, corePolicyId, mission.getId(), distanceKm, weightKg
                 ))
                 .map(BillingPricingPort.PricingResult::amount)
                 .switchIfEmpty(
                         billingEvaluator.evaluate(new BillingEvaluatorPort.BillingEvaluationRequest(
-                                        tenantId, agencyId, corePolicyId, 10.0, 1.0, 0.0, null
+                                        tenantId, agencyId, corePolicyId, distanceKm, weightKg, 0.0, null
                                 ))
                                 .map(result -> result.amount().compareTo(BigDecimal.ZERO) > 0
                                         ? result.amount()
-                                        : policy.estimate(10.0, 1.0))
+                                        : policy.estimate(distanceKm, weightKg))
                 );
     }
 

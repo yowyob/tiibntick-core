@@ -33,10 +33,12 @@
             <groupId>com.yowyob.tiibntick.core</groupId>
             <artifactId>tnt-roles-core</artifactId>
         </dependency>
+        <!-- yow-event-kernel: transactional outbox (PublishEventUseCase) — Chantier C · Audit n°3 · P5.
+             Replaces the direct tnt-agency-eventing-core dependency, which existed solely to reuse
+             its shared agencyEventKafkaTemplate KafkaTemplate bean (now unused here). -->
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>
-            <artifactId>tnt-agency-eventing-core</artifactId>
-            <version>${project.version}</version>
+            <artifactId>yow-event-kernel</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -58,6 +60,25 @@
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
+        </dependency>
+
+        <!-- ── Test ── -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka-test</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>

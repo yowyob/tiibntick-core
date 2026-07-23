@@ -1,6 +1,7 @@
 package com.yowyob.tiibntick.core.trust.adapter.in.web.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import jakarta.validation.constraints.NotBlank;
 
 /**
  * Request DTO — Record a Proof-of-Location verification.
@@ -14,8 +15,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record PolVerificationRequest(
-        String actorId,
+        @NotBlank(message = "actorId is required") String actorId,
         String tenantId,
         double gpsLat,
         double gpsLng,
-        String polHash) {}
+        @NotBlank(message = "polHash is required") String polHash) {}

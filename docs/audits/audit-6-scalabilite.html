@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audit n°6 — Scalabilité · Audit TiiBnTick</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --text: #1c2430; --muted: #5b6675;
+  --border: #e3e7ec; --accent: #0f5fa8; --accent-soft: #e8f1fa;
+  --code-bg: #f0f2f5; --sidebar-bg: #101823; --sidebar-text: #c7d0dc;
+  --crit: #c62828; --high: #e65100; --med: #f9a825; --low: #2e7d32;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1319; --panel: #161d27; --text: #dbe2ea; --muted: #8b97a5;
+    --border: #263140; --accent: #5aa2e0; --accent-soft: #17273a;
+    --code-bg: #1d2733; --sidebar-bg: #0a0f15; --sidebar-text: #a9b4c0;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--bg); color: var(--text); line-height: 1.65; }
+.layout { display: flex; min-height: 100vh; }
+nav.sidebar { width: 270px; flex-shrink: 0; background: var(--sidebar-bg);
+  color: var(--sidebar-text); padding: 1.4rem 1rem; position: sticky; top: 0;
+  height: 100vh; overflow-y: auto; }
+nav.sidebar .brand { font-size: 1.05rem; font-weight: 700; color: #fff;
+  margin-bottom: .2rem; }
+nav.sidebar .brand small { display:block; font-weight: 400; color: var(--sidebar-text);
+  font-size: .75rem; margin-top: .2rem; }
+nav.sidebar ul { list-style: none; padding: 0; margin: 1.2rem 0; }
+nav.sidebar li a { display: block; color: var(--sidebar-text); text-decoration: none;
+  padding: .45rem .6rem; border-radius: 6px; font-size: .86rem; }
+nav.sidebar li a:hover { background: rgba(255,255,255,.08); color: #fff; }
+nav.sidebar li a.active { background: var(--accent); color: #fff; }
+nav.sidebar .section-label { text-transform: uppercase; letter-spacing: .08em;
+  font-size: .68rem; color: #6b7683; margin: 1.4rem 0 .4rem .4rem; }
+main { flex: 1; min-width: 0; padding: 2.2rem 3rem 4rem; max-width: 1100px; }
+header.page { border-bottom: 1px solid var(--border); padding-bottom: 1.2rem;
+  margin-bottom: 1.6rem; }
+header.page .kicker { color: var(--accent); font-weight: 600; font-size: .85rem;
+  text-transform: uppercase; letter-spacing: .06em; }
+header.page h1 { margin: .25rem 0 .4rem; font-size: 1.9rem; }
+header.page .meta { color: var(--muted); font-size: .85rem; }
+h2 { margin-top: 2.4rem; padding-bottom: .35rem; border-bottom: 1px solid var(--border);
+  font-size: 1.35rem; }
+h3 { margin-top: 1.8rem; font-size: 1.08rem; }
+h4 { margin-top: 1.4rem; font-size: .98rem; }
+a { color: var(--accent); }
+code { background: var(--code-bg); padding: .12em .38em; border-radius: 4px;
+  font-size: .84em; font-family: "JetBrains Mono", Consolas, monospace; }
+pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem; overflow-x: auto; font-size: .82rem; line-height: 1.5; }
+pre code { background: none; padding: 0; }
+.table-wrap { overflow-x: auto; margin: 1rem 0; border: 1px solid var(--border);
+  border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: .85rem; background: var(--panel); }
+th, td { border-bottom: 1px solid var(--border); padding: .55rem .75rem; text-align: left;
+  vertical-align: top; }
+th { background: var(--accent-soft); color: var(--text); font-weight: 600;
+  white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+blockquote { border-left: 4px solid var(--accent); background: var(--accent-soft);
+  margin: 1rem 0; padding: .7rem 1rem; border-radius: 0 8px 8px 0; }
+blockquote p { margin: .3rem 0; }
+.badge { display: inline-block; padding: .1em .6em; border-radius: 999px;
+  font-size: .74rem; font-weight: 700; color: #fff; white-space: nowrap; }
+.badge.crit { background: var(--crit); } .badge.high { background: var(--high); }
+.badge.med { background: var(--med); color: #333; } .badge.low { background: var(--low); }
+.mermaid { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem; margin: 1rem 0; text-align: center; overflow-x: auto; }
+.toc { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem 1.4rem; margin: 1.4rem 0; font-size: .88rem; }
+.toc > ul { margin: .3rem 0; padding-left: 1.1rem; }
+.toc .toctitle { font-weight: 700; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1rem; margin: 1.4rem 0; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1.1rem 1.2rem; text-decoration: none; color: var(--text); display: block; }
+.card:hover { border-color: var(--accent); }
+.card .icon { font-size: 1.5rem; }
+.card h3 { margin: .4rem 0 .2rem; font-size: 1rem; }
+.card p { margin: 0; color: var(--muted); font-size: .82rem; }
+.stat-row { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1.2rem 0; }
+.stat { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: .8rem 1.2rem; min-width: 130px; }
+.stat .num { font-size: 1.6rem; font-weight: 800; }
+.stat .lbl { font-size: .74rem; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .05em; }
+.stat.crit .num { color: var(--crit); } .stat.high .num { color: var(--high); }
+.stat.med .num { color: var(--med); } .stat.low .num { color: var(--low); }
+footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border);
+  color: var(--muted); font-size: .78rem; }
+.progress-block { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1rem 1.2rem; margin: 1rem 0 1.6rem; }
+.progress-block .progress-label { display: flex; justify-content: space-between; align-items: baseline;
+  font-size: .85rem; margin-bottom: .5rem; }
+.progress-block .progress-label b { font-size: 1rem; }
+.progress-bar-track { background: var(--code-bg); border-radius: 999px; height: .6rem; overflow: hidden; }
+.progress-bar-fill { height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--low), var(--accent)); transition: width .3s ease; }
+.progress-note { font-size: .72rem; color: var(--muted); margin-top: .5rem; }
+li:has(> input.task-checkbox) { list-style: none; margin-left: -1.4rem; padding-left: .3rem;
+  display: list-item; }
+input.task-checkbox { width: 1rem; height: 1rem; margin-right: .5rem; vertical-align: middle;
+  accent-color: var(--accent); }
+li:has(> input.task-checkbox:checked) { color: var(--muted); }
+li:has(> input.task-checkbox:checked) code { opacity: .75; }
+@media (max-width: 900px) {
+  .layout { flex-direction: column; }
+  nav.sidebar { width: 100%; height: auto; position: static; }
+  main { padding: 1.4rem 1.2rem 3rem; }
+}
+@media print { nav.sidebar { display: none; } main { padding: 0; } }
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar"><div class="brand">TiiBnTick Core<small>Audit technique — juillet 2026</small></div>
+<ul><li><a href="index.html">🏠 Accueil</a></li>
+<li><a href="executive-summary.html">📋 Résumé exécutif global</a></li>
+</ul><div class="section-label">Rapports d'audit</div><ul>
+<li><a href="audit-1-architecture.html">🏛️ Audit n°1 — Architecture globale</a></li>
+<li><a href="audit-2-inter-modules.html">🔗 Audit n°2 — Connexions inter-modules</a></li>
+<li><a href="audit-3-yow-event-kernel.html">📨 Audit n°3 — yow-event-kernel</a></li>
+<li><a href="audit-4-yow-i18n-kernel.html">🌍 Audit n°4 — yow-i18n-kernel</a></li>
+<li><a href="audit-5-kafka.html">🧵 Audit n°5 — Kafka</a></li>
+<li><a href="audit-6-scalabilite.html" class="active">📈 Audit n°6 — Scalabilité</a></li>
+<li><a href="audit-7-system-design.html">🧭 Audit n°7 — System Design & Sécurité</a></li>
+</ul><div class="section-label">Plan de remédiation</div><ul>
+<li><a href="remediation/implementation-plan.html">🗂️ Plan — Plan d'implémentation — vue d'ensemble</a></li>
+<li><a href="remediation/phase-0-critical.html">🚨 P0 — Phase 0 — Bloquant production</a></li>
+<li><a href="remediation/phase-1-hardening.html">🛡️ P1 — Phase 1 — Durcissement</a></li>
+<li><a href="remediation/phase-2-target-architecture.html">🚀 P2 — Phase 2 — Architecture cible</a></li>
+<li><a href="remediation/workstream-payment-billing-kernel-delegation.html">💳 Chantier — Délégation paiement/facturation au Kernel</a></li>
+</ul></nav>
+<main>
+<header class="page">
+  <div class="kicker">Audit n°6</div>
+  <h1>📈 Scalabilité</h1>
+  <div class="meta">Projet TiiBnTick Core · dépôt <code>tiibntick-core</code> (34 modules Maven, y compris <code>trust/tnt-trust-core</code>) · Audit réalisé le 16 juillet 2026</div>
+</header>
+
+<div class="toc"><div class="toc"><span class="toctitle">Sommaire</span><ul>
+<li><a href="#1-resume-executif">1. Résumé exécutif</a></li>
+<li><a href="#2-etat-actuel-de-larchitecture">2. État actuel de l'architecture</a><ul>
+<li><a href="#21-topologie-de-deploiement">2.1 Topologie de déploiement</a></li>
+<li><a href="#22-la-pyramide-de-base-de-donnees">2.2 La « pyramide » de base de données</a></li>
+<li><a href="#23-points-structurels">2.3 Points structurels</a></li>
+</ul>
+</li>
+<li><a href="#3-goulots-detranglement-classes-dans-lordre-ou-ils-casseront">3. Goulots d'étranglement — classés dans l'ordre où ils casseront</a></li>
+<li><a href="#4-points-positifs-a-preserver">4. Points positifs (à préserver)</a></li>
+<li><a href="#5-problemes-detectes">5. Problèmes détectés</a><ul>
+<li><a href="#tableau-de-synthese">Tableau de synthèse</a></li>
+<li><a href="#51-statelessness-lapplication-nest-pas-scale-out-ready">5.1 Statelessness — l'application n'est pas scale-out ready</a></li>
+<li><a href="#52-base-de-donnees">5.2 Base de données</a></li>
+<li><a href="#53-cache">5.3 Cache</a></li>
+<li><a href="#54-verrous-contention-et-resilience-http">5.4 Verrous, contention et résilience HTTP</a></li>
+<li><a href="#55-reactif-et-cpu-bound-or-tools">5.5 Réactif et CPU-bound — OR-Tools</a></li>
+<li><a href="#56-files-asynchrone-backpressure">5.6 Files, asynchrone, backpressure</a></li>
+<li><a href="#57-corebackend-tnt-link-back-core-la-carte-temps-reel-est-un-polling-de-base-de-donnees">5.7 coreBackend — tnt-link-back-core : la carte « temps réel » est un polling de base de données</a></li>
+<li><a href="#58-deploiement">5.8 Déploiement</a></li>
+</ul>
+</li>
+<li><a href="#6-recommandations-priorisees">6. Recommandations priorisées</a><ul>
+<li><a href="#p0-bloquant-avant-tout-scale-out-semaines-1-3">P0 — Bloquant avant tout scale-out (semaines 1-3)</a></li>
+<li><a href="#p1-avant-montee-en-charge-significative-mois-1-2">P1 — Avant montée en charge significative (mois 1-2)</a></li>
+<li><a href="#p2-trajectoire-centaines-de-millions-mois-3-6">P2 — Trajectoire « centaines de millions » (mois 3-6)</a></li>
+</ul>
+</li>
+<li><a href="#7-conclusion">7. Conclusion</a></li>
+</ul>
+</div>
+</div>
+<h1 id="audit-n6-scalabilite-tiibntick-core">Audit n°6 — Scalabilité — TiiBnTick Core</h1>
+<ul>
+<li><strong>Date</strong> : 2026-07-17</li>
+<li><strong>Auditeur</strong> : Performance/Platform Engineer (audit outillé, preuves fichier:ligne)</li>
+<li><strong>Périmètre</strong> : dépôt <code>tiibntick-core</code> (~34 modules Maven, ~2 956 fichiers Java), application unique déployable <code>tnt-bootstrap</code> — <strong>y compris <code>coreBackend/</code></strong> (tnt-agency-back-core, tnt-go-freelancer-point-back-core, tnt-link-back-core, tnt-market-back-core), avec analyse approfondie de <code>tnt-link-back-core</code> (carte temps réel, cible : millions d'utilisateurs simultanés)</li>
+<li><strong>Objectif client</strong> : capacité cible de plusieurs centaines de millions d'utilisateurs</li>
+</ul>
+<hr />
+<h2 id="1-resume-executif">1. Résumé exécutif</h2>
+<p>TiiBnTick Core est un <strong>monolithe modulaire réactif</strong> (Spring Boot 4 WebFlux, R2DBC/PostgreSQL+PostGIS, Kafka, Redis réactif, MinIO, OR-Tools). L'architecture interne est de bonne qualité (hexagonale, outbox pattern avec <code>FOR UPDATE SKIP LOCKED</code>, verrouillage optimiste sur les wallets, cache Redis à deux niveaux pour le routage, URLs présignées MinIO). <strong>Le code est visiblement pensé pour un futur scale-out</strong> — mais il n'y est pas encore prêt.</p>
+<p><strong>Verdict : l'application ne peut PAS être déployée en plusieurs instances aujourd'hui sans corruption fonctionnelle</strong>, à cause de trois défauts bloquants : (1) un générateur de références de litiges basé sur un <code>AtomicInteger</code> statique par JVM qui produit des doublons garantis en multi-instances, (2) ~10 jobs <code>@Scheduled</code> sans verrou distribué (aucun ShedLock dans le dépôt) qui s'exécuteraient en double, (3) des dépôts de données <strong>en mémoire</strong> utilisés en production (réconciliation financière du wallet, affectations de rôles RBAC en mode <code>LOCAL</code> par défaut).</p>
+<p>Même en mono-instance, le plafond de charge est bas : <strong>une seule instance PostgreSQL partagée par ~30 schémas</strong>, pools R2DBC de 10 connexions par factory, <strong>aucune pagination</strong> sur les endpoints de listing, <strong>aucun partitionnement</strong> de tables, <strong>aucun read replica</strong>, et des appels HTTP vers le Kernel Yowyob <strong>sans timeout ni circuit breaker</strong> (le Resilience4j présent ne couvre que le module trust). L'objectif « centaines de millions d'utilisateurs » exige un chantier structurel : la base de données cassera la première, bien avant le monolithe lui-même.</p>
+<p><strong>Alerte spécifique <code>tnt-link-back-core</code></strong> (exigence : millions d'utilisateurs simultanés sur une carte temps réel) : le module ne contient <strong>aucun mécanisme de push</strong> — pas de WebSocket, pas de SSE, pas de sink, pas d'adapter Kafka ni Redis (il ne dépend même pas de <code>tnt-realtime-core</code>). La « carte temps réel » ne peut fonctionner que par <strong>polling REST</strong> de requêtes bounding-box exécutées <strong>sans PostGIS</strong> (colonnes lat/lon en <code>DOUBLE PRECISION</code>, index B-tree inadapté, table des alertes sans aucun index géo). À 1 M d'utilisateurs rafraîchissant leur viewport toutes les 5 s, cela représente ~200 000 requêtes DB/s sur une instance PostgreSQL dont le pool primaire fait 10 connexions : <strong>le design actuel est hors d'échelle par plusieurs ordres de grandeur</strong> (§5.8).</p>
+<p><strong>Problèmes recensés : 27</strong> — dont <strong>6 Critiques</strong>, <strong>10 Élevés</strong>, <strong>7 Moyens</strong>, <strong>4 Faibles</strong>.</p>
+<hr />
+<h2 id="2-etat-actuel-de-larchitecture">2. État actuel de l'architecture</h2>
+<h3 id="21-topologie-de-deploiement">2.1 Topologie de déploiement</h3>
+<ul>
+<li><strong>Une seule application déployable</strong> : <code>tnt-bootstrap</code> assemble ~34 modules-bibliothèques (CLAUDE.md, racine du dépôt).</li>
+<li><strong>Infrastructure locale</strong> (<code>tnt-bootstrap/docker-compose.yml</code>) : 1 PostgreSQL/PostGIS (l.48), 1 Redis (l.71), 1 Kafka KRaft mono-broker (l.89), 1 MinIO (l.125), Elasticsearch, Prometheus, Grafana, Zipkin — <strong>tous en instance unique, sans réplication ni cluster</strong>.</li>
+<li><strong>Aucun manifeste Kubernetes, HPA, ou configuration de load balancer</strong> dans le dépôt (seul indice : commentaire « TLS terminated at Nginx/load balancer level », <code>application.yml:527</code>).</li>
+<li><strong>Dockerfile</strong> (<code>tnt-bootstrap/Dockerfile</code>) : bonnes pratiques (jar en couches, utilisateur non-root, <code>MaxRAMPercentage=75</code>, ZGC générationnel, healthcheck liveness) — le conteneur est correctement préparé.</li>
+</ul>
+<h3 id="22-la-pyramide-de-base-de-donnees">2.2 La « pyramide » de base de données</h3>
+<p><code>tnt-bootstrap/src/main/java/com/yowyob/tiibntick/bootstrap/config/TntDataSourceConfig.java</code> définit <strong>8 <code>ConnectionFactory</code> R2DBC</strong> (kernel + core + 6 plateformes) qui, en mode monolithe, <strong>pointent toutes vers la même instance PostgreSQL</strong> (l.36-38, l.160-167). Pool par factory : <code>DB_POOL_MAX_SIZE</code> <strong>défaut 10</strong> (l.64), soit un plafond théorique de 80 connexions. Le pool <code>spring.r2dbc</code> (max 30, <code>application.yml:26-30</code>) est <strong>inactif</strong> — commentaire explicite l.17-21 : « This starter-managed factory/pool is NOT what the app actually uses ».</p>
+<h3 id="23-points-structurels">2.3 Points structurels</h3>
+<ul>
+<li>~160 tables (<code>createTable</code>) réparties dans les changelogs Liquibase des modules ; <strong>388 <code>createIndex</code></strong> au total — bonne couverture d'indexation.</li>
+<li>Outbox pattern transactionnel dans <code>foundation/yow-event-kernel</code> (poller 1 s, batch 50).</li>
+<li>Realtime : WebSocket/SSE adossés à <strong>Redis pub/sub</strong> pour le broadcast inter-instances.</li>
+<li>Kernel Yowyob consommé <strong>exclusivement en HTTP</strong> (migration terminée) via des <code>WebClient</code> centralisés dans <code>KernelBridgeConfig</code>.</li>
+</ul>
+<hr />
+<h2 id="3-goulots-detranglement-classes-dans-lordre-ou-ils-casseront">3. Goulots d'étranglement — classés dans l'ordre où ils casseront</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>Goulot</th>
+<th>Seuil estimé de rupture</th>
+<th>Preuve principale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>PostgreSQL unique + pools de 10 connexions</strong> : 30 schémas, requêtes OLTP + géo PostGIS + audit + outbox pollé chaque seconde sur la même instance</td>
+<td>Premier à saturer : ~quelques centaines de req/s soutenues ; le pool primaire de 10 connexions fera des files d'attente <code>AcquirePending</code> bien avant</td>
+<td><code>TntDataSourceConfig.java:63-64</code>, <code>docker-compose.yml:48</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>Carte Link « temps réel » = polling REST sur bounding-box sans PostGIS</strong> : chaque viewport utilisateur = 1+ requête DB ; aucune voie de push, aucun fan-out par zone</td>
+<td>Casse dès les premiers dizaines de milliers d'utilisateurs actifs sur la carte (bien avant le million visé) : 10⁴ users × 0,2 Hz = 2 000 scans géo/s sur le goulot #1</td>
+<td><code>NetworkNodeR2dbcRepository.java:17-20</code>, <code>003-create-network-nodes.sql:19</code>, §5.8</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>Endpoints de listing non paginés</strong> : <code>Flux</code> illimités sur des tables à forte volumétrie (deliveries, nearby Link)</td>
+<td>Dès ~10⁵–10⁶ lignes par tenant : latence et pression mémoire (sérialisation de dizaines de Mo par requête)</td>
+<td><code>DeliveryController.java:72-97</code>, <code>R2dbcDeliveryRepository.java:24-31</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>Appels Kernel sans timeout ni circuit breaker</strong> : un Kernel lent bloque indéfiniment les requêtes en attente et épuise les connexions Netty</td>
+<td>À n'importe quel moment — dégradation en cascade dès que le Kernel ralentit</td>
+<td><code>KernelBridgeConfig.java:57-69</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>Scale-out impossible</strong> (séquence de litiges par JVM, schedulers dupliqués, état en mémoire) : la seule réponse à la charge est verticale</td>
+<td>Bloque toute augmentation d'instances → plafond = 1 machine</td>
+<td><code>DisputeReference.java:21</code>, §5.1</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>Contention wallet sans retry</strong> sur verrou optimiste : les crédits de commission convergent vers le wallet de l'organisation à chaque livraison</td>
+<td>Dès quelques débits/crédits concurrents sur un même wallet « chaud » → erreurs 5xx de paiement</td>
+<td><code>WalletEntity.java:72</code>, <code>WalletService.java:80-115</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>OR-Tools CPU-bound</strong> sur <code>boundedElastic</code> sans limite de concurrence + matrice de distances A* O(n²) recalculée par requête</td>
+<td>Quelques optimisations VRP simultanées saturent tous les cœurs et affament les event loops Netty</td>
+<td><code>VrpSolverService.java:39-43</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td><strong>Kafka mono-broker, 3 partitions, <code>max.in.flight=1</code></strong> : débit producteur sérialisé par partition</td>
+<td>Ingestion GPS/événements à grande échelle (&gt;quelques milliers msg/s)</td>
+<td><code>application.yml:46-50, 314-315</code></td>
+</tr>
+<tr>
+<td>9</td>
+<td><strong>Redis unique</strong> : pub/sub realtime (WS/SSE), presence, caches, idempotence — tout sur un nœud</td>
+<td>Fan-out temps réel massif ; panne = perte totale du realtime</td>
+<td><code>docker-compose.yml:71</code></td>
+</tr>
+<tr>
+<td>10</td>
+<td><strong>MinIO unique sans CDN</strong> : les médias (preuves de livraison, photos) sortent d'un seul nœud</td>
+<td>Trafic média à l'échelle nationale</td>
+<td><code>docker-compose.yml:125</code>, <code>application.yml:263-272</code></td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="4-points-positifs-a-preserver">4. Points positifs (à préserver)</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Point</th>
+<th>Preuve</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Outbox pattern multi-instances sûr</strong> : <code>SELECT … FOR UPDATE SKIP LOCKED</code> + garde <code>AtomicBoolean</code></td>
+<td><code>R2dbcOutboxEntryRepository.java:37-47</code>, <code>OutboxPollerService.java:104-116</code></td>
+</tr>
+<tr>
+<td><strong>Trust retry queue multi-replica safe</strong> — même technique SKIP LOCKED, documentée pour le multi-réplicas</td>
+<td><code>TrustRetryQueueRepositoryAdapter.java:108-120</code></td>
+</tr>
+<tr>
+<td><strong>Verrouillage optimiste</strong> <code>@Version</code> sur wallets et factures</td>
+<td><code>WalletEntity.java:72</code>, <code>InvoiceEntity.java:72</code></td>
+</tr>
+<tr>
+<td><strong>Broadcast realtime distribué</strong> : WS et SSE adossés à Redis pub/sub — les clients peuvent se connecter à n'importe quelle instance</td>
+<td><code>FluxSseEmitter.java:19-25</code>, <code>RedisBackedWebSocketBroadcaster</code></td>
+</tr>
+<tr>
+<td><strong>Cache réseau routier à 2 niveaux</strong> L1 local 30 s / L2 Redis 5 min avec dégradation gracieuse</td>
+<td><code>RoadNetworkProviderAdapter.java:20-58</code></td>
+</tr>
+<tr>
+<td><strong>VRP exécuté hors event loop</strong> via <code>subscribeOn(Schedulers.boundedElastic())</code></td>
+<td><code>VrpSolverService.java:42</code></td>
+</tr>
+<tr>
+<td><strong>Presque aucun <code>.block()</code></strong> : 4 occurrences seulement dans le code de production (voir §5.5) ; commentaire vigilant dans <code>TntStartupRunner.java:82</code></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Indexation généreuse</strong> : 388 index pour ~160 tables ; deliveries indexées sur (tenant, sender), (tenant, dp), (tenant, status), tracking_code</td>
+<td><code>005-create-deliveries.yaml:64-86</code></td>
+</tr>
+<tr>
+<td><strong>Idempotence distribuée sur Redis</strong> pour wallet et événements</td>
+<td><code>RedisIdempotencyStore.java</code>, <code>RedisEventIdempotencyStore.java</code></td>
+</tr>
+<tr>
+<td><strong>Resilience4j complet sur le module trust</strong> : 2 circuit breakers + timelimiter + retry, readiness qui exclut délibérément le trust gateway</td>
+<td><code>application.yml:160-186, 116-121</code></td>
+</tr>
+<tr>
+<td><strong>URLs présignées MinIO</strong> (TTL 3600 s) — le téléchargement de médias ne transite pas par la JVM</td>
+<td><code>application.yml:271</code></td>
+</tr>
+<tr>
+<td><strong>Dockerfile production-grade</strong> : layered JAR, non-root, ZGC, <code>MaxRAMPercentage</code></td>
+<td><code>tnt-bootstrap/Dockerfile</code></td>
+</tr>
+<tr>
+<td><strong>Kafka producteur idempotent, acks=all, isolation read_committed</strong> — cohérence forte des événements</td>
+<td><code>application.yml:46-58</code></td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="5-problemes-detectes">5. Problèmes détectés</h2>
+<h3 id="tableau-de-synthese">Tableau de synthèse</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Problème</th>
+<th>Criticité</th>
+<th>Localisation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>S1</td>
+<td>Séquence de référence de litige en <code>AtomicInteger</code> statique par JVM → doublons garantis en multi-instances</td>
+<td><span class="badge crit">Critique</span></td>
+<td><code>DisputeReference.java:21,44-49</code></td>
+</tr>
+<tr>
+<td>S2</td>
+<td>~10 jobs <code>@Scheduled</code> sans verrou distribué (aucun ShedLock dans le dépôt)</td>
+<td><span class="badge crit">Critique</span></td>
+<td>voir §5.1</td>
+</tr>
+<tr>
+<td>S3</td>
+<td>Réconciliation financière du wallet stockée en <code>ConcurrentHashMap</code> (<code>@Repository</code> en mémoire)</td>
+<td><span class="badge crit">Critique</span></td>
+<td><code>InMemoryReconciliationRepository.java:24-27</code></td>
+</tr>
+<tr>
+<td>S4</td>
+<td>Appels HTTP Kernel sans timeout, retry ni circuit breaker (auth, rôles, organisation, notifications)</td>
+<td><span class="badge crit">Critique</span></td>
+<td><code>KernelBridgeConfig.java:57-118</code></td>
+</tr>
+<tr>
+<td>S5</td>
+<td>Affectations de rôles RBAC en mémoire (mode <code>LOCAL</code> par défaut + fallback in-memory actif)</td>
+<td><span class="badge crit">Critique</span></td>
+<td><code>TntRolesAutoConfiguration.java:71-84</code>, <code>application.yml:260</code></td>
+</tr>
+<tr>
+<td>S6</td>
+<td>PostgreSQL unique pour ~30 schémas, pool 10/factory, ni réplicas ni sharding</td>
+<td><span class="badge high">Élevé</span></td>
+<td><code>TntDataSourceConfig.java:59-64</code></td>
+</tr>
+<tr>
+<td>S7</td>
+<td>Endpoints de listing sans pagination (Flux non bornés, requêtes sans LIMIT)</td>
+<td><span class="badge high">Élevé</span></td>
+<td><code>DeliveryController.java:72-97</code></td>
+</tr>
+<tr>
+<td>S8</td>
+<td>Aucune table partitionnée (deliveries, transactions wallet, audit, outbox)</td>
+<td><span class="badge high">Élevé</span></td>
+<td>grep <code>PARTITION BY</code> = 0 résultat</td>
+</tr>
+<tr>
+<td>S9</td>
+<td>Pas de retry sur échec de verrou optimiste wallet ; wallet d'organisation = point de contention</td>
+<td><span class="badge high">Élevé</span></td>
+<td><code>WalletService.java:80-115,239-291</code></td>
+</tr>
+<tr>
+<td>S10</td>
+<td>État GPS en mémoire non borné et par instance (détection d'anomalies cassée en scale-out + fuite mémoire)</td>
+<td><span class="badge high">Élevé</span></td>
+<td><code>GpsPingProcessor.java:71-77</code></td>
+</tr>
+<tr>
+<td>S11</td>
+<td>OR-Tools CPU-bound sans limitation de concurrence ; matrice de distances A* O(n²) par requête</td>
+<td><span class="badge high">Élevé</span></td>
+<td><code>VrpSolverService.java:39-43,45-66</code></td>
+</tr>
+<tr>
+<td>S12</td>
+<td>Kafka mono-broker, replication-factor 1 (défaut), 3 partitions, <code>max.in.flight=1</code></td>
+<td><span class="badge high">Élevé</span></td>
+<td><code>application.yml:46-50,314-315</code>, <code>docker-compose.yml:89</code></td>
+</tr>
+<tr>
+<td>S13</td>
+<td>Redis unique : pub/sub realtime + caches + idempotence sans HA</td>
+<td><span class="badge high">Élevé</span></td>
+<td><code>docker-compose.yml:71</code></td>
+</tr>
+<tr>
+<td>S14</td>
+<td><code>.block()</code> dans l'aspect de validation tenant et dans un consumer Kafka</td>
+<td><span class="badge med">Moyen</span></td>
+<td><code>TenantValidationAspect.java:74</code>, <code>DisputeEventConsumer.java:101</code></td>
+</tr>
+<tr>
+<td>S15</td>
+<td>État geofence en mémoire par instance</td>
+<td><span class="badge med">Moyen</span></td>
+<td><code>GeofenceMonitorService.java:43</code></td>
+</tr>
+<tr>
+<td>S16</td>
+<td>Caches locaux (permissions 300 s, clients plateforme 45 s) → fenêtre d'incohérence inter-instances</td>
+<td><span class="badge med">Moyen</span></td>
+<td><code>PermissionCache.java:30</code>, <code>application.yml:222,253</code></td>
+</tr>
+<tr>
+<td>S17</td>
+<td>80/83 usages de <code>WebClient</code> sans timeout explicite</td>
+<td><span class="badge med">Moyen</span></td>
+<td>grep §5.4</td>
+</tr>
+<tr>
+<td>S18</td>
+<td>Réseau routier complet chargé en mémoire JVM par tenant (L1) — empreinte mémoire non bornée multi-tenants</td>
+<td><span class="badge med">Moyen</span></td>
+<td><code>RoadNetworkProviderAdapter.java:61</code></td>
+</tr>
+<tr>
+<td>S19</td>
+<td>Pas de protection anti-stampede sur les caches Redis (expiration L2 → reconstructions DB simultanées)</td>
+<td><span class="badge med">Moyen</span></td>
+<td><code>RoadNetworkProviderAdapter.java:85-89</code></td>
+</tr>
+<tr>
+<td>S20</td>
+<td><code>findAll()</code> non borné sur les templates de facturation</td>
+<td><span class="badge low">Faible</span></td>
+<td><code>ListTemplatesUseCase.java:69</code></td>
+</tr>
+<tr>
+<td>S21</td>
+<td>Liquibase exécuté au démarrage de chaque instance (sérialisé par <code>DATABASECHANGELOGLOCK</code> — ralentit les rolling deploys)</td>
+<td><span class="badge low">Faible</span></td>
+<td><code>application.yml:33-38</code></td>
+</tr>
+<tr>
+<td>S22</td>
+<td>Backpressure quasi absente : un seul <code>onBackpressureBuffer(256)</code> dans tout le dépôt</td>
+<td><span class="badge low">Faible</span></td>
+<td><code>TntStompWebSocketHandler.java:104</code></td>
+</tr>
+<tr>
+<td>S23</td>
+<td>Carte Link « temps réel » sans aucun canal de push (ni WS, ni SSE, ni Kafka, ni Redis) → modèle 100 % polling DB</td>
+<td><span class="badge crit">Critique</span></td>
+<td><code>coreBackend/tnt-link-back-core</code> (module entier), §5.8</td>
+</tr>
+<tr>
+<td>S24</td>
+<td>Requêtes géo Link sans PostGIS : lat/lon <code>DOUBLE PRECISION</code>, index B-tree composite inadapté ; <code>network_alerts</code> sans aucun index géo</td>
+<td><span class="badge high">Élevé</span></td>
+<td><code>003-create-network-nodes.sql:12-19</code>, <code>002-create-network-alerts.sql:10-11</code></td>
+</tr>
+<tr>
+<td>S25</td>
+<td>Endpoints <code>/nearby</code> Link sans LIMIT ni tuilage — Flux non borné sur un viewport arbitraire</td>
+<td><span class="badge high">Élevé</span></td>
+<td><code>NetworkNodeController.java:119-128</code>, <code>NetworkAlertController.java:100-108</code></td>
+</tr>
+<tr>
+<td>S26</td>
+<td><code>updateLocation</code> Link : ≥3 requêtes DB par ping (lecture nœud + zones DAO contenantes + save), aucun événement émis → aucun fan-out possible</td>
+<td><span class="badge med">Moyen</span></td>
+<td><code>NetworkNodeApplicationService.java:61-77</code></td>
+</tr>
+<tr>
+<td>S27</td>
+<td>Batch <code>by-ref/batch</code> en N+1 : un <code>flatMap</code> par id au lieu d'un <code>IN (...)</code></td>
+<td><span class="badge low">Faible</span></td>
+<td><code>NetworkNodeController.java:109-116</code></td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h3 id="51-statelessness-lapplication-nest-pas-scale-out-ready">5.1 Statelessness — l'application n'est pas scale-out ready</h3>
+<h4 id="s1-critique-references-de-litiges-dupliquees-en-multi-instances">S1 — CRITIQUE : références de litiges dupliquées en multi-instances</h4>
+<p><code>logistics/tnt-dispute-core/.../domain/model/DisputeReference.java:21</code> :</p>
+<pre><code class="language-java">private static final AtomicInteger SEQUENCE = new AtomicInteger(0);
+...
+public static void initSequence(int maxSequence) { SEQUENCE.set(maxSequence); }
+public static DisputeReference generate() { ... SEQUENCE.incrementAndGet(); ... }
+</code></pre>
+<p>La séquence est <strong>par JVM</strong>, initialisée une fois au démarrage depuis le max persisté. Avec 2 instances démarrées au même moment, les deux partent du même max → <strong>chaque litige créé produit la même référence sur les deux instances</strong> (violation de contrainte unique au mieux, doublon client au pire). Le format <code>DSP-YYYYMM-NNNNN</code> est utilisé pour la communication client et les documents légaux (javadoc l.12-14).
+<strong>Impact</strong> : bloque à lui seul le passage à N&gt;1 instances pour le module dispute.
+<strong>Recommandation</strong> : séquence PostgreSQL (<code>CREATE SEQUENCE ... ; nextval()</code>) ou table de compteurs avec <code>UPDATE ... RETURNING</code> — coût : 1 aller-retour DB par création de litige, négligeable.</p>
+<h4 id="s2-critique-jobs-scheduled-sans-verrou-distribue">S2 — CRITIQUE : jobs @Scheduled sans verrou distribué</h4>
+<p><code>grep -rn shedlock</code> → <strong>0 résultat dans tout le dépôt</strong>. 15 classes portent <code>@Scheduled</code> ; deux seulement sont multi-instances safe (outbox et trust retry queue via <code>SKIP LOCKED</code>). Les autres s'exécuteraient <strong>en double sur chaque instance</strong> :</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Job</th>
+<th>Localisation</th>
+<th>Effet en double exécution</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Relance factures en retard</td>
+<td><code>OverdueInvoiceScheduler.java:26</code> (toutes les heures)</td>
+<td>doubles notifications de relance, doubles pénalités éventuelles</td>
+</tr>
+<tr>
+<td>SLA litiges (escalade)</td>
+<td><code>DisputeSLAScheduler.java:53,71</code></td>
+<td>doubles escalades / notifications</td>
+</tr>
+<tr>
+<td>Monitoring SLA incidents</td>
+<td><code>IncidentSlaMonitorScheduler.java:36</code> (5 min)</td>
+<td>doubles alertes</td>
+</tr>
+<tr>
+<td>Auto-escalade incidents</td>
+<td><code>IncidentAutoEscalationScheduler.java</code></td>
+<td>doubles escalades</td>
+</tr>
+<tr>
+<td>Nettoyage fichiers médias</td>
+<td><code>MediaFileCleanupScheduler.java</code> (cron 02:00)</td>
+<td>course sur suppressions</td>
+</tr>
+<tr>
+<td>Maintenance realtime / sync</td>
+<td><code>RealtimeMaintenanceScheduler.java</code>, <code>SyncMaintenanceScheduler.java</code></td>
+<td>travail redondant</td>
+</tr>
+<tr>
+<td>Réconciliation wallet</td>
+<td><code>ReconciliationService.java</code></td>
+<td>double traitement financier (voir S3)</td>
+</tr>
+<tr>
+<td>Expiration colis hub</td>
+<td><code>HubParcelExpiryJob.java</code></td>
+<td>doubles événements d'expiration</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Recommandation</strong> : ShedLock (support R2DBC) ou généraliser le pattern <code>FOR UPDATE SKIP LOCKED</code> déjà maîtrisé dans le dépôt (<code>TrustRetryQueueRepositoryAdapter.java:108-120</code> est le modèle à copier).</p>
+<h4 id="s3-critique-reconciliation-financiere-en-memoire">S3 — CRITIQUE : réconciliation financière en mémoire</h4>
+<p><code>billing/tnt-billing-wallet/.../InMemoryReconciliationRepository.java:24-27</code> :</p>
+<pre><code class="language-java">@Repository
+public class InMemoryReconciliationRepository implements IReconciliationRepository {
+    private final Map&lt;UUID, ReconciliationRecord&gt; store = new ConcurrentHashMap&lt;&gt;();
+</code></pre>
+<p>C'est le bean actif (annoté <code>@Repository</code>, aucune alternative R2DBC trouvée). Les enregistrements de réconciliation de paiement (MoMo/Orange/Stripe, cf. <code>MtnMoMoProperties.java</code>, <code>StripeProperties.java</code>) sont <strong>perdus à chaque redémarrage et invisibles des autres instances</strong>. Combiné au scheduler <code>ReconciliationService</code> (S2), le multi-instances produit des réconciliations incohérentes sur des flux d'argent réel.
+<strong>Recommandation</strong> : adapter R2DBC persistant (table <code>tnt_wallet.reconciliation_records</code>), avant toute mise en production du paiement.</p>
+<h4 id="s5-critique-rbac-en-memoire-en-mode-local">S5 — CRITIQUE : RBAC en mémoire en mode LOCAL</h4>
+<p><code>application.yml:260</code> : <code>mode: ${TNT_ROLES_PERMISSION_MODE:LOCAL}</code> — la résolution de permissions se fait « from local role assignments ». Or <code>TntRolesAutoConfiguration.java:71-84</code> fournit <code>InMemoryUserRoleAssignmentRepository</code> / <code>InMemoryRoleRepository</code> en fallback <code>@ConditionalOnMissingBean</code>, et aucun adapter persistant n'implémente ces ports dans le dépôt. Conséquences : les affectations de rôles <strong>disparaissent au redémarrage</strong> et <strong>divergent entre instances</strong> (un utilisateur promu sur l'instance A reste sans rôle sur l'instance B).
+<strong>Recommandation</strong> : adapter R2DBC ou passage au mode <code>REMOTE</code>/<code>HYBRID</code> dès que l'endpoint Kernel existe ; a minima, refuser le démarrage en profil prod si le fallback in-memory est actif.</p>
+<h4 id="s10s15-elevemoyen-etat-realtime-par-instance-et-non-borne">S10/S15 — ÉLEVÉ/MOYEN : état realtime par instance et non borné</h4>
+<p><code>GpsPingProcessor.java:71-77</code> :</p>
+<pre><code class="language-java">private final Map&lt;String, GPSStreamEntry&gt; lastPositions = new ConcurrentHashMap&lt;&gt;();
+private final Map&lt;String, LocalDateTime&gt; stopStartTimes = new ConcurrentHashMap&lt;&gt;();
+</code></pre>
+<p>et <code>GeofenceMonitorService.java:43</code> (<code>activeZoneMembership</code>). Deux problèmes :
+1. <strong>Multi-instances</strong> : si les pings GPS d'un même livreur sont load-balancés entre instances, la détection d'outliers, d'arrêt prolongé (&gt;10 min) et d'entrée/sortie de geofence devient aléatoire — chaque instance ne voit qu'une fraction des pings (faux positifs « trajectory anomaly » consommés par tnt-incident-core).
+2. <strong>Fuite mémoire</strong> : aucune éviction — 1 entrée par livreur jamais supprimée. À 1 M de livreurs actifs cumulés : ~centaines de Mo de heap perdus.</p>
+<p>À noter : le module a déjà <code>RedisPresenceRepository</code>/<code>RedisSessionRepository</code> — la plomberie Redis existe.
+<strong>Recommandation</strong> : déplacer last-position/stop-start/zone-membership dans Redis (hash par livreur, TTL glissant), ou garantir l'affinité livreur→instance (sticky partitioning Kafka) et borner les maps (Caffeine + TTL).</p>
+<p><strong>Point conforme</strong> : <code>WebSocketSessionRegistry.java:23-24</code> est volontairement local (« Multi-instance broadcasting is handled by Redis pub-sub ») — ce design-là est correct.</p>
+<h3 id="52-base-de-donnees">5.2 Base de données</h3>
+<h4 id="s6-eleve-instance-unique-pools-sous-dimensionnes-pas-de-replicas">S6 — ÉLEVÉ : instance unique, pools sous-dimensionnés, pas de réplicas</h4>
+<ul>
+<li>Les 8 factories partagent la même instance (<code>TntDataSourceConfig.java:160-167</code>, commentaire l.59-62). <code>DB_POOL_MAX_SIZE</code> défaut <strong>10</strong> (l.64) : la factory <code>@Primary</code> qui sert ~30 modules ne dispose que de 10 connexions. En WebFlux, 10 connexions saturées = toutes les requêtes suivantes en file d'acquisition → latence en escalier puis timeouts.</li>
+<li><strong>Aucun read replica</strong> (aucune configuration de routage lecture/écriture), <strong>aucun sharding</strong>.</li>
+<li>Chiffrage : une instance PostgreSQL bien réglée tient ~10⁴ tx/s simples ; avec PostGIS, l'outbox pollé chaque seconde, l'audit et 30 schémas OLTP, le plafond réaliste est très inférieur. Pour des centaines de millions d'utilisateurs (même 1 % actifs/jour = quelques milliers de req/s soutenues), <strong>c'est le premier mur</strong>.</li>
+</ul>
+<p><strong>Recommandation</strong> : (1) porter <code>DB_POOL_MAX_SIZE</code> à un dimensionnement calculé (cores DB × 2-4 réparties par criticité de factory) ; (2) read replicas + routage des requêtes de lecture ; (3) préparer la sortie des modules à plus fort débit (delivery, realtime, wallet) vers leurs propres instances — la « pyramide » à 8 factories est déjà conçue pour ça, il faut l'activer.</p>
+<h4 id="s7-eleve-absence-de-pagination">S7 — ÉLEVÉ : absence de pagination</h4>
+<p><code>DeliveryController.java:72-97</code> expose <code>Flux&lt;DeliveryDetailResponse&gt;</code> sans paramètre de page ; les requêtes sous-jacentes n'ont <strong>pas de LIMIT</strong> (<code>R2dbcDeliveryRepository.java:24-31</code> : <code>SELECT * FROM tnt_deliveries WHERE tenant_id = :tenantId AND status = :status ORDER BY created_at DESC</code>). <code>listByStatus</code> pour un gros tenant retournera l'intégralité de la table filtrée. Seuls 12 fichiers dans tout le dépôt mentionnent <code>Pageable</code>/<code>PageRequest</code>. Idem <code>ListTemplatesUseCase.java:69</code> (<code>findAll()</code>, S20).
+<strong>Impact chiffré</strong> : 1 M de livraisons <code>PENDING</code> × ~1 Ko sérialisé ≈ 1 Go transféré par appel ; même en streaming réactif, la DB exécute le tri complet.
+<strong>Recommandation</strong> : pagination keyset obligatoire (<code>WHERE created_at &lt; :cursor ORDER BY created_at DESC LIMIT :n</code>) sur tous les endpoints de listing ; l'imposer par convention de revue.</p>
+<h4 id="s8-eleve-aucun-partitionnement">S8 — ÉLEVÉ : aucun partitionnement</h4>
+<p><code>grep "PARTITION BY"</code> → 0 résultat sur 200 fichiers de changelog. Tables à croissance illimitée concernées : <code>tnt_deliveries</code>, transactions wallet, <code>client_audit_logs</code> (gateway), outbox/event store (<code>yow-event-kernel</code>), pings/positions. À 10⁸ utilisateurs, <code>tnt_deliveries</code> dépasse 10⁹ lignes/an : les index ne tiennent plus en RAM, le vacuum devient un problème permanent.
+<strong>Recommandation</strong> : partitionnement natif PostgreSQL par plage temporelle (mois) sur deliveries/transactions/audit/outbox + politique de rétention/archivage (l'outbox <code>PROCESSED</code> peut être purgé agressivement).</p>
+<h4 id="s21-faible-liquibase-a-chaque-demarrage">S21 — FAIBLE : Liquibase à chaque démarrage</h4>
+<p><code>application.yml:33-38</code> : chaque instance exécute Liquibase au boot. Le <code>DATABASECHANGELOGLOCK</code> standard sérialise correctement (pas de corruption), mais un rolling deploy de N instances sérialise N validations de changelog et un crash pendant la migration laisse le lock posé.
+<strong>Recommandation</strong> : exécuter les migrations dans un job séparé (init-container/CI) et <code>spring.liquibase.enabled=false</code> sur les instances applicatives en prod.</p>
+<h3 id="53-cache">5.3 Cache</h3>
+<ul>
+<li><strong>Usage Redis sain et distribué</strong> là où c'est critique : presence, zones geofence, sessions, broadcast (realtime), réseau routier L2, idempotence wallet/événements, localisation véhicules (<code>VehicleLocationRedisAdapter.java</code>).</li>
+<li><strong>S16 — MOYEN</strong> : deux caches purement locaux — <code>PermissionCache</code> (Caffeine, TTL 300 s, <code>PermissionCache.java:30</code>, <code>application.yml:253</code>) et le cache clients plateforme (TTL 45 s, <code>application.yml:222</code>). En multi-instances : une révocation de permission/API-key reste effective jusqu'à 5 min/45 s selon l'instance frappée. Acceptable si documenté (le TTL-only est un choix explicité l.221), mais à 100 instances la fenêtre d'incohérence devient un vrai sujet de sécurité.</li>
+<li><strong>S18 — MOYEN</strong> : le L1 du réseau routier garde le graphe complet par tenant en heap (<code>RoadNetworkProviderAdapter.java:61</code>) sans plafond de nombre d'entrées (TTL 30 s seulement). Un réseau urbain dense = dizaines de Mo ; multiplié par les tenants actifs simultanément → pression GC.</li>
+<li><strong>S19 — MOYEN</strong> : pas de protection anti-stampede : à l'expiration du L2 Redis (5 min), toutes les instances qui reçoivent une requête VRP reconstruisent le graphe depuis la DB en parallèle (requête lourde full-scan des nœuds/arcs).
+<strong>Recommandation</strong> : verrou de reconstruction (<code>SETNX</code> court) ou jitter sur TTL + <code>Caffeine.maximumWeight</code> pour L1.</li>
+</ul>
+<h3 id="54-verrous-contention-et-resilience-http">5.4 Verrous, contention et résilience HTTP</h3>
+<h4 id="s9-eleve-wallet-verrou-optimiste-sans-retry-wallet-chaud">S9 — ÉLEVÉ : wallet — verrou optimiste sans retry, wallet chaud</h4>
+<p>Le domaine est correct (<code>WalletEntity.java:72</code> <code>@Version</code> ; idempotency-key Redis). Mais <code>WalletService</code> (l.80-115) fait <code>walletRepository.save(wallet)</code> sans <strong>aucun</strong> <code>retryWhen</code> (grep <code>retry|OptimisticLock</code> dans le service → 0 résultat). Une collision de version remonte en erreur brute vers l'appelant. Or <code>splitPayment</code>/<code>creditCommission</code> (l.239-291) créditent <strong>le wallet de l'organisation à chaque livraison terminée</strong> : pour une grosse agence (10³ livraisons/h), c'est un point de contention garanti — les échecs optimistes deviendront fréquents précisément aux heures de pointe.
+<strong>Recommandation</strong> : (1) <code>retryWhen(Retry.backoff(3, …).filter(OptimisticLockingFailureException.class))</code> autour des opérations wallet ; (2) à terme, modèle ledger append-only (le solde = somme des transactions, matérialisé périodiquement) qui supprime la contention d'UPDATE sur une ligne unique.</p>
+<h4 id="s4s17-critiquemoyen-webclients-sans-timeout-ni-circuit-breaker">S4/S17 — CRITIQUE/MOYEN : WebClients sans timeout ni circuit breaker</h4>
+<p><code>KernelBridgeConfig.java:57-69</code> construit <code>kernelWebClient</code> (et <code>kernelOrganizationWebClient</code>, <code>kernelTpWebClient</code>) avec baseUrl + headers + logging — <strong>aucun <code>responseTimeout</code>, aucun <code>ReadTimeoutHandler</code>, aucun retry, aucun circuit breaker</strong>. Ces clients portent : provisioning RBAC, résolution d'acteurs, organisation, tiers, notifications (mode <code>tnt.notify.kernel.enabled=true</code> par défaut, <code>application.yml:282</code>), onboarding.
+Dans tout le dépôt, seuls <strong>3 endroits</strong> configurent des timeouts HTTP : <code>WebClientGeoConfig.java:42-61</code>, <code>TntTrustAutoConfiguration.java:97</code>, <code>TrustClientConfig.java:40-43</code> — sur <strong>83 fichiers</strong> utilisant <code>WebClient</code>. Le Resilience4j de <code>application.yml:160-186</code> ne couvre que le trust gateway.
+<strong>Scénario de panne</strong> : le Kernel ralentit (GC, réseau) → chaque requête TiiBnTick qui l'appelle reste suspendue indéfiniment → les requêtes s'accumulent, la mémoire des buffers Netty gonfle, les health checks passent encore (readiness ne teste que r2dbc/redis/kafka, l.121) → l'instance devient un zombie qui accepte du trafic sans le servir.
+<strong>Recommandation</strong> : timeout global sur le <code>WebClient.Builder</code> partagé (connect 2 s / response 5 s), retry idempotent limité, circuit breaker Resilience4j par famille d'appels Kernel (le pattern existe déjà pour trust — le généraliser), et fallback dégradé pour la résolution d'acteur (contexte minimal plutôt qu'échec).</p>
+<h4 id="s14-moyen-block-residuels">S14 — MOYEN : <code>.block()</code> résiduels</h4>
+<ul>
+<li><code>TenantValidationAspect.java:74</code> : la branche « méthodes non réactives » fait <code>.block()</code> dans un aspect AOP. Si une méthode <code>@TenantScoped</code> non réactive est atteinte depuis une chaîne WebFlux, c'est un blocage d'event loop (et <code>Mono.block()</code> y lève une exception en runtime). Commentaire admis : « not ideal in reactive context, but supported for tests/batch ».</li>
+<li><code>DisputeEventConsumer.java:101</code> : <code>.block()</code> dans un consumer Kafka — s'exécute sur le thread listener (pas l'event loop), tolérable mais sérialise le débit de consommation du topic.</li>
+<li><code>TntAdministrationApplicationService.java:305</code> : <code>mono.block()</code> dans un service applicatif.
+<strong>Recommandation</strong> : supprimer la branche bloquante de l'aspect (lever <code>UnsupportedOperationException</code> hors profil test) ; convertir le consumer en reactor-kafka ou <code>CompletableFuture</code>.</li>
+</ul>
+<h3 id="55-reactif-et-cpu-bound-or-tools">5.5 Réactif et CPU-bound — OR-Tools</h3>
+<h4 id="s11-eleve">S11 — ÉLEVÉ</h4>
+<p><code>VrpSolverService.java:39-43</code> isole bien le solveur : <code>Mono.fromCallable(() -&gt; solveBlocking(...)).subscribeOn(Schedulers.boundedElastic())</code>. Deux limites :
+1. <code>boundedElastic</code> est calibré pour du <strong>blocking I/O</strong> (plafond par défaut 10 × cœurs threads). 10 requêtes VRP simultanées sur une machine 4 cœurs = 10 threads CPU-bound qui se disputent 4 cœurs <strong>en concurrence avec les event loops Netty</strong> → latence de toute l'application pendant les calculs.
+2. <code>buildDistanceMatrix</code> (l.60 et suivantes) exécute un pathfinding A<em> pour chaque paire de nœuds — O(n²) recherches sur le graphe routier complet, </em><em>recalculé à chaque requête</em><em> (pas de cache de matrice). Pour 30 livraisons ≈ 61 nœuds ≈ 3 700 A</em>.
+<strong>Recommandation</strong> : scheduler dédié <code>Schedulers.newParallel("vrp", cores-1)</code> ou sémaphore réactif (<code>Mono.fromCallable(...).transformDeferred(BulkheadOperator.of(...))</code> — Resilience4j bulkhead) limitant à N solveurs simultanés ; cache des matrices de distances par (tenant, ensemble de nœuds arrondi) ; à terme, extraire le solveur dans un worker séparé consommant une file Kafka.</p>
+<h3 id="56-files-asynchrone-backpressure">5.6 Files, asynchrone, backpressure</h3>
+<ul>
+<li><strong>S12 — ÉLEVÉ</strong> : <code>max.in.flight.requests.per.connection: 1</code> (<code>application.yml:50</code>) + <code>acks=all</code> sérialise l'envoi producteur (≈ quelques centaines de msg/s par partition selon la latence broker). 3 partitions par défaut, 6 en prod (l.314, 555) ; replication-factor <strong>1</strong> par défaut (l.315) = perte de données à la moindre panne broker. Kafka lui-même est mono-broker en compose (<code>docker-compose.yml:89</code>).
+  <strong>Recommandation</strong> : idempotence Kafka autorise <code>max.in.flight=5</code> sans réordonnancement — le passer à 5 ; partitionnement par clé métier (tenantId/delivererId) avec 24-48 partitions sur les topics chauds (GPS, events) ; cluster 3 brokers, RF 3 en prod.</li>
+<li><strong>S22 — FAIBLE</strong> : un seul opérateur de backpressure explicite dans le dépôt (<code>TntStompWebSocketHandler.java:104</code>, buffer 256). Les flux SSE Redis (<code>FluxSseEmitter.java:49-60</code>) n'ont ni buffer borné ni stratégie de drop : un client SSE lent accumule dans la mémoire du listener container. Redis pub/sub n'a par ailleurs <strong>aucune persistance</strong> : toute déconnexion = messages perdus (acceptable pour de la position temps réel, à documenter).</li>
+<li><strong>Positif</strong> : la chaîne événementielle métier passe par l'outbox transactionnel — le travail lourd est déjà asynchrone by design.</li>
+</ul>
+<h3 id="57-corebackend-tnt-link-back-core-la-carte-temps-reel-est-un-polling-de-base-de-donnees">5.7 coreBackend — tnt-link-back-core : la carte « temps réel » est un polling de base de données</h3>
+<p>Le module <code>coreBackend/tnt-link-back-core</code> (carte réseau TiiBnTick Link : nœuds, alertes, balises, suivi de colis) est celui dont l'exigence produit est la plus extrême — « millions d'utilisateurs simultanés sur une carte temps réel ». C'est aussi, en l'état, <strong>le module le moins prêt pour cette échelle</strong>.</p>
+<h4 id="s23-critique-aucun-canal-de-push">S23 — CRITIQUE : aucun canal de push</h4>
+<p>Inventaire exhaustif du module (114 fichiers Java) : <strong>zéro</strong> WebSocket, SSE, <code>Sinks</code>, adapter Kafka ou Redis. La configuration du module se limite à <code>LinkBackR2dbcConfig.java</code> (R2DBC uniquement), et son <code>pom.xml</code> ne référence ni <code>tnt-realtime-core</code> ni <code>tnt-notify-core</code> (dépendances : common, auth, roles, actor, organization, geo, route, delivery, incident — <code>coreBackend/tnt-link-back-core/pom.xml:37-75</code>). Toute l'API est du REST requête/réponse :</p>
+<ul>
+<li><code>GET /nearby</code> (nœuds) — <code>NetworkNodeController.java:119-128</code> ;</li>
+<li><code>GET /nearby</code> (alertes, rayon 5 km) — <code>NetworkAlertController.java:100-108</code> ;</li>
+<li><code>GET /track/{trackingCode}</code> — <code>ParcelTrackingController.java:34-35</code>, qui délègue à <code>deliveryQueryUseCase.findByTrackingCode</code> (<code>TrackParcelApplicationService.java:25-27</code>).</li>
+</ul>
+<p>Conséquence : la seule façon pour un client d'avoir une carte « vivante » est de <strong>repoller ces endpoints en boucle</strong>. Chiffrage : 1 M d'utilisateurs simultanés × 1 rafraîchissement/5 s = <strong>200 000 requêtes/s</strong>, chacune traversant l'auth JWT, l'event loop et <strong>le pool PostgreSQL primaire de 10 connexions</strong> (goulot #1). Même à 10 000 utilisateurs (0,1 % de la cible), c'est déjà 2 000 scans géo/s — hors de portée de l'instance unique actuelle. L'ironie architecturale : <code>tnt-realtime-core</code> contient déjà exactement l'infrastructure nécessaire (SSE/WS adossés à Redis pub/sub, <code>FluxSseEmitter.java:19-25</code>) — Link ne s'y raccorde pas.</p>
+<p><strong>Recommandation</strong> : (1) brancher Link sur <code>tnt-realtime-core</code> : topics de broadcast par tuile géographique (geohash de précision 5-6), le client s'abonne en SSE/WS aux tuiles de son viewport ; (2) publier les mises à jour de nœuds/alertes en événements (Kafka → Redis pub/sub) au lieu de laisser les clients repoller ; (3) pour l'état initial du viewport, servir des snapshots par tuile pré-agrégés en cache Redis (TTL quelques secondes) plutôt que la DB.</p>
+<h4 id="s24-eleve-geo-requetes-sans-postgis-sur-une-plateforme-qui-embarque-postgis">S24 — ÉLEVÉ : géo-requêtes sans PostGIS sur une plateforme qui embarque PostGIS</h4>
+<p><code>003-create-network-nodes.sql:12-13</code> stocke <code>latitude</code>/<code>longitude</code> en <code>DOUBLE PRECISION</code> ; l'« index géo » est un B-tree composite (l.19) :</p>
+<pre><code class="language-sql">CREATE INDEX ... idx_network_nodes_bbox ON tnt_link.network_nodes (tenant_id, latitude, longitude);
+</code></pre>
+<p>Un B-tree composite ne sert efficacement qu'un préfixe : le planner fait un range-scan sur <code>(tenant_id, latitude)</code> puis <strong>filtre <code>longitude</code> ligne à ligne</strong>. Pour une bande de latitude à l'échelle d'un pays, chaque <code>/nearby</code> (<code>NetworkNodeR2dbcRepository.java:17-20</code>) parcourt tous les nœuds de la bande. Pire : <code>network_alerts</code> n'a <strong>aucun index</strong> sur <code>(tenant_id, status, latitude, longitude)</code> (<code>002-create-network-alerts.sql</code> — aucun <code>CREATE INDEX</code> dans le fichier) → la requête <code>findByTenantIdAndStatusWithinBoundingBox</code> (<code>NetworkAlertR2dbcRepository.java:17-21</code>) fait un <strong>scan séquentiel complet à chaque appel</strong>, alors que c'est l'endpoint destiné à être pollé par tous les clients de la carte. Le tout sur une image <code>postgis/postgis:17-3.5</code> (<code>docker-compose.yml:49</code>) dont les capacités (type <code>geometry</code>, index GIST, <code>ST_DWithin</code>) sont déjà utilisées par <code>tnt-geo-core</code> mais ignorées ici.
+<strong>Recommandation</strong> : colonne <code>geometry(Point,4326)</code> + index GIST + <code>ST_Within</code>/<code>ST_DWithin</code>, ou a minima ajout d'une colonne geohash indexée pour le tuilage. Coût : une migration Liquibase, gain : ×100-1000 sur les scans géo.</p>
+<h4 id="s25-eleve-nearby-non-borne">S25 — ÉLEVÉ : <code>/nearby</code> non borné</h4>
+<p>Aucun <code>LIMIT</code>, aucun plafond de surface de bounding-box, aucune pagination : un client qui demande la carte du pays entier (<code>minLat=-90&amp;maxLat=90...</code>) reçoit <strong>tous les nœuds du tenant</strong> en un seul <code>Flux</code>. À des millions de nœuds enregistrés, c'est un déni de service involontaire à un seul appel.
+<strong>Recommandation</strong> : plafonner la surface du viewport, <code>LIMIT</code> serveur (p. ex. 500 nœuds, clustering côté serveur au-delà), tuilage.</p>
+<h4 id="s26-moyen-cout-par-ping-de-localisation-et-absence-devenement">S26 — MOYEN : coût par ping de localisation et absence d'événement</h4>
+<p><code>NetworkNodeApplicationService.java:61-77</code> (<code>updateLocation</code>) : chaque ping de position d'un nœud fait ≥3 allers-retours DB — lecture du nœud, <code>findContaining</code> sur les zones DAO (test point-in-polygon), sauvegarde avec <code>@Version</code> (contention optimiste si plusieurs pings du même nœud arrivent en parallèle, <code>003-create-network-nodes.sql:16</code>). Et <strong>aucun événement n'est publié</strong> : les autres utilisateurs ne peuvent voir le mouvement qu'en repollant (cercle vicieux avec S23).
+<strong>Recommandation</strong> : écrire la position chaude dans Redis (comme <code>VehicleLocationRedisAdapter</code> le fait déjà côté resource-core), persister en DB par échantillonnage, publier un événement par tuile.</p>
+<h4 id="s27-faible-n1-sur-le-batch">S27 — FAIBLE : N+1 sur le batch</h4>
+<p><code>NetworkNodeController.java:109-116</code> : <code>by-ref/batch</code> exécute un <code>flatMap(refId -&gt; findByRefId(...))</code> — N requêtes pour N ids au lieu d'un <code>WHERE ref_id IN (...)</code>. Contre-productif pour un endpoint créé précisément pour « one round trip ».</p>
+<p><strong>Note positive Link</strong> : le leaderboard est correctement borné (<code>findTopRanked ... LIMIT :limit</code>, <code>NetworkNodeR2dbcRepository.java:22-24</code>) et indexé (<code>005-create-leaderboard-index.sql</code>), les entités portent <code>version BIGINT</code> (verrou optimiste), et les autres backends <code>coreBackend/</code> (agency, go-freelancer-point, market) consomment Kafka via les groupes dédiés (<code>application.yml:330-334</code>) — le pattern événementiel existe dans la couche, Link est l'exception.</p>
+<h3 id="58-deploiement">5.8 Déploiement</h3>
+<ul>
+<li><strong>S13 — ÉLEVÉ / SPOF généralisés</strong> : en l'état des artefacts fournis (docker-compose uniquement), chaque brique est un SPOF : PostgreSQL (l.48), Redis (l.71), Kafka (l.89), MinIO (l.125), et l'application elle-même (1 conteneur, l.216, profil <code>app</code>). Aucun manifeste K8s/HPA, aucun <code>deploy.replicas</code>.</li>
+<li><strong>Positif</strong> : Dockerfile prêt pour l'orchestration (healthcheck liveness l.57-59, <code>MaxRAMPercentage=75</code> l.66, graceful shutdown <code>application.yml:96</code>).</li>
+<li><strong>Médias</strong> : URLs présignées = bon offload, mais pas de CDN devant MinIO ni de réplication MinIO (mode single node).</li>
+</ul>
+<hr />
+<h2 id="6-recommandations-priorisees">6. Recommandations priorisées</h2>
+<h3 id="p0-bloquant-avant-tout-scale-out-semaines-1-3">P0 — Bloquant avant tout scale-out (semaines 1-3)</h3>
+<ol>
+<li><strong>S1</strong> : remplacer <code>DisputeReference.SEQUENCE</code> par une séquence PostgreSQL.</li>
+<li><strong>S2</strong> : ShedLock R2DBC (ou pattern SKIP LOCKED maison) sur les ~10 schedulers non protégés.</li>
+<li><strong>S3</strong> : persister la réconciliation wallet en R2DBC — aucune donnée financière en <code>ConcurrentHashMap</code>.</li>
+<li><strong>S5</strong> : adapter persistant pour les rôles/affectations RBAC ; fail-fast au boot prod si le fallback in-memory est actif.</li>
+<li><strong>S4</strong> : timeouts (connect 2 s / response 5 s) sur tous les WebClients Kernel + circuit breakers Resilience4j (copier le pattern trust).</li>
+</ol>
+<h3 id="p1-avant-montee-en-charge-significative-mois-1-2">P1 — Avant montée en charge significative (mois 1-2)</h3>
+<ol>
+<li><strong>S7/S20/S25</strong> : pagination keyset sur tous les endpoints de listing ; plafonner la surface et le nombre de résultats des <code>/nearby</code> Link.
+6bis. <strong>S24</strong> : migrer les colonnes géo de Link vers <code>geometry</code> + index GIST (et indexer <code>network_alerts</code>) — migration Liquibase à faible risque, gain immédiat ×100+.</li>
+<li><strong>S9</strong> : retry avec backoff sur les échecs optimistes wallet ; planifier le modèle ledger.</li>
+<li><strong>S6</strong> : dimensionner <code>DB_POOL_MAX_SIZE</code> ; mettre en place 1-2 read replicas et router les lectures.</li>
+<li><strong>S10/S15</strong> : état GPS/geofence dans Redis (TTL glissant) ou sticky partitioning + éviction locale.</li>
+<li><strong>S11</strong> : bulkhead sur le solveur VRP + cache des matrices de distances.</li>
+<li><strong>S12</strong> : <code>max.in.flight=5</code>, plus de partitions sur les topics chauds, cluster Kafka RF 3.</li>
+</ol>
+<h3 id="p2-trajectoire-centaines-de-millions-mois-3-6">P2 — Trajectoire « centaines de millions » (mois 3-6)</h3>
+<ol>
+<li><strong>S8</strong> : partitionnement temporel deliveries/transactions/audit/outbox + rétention.</li>
+<li>Activer la « pyramide » DB : sortir delivery/realtime/wallet vers des instances PostgreSQL dédiées (les 8 factories existent déjà pour ça).</li>
+<li><strong>S13</strong> : Kubernetes + HPA, Redis Sentinel/Cluster, MinIO distribué ou S3 managé + CDN, migrations Liquibase hors instances (S21).</li>
+<li><strong>S16/S19</strong> : invalidation par pub/sub des caches sécurité ; anti-stampede sur les caches Redis.</li>
+<li>Extraire les workloads divergents (VRP CPU-bound, ingestion GPS haut débit) en services dédiés — le découpage hexagonal par module rend cette extraction peu coûteuse.</li>
+<li><strong>S23/S26</strong> : refonte du modèle temps réel de Link — abonnement SSE/WS par tuile geohash via <code>tnt-realtime-core</code>, positions chaudes dans Redis, événements de mise à jour par tuile, snapshots de viewport en cache. C'est le prérequis absolu de l'objectif « millions d'utilisateurs simultanés sur la carte » ; le modèle polling actuel ne franchira jamais 10⁴ utilisateurs.</li>
+</ol>
+<hr />
+<h2 id="7-conclusion">7. Conclusion</h2>
+<p>Le socle est sérieux : réactif de bout en bout presque sans <code>.block()</code>, outbox multi-instances exemplaire, realtime déjà pensé pour le broadcast distribué, indexation soignée, Dockerfile production-grade. Les auteurs connaissent les patterns de scalabilité — la preuve : ils les ont appliqués aux deux endroits les plus difficiles (outbox, trust retry queue).</p>
+<p>Mais l'application est aujourd'hui <strong>verrouillée en mono-instance</strong> par cinq défauts critiques (séquence de litiges par JVM, schedulers dupliqués, réconciliation et RBAC en mémoire, appels Kernel sans timeout), et son plafond mono-instance est lui-même bas (PostgreSQL unique, pools de 10, pas de pagination). S'y ajoute un sixième défaut critique de conception : <strong>la carte « temps réel » de TiiBnTick Link n'a aucun canal de push</strong> — elle repose entièrement sur du polling REST de requêtes géographiques non indexées, un modèle qui plafonne trois à quatre ordres de grandeur sous l'objectif « millions d'utilisateurs simultanés », alors même que l'infrastructure nécessaire (SSE/WS sur Redis pub/sub) existe déjà dans <code>tnt-realtime-core</code>.</p>
+<p>Le chemin vers « des centaines de millions d'utilisateurs » est clair et incrémental : corriger les P0 (quelques semaines) débloque le scale-out horizontal de l'application ; les P1 (pagination, PostGIS/GIST pour Link, réplicas de lecture, retry wallet) repoussent le mur de la base de données ; les P2 (partitionnement, pyramide DB effective, refonte push de la carte Link, extraction des workloads VRP/GPS) constituent la trajectoire réaliste vers l'échelle cible. Sans les P0, ajouter une deuxième instance <strong>corromprait des données</strong> (références dupliquées, doubles traitements financiers) — c'est la conclusion la plus importante de cet audit.</p>
+<footer>Audit technique TiiBnTick — généré à partir de l'analyse du code source réel. Chaque constat référence les fichiers et lignes concernés.</footer>
+</main>
+</div>
+
+<script type="module">
+  try {
+    const m = await import("https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs");
+    const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    m.default.initialize({ startOnLoad: true, theme: dark ? "dark" : "neutral", securityLevel: "loose" });
+  } catch (e) {
+    document.querySelectorAll(".mermaid").forEach(el => {
+      el.style.textAlign = "left";
+      el.innerHTML = "<div style='color:var(--muted);font-size:.75rem;margin-bottom:.5rem'>⚠ Diagramme Mermaid (connexion internet requise pour le rendu) — source :</div><pre>" + el.textContent.replace(/&/g,"&amp;").replace(/</g,"&lt;") + "</pre>";
+    });
+  }
+</script>
+
+</body>
+</html>

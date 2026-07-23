@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Enriched delivery status-changed event published to {@code tnt.delivery.mission.status-changed}.
+ * Enriched delivery status-changed event published to {@code tnt.delivery.mission.status.changed}.
  *
  * <p> — Added FreelancerOrg context fields:
  * <ul>

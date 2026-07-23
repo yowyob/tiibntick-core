@@ -9,6 +9,7 @@ import com.yowyob.tiibntick.core.notify.domain.enums.NotificationChannel;
 import com.yowyob.tiibntick.core.notify.domain.model.Notification;
 import com.yowyob.tiibntick.core.notify.domain.vo.NotificationId;
 import com.yowyob.tiibntick.core.notify.domain.vo.NotificationModel;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -39,6 +40,7 @@ public class NotificationService implements ISendNotificationUseCase {
         }
 
         @Override
+        @Transactional
         public Mono<Notification> send(String tenantId,
                         String organizationId,
                         String recipientId,

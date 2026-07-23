@@ -2,6 +2,7 @@ package com.yowyob.tiibntick.core.agency.org.hubops.application.service;
 
 import com.yowyob.tiibntick.common.exception.TntNotFoundException;
 import com.yowyob.tiibntick.common.exception.TntValidationException;
+import com.yowyob.tiibntick.core.agency.org.adapter.out.clients.TrustPort;
 import com.yowyob.tiibntick.core.agency.org.adapter.out.persistence.AgencyRelayHubR2dbcRepository;
 import com.yowyob.tiibntick.core.agency.org.hubops.adapter.in.web.dto.HubParcelResponse;
 import com.yowyob.tiibntick.core.agency.org.hubops.adapter.out.clients.InventoryCorePort;
@@ -30,6 +31,7 @@ public class HubParcelService {
     private final InventoryCorePort inventoryCore;
     private final HubOccupancyService occupancyService;
     private final AgencyEventPublisher eventPublisher;
+    private final TrustPort trust;
 
     public record DepositInput(
             UUID tenantId, UUID hubId, UUID missionId, String trackingCode, UUID packageId) {}
@@ -73,6 +75,13 @@ public class HubParcelService {
                                             saved.getHubId(), saved.getPackageId(), saved.getTrackingCode(),
                                             saved.getWithdrawalDeadline(), now))
                                     .thenReturn(saved))
+                            .flatMap(saved -> trust.recordHubDeposit(new TrustPort.HubDepositTransaction(
+                                            saved.getHubId(),
+                                            saved.getPackageId(),
+                                            saved.getMissionId() != null ? saved.getMissionId() : saved.getId(),
+                                            saved.getTrackingCode(),
+                                            now))
+                                    .thenReturn(saved))
                             .map(HubParcelResponse::from);
                 });
     }
@@ -99,6 +108,14 @@ public class HubParcelService {
                                         UUID.randomUUID(), saved.getId(), saved.getTenantId(),
                                         saved.getHubId(), saved.getPackageId(), saved.getTrackingCode(),
                                         input.withdrawnBy(), input.identityVerified(), now))
+                                .thenReturn(saved))
+                        .flatMap(saved -> trust.recordHubWithdrawal(new TrustPort.HubWithdrawalTransaction(
+                                        saved.getHubId(),
+                                        saved.getPackageId(),
+                                        saved.getTrackingCode(),
+                                        input.withdrawnBy(),
+                                        input.identityVerified(),
+                                        now))
                                 .thenReturn(saved))
                         .map(HubParcelResponse::from));
     }

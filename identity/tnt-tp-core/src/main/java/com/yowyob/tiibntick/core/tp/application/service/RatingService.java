@@ -14,6 +14,7 @@ import reactor.core.publisher.Mono;
 
 import java.time.Instant;
 import java.util.UUID;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Application service for third party rating management.
@@ -41,6 +42,7 @@ public class RatingService {
      * Prevents duplicate ratings for the same mission by the same rater.
      */
     @RequirePermission(resource = "actor", action = "write")
+    @Transactional
     public Mono<ThirdPartyRating> rate(RateThirdPartyCommand command) {
         return ratingRepository.existsByMissionIdAndRaterActorId(
                         command.missionId(), command.raterActorId())

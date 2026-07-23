@@ -46,6 +46,11 @@ public class BillingPolicyRepositoryAdapter implements IBillingPolicyRepository 
     }
 
     @Override
+    public Mono<BillingPolicy> findByIdAndTenantId(UUID id, UUID tenantId) {
+        return r2dbcRepository.findByIdAndTenantId(id, tenantId).map(mapper::toDomain);
+    }
+
+    @Override
     public Mono<BillingPolicy> findDefaultByTenantId(UUID tenantId) {
         return r2dbcRepository.findDefaultByTenantId(tenantId).map(mapper::toDomain);
     }

@@ -14,6 +14,7 @@ import com.yowyob.tiibntick.core.incident.port.inbound.IReportIncidentUseCase;
 import com.yowyob.tiibntick.core.incident.port.outbound.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
@@ -54,6 +55,7 @@ public class IncidentReportingService implements IReportIncidentUseCase, IReport
      * @return the created incident
      */
     @Override
+    @Transactional
     public Mono<Incident> execute(ReportIncidentCommand command) {
         IncidentType type = command.getType();
         var category = triageService.deriveCategory(type);
@@ -75,6 +77,7 @@ public class IncidentReportingService implements IReportIncidentUseCase, IReport
     }
 
     @Override
+    @Transactional
     public Mono<Incident> execute(ReportDriverWithdrawalCommand command) {
         var category = triageService.deriveCategory(command.getWithdrawalType());
 

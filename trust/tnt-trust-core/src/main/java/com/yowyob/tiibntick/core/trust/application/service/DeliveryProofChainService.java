@@ -4,6 +4,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import com.yowyob.tiibntick.core.trust.domain.model.valueobject.CustodyTransferRecord;
@@ -77,6 +78,7 @@ public class DeliveryProofChainService
      * Returns the {@code correlationId} as an immediate tracking reference.
      */
     @Override
+    @Transactional
     public Mono<String> record(final DeliveryProofRecord proof) {
         log.info("Recording delivery proof on blockchain — proofId={}, missionId={}, actor={}",
                 proof.getProofId(), proof.getMissionId(), proof.getActorId());
@@ -104,6 +106,7 @@ public class DeliveryProofChainService
      * The Fabric tx hash is updated asynchronously via the committed Kafka topic.
      */
     @Override
+    @Transactional
     public Mono<String> record(final CustodyTransferRecord transfer) {
         log.info("Recording custody transfer — transferId={}, package={}, {}→{}",
                 transfer.getTransferId(), transfer.getTrackingCode(),

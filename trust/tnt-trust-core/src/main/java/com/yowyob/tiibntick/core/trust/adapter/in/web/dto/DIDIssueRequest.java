@@ -1,8 +1,7 @@
 package com.yowyob.tiibntick.core.trust.adapter.in.web.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.yowyob.tiibntick.core.trust.domain.model.valueobject.DIDDocument;
+import jakarta.validation.constraints.NotBlank;
 
 /**
  * Request DTO — Issue a DID for a deliverer actor.
@@ -12,7 +11,7 @@ import com.yowyob.tiibntick.core.trust.domain.model.valueobject.DIDDocument;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record DIDIssueRequest(
-        String actorId,
+        @NotBlank(message = "actorId is required") String actorId,
         String tenantId,
-        String publicKeyPem,
+        @NotBlank(message = "publicKeyPem is required") String publicKeyPem,
         String serviceEndpoint) {}

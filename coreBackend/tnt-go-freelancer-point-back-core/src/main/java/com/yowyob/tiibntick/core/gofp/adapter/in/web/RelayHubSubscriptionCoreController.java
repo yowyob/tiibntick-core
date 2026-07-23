@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * Contrôleur REST — Abonnements des points relais.
@@ -39,6 +40,7 @@ public class RelayHubSubscriptionCoreController {
 
     @Operation(summary = "Souscrire ou changer de plan pour un point relais")
     @PostMapping("/{relayHubId}")
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<RelayHubSubscriptionEntity> subscribe(
             @PathVariable UUID relayHubId,
@@ -58,6 +60,7 @@ public class RelayHubSubscriptionCoreController {
 
     @Operation(summary = "Annuler l'abonnement d'un point relais")
     @PatchMapping("/{relayHubId}/cancel")
+    @PreAuthorize("isAuthenticated()")
     public Mono<RelayHubSubscriptionEntity> cancel(@PathVariable UUID relayHubId) {
         return subscriptionUseCase.cancel(relayHubId);
     }
@@ -70,12 +73,14 @@ public class RelayHubSubscriptionCoreController {
 
     @Operation(summary = "Incrémenter le compteur de colis (appelé à la création d'un dépôt)")
     @PatchMapping("/{relayHubId}/increment-packets")
+    @PreAuthorize("isAuthenticated()")
     public Mono<RelayHubSubscriptionEntity> incrementPackets(@PathVariable UUID relayHubId) {
         return subscriptionUseCase.incrementPacketsUsed(relayHubId);
     }
 
     @Operation(summary = "Décrémenter le compteur de colis (appelé à la récupération d'un colis)")
     @PatchMapping("/{relayHubId}/decrement-packets")
+    @PreAuthorize("isAuthenticated()")
     public Mono<RelayHubSubscriptionEntity> decrementPackets(@PathVariable UUID relayHubId) {
         return subscriptionUseCase.decrementPacketsUsed(relayHubId);
     }

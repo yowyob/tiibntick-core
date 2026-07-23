@@ -12,6 +12,7 @@ import com.yowyob.tiibntick.core.inventory.domain.event.PackagePickedUpEvent;
 import com.yowyob.tiibntick.core.inventory.domain.exception.HubPackageNotFoundException;
 import com.yowyob.tiibntick.core.inventory.domain.model.HubPackageEntry;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -42,6 +43,7 @@ public class HubInventoryApplicationService implements
         this.eventPublisher = eventPublisher;
     }
 
+    @Transactional
     @Override
     public Mono<HubPackageEntry> depositPackage(DepositHubPackageCommand cmd) {
         HubPackageEntry entry = HubPackageEntry.deposit(
@@ -54,6 +56,7 @@ public class HubInventoryApplicationService implements
                         .thenReturn(saved));
     }
 
+    @Transactional
     @Override
     public Mono<Void> pickupPackage(String trackingCode, UUID pickedUpByActorId) {
         return hubPackageRepository.findByTrackingCode(trackingCode)

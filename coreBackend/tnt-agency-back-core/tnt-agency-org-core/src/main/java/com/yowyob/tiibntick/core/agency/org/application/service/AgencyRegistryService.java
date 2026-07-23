@@ -3,14 +3,11 @@ package com.yowyob.tiibntick.core.agency.org.application.service;
 import com.yowyob.tiibntick.common.exception.TntConflictException;
 import com.yowyob.tiibntick.common.exception.TntNotFoundException;
 import com.yowyob.tiibntick.common.exception.TntValidationException;
-import com.yowyob.tiibntick.core.agency.org.adapter.in.web.dto.AgencyRegistryResponse;
-import com.yowyob.tiibntick.core.agency.org.adapter.in.web.dto.AgencySettingsResponse;
 import com.yowyob.tiibntick.core.agency.org.adapter.out.clients.OrganizationCorePort;
 import com.yowyob.tiibntick.core.agency.org.adapter.out.persistence.AgencyRegistryR2dbcRepository;
 import com.yowyob.tiibntick.core.agency.org.adapter.out.persistence.AgencySettingsR2dbcRepository;
 import com.yowyob.tiibntick.core.agency.org.adapter.out.persistence.entity.AgencyRegistryEntity;
 import com.yowyob.tiibntick.core.agency.org.adapter.out.persistence.entity.AgencySettingsEntity;
-import com.yowyob.tiibntick.core.agency.org.application.mapper.AgencyOrgMapper;
 import com.yowyob.tiibntick.core.agency.eventing.application.port.AgencyEventPublisher;
 import com.yowyob.tiibntick.core.agency.eventing.domain.event.AgencyActivated;
 import com.yowyob.tiibntick.core.agency.eventing.domain.event.AgencyRegistered;
@@ -39,16 +36,16 @@ public class AgencyRegistryService {
     private final OrganizationCorePort organizationCore;
     private final AgencyEventPublisher eventPublisher;
 
-    public Flux<AgencyRegistryResponse> listByTenant(UUID tenantId) {
-        return agencyRepo.findByTenantId(tenantId).map(AgencyOrgMapper::toAgencyResponse);
+    public Flux<AgencyRegistryEntity> listByTenant(UUID tenantId) {
+        return agencyRepo.findByTenantId(tenantId);
     }
 
-    public Mono<AgencyRegistryResponse> getById(UUID tenantId, UUID agencyId) {
-        return requireAgency(agencyId, tenantId).map(AgencyOrgMapper::toAgencyResponse);
+    public Mono<AgencyRegistryEntity> getById(UUID tenantId, UUID agencyId) {
+        return requireAgency(agencyId, tenantId);
     }
 
     @Transactional
-    public Mono<AgencyRegistryResponse> register(RegisterAgencyInput input) {
+    public Mono<AgencyRegistryEntity> register(RegisterAgencyInput input) {
         return agencyRepo.existsByAgencyCode(input.agencyCode())
                 .flatMap(exists -> {
                     if (Boolean.TRUE.equals(exists)) {
@@ -104,13 +101,12 @@ public class AgencyRegistryService {
                             .flatMap(saved -> eventPublisher.publish(new AgencyRegistered(
                                             UUID.randomUUID(), agencyId, input.tenantId(),
                                             input.name(), input.agencyCode(), input.type(), now))
-                                    .thenReturn(saved))
-                            .map(AgencyOrgMapper::toAgencyResponse);
+                                    .thenReturn(saved));
                 });
     }
 
     @Transactional
-    public Mono<AgencyRegistryResponse> activate(UUID tenantId, UUID agencyId) {
+    public Mono<AgencyRegistryEntity> activate(UUID tenantId, UUID agencyId) {
         return requireAgency(agencyId, tenantId)
                 .flatMap(agency -> {
                     agency.setStatus(STATUS_ACTIVE);
@@ -119,12 +115,11 @@ public class AgencyRegistryService {
                 })
                 .flatMap(saved -> eventPublisher.publish(new AgencyActivated(
                                 UUID.randomUUID(), agencyId, tenantId, null, Instant.now()))
-                        .thenReturn(saved))
-                .map(AgencyOrgMapper::toAgencyResponse);
+                        .thenReturn(saved));
     }
 
     @Transactional
-    public Mono<AgencyRegistryResponse> suspend(UUID tenantId, UUID agencyId, String reason) {
+    public Mono<AgencyRegistryEntity> suspend(UUID tenantId, UUID agencyId, String reason) {
         return requireAgency(agencyId, tenantId)
                 .flatMap(agency -> {
                     agency.setStatus(STATUS_SUSPENDED);
@@ -133,12 +128,11 @@ public class AgencyRegistryService {
                 })
                 .flatMap(saved -> eventPublisher.publish(new AgencySuspended(
                                 UUID.randomUUID(), agencyId, tenantId, reason, null, Instant.now()))
-                        .thenReturn(saved))
-                .map(AgencyOrgMapper::toAgencyResponse);
+                        .thenReturn(saved));
     }
 
     @Transactional
-    public Mono<AgencyRegistryResponse> reject(UUID tenantId, UUID agencyId) {
+    public Mono<AgencyRegistryEntity> reject(UUID tenantId, UUID agencyId) {
         return requireAgency(agencyId, tenantId)
                 .flatMap(agency -> {
                     if (!STATUS_PENDING.equals(agency.getStatus())) {
@@ -149,12 +143,11 @@ public class AgencyRegistryService {
                     agency.setStatus(STATUS_REJECTED);
                     agency.setUpdatedAt(Instant.now());
                     return agencyRepo.save(agency);
-                })
-                .map(AgencyOrgMapper::toAgencyResponse);
+                });
     }
 
     @Transactional
-    public Mono<AgencyRegistryResponse> syncPlatformCore(UUID tenantId, UUID agencyId) {
+    public Mono<AgencyRegistryEntity> syncPlatformCore(UUID tenantId, UUID agencyId) {
         return requireAgency(agencyId, tenantId)
                 .flatMap(agency -> {
                     if (agency.getKernelOrganizationId() == null) {
@@ -179,24 +172,22 @@ public class AgencyRegistryService {
                                         agency.setUpdatedAt(Instant.now());
                                         return agencyRepo.save(agency);
                                     }));
-                })
-                .map(AgencyOrgMapper::toAgencyResponse);
+                });
     }
 
     @Transactional
-    public Mono<AgencyRegistryResponse> linkKernelBusinessActor(
+    public Mono<AgencyRegistryEntity> linkKernelBusinessActor(
             UUID tenantId, UUID agencyId, UUID kernelBusinessActorId) {
         return requireAgency(agencyId, tenantId)
                 .flatMap(agency -> {
                     agency.setKernelBusinessActorId(kernelBusinessActorId);
                     agency.setUpdatedAt(Instant.now());
                     return agencyRepo.save(agency);
-                })
-                .map(AgencyOrgMapper::toAgencyResponse);
+                });
     }
 
     @Transactional
-    public Mono<AgencyRegistryResponse> linkKernelIdentity(
+    public Mono<AgencyRegistryEntity> linkKernelIdentity(
             UUID tenantId,
             UUID agencyId,
             UUID kernelOrganizationId,
@@ -211,12 +202,11 @@ public class AgencyRegistryService {
                     }
                     agency.setUpdatedAt(Instant.now());
                     return agencyRepo.save(agency);
-                })
-                .map(AgencyOrgMapper::toAgencyResponse);
+                });
     }
 
     @Transactional
-    public Mono<AgencyRegistryResponse> updateProfile(UpdateProfileInput input) {
+    public Mono<AgencyRegistryEntity> updateProfile(UpdateProfileInput input) {
         return requireAgency(input.agencyId(), input.tenantId())
                 .flatMap(agency -> {
                     if (input.name() != null) agency.setName(input.name());
@@ -236,19 +226,17 @@ public class AgencyRegistryService {
                     if (input.website() != null) agency.setWebsite(input.website());
                     agency.setUpdatedAt(Instant.now());
                     return agencyRepo.save(agency);
-                })
-                .map(AgencyOrgMapper::toAgencyResponse);
+                });
     }
 
-    public Mono<AgencySettingsResponse> getSettings(UUID tenantId, UUID agencyId) {
+    public Mono<AgencySettingsEntity> getSettings(UUID tenantId, UUID agencyId) {
         return settingsRepo.findByAgencyIdAndTenantId(agencyId, tenantId)
                 .switchIfEmpty(Mono.error(new TntNotFoundException(
-                        "AGENCY_SETTINGS_NOT_FOUND", "Settings not found for agency: " + agencyId)))
-                .map(AgencyOrgMapper::toSettingsResponse);
+                        "AGENCY_SETTINGS_NOT_FOUND", "Settings not found for agency: " + agencyId)));
     }
 
     @Transactional
-    public Mono<AgencySettingsResponse> updateSettings(UpdateSettingsInput input) {
+    public Mono<AgencySettingsEntity> updateSettings(UpdateSettingsInput input) {
         return settingsRepo.findByAgencyIdAndTenantId(input.agencyId(), input.tenantId())
                 .switchIfEmpty(Mono.error(new TntNotFoundException(
                         "AGENCY_SETTINGS_NOT_FOUND", "Settings not found for agency: " + input.agencyId())))
@@ -267,8 +255,7 @@ public class AgencyRegistryService {
                     if (input.timezone() != null) settings.setTimezone(input.timezone());
                     settings.setUpdatedAt(Instant.now());
                     return settingsRepo.save(settings);
-                })
-                .map(AgencyOrgMapper::toSettingsResponse);
+                });
     }
 
     private Mono<AgencyRegistryEntity> requireAgency(UUID agencyId, UUID tenantId) {

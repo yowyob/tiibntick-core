@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>P0 — Phase 0 — Bloquant production · Audit TiiBnTick</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --text: #1c2430; --muted: #5b6675;
+  --border: #e3e7ec; --accent: #0f5fa8; --accent-soft: #e8f1fa;
+  --code-bg: #f0f2f5; --sidebar-bg: #101823; --sidebar-text: #c7d0dc;
+  --crit: #c62828; --high: #e65100; --med: #f9a825; --low: #2e7d32;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1319; --panel: #161d27; --text: #dbe2ea; --muted: #8b97a5;
+    --border: #263140; --accent: #5aa2e0; --accent-soft: #17273a;
+    --code-bg: #1d2733; --sidebar-bg: #0a0f15; --sidebar-text: #a9b4c0;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--bg); color: var(--text); line-height: 1.65; }
+.layout { display: flex; min-height: 100vh; }
+nav.sidebar { width: 270px; flex-shrink: 0; background: var(--sidebar-bg);
+  color: var(--sidebar-text); padding: 1.4rem 1rem; position: sticky; top: 0;
+  height: 100vh; overflow-y: auto; }
+nav.sidebar .brand { font-size: 1.05rem; font-weight: 700; color: #fff;
+  margin-bottom: .2rem; }
+nav.sidebar .brand small { display:block; font-weight: 400; color: var(--sidebar-text);
+  font-size: .75rem; margin-top: .2rem; }
+nav.sidebar ul { list-style: none; padding: 0; margin: 1.2rem 0; }
+nav.sidebar li a { display: block; color: var(--sidebar-text); text-decoration: none;
+  padding: .45rem .6rem; border-radius: 6px; font-size: .86rem; }
+nav.sidebar li a:hover { background: rgba(255,255,255,.08); color: #fff; }
+nav.sidebar li a.active { background: var(--accent); color: #fff; }
+nav.sidebar .section-label { text-transform: uppercase; letter-spacing: .08em;
+  font-size: .68rem; color: #6b7683; margin: 1.4rem 0 .4rem .4rem; }
+main { flex: 1; min-width: 0; padding: 2.2rem 3rem 4rem; max-width: 1100px; }
+header.page { border-bottom: 1px solid var(--border); padding-bottom: 1.2rem;
+  margin-bottom: 1.6rem; }
+header.page .kicker { color: var(--accent); font-weight: 600; font-size: .85rem;
+  text-transform: uppercase; letter-spacing: .06em; }
+header.page h1 { margin: .25rem 0 .4rem; font-size: 1.9rem; }
+header.page .meta { color: var(--muted); font-size: .85rem; }
+h2 { margin-top: 2.4rem; padding-bottom: .35rem; border-bottom: 1px solid var(--border);
+  font-size: 1.35rem; }
+h3 { margin-top: 1.8rem; font-size: 1.08rem; }
+h4 { margin-top: 1.4rem; font-size: .98rem; }
+a { color: var(--accent); }
+code { background: var(--code-bg); padding: .12em .38em; border-radius: 4px;
+  font-size: .84em; font-family: "JetBrains Mono", Consolas, monospace; }
+pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem; overflow-x: auto; font-size: .82rem; line-height: 1.5; }
+pre code { background: none; padding: 0; }
+.table-wrap { overflow-x: auto; margin: 1rem 0; border: 1px solid var(--border);
+  border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: .85rem; background: var(--panel); }
+th, td { border-bottom: 1px solid var(--border); padding: .55rem .75rem; text-align: left;
+  vertical-align: top; }
+th { background: var(--accent-soft); color: var(--text); font-weight: 600;
+  white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+blockquote { border-left: 4px solid var(--accent); background: var(--accent-soft);
+  margin: 1rem 0; padding: .7rem 1rem; border-radius: 0 8px 8px 0; }
+blockquote p { margin: .3rem 0; }
+.badge { display: inline-block; padding: .1em .6em; border-radius: 999px;
+  font-size: .74rem; font-weight: 700; color: #fff; white-space: nowrap; }
+.badge.crit { background: var(--crit); } .badge.high { background: var(--high); }
+.badge.med { background: var(--med); color: #333; } .badge.low { background: var(--low); }
+.mermaid { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem; margin: 1rem 0; text-align: center; overflow-x: auto; }
+.toc { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem 1.4rem; margin: 1.4rem 0; font-size: .88rem; }
+.toc > ul { margin: .3rem 0; padding-left: 1.1rem; }
+.toc .toctitle { font-weight: 700; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1rem; margin: 1.4rem 0; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1.1rem 1.2rem; text-decoration: none; color: var(--text); display: block; }
+.card:hover { border-color: var(--accent); }
+.card .icon { font-size: 1.5rem; }
+.card h3 { margin: .4rem 0 .2rem; font-size: 1rem; }
+.card p { margin: 0; color: var(--muted); font-size: .82rem; }
+.stat-row { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1.2rem 0; }
+.stat { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: .8rem 1.2rem; min-width: 130px; }
+.stat .num { font-size: 1.6rem; font-weight: 800; }
+.stat .lbl { font-size: .74rem; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .05em; }
+.stat.crit .num { color: var(--crit); } .stat.high .num { color: var(--high); }
+.stat.med .num { color: var(--med); } .stat.low .num { color: var(--low); }
+footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border);
+  color: var(--muted); font-size: .78rem; }
+.progress-block { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1rem 1.2rem; margin: 1rem 0 1.6rem; }
+.progress-block .progress-label { display: flex; justify-content: space-between; align-items: baseline;
+  font-size: .85rem; margin-bottom: .5rem; }
+.progress-block .progress-label b { font-size: 1rem; }
+.progress-bar-track { background: var(--code-bg); border-radius: 999px; height: .6rem; overflow: hidden; }
+.progress-bar-fill { height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--low), var(--accent)); transition: width .3s ease; }
+.progress-note { font-size: .72rem; color: var(--muted); margin-top: .5rem; }
+li:has(> input.task-checkbox) { list-style: none; margin-left: -1.4rem; padding-left: .3rem;
+  display: list-item; }
+input.task-checkbox { width: 1rem; height: 1rem; margin-right: .5rem; vertical-align: middle;
+  accent-color: var(--accent); }
+li:has(> input.task-checkbox:checked) { color: var(--muted); }
+li:has(> input.task-checkbox:checked) code { opacity: .75; }
+@media (max-width: 900px) {
+  .layout { flex-direction: column; }
+  nav.sidebar { width: 100%; height: auto; position: static; }
+  main { padding: 1.4rem 1.2rem 3rem; }
+}
+@media print { nav.sidebar { display: none; } main { padding: 0; } }
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar"><div class="brand">TiiBnTick Core<small>Audit technique — juillet 2026</small></div>
+<ul><li><a href="../index.html">🏠 Accueil</a></li>
+<li><a href="../executive-summary.html">📋 Résumé exécutif global</a></li>
+</ul><div class="section-label">Rapports d'audit</div><ul>
+<li><a href="../audit-1-architecture.html">🏛️ Audit n°1 — Architecture globale</a></li>
+<li><a href="../audit-2-inter-modules.html">🔗 Audit n°2 — Connexions inter-modules</a></li>
+<li><a href="../audit-3-yow-event-kernel.html">📨 Audit n°3 — yow-event-kernel</a></li>
+<li><a href="../audit-4-yow-i18n-kernel.html">🌍 Audit n°4 — yow-i18n-kernel</a></li>
+<li><a href="../audit-5-kafka.html">🧵 Audit n°5 — Kafka</a></li>
+<li><a href="../audit-6-scalabilite.html">📈 Audit n°6 — Scalabilité</a></li>
+<li><a href="../audit-7-system-design.html">🧭 Audit n°7 — System Design & Sécurité</a></li>
+</ul><div class="section-label">Plan de remédiation</div><ul>
+<li><a href="implementation-plan.html">🗂️ Plan — Plan d'implémentation — vue d'ensemble</a></li>
+<li><a href="phase-0-critical.html" class="active">🚨 P0 — Phase 0 — Bloquant production</a></li>
+<li><a href="phase-1-hardening.html">🛡️ P1 — Phase 1 — Durcissement</a></li>
+<li><a href="phase-2-target-architecture.html">🚀 P2 — Phase 2 — Architecture cible</a></li>
+<li><a href="workstream-payment-billing-kernel-delegation.html">💳 Chantier — Délégation paiement/facturation au Kernel</a></li>
+</ul></nav>
+<main>
+<header class="page">
+  <div class="kicker">P0</div>
+  <h1>🚨 Phase 0 — Bloquant production</h1>
+  <div class="meta">Plan d'implémentation — document vivant, mis à jour à chaque décision. Voir <code>docs/audits/raw/</code> pour le constat figé.</div>
+</header>
+<div class="progress-block">
+  <div class="progress-label"><span>Progression — Phase 0 — Bloquant production</span><b>45 / 49 (92%)</b></div>
+  <div class="progress-bar-track"><div class="progress-bar-fill" style="width:92%"></div></div>
+  <div class="progress-note">Lecture seule : ces cases reflètent l'état du fichier Markdown versionné dans git au moment de la génération. On les coche en éditant le <code>.md</code> (IDE ou <code>- [x]</code> par commit), jamais depuis cette page — régénérer avec <code>python3 docs/audits/build_reports.py</code> après un commit pour mettre à jour l'affichage.</div>
+</div>
+<div class="toc"><div class="toc"><span class="toctitle">Sommaire</span><ul>
+<li><a href="#vue-densemble-des-chantiers">Vue d'ensemble des chantiers</a></li>
+<li><a href="#chantier-a-securite-isolation-multi-tenant">Chantier A — Sécurité &amp; isolation multi-tenant</a></li>
+<li><a href="#chantier-b-paiement-facturation-delegation-complete-au-kernel">Chantier B — Paiement &amp; facturation (délégation complète au Kernel)</a></li>
+<li><a href="#chantier-c-evenementiel-kafka-flux-casses">Chantier C — Événementiel &amp; Kafka (flux cassés)</a></li>
+<li><a href="#chantier-d-verrous-multi-instances">Chantier D — Verrous multi-instances</a></li>
+<li><a href="#chantier-e-corrections-rapides-darchitecture-effort-35-j-groupees-par-laudit-n1">Chantier E — Corrections rapides d'architecture (effort 3–5 j, groupées par l'Audit n°1)</a></li>
+<li><a href="#chantier-f-i18n-messages-casses-en-production-audit-n4-p0-explicite">Chantier F — i18n : messages cassés en production (Audit n°4, P0 explicite)</a></li>
+<li><a href="#chantier-g-mitigation-temporaire-carte-link-stop-gap-avant-la-refonte-phase-1">Chantier G — Mitigation temporaire carte Link (stop-gap avant la refonte Phase 1)</a></li>
+<li><a href="#definition-of-done-phase-0">Definition of Done — Phase 0</a></li>
+</ul>
+</div>
+</div>
+<h1 id="phase-0-bloquant-production">Phase 0 — Bloquant production</h1>
+<p><strong>Statut global : 🟡 Planifié — non commencé</strong>
+<strong>Horizon estimé : 3–5 semaines</strong>
+<strong>Objectif :</strong> rendre une ouverture de production défendable. Sans ces correctifs : fraude financière possible, fuite de données inter-tenant, flux métier silencieusement cassés, corruption de données au premier scale-out.</p>
+<blockquote>
+<p><strong>Mode d'emploi des cases à cocher.</strong> La source de vérité est ce fichier Markdown, versionné dans git : cochez <code>- [ ]</code> → <code>- [x]</code> dans l'IDE (ou tout éditeur) et committez, au fur et à mesure de l'implémentation, comme n'importe quel changement de code. La page HTML régénérée (<code>python3 docs/audits/build_reports.py</code>) reflète l'état du fichier au moment du build et affiche une barre de progression calculée automatiquement. <strong>Les cases sont en lecture seule dans le navigateur</strong> — on ne coche jamais depuis la page HTML, uniquement en éditant ce fichier.</p>
+</blockquote>
+<p>Chaque item référence son audit source et sa localisation exacte. Aucun constat des 7 audits n'est omis — les items non retenus pour la Phase 0 sont dans <a href="phase-1-hardening.html">Phase 1</a> ou <a href="phase-2-target-architecture.html">Phase 2</a>, jamais silencieusement abandonnés.</p>
+<h2 id="vue-densemble-des-chantiers">Vue d'ensemble des chantiers</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Chantier</th>
+<th>Items</th>
+<th>Effort</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A — Sécurité &amp; isolation multi-tenant</td>
+<td>10</td>
+<td>~2 sem.</td>
+</tr>
+<tr>
+<td>B — Paiement &amp; facturation (délégation Kernel)</td>
+<td>voir fichier dédié</td>
+<td>~2 sem.</td>
+</tr>
+<tr>
+<td>C — Événementiel &amp; Kafka (flux cassés)</td>
+<td>11</td>
+<td>~1 sem.</td>
+</tr>
+<tr>
+<td>D — Verrous multi-instances</td>
+<td>6</td>
+<td>~1 sem.</td>
+</tr>
+<tr>
+<td>E — Corrections rapides d'architecture</td>
+<td>5</td>
+<td>~3–5 j</td>
+</tr>
+<tr>
+<td>F — i18n : messages cassés en production</td>
+<td>5</td>
+<td>~2 j</td>
+</tr>
+<tr>
+<td>G — Mitigation temporaire carte Link</td>
+<td>1</td>
+<td>~1 j</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="chantier-a-securite-isolation-multi-tenant">Chantier A — Sécurité &amp; isolation multi-tenant</h2>
+<ul>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>[Audit n°7 · #4]</strong> Tenant accepté depuis l'en-tête client <code>X-Tenant-Id</code> sur 68 endpoints (11 modules) au lieu du JWT — remplacer par un résolveur central sur <code>TntSecurityContext</code> — <strong>Critique</strong> — <code>InvoiceController.java:43,70,78,88,105</code> (et 67 autres). Résolu en 3 vagues : (1) 9/11 modules (<code>tnt-billing-report</code>, <code>tnt-accounting-core</code>, <code>tnt-product-core</code>, <code>tnt-resource-core</code>, <code>tnt-realtime-core</code>, <code>tnt-notify-core</code>, <code>tnt-sync-core</code>, <code>tnt-media-core</code>, <code>tnt-route-core</code>) convertis vers <code>@CurrentUser TntUserIdentity</code> ; (2) <code>InvoiceController</code> (<code>tnt-billing-invoice</code>) converti séparément par le workstream paiement/facturation (étape 7 Chantier B) ; (3) 2026-07-18 — les 2 modules restants, <code>tnt-dispute-core</code> (<code>DisputeController</code>, <code>EvidenceController</code>, <code>MediationController</code>) et <code>tnt-sales-core</code> (<code>SalesOrderController</code>), bloqués parce qu'appelés serveur-à-serveur par <code>coreBackend/tnt-agency-back-core</code> (<code>DisputeCoreClient</code>, <code>DeliveryMissionClient</code>) sans JWT disponible (flux déclenchés par Kafka, sans session utilisateur à transmettre) : migrés vers le mécanisme Client-Id/Api-Key existant de <code>tnt-platform-gateway-core</code> plutôt que de propager le JWT utilisateur final (décision produit du 2026-07-18) — nouvelle chaîne de sécurité double JWT-ou-Client-Id/Api-Key (<code>TntPlatformGatewaySecurityConfig</code> <code>@Order(11)</code>, scopes <code>DISPUTE:*</code>/<code>SALES:*</code>), les deux contrôleurs utilisent maintenant <code>@CurrentUser TntUserIdentity</code> comme les 10 autres. Voir <code>docs/auth/platform-client-onboarding-guide.md</code> §4 pour l'enregistrement du client interne <code>tnt-agency-back-core</code>.
+  — <strong>Statut (2026-07-23) — trou résiduel trouvé et corrigé :</strong> la vague (1) n'avait converti que les contrôleurs annotés <code>@RestController</code> de <code>tnt-product-core</code>/<code>tnt-resource-core</code>, en laissant vivants, à côté, d'anciens routeurs fonctionnels WebFlux dupliqués jamais supprimés — <code>ProductHandler</code>/<code>ProductRouterConfig</code> (<code>/api/v1/products</code>, <code>/api/v1/service-offers</code>), <code>VehicleHandler</code>/<code>VehicleRouterConfig</code> (<code>/api/v1/resources/vehicles</code>), <code>EquipmentHandler</code>/<code>EquipmentRouterConfig</code> (<code>/api/v1/resources/equipment</code>) — chacun résolvant encore <code>tenantId</code> depuis l'en-tête <code>X-Tenant-Id</code>, exposés en parallèle des routes sécurisées <code>/api/products</code>, <code>/api/resources/vehicles</code>, <code>/api/resources/equipment</code>. <code>tnt-inventory-core</code> n'avait quant à lui jamais reçu de contrôleur annoté du tout (<code>InventoryHandler</code>/<code>InventoryRouterConfig</code> seul, même faille). Et <code>VehicleController</code> — pourtant annoté — n'avait en réalité jamais été migré vers <code>@CurrentUser</code> : ses 13 endpoints lisaient toujours <code>tenantId</code> en <code>@RequestParam</code> (GET) ou dans le corps de la requête (mutations). Corrigé par 4 branches parallèles mergées (<code>834b7fa2</code>/<code>9f27118c</code>, <code>2e1efff4</code>/<code>e183d1ec</code>, <code>d5b85ccd</code>/<code>a5cec986</code>, <code>768fb8fa</code>+<code>fa283f3b</code>/<code>2adc50df</code>) : les 3 paires de routeurs fonctionnels dupliqués supprimées (confirmé sans dépendant interne par grep repo-entier avant suppression) ; <code>tnt-inventory-core</code> reçoit un vrai <code>InventoryController</code> annoté (<code>/api/inventory</code>, <code>@CurrentUser</code>), son seul appelant interne (<code>InventoryCoreClient</code> dans <code>tnt-agency-org-core</code>) mis à jour vers le nouveau chemin ; <code>VehicleController</code> réécrit pour résoudre <code>tenantId</code> via <code>@CurrentUser</code> comme <code>EquipmentController</code>. Tests <code>*TenantHeaderIgnoredTest</code> ajoutés pour les 3 modules. <code>mvn -am clean test</code> complet vert après les 4 merges. <strong>Gap résiduel signalé puis corrigé le jour même (commit <code>714373ee</code>)</strong> : <code>FreelancerVehicleHandler</code>/<code>FreelancerVehicleRouterConfig</code> (<code>tnt-resource-core</code>, base <code>/api/v1/resources/freelancer-orgs/{orgId}/fleet</code>) était le même schéma de route morte dupliquée que <code>VehicleHandler</code>/<code>EquipmentHandler</code>, vivante en parallèle de <code>FreelancerFleetController</code> (<code>/api/resources/freelancer-orgs/{orgId}/fleet</code>). Ce domaine n'a pas de notion de <code>tenantId</code> (scopé par <code>orgId</code> du path dans les deux versions) — pas une faille header-vs-JWT, mais le même problème de double route active. Confirmé aucun appelant interne, supprimé.</li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>[Audit n°7 · #5]</strong> 139 occurrences de <code>findById</code>/repository sans filtre tenant (IDOR prouvé factures/PDF/policies/règles DSL) — <strong>Critique</strong> — <code>InvoiceService.java:112,163,184,205,243</code>, <code>BillingPolicyService.java:70-262</code>, <code>DslRuleService.java:60-110</code>
+  — <strong>Statut (2026-07-18) :</strong> <code>InvoiceController.getById</code>/<code>getPdfUrl</code> (dernier trou tenant sur invoice, appelaient encore les surcharges non scopées dépréciées de <code>InvoiceService</code>), <code>BillingPolicyService</code> (+ <code>BillingPolicyController</code>), <code>DslRuleService</code> (+ <code>DslRuleController</code>) traités, avec en plus 4 services <code>tnt-billing-pricing</code> non listés dans l'audit original mais confirmés réels lors de l'exploration précédente : <code>PricingEngineService</code>, <code>PromotionService</code>, <code>CommissionCalculatorService</code>, <code>LoyaltyDiscountService</code>. Tests de régression IDOR ajoutés pour chaque service.
+  — <strong>Statut (2026-07-20) :</strong> <code>dispute-core</code>/<code>sales-core</code> reconfirmés par un agent dédié — déjà tenant-scopés de bout en bout, aucun IDOR. <code>tnt-dispute-core</code> : <code>DisputeController</code>/<code>EvidenceController</code>/<code>MediationController</code> résolvent tous le tenant via <code>@CurrentUser TntUserIdentity</code>, <code>DisputeQueryService</code>/<code>DisputeCommandService</code>/<code>EvidenceApplicationService</code> appellent systématiquement <code>repository.findByIdAndTenantId(id, tenantId)</code> (<code>DisputeCommandService.java:231-234</code>, <code>EvidenceApplicationService.java:53,73,91,105</code>), et <code>DisputeR2dbcRepository</code> filtre réellement <code>WHERE tenant_id = :tenantId</code> en SQL (pas un paramètre décoratif) — couvert par <code>DisputeCommandServiceTest</code>, <code>DisputeControllerTenantHeaderIgnoredTest</code>, <code>DisputeControllersSecurityTest</code>. <code>tnt-sales-core</code> : <code>SalesOrderController</code> résout <code>tenantId</code> depuis <code>@CurrentUser</code> sur tous les endpoints, <code>SalesApplicationService</code> appelle <code>orderRepository.findById(tenantId, orderId)</code> partout, <code>TntSalesOrderR2dbcRepository</code> filtre bien <code>WHERE tenant_id = :tenantId</code> — couvert par <code>SalesOrderControllerTenantHeaderIgnoredTest</code>. Aucun code modifié (rien à corriger). Item #5 entièrement clos. Note hors périmètre #5 (à traiter séparément, pattern #4) : <code>DisputeController.java:260-278</code> (<code>/freelancer-org/{orgId}</code> et <code>/stats</code>) prend <code>tenantId</code> en <code>@RequestParam</code> plutôt que depuis <code>@CurrentUser</code> — le filtre tenant SQL est bien appliqué (pas un IDOR), mais la source du tenantId est le client, pas le JWT.</li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>[Audit n°7 · #6]</strong> ~40 contrôleurs de mutation sans <code>@RequirePermission</code>/<code>@PreAuthorize</code> (wallet, invoice, HRM×16, product, resource, gofp×10…) — <strong>Critique</strong> — voir liste §4.1 de l'audit
+  — <strong>Statut (2026-07-18) :</strong> Wallet/Invoice vérifiés en pratique : <code>@RequirePermission</code> service-layer était bien invoqué (AOP proxy sur bean injecté), mais <strong>aucun handler ne mappait <code>TntRoleException</code> à un code HTTP</strong> — un refus de permission remontait en 500, pas en 403, pour tout module utilisant <code>@RequirePermission</code> (pas seulement wallet/invoice). Corrigé via <code>TntRoleExceptionHandler</code> (tnt-roles-core, même patron que <code>TntAuthExceptionHandler</code>), prouvé par test d'intégration AOP réel (<code>InvoiceControllerPermissionEnforcementTest</code>, <code>WalletControllerPermissionEnforcementTest</code>). Product (<code>ProductController</code>, <code>ServiceOfferController</code>) et Resource (<code>EquipmentController</code>, <code>FreelancerFleetController</code>, <code>VehicleController</code>) : 0 annotation sur toutes les mutations → <code>@PreAuthorize("isAuthenticated()")</code> ajouté partout (aucun rôle <code>product:*</code>/<code>resource:*</code>/<code>vehicle:*</code> fin n'existe dans le référentiel <code>tnt-roles-core</code>), prouvé par test <code>@EnableReactiveMethodSecurity</code> (<code>ProductControllerSecurityTest</code>, <code>VehicleControllerSecurityTest</code>). <code>sales-core</code> (<code>SalesOrderController</code>) confirmé déjà annoté. <code>dispute-core</code> (<code>DisputeController</code>, <code>EvidenceController</code>, <code>MediationController</code>) : 0 annotation confirmée le 2026-07-19, <code>@PreAuthorize("isAuthenticated()")</code> ajouté aux 3 contrôleurs (même motif que product/resource, aucun rôle <code>dispute:*</code> fin dans le référentiel), prouvé par <code>DisputeControllersSecurityTest</code>. <code>gofp×10</code> déjà traité par le premier agent (#23).</li>
+</ul>
+<blockquote>
+<p><strong>Note HRM×16 — décision tranchée (2026-07-19) :</strong> les 16 contrôleurs <code>Hrm*Controller</code> (<code>business/tnt-hrm-core</code>) sont de purs proxies Kernel (<code>AbstractHrmProxyController</code> — "TiiBnTick Core performs NO HRM business logic here") : ils transmettent le header <code>Authorization</code> tel quel au Kernel et n'ont aucune logique métier locale. Vérification faite sur <code>TntSecurityConfig</code> (tnt-bootstrap) : la chaîne <code>authenticatedSecurityWebFilterChain</code> (<code>@Order(20)</code>) couvre <code>anyExchange().authenticated()</code> sans <code>securityMatcher</code> restreint à <code>/api/v1/**</code> — donc <strong>les chemins <code>/api/employees/**</code> etc. sont déjà protégés contre l'anonyme</strong> (401 avant d'atteindre le contrôleur), contrairement à l'hypothèse initiale de l'audit. Ajouter <code>@PreAuthorize("isAuthenticated()")</code> localement serait strictement redondant avec cette chaîne globale — aucune valeur de sécurité ajoutée. <strong>Option A retenue</strong> (utilisateur, 2026-07-19) : la délégation d'autorisation fine au Kernel telle qu'elle existe déjà est le design cible définitif — aucun changement de code. Un mapping de permissions locales miroir du Kernel (Option B) reste possible plus tard mais est explicitement écarté pour ce chantier (changement d'architecture plus lourd, hors "un item = un changement ciblé"). #6 est donc entièrement clos, HRM inclus.
+- [x] <strong>[Audit n°7 · #23]</strong> Core Backend produits quasi sans autorisation : market 0/9, gofp 0/10, link 2/9 contrôleurs annotés, exposés sous <code>/api/v1/platform/**</code> — <strong>Critique</strong>
+- [x] <strong>[Audit n°2 · P4]</strong> 14 modules <code>tnt-agency-*</code> déclarent <code>tnt-auth-core</code>/<code>tnt-roles-core</code> sans aucun usage : 0 <code>@RequirePermission</code>/<code>TntSecurityContext</code> dans tout <code>coreBackend/tnt-agency-back-core</code> — <strong>Élevé</strong> — même correctif que les deux items ci-dessus, décision produit/sécurité à trancher en même temps
+- [x] <strong>[Audit n°7 · #19]</strong> Fallback permissif : <code>findById(id, null)</code> géo saute le filtre tenant — corriger dans la foulée du point tenant — <strong>Moyen</strong> — <code>R2dbcServiceZoneRepository.java:89-99</code>
+- [x] <strong>[Audit n°7 · #8]</strong> Secrets par défaut en fallback silencieux (DB, MinIO, HMAC QR, Grafana, kernel api-key vide) — fail-fast au démarrage prod si une valeur par défaut est détectée — <strong>Élevé</strong> — <code>application.yml:25,266-269,574</code>, <code>docker-compose.yml:134-135,194-195</code>
+- [x] <strong>[Audit n°7 · #9]</strong> Mode dev <code>allow-anonymous-context</code> injecte <code>ROLE_TNT_ADMIN</code> sans garde-fou de profil — refuser si profil prod actif — <strong>Élevé</strong> — <code>TntSecurityConfig.java:150-206</code>
+- [x] <strong>[Audit n°7 · #10]</strong> Swagger UI + api-docs activés en prod (reconnaissance complète de la surface d'attaque) — <code>springdoc.enabled=false</code> en prod — <strong>Élevé</strong> — <code>application.yml:541-545</code>
+- [x] <strong>[Audit n°7 · #16]</strong> <code>/actuator/prometheus</code> public ; <code>env,beans,loggers</code> exposés en profil défaut — retirer du public (auth réseau ou token scrape) — <strong>Moyen</strong>, bundlé avec #10 — <code>TntSecurityConfig.java:66</code>, <code>application.yml:106</code>
+- [x] <strong>[Audit n°7 · #15]</strong> <code>/api/v1/platform/**</code> sans scope requis (Market/Link déjà déployés) — exiger <code>MARKET:*</code>/<code>LINK:*</code> comme pour AUTH/SSO/ONBOARDING — <strong>Moyen</strong> — <code>TntPlatformGatewaySecurityConfig.java:88-92</code></p>
+</blockquote>
+<p><strong>Vérification :</strong> test d'intégration par module — authentifié tenant A, tentative d'accès à une ressource tenant B → 403/404 attendu. Test par contrôleur de mutation sans permission → 403 attendu.</p>
+<h2 id="chantier-b-paiement-facturation-delegation-complete-au-kernel">Chantier B — Paiement &amp; facturation (délégation complète au Kernel)</h2>
+<p><strong>Détail complet, mapping d'endpoints et étapes : <a href="workstream-payment-billing-kernel-delegation.html">workstream-payment-billing-kernel-delegation.html</a></strong></p>
+<p>Ce chantier <strong>supprime</strong> les trois failles suivantes plutôt que de les patcher :</p>
+<ul>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>[Audit n°7 · #1]</strong> Signature Stripe non vérifiée — <strong>Critique</strong> — <code>PaymentWebhookController.java:101-116</code> → <strong>supprimé</strong>, remplacé par le proxy Kernel <code>payment-gateway-controller</code> (workstream payment/wallet, étapes 4/5 — confirmé présent dans <code>docs/kernel-api/endpoints.md</code>/<code>openapi.json</code>, corrigeant une fausse alerte initiale de l'agent).</li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>[Audit n°7 · #2]</strong> Signature MTN facultative (absente ⇒ acceptée) — <strong>Critique</strong> — <code>PaymentWebhookController.java:121-126</code> → <strong>supprimé</strong> (workstream payment/wallet, étape 6)</li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>[Audit n°7 · #3]</strong> Callback Orange sans aucune vérification — <strong>Critique</strong> — <code>PaymentWebhookController.java:74-95</code> → <strong>supprimé</strong> (workstream payment/wallet, étape 6)</li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>[Audit n°7 · #7]</strong> Webhooks <code>/billing/webhooks/**</code> derrière la chaîne JWT → 401 pour les providers — <strong>Élevé</strong> — devient sans objet une fois les webhooks locaux supprimés (le Kernel reçoit directement les callbacks providers)
+  — <strong>Statut (2026-07-20) :</strong> confirmé sans objet. <code>PaymentWebhookController</code> (et <code>StripeAdapter</code>/<code>MtnMoMoAdapter</code>/<code>OrangeMoneyAdapter</code>/<code>IMoMoPaymentPort</code>) ont bien été supprimés du repo (workstream paiement/facturation, étape 6, <code>docs/audits/remediation/workstream-payment-billing-kernel-delegation.md:108</code>) — <code>grep -rn "webhook" --include=*.java .</code> et <code>find . -iname "*webhook*"</code> sur tout le dépôt (hors <code>target/</code>, hors worktrees) : zéro résultat. Le point d'entrée de confirmation de paiement est désormais le polling actif <code>WalletService.pollPendingProviderOrders()</code> (étape 5 du même workstream), pas un webhook local — aucun code à écrire, case cochée sur preuve négative (absence confirmée) plutôt que sur un correctif.</li>
+</ul>
+<p>Voir le fichier dédié pour le détail des 10 étapes d'implémentation (elles y sont cochables individuellement).</p>
+<h2 id="chantier-c-evenementiel-kafka-flux-casses">Chantier C — Événementiel &amp; Kafka (flux cassés)</h2>
+<ul>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>[Audit n°3 · PR1]</strong> Décision d'architecture : ADR tranchant le sort de <code>yow-event-kernel</code> — Option A (le réhabiliter comme voie unique) ou Option B (l'abandonner et retirer ses 21 dépendances pom) — <strong>Critique, décision d'équipe</strong>. <strong>Tranché le 2026-07-18 par l'utilisateur : Option A — réhabiliter <code>yow-event-kernel</code> comme voie unique.</strong></li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>[Audit n°2 · P3]</strong> <code>yow-event-kernel</code> totalement inutilisé : 60 classes, 21 dépendants Maven, 0 import réel — même constat que PR1, à trancher ensemble — <strong>Élevé</strong> — sans objet (Option A retenue : le module est réhabilité, pas retiré)</li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>[Audit n°3 · P1]</strong> Le module ne peut pas démarrer : pas d'<code>AutoConfiguration.imports</code>, jamais <code>@Import</code> dans bootstrap — <strong>Critique</strong> — <code>AutoConfiguration.imports</code> créé, <code>@Import</code> ajouté dans <code>tnt-bootstrap</code>/<code>TntCoreConfig</code></li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>[Audit n°3 · P2]</strong> <code>@ComponentScan</code> sur un package inexistant (<code>yowyob.kernel.event</code> au lieu de <code>com.yowyob.kernel.event</code>) — <strong>Critique</strong> — corrigé</li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>[Audit n°3 · P3]</strong> Port <code>EventEnvelopeRepository</code> sans aucune implémentation — <strong>Critique</strong> — adaptateur R2DBC implémenté (<code>adapter/out/persistence</code>)</li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>[Audit n°3 · P4]</strong> Aucune migration DB pour les 4 tables <code>event_bus.*</code> référencées — <strong>Critique</strong> — migration Liquibase ajoutée (<code>domain_event_envelopes</code>, <code>outbox_entries</code>, <code>event_schemas</code>, <code>dead_letter_entries</code>). Test de bout en bout (<code>YowEventKernelIntegrationTest</code>, Postgres réel) : publication d'une enveloppe → relecture depuis <code>event_bus.domain_event_envelopes</code>/<code>outbox_entries</code> et via <code>findByCorrelationId</code>/<code>findByAggregateId</code> — 2/2 vert.</li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>[Audit n°3 · P5]</strong> 100 % des flux événementiels contournent le kernel : fire-and-forget sans outbox, perte silencieuse (<code>.onErrorComplete()</code>, ~24 modules) — <strong>Critique</strong>
+  — <strong>Statut (2026-07-20) :</strong> module pilote <code>tnt-delivery-core</code> (<code>KafkaDeliveryEventPublisher</code>) migré vers l'outbox <code>PublishEventUseCase</code>/<code>PublishEventBatchUseCase</code>, format Kafka inchangé pour les consommateurs, <code>DeliveryLifecycleService</code>/<code>DeliveryAnnouncementService</code> rendus <code>@Transactional</code> sur les méthodes save+publish. Validation du pilote payante : 3 bugs réels préexistants trouvés et corrigés dans <code>OutboxPollerService</code> (jamais couvert par un test avant) — les enveloppes ne passaient jamais <code>PUBLISHED</code> (capture "eager" pré-mutation dans <code>commitSuccess</code>), ce qui aurait provoqué un flood de republications Kafka dès le premier module migré ; <code>switchIfEmpty</code> se déclenchait à tort même en cas de succès ; <code>poll()</code> retournait toujours 0. Voir <code>docs/audits/remediation/chantier-c-p5-inventory.md</code> §8 pour le détail et les preuves de test. Reste : dérouler les 24 autres publishers par domaine (billing, business, identity, logistics, coreBackend, trust) — case laissée décochée tant que les 25 ne sont pas migrés.
+  — <strong>Statut (2026-07-23) — item clos, tous les domaines migrés :</strong> identity (<code>tnt-actor-core</code>, <code>tnt-administration-core</code>, <code>tnt-organization-core</code>, <code>tnt-tp-core</code>), billing (<code>tnt-billing-invoice</code>, <code>tnt-billing-templates</code>, <code>tnt-billing-wallet</code>), logistics (<code>tnt-dispute-core</code>, <code>tnt-geo-core</code>, <code>tnt-incident-core</code>, <code>tnt-notify-core</code>, <code>tnt-route-core</code> partiel — voir exception ci-dessous —, <code>tnt-sync-core</code>, <code>tnt-realtime-core</code> partiel — voir exception ci-dessous), business (<code>tnt-accounting-core</code>, <code>tnt-inventory-core</code>, <code>tnt-product-core</code>, <code>tnt-resource-core</code>, <code>tnt-sales-core</code>), coreBackend (<code>tnt-agency-compliance-core</code>, <code>tnt-agency-eventing-core</code>, <code>tnt-go-freelancer-point-back-core</code>, <code>tnt-market-back-core</code>), trust (<code>tnt-trust-core</code>, avec suppression du circuit breaker Resilience4j / <code>TrustAvailabilityGuard</code> / table <code>trust_retry_queue</code> devenus redondants avec l'outbox — décision utilisateur : migration complète, pas de coexistence). Chaque publisher migré a son test d'intégration outbox dédié (Postgres réel + Kafka embarqué, <code>@Tag("integration")</code>) prouvant : enveloppe persistée <code>PENDING</code> avant tout envoi Kafka → poll → relais sur le topic/clé/payload exact attendu par les consommateurs existants → transition <code>PUBLISHED</code>. Vérification post-merge (<code>mvn -am clean test</code> / <code>verify -Pintegration-tests</code>) : 0 régression sur <code>logistics/*</code> et <code>billing/*</code> (agent dédié), 0 régression sur <code>business/*</code> et <code>coreBackend/*</code>. Deux publishers additionnels (<code>DeliveryStatusAdapter</code>, <code>BillingCompensationAdapter</code> dans <code>tnt-dispute-core</code>, hors de <code>DisputeKafkaEventPublisher</code>) avaient été oubliés par la première passe logistics — détectés lors de la vérification finale, migrés et testés séparément (commit <code>460a925a</code>).
+  — <strong>Exceptions volontaires documentées (2 event types sur 4 dans chacun des 2 modules), Javadoc en tête de classe :</strong> <code>KafkaRealtimeEventPublisher</code> (<code>GpsPositionUpdatedEvent</code>, <code>ETAUpdatedEvent</code>, <code>ActorConnectedEvent</code>, <code>ActorDisconnectedEvent</code>) et <code>KafkaRouteEventPublisher</code> (<code>publishEtaUpdated</code>) restent en envoi Kafka direct — télémétrie haute fréquence et éphémère (positions GPS, ETA recalculée à chaque ping) où le message suivant supersède le précédent sans conséquence métier durable ; router ce flux par l'outbox n'ajouterait que de l'amplification d'écriture sans bénéfice de durabilité. <code>KafkaRouteEventPublisher#publishEtaUpdated</code> a par ailleurs un <code>tenantId</code> jamais renseigné par son appelant (<code>KalmanFilterService.updateEta</code> passe <code>null</code>) — incompatible avec l'invariant non-null de l'enveloppe outbox, gap pré-existant documenté dans le Javadoc de la classe plutôt que corrigé silencieusement ici.
+  — <strong>Constat hors périmètre, non corrigé ici :</strong> un bug pré-existant sans rapport avec cette migration a été détecté pendant la vérification — <code>RedisPresenceRepository.findAllStale()</code> (<code>tnt-realtime-core</code>) scanne les clés avec un préfixe qui capture aussi les clés d'index (<code>WRONGTYPE</code> Redis), cassant <code>findAllStaleReturnsOldRecords</code>. Introduit par un commit antérieur (<code>12328b58</code>/<code>1177c7da</code>), pas par le chantier P5. Tracké séparément.</li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>[Audit n°3 · P6]</strong> Divergence de topic producteur/consommateurs <code>mission.status-changed</code> vs <code>mission.status.changed</code> → incident/sync/realtime ne reçoivent jamais les statuts de mission — <strong>Critique</strong> — <code>KafkaDeliveryEventPublisher.java:33</code> vs <code>IncidentEventConsumer.java:35</code>, <code>EntityChangedEventConsumer.java:46</code>, <code>RealtimeProperties.java:65</code>
+  — <strong>Statut (2026-07-18) :</strong> producteur aligné sur <code>tnt.delivery.mission.status.changed</code> (point) ; <code>MarketKafkaConsumer</code> (seul consommateur encore sur le tiret) corrigé avec son fix P-02 ; <code>TntKafkaTopicsConfig</code>/<code>TntModuleRegistry</code> alignés. Test d'intégration Kafka embarqué (<code>spring-kafka-test</code>, sans Docker — Testcontainers <code>KafkaContainer</code> a rencontré un conflit d'environnement commons-compress/docker-java documenté dans le commit) publiant un vrai <code>MissionStatusChangedEvent</code> et vérifiant la réception sur le nom de topic exact : <code>MissionStatusChangedTopicIntegrationTest</code> (tnt-delivery-core) — vert.</li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>[Audit n°5 · P-01]</strong> ~20 topics consommés sans producteur (mismatches tiret/point + événements jamais émis) : facturation, comptabilité, temps réel mission, ERP agency, boucle litige-remboursement inertes — <strong>Critique</strong> — table complète §3.1 de l'audit
+  — <strong>Statut (2026-07-18) :</strong> 4 mismatches nommage réels corrigés (producteur ET consommateur alignés) : <code>tnt.billing.wallet.payment.confirmed</code> (wallet publiait en tiret, invoice/accounting/market attendaient 3 variantes différentes — unifié), <code>tnt.billing.wallet.commission.calculated</code> (idem), <code>tnt.route.eta.updated</code> (route publiait <code>.eta.events</code>, realtime attendait <code>.eta.updated</code>), <code>tnt.actor.kyc.validated</code> (yml pointait vers <code>tnt.staff.kyc.validated</code>, jamais publié). Les ~15 autres orphelins de la table §3.1 sont des événements <strong>jamais émis</strong> par aucun producteur (pas un mismatch de nom) : <code>tnt.billing.invoice.paid</code>, <code>tnt.delivery.mission.completed/started/failed/created</code>, <code>tnt.delivery.package.delivered/updated</code>, <code>tnt.billing.wallet.split_executed</code>, <code>tnt.billing.wallet.events</code> (payload du consommateur ne correspond de toute façon à aucun événement wallet réel), <code>tnt.billing.compensation.paid</code>, <code>tnt.actor.profile.updated</code>, <code>tnt.organization.hub.updated</code>, <code>tnt.geo.alert.created</code>, <code>tnt.freelancer_org.*</code>, <code>tnt.admin.freelancer_org.*</code>, <code>tnt.roles.permission-changed</code> — documentés comme dette connue (constantes <code>TntTopics</code> + Javadoc dédiée) plutôt qu'un producteur inventé, chacun nécessitant une décision métier hors du périmètre "nom de topic" de ce chantier.</li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>[Audit n°5 · P-02]</strong> 6+ listeners sur la factory Boot par défaut (<code>ByteArrayDeserializer</code>) alors qu'ils attendent <code>String</code> — échec de conversion à l'exécution — <strong>Critique</strong> — <code>application.yml:54</code>, <code>BillingEventAccountingConsumer.java:44,73,102,143,188</code>, <code>DeliveryEventSalesConsumer.java:37,48,59</code>, <code>MarketKafkaConsumer.java:33,53</code>
+  — <strong>Statut (2026-07-18) :</strong> 17 listeners corrigés au total (au-delà des 10 cités) — <code>BillingEventAccountingConsumer</code> (5), <code>DeliveryEventSalesConsumer</code> (3), <code>MarketKafkaConsumer</code> (2), <code>tnt-actor-core</code> <code>IncidentEventConsumer</code> (1) + <code>FreelancerOrgEventConsumer</code> (4), <code>tnt-delivery-core</code> <code>IncidentEventConsumer</code> (2, référençait par erreur la factory par défaut alors qu'une factory <code>deliveryKafkaListenerContainerFactory</code> correcte existait déjà, inutilisée). Chaque module concerné a maintenant sa propre <code>ConcurrentKafkaListenerContainerFactory</code> avec <code>StringDeserializer</code> explicite. Test d'intégration embarqué (<code>spring-kafka-test</code>) prouvant la désérialisation réelle : <code>BillingEventAccountingConsumerDeserializerIntegrationTest</code> (tnt-accounting-core) — publie un payload JSON String et vérifie que <code>AccountingApplicationService.postJournalEntry(...)</code> est bien invoqué — vert.</li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>[Audit n°5 · P-03 + P-12]</strong> Geler un référentiel unique de topics dans <code>tnt-common-core</code> (convention <code>tnt.&lt;module&gt;.&lt;entité&gt;.&lt;action&gt;</code> en points), remplacer chaque littéral, désactiver <code>auto.create.topics.enable</code> en staging/prod — <strong>Élevé</strong> — <code>docker-compose.yml:111</code>, <code>application.yml:59-60</code>
+  — <strong>Statut (2026-07-18) :</strong> classe <code>TntTopics</code> créée dans <code>tnt-common-core</code> (<code>com.yowyob.tiibntick.common.kafka</code>), ~90 constantes couvrant tous les topics identifiés dans l'audit (flux appariés, produits-sans-consommateur, orphelins documentés), avec Javadoc par constante référençant son statut (fonctionnel / dette connue / nommage legacy). Tous les littéraux de topic dans les fichiers touchés par P6/P-01/P-02 remplacés par des références à <code>TntTopics</code> (producteurs, <code>@KafkaListener</code>, <code>TntKafkaTopicsConfig</code> — les ~50 <code>NewTopic</code> beans centraux —, <code>TntModuleRegistry</code>). Test <code>TntTopicsTest</code> (unicité des valeurs, casse, préfixe) — vert. <code>spring.kafka.admin.auto-create: false</code> ajouté aux profils <code>staging</code>/<code>prod</code> de <code>application.yml</code> (dev/test gardent <code>true</code>, cf. règle de travail) ; <code>docker-compose.yml</code> (dev-only) commenté pour clarifier que <code>KAFKA_AUTO_CREATE_TOPICS_ENABLE</code> doit être désactivé côté broker si ce fichier sert de base à une config staging/prod. <strong>Portée non couverte</strong> : une quinzaine de topics legacy tiret/underscore (<code>tnt.billing.wallet.payment-initiated</code>, <code>tnt.dispute.evidence-added</code>, <code>tnt.vehicle.assigned_to_mission</code>…) restent en l'état — les renommer exigerait de coordonner à nouveau chaque producteur/consommateur comme pour P-01, tracké séparément plutôt que fait à l'aveugle dans cette passe de centralisation ; de même, les ~25 autres modules du dépôt (geo, dispute, notify, tp, administration, product, inventory, resource, trust, agency-*, gofp…) ne référencent pas encore <code>TntTopics</code> pour leurs propres littéraux — la classe existe et le motif est prouvé sur les modules touchés par ce chantier, le balayage complet du reste du dépôt est un suivi documenté plutôt qu'une prétention de complétude.</li>
+</ul>
+<p><strong>Vérification :</strong> test d'intégration par flux critique (mission status, paiement, ETA) publiant côté producteur et vérifiant la réception côté consommateur avec le nom de topic réel réglé.</p>
+<h2 id="chantier-d-verrous-multi-instances">Chantier D — Verrous multi-instances</h2>
+<ul>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>[Audit n°6 · S1]</strong> Séquence de référence de litige en <code>AtomicInteger</code> statique par JVM → doublons garantis en multi-instances — remplacer par une séquence PostgreSQL — <strong>Critique</strong> — <code>DisputeReference.java:21,44-49</code></li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>[Audit n°6 · S2]</strong> ~10 jobs <code>@Scheduled</code> sans verrou distribué (aucun ShedLock dans le dépôt) — <strong>Critique</strong> — voir §5.1 de l'audit
+  — <strong>Régression détectée et corrigée (2026-07-19) :</strong> <code>OutboxPollerService.scheduledPoll()</code> (<code>yow-event-kernel</code>) n'avait jamais été couvert par ce chantier car le module n'était pas encore câblé dans <code>tnt-bootstrap</code> à l'époque. Depuis la réactivation P1 de Chantier C (2026-07-18, <code>YowEventKernelAutoConfiguration</code> importée dans <code>TntCoreConfig</code>), ce poller tourne réellement en production, en multi-instances — corrigé : <code>@SchedulerLock(name = "yow-event-outbox-poll", ...)</code> ajouté, dépendance <code>shedlock-spring</code> ajoutée à <code>yow-event-kernel/pom.xml</code>, Javadoc obsolète mis à jour. <code>mvn -pl foundation/yow-event-kernel -am test</code> vert. Voir <code>docs/audits/remediation/chantier-c-p5-inventory.md</code> §3.</li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>[Audit n°6 · S3]</strong> Réconciliation financière du wallet stockée en <code>ConcurrentHashMap</code> (<code>@Repository</code> en mémoire) — persister en R2DBC — <strong>Critique</strong> — <code>InMemoryReconciliationRepository.java:24-27</code></li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>[Audit n°6 · S4]</strong> Appels HTTP Kernel sans timeout, retry ni circuit breaker (auth, rôles, organisation, notifications) — timeouts (connect 2s/response 5s) + Resilience4j sur le modèle trust — <strong>Critique</strong> — <code>KernelBridgeConfig.java:57-118</code></li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>[Audit n°6 · S5]</strong> Affectations de rôles RBAC en mémoire (mode <code>LOCAL</code> par défaut + fallback in-memory actif) — adapter persistant, fail-fast au boot prod si fallback actif — <strong>Critique</strong> — <code>TntRolesAutoConfiguration.java:71-84</code>, <code>application.yml:260</code>
+  — <strong>Statut (2026-07-20) :</strong> implémenté en entier, conforme à <code>docs/audits/remediation/rbac-s5-outbox-architecture.md</code>. Schéma R2DBC propre à <code>tnt-roles-core</code> (<code>tnt_roles</code>, <code>tnt_user_role_assignments</code>, <code>tnt_role_sync_outbox</code>, Liquibase, <code>TntRolesR2dbcConfig</code>) devenu le défaut réel (<code>RoleRepository</code>/<code>UserRoleAssignmentRepository</code> R2DBC-backed, l'in-memory n'est plus qu'un ultime repli). <code>TntRoleAssignmentService</code>/<code>TntRoleInitializationService</code> écrivent localement + outbox dans la même transaction (<code>TntRolesTransactionConfig</code>, premier <code>ReactiveTransactionManager</code> du dépôt) — plus aucun appel Kernel synchrone depuis la couche applicative. <code>KernelRoleSyncWorker</code> (ShedLock + <code>SELECT...FOR UPDATE SKIP LOCKED</code>, backoff exponentiel, 10 tentatives max → <code>DEAD</code>) et <code>KernelRoleReconciliationJob</code> (horaire, scope limité aux entités déjà connues localement — jamais un dump du Kernel) drainent l'outbox de façon asynchrone et fiable. Portée étendue par décision utilisateur (2026-07-19) : <code>ManageTntRoleUseCase</code>/<code>TntRoleManagementService</code> (CRUD rôles métier autonomes par tenant) + <code>RevokeTntRoleUseCase</code>/<code>TntRoleRevocationService</code>, tous deux branchés sur le même mécanisme de lecture <code>kernelRoleId</code>/<code>kernelAssignmentId</code> pour savoir s'il faut aussi purger côté Kernel. Endpoints admin (<code>TntRoleAdminController</code>, <code>TntRoleAssignmentAdminController</code> complété du DELETE revoke) sous la même garde <code>TNT_ADMIN</code>. Correctif annexe : <code>OutboxPollerService</code> (<code>yow-event-kernel</code>) reçoit enfin son <code>@SchedulerLock</code> (régression S2 identifiée en cours de route, voir <code>chantier-c-p5-inventory.md</code> §3). 140 tests verts sur <code>tnt-roles-core</code>, build complet de <code>tnt-bootstrap</code> (55 modules) vérifié. Pas de test d'intégration Postgres/Kafka réel (pas de Docker dans cet environnement) — à faire avant mise en prod.</li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>[Audit n°1 · A3 / Audit n°6 · S14]</strong> <code>.block()</code> en production réactive : aspect AOP transversal <code>TenantValidationAspect.java:74</code> (sans timeout) et <code>DisputeEventConsumer.java:101</code> (+ 4 autres occurrences) — <strong>Élevé</strong></li>
+</ul>
+<p><strong>Vérification :</strong> deux instances locales en parallèle (docker compose scale) contre la même base — absence de doublons de référence litige, exécution unique des <code>@Scheduled</code>, cohérence des caches.</p>
+<h2 id="chantier-e-corrections-rapides-darchitecture-effort-35-j-groupees-par-laudit-n1">Chantier E — Corrections rapides d'architecture (effort 3–5 j, groupées par l'Audit n°1)</h2>
+<ul>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>[Audit n°1 · A1 / Audit n°2 · P5]</strong> Violation de couche <code>yow-i18n-kernel</code> (L0) → <code>tnt-common-core</code> (L1), déclarée et jamais utilisée — retirer la dépendance pom — <strong>Élevé</strong> — <code>foundation/yow-i18n-kernel/pom.xml:24-27</code></li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>[Audit n°1 · A2 / Audit n°2 · P1]</strong> Violation de couche <code>tnt-actor-core</code> (L2) → <code>tnt-incident-core</code> (L3), utilisée avec un pattern de port inversé — déplacer <code>ActorReputationPortAdapter</code> dans <code>tnt-incident-core</code> (comme fait pour trust) — <strong>Élevé</strong> — <code>identity/tnt-actor-core/pom.xml:62</code>, <code>ActorReputationPortAdapter.java:8</code></li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>[Audit n°1 · A6]</strong> Fuite de DTOs web dans la couche application (services retournant des <code>*Response</code> web) — <strong>Moyen</strong> — <code>AgencyRegistryService.java:6-7</code>, <code>MissionService.java:9</code></li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>Test ArchUnit reactor-wide</strong> — interdiction des imports montants entre couches Maven + <code>adapter.in</code>→<code>adapter.out</code> + <code>application</code>→<code>adapter.in.web</code> — empêche la régression de A1/A2/A6 et de toute violation future — <strong>[Audit n°1 · reco P1] / [Audit n°2 · reco 8]</strong></li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>[Audit n°4 · P0 item2]</strong> Test de non-régression i18n : scanner les <code>templateKey</code> référencées dans le code et vérifier leur présence dans chaque pack de langue — <strong>Critique</strong> — couvre P-1/P-3</li>
+</ul>
+<h2 id="chantier-f-i18n-messages-casses-en-production-audit-n4-p0-explicite">Chantier F — i18n : messages cassés en production (Audit n°4, P0 explicite)</h2>
+<ul>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>[Audit n°4 · P-1]</strong> Clés de notification inexistantes dans les packs → l'utilisateur reçoit <code>⚠ Missing translation: notify.freelancer_org.verified</code> par SMS/Email/Push — ajouter les clés manquantes aux 5 packs — <strong>Critique</strong> — <code>FreelancerOrgKafkaEventConsumer.java:98-240</code>, <code>IncidentNotificationPortAdapter.java:224</code></li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>[Audit n°4 · P-2]</strong> Langue <code>"fr"</code> passée partout alors que les packs sont indexés <code>fr_CM</code>/<code>fr_FR</code> → lookup toujours vide — normaliser via l'enum <code>SupportedLanguage</code> — <strong>Critique</strong> — <code>FreelancerOrgKafkaEventConsumer.java:99</code> (+5), <code>IncidentNotificationPortAdapter.java:225</code>, <code>NotificationController.java:86</code></li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>[Audit n°4 · P-21]</strong> Notifications e-commerce market-back : 8 clés (<code>ORDER_PAID</code>, <code>LISTING_APPROVED</code>…) absentes des packs + langue <code>"fr"</code> invalide → clients/marchands reçoivent le même message cassé — <strong>Critique</strong> — <code>MarketNotificationAdapter.java:39-84</code></li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> Remplacer le fallback <code>defaultIfEmpty("⚠ Missing translation: …")</code> par un repli sur la locale par défaut + log/métrique, jamais le texte brut envoyé au client final — bundlé avec P-1/P-2/P-21 — <strong>[Audit n°4 · P0 item1]</strong></li>
+</ul>
+<h2 id="chantier-g-mitigation-temporaire-carte-link-stop-gap-avant-la-refonte-phase-1">Chantier G — Mitigation temporaire carte Link (stop-gap avant la refonte Phase 1)</h2>
+<ul>
+<li><input type="checkbox" class="task-checkbox" checked disabled> <strong>[Audit n°6 · S25, mitigation partielle]</strong> Plafonner <code>/nearby</code> (Link) avec <code>LIMIT</code> + throttling par utilisateur, en attendant la refonte complète temps réel (tuiles geohash + BFF) planifiée en <a href="phase-1-hardening.html">Phase 1</a> — stop-gap, pas la solution cible — <strong>Élevé</strong> — <code>NetworkNodeController.java:119-128</code>, <code>NetworkAlertController.java:100-108</code></li>
+</ul>
+<blockquote>
+<p>Le constat <strong>S23 (Audit n°6, Critique)</strong> — absence totale de canal de push sur la carte Link — n'est <strong>pas</strong> traité en Phase 0 : sa correction réelle (abonnement par tuiles geohash + BFF Link, réutilisation de <code>tnt-realtime-core</code>) est un chantier de 3–4 semaines qui ne relève pas d'un correctif bloquant immédiat. Il est délibérément placé en tête de la <a href="phase-1-hardening.html">Phase 1</a>, conformément à la justification détaillée de l'<a href="../audit-7-system-design.html">Audit n°7 (§ P1 bis)</a>. Le plafonnement ci-dessus est la seule mitigation à apporter maintenant.</p>
+</blockquote>
+<hr />
+<h2 id="definition-of-done-phase-0">Definition of Done — Phase 0</h2>
+<ul>
+<li><input type="checkbox" class="task-checkbox" disabled> Chantier A : 0 endpoint de mutation acceptant le tenant depuis un en-tête client ; test IDOR vert sur les modules <code>coreBackend/</code> ; 0 contrôleur de mutation sans <code>@RequirePermission</code> sur <code>market</code>, <code>gofp</code>, <code>link</code>, <code>agency</code> ; secrets par défaut fail-fast en prod ; Swagger/actuator fermés en prod.
+  — <strong>Vérification (2026-07-23) :</strong> 3/5 sous-critères vérifiés — 0 contrôleur de mutation sans <code>@RequirePermission</code> confirmé sur les 46 contrôleurs de <code>market</code>/<code>gofp</code>/<code>link</code>/<code>agency</code> ; secrets par défaut fail-fast confirmé (<code>TntProdSecretsGuardTest</code> 4/4 vert) ; Swagger <strong>et</strong> actuator (pas seulement Swagger) confirmés fermés en prod (<code>management.endpoints.web.exposure.include</code> restreint, <code>/actuator/prometheus</code> sorti de l'allowlist publique en prod). 2/5 non vérifiés — <strong>vraies lacunes, pas juste non prouvées</strong> : des handlers WebFlux fonctionnels non annotés (<code>ProductHandler</code>, <code>InventoryHandler</code>, <code>EquipmentHandler</code> — <code>business/tnt-product-core</code>, <code>tnt-inventory-core</code>, <code>tnt-resource-core</code>) lisent encore le tenantId depuis l'en-tête <code>X-Tenant-Id</code> sur des endpoints POST/DELETE de mutation, ratés par la vague de correctifs initiale car invisibles à un grep par annotation (<code>@PostMapping</code> etc., pas de routeur fonctionnel) ; <code>VehicleController</code> lit <code>tenantId</code> depuis le corps de la requête (même faille IDOR, vecteur différent) ; aucun test IDOR n'existe sous <code>coreBackend/</code>. Case laissée décochée — dette réelle identifiée, pas encore traitée.
+  — <strong>Correctif (2026-07-23, plus tard le même jour) :</strong> les deux vraies lacunes ci-dessus corrigées, voir le détail sous [Audit n°7 · #4]. Un troisième cas du même type (route morte dupliquée, sans lien direct avec le tenant vu que ce domaine est scopé par <code>orgId</code>) trouvé et corrigé dans la foulée : <code>FreelancerVehicleHandler</code>/<code>FreelancerVehicleRouterConfig</code> (<code>tnt-resource-core</code>, commit <code>714373ee</code>). 4/5 sous-critères désormais vérifiés. <strong>Case restant décochée</strong> : le seul point encore ouvert est « test IDOR vert sur les modules <code>coreBackend/</code> » — aucun test de ce type n'existe toujours sous <code>coreBackend/</code>, non traité dans cette passe (portée : la faille tenant côté header/body sur <code>product</code>/<code>inventory</code>/<code>resource</code>, pas l'ajout de tests IDOR pour <code>coreBackend/</code>).</li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> Chantier B : 0 secret provider de paiement dans le repo ; <code>mvn verify</code> vert sur <code>tnt-billing-wallet</code>, <code>tnt-billing-invoice</code>, <code>tnt-trust-core</code>.
+  — <strong>Vérification (2026-07-23) :</strong> 2/2 sous-critères vérifiés. Recherche repo-entier (hors <code>target/</code>) de secrets provider hardcodés (<code>sk_live</code>, <code>sk_test</code>, <code>pk_live</code>) et de fichiers webhook/provider (<code>*webhook*</code>, <code>*stripe*</code>, <code>*momo*adapter*</code>, <code>*orangemoney*</code>) : zéro résultat — confirme la suppression déjà documentée dans le workstream paiement/facturation. <code>mvn -pl billing/tnt-billing-wallet,billing/tnt-billing-invoice,trust/tnt-trust-core -am verify</code> : <strong>BUILD SUCCESS</strong>, 0 échec.</li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> Chantier C : ADR <code>yow-event-kernel</code> tranchée et exécutée ; 0 topic orphelin en environnement de test (<code>auto.create.topics.enable=false</code> sans erreur au démarrage) ; les mismatches de topics corrigés et testés.
+  — <strong>Vérification (2026-07-23) :</strong> 3/3 sous-critères vérifiés. ADR tranchée et exécutée (PR1 + P1-P6 tous clos, y compris P5 ci-dessus). <code>spring.kafka.admin.auto-create=false</code> testé en conditions réelles (surcharge de la propriété sur le profil <code>test</code>) : <code>TiiBnTickApplicationTest</code> démarre sans erreur — tous les topics réels sont couverts par les <code>NewTopic</code> beans de <code>TntKafkaTopicsConfig</code>. Mismatches de topics (P6, P-01, P-02) déjà corrigés et testés. Effet de bord positif de cette vérification : elle a mis en évidence puis permis de corriger un bug bloquant réel qui empêchait <code>TiiBnTickApplicationTest</code> de démarrer depuis le début de ce chantier — voir commit <code>f9864fe7</code> (chemin classpath Liquibase dupliqué entre <code>src/main/resources</code> et <code>src/test/resources</code>, faisant échouer le chargement du contexte Spring complet pour n'importe quel module, pas seulement ceux touchés par P5).</li>
+<li><input type="checkbox" class="task-checkbox" disabled> Chantier D : test deux-instances local sans corruption observée sur litiges/wallet/RBAC.
+  — <strong>Vérification (2026-07-23) :</strong> des tests Testcontainers réels existent et passent pour litiges (<code>DisputeReferenceSequenceAdapterIntegrationTest</code> — 500 appels concurrents sur 20 connexions/adaptateurs indépendants, 0 doublon) et wallet (<code>ReconciliationRepositoryAdapterIntegrationTest</code>), mais simulent « deux instances » via deux connexions dans la même JVM de test, pas deux processus <code>tnt-bootstrap</code> réellement distincts comme le prescrit la note de vérification du chantier (« deux instances locales en parallèle, docker compose scale »). Aucun test de concurrence réel n'existe pour RBAC (seulement des tests unitaires mockés) — l'item S5 lui-même admet l'absence de test d'intégration Postgres/Kafka réel avant mise en prod. Case laissée décochée : prouvé pour litiges/wallet, non prouvé pour RBAC.</li>
+<li><input type="checkbox" class="task-checkbox" disabled> Chantier E : test ArchUnit vert en CI, bloquant toute nouvelle violation de couche.
+  — <strong>Vérification (2026-07-23) :</strong> <code>LayeringArchitectureTest</code> (tnt-bootstrap) existe et passe (3/3 vert, exécuté localement). Mais aucune CI n'exécute de build/test Maven dans ce dépôt — le seul fichier de workflow (<code>.github/workflows/notify-yowyob.yml</code>) ne fait qu'un webhook <code>repository_dispatch</code> vers un autre dépôt, aucun <code>.gitlab-ci.yml</code> n'existe nulle part dans l'historique. Le test est donc vert localement mais pas « en CI, bloquant toute nouvelle violation » comme l'exige littéralement ce critère. Case laissée décochée tant qu'aucune pipeline CI ne fait tourner ce test.</li>
+<li><input type="checkbox" class="task-checkbox" disabled> Chantier F : test de non-régression i18n vert ; plus aucune notification <code>⚠ Missing translation</code> en environnement de test.
+  — <strong>Vérification (2026-07-23) :</strong> <code>TemplateKeyI18nRegressionTest</code> existe et passe (6/6 vert avec <code>I18nTranslationPortAdapterTest</code>), 0 occurrence du texte brut <code>⚠ Missing translation</code> dans <code>src/main</code> (fallback locale par défaut + métrique confirmés). Mais le test est un contrôle de non-régression sur une liste connue de clés manquantes (fichier baseline), pas une assertion « zéro clé manquante » : 3 clés utilisées par du code de production (<code>notify.sub_deliverer.invited</code>, <code>notify.sub_deliverer.invitation_accepted</code>, <code>notify.billing.surcharge_triggered</code>) restent absentes des 5 packs de langue, listées comme dette connue dans la baseline plutôt que corrigées. Case laissée décochée tant que ces 3 clés manquent réellement.</li>
+<li><input type="checkbox" class="task-checkbox" checked disabled> Chantier G : <code>/nearby</code> Link plafonné et throttlé.</li>
+</ul>
+<footer>Audit technique TiiBnTick — généré à partir de l'analyse du code source réel. Chaque constat référence les fichiers et lignes concernés.</footer>
+</main>
+</div>
+
+<script type="module">
+  try {
+    const m = await import("https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs");
+    const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    m.default.initialize({ startOnLoad: true, theme: dark ? "dark" : "neutral", securityLevel: "loose" });
+  } catch (e) {
+    document.querySelectorAll(".mermaid").forEach(el => {
+      el.style.textAlign = "left";
+      el.innerHTML = "<div style='color:var(--muted);font-size:.75rem;margin-bottom:.5rem'>⚠ Diagramme Mermaid (connexion internet requise pour le rendu) — source :</div><pre>" + el.textContent.replace(/&/g,"&amp;").replace(/</g,"&lt;") + "</pre>";
+    });
+  }
+</script>
+
+</body>
+</html>

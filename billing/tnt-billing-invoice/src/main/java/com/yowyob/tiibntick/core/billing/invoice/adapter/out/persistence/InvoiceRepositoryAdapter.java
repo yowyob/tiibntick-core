@@ -47,6 +47,11 @@ public class InvoiceRepositoryAdapter implements InvoiceRepository {
     }
 
     @Override
+    public Mono<Invoice> findByIdAndTenantId(UUID invoiceId, UUID tenantId) {
+        return r2dbcRepo.findByIdAndTenantId(invoiceId, tenantId).map(mapper::toDomain);
+    }
+
+    @Override
     public Mono<Invoice> findByNumber(String invoiceNumber) {
         return r2dbcRepo.findByInvoiceNumber(invoiceNumber).map(mapper::toDomain);
     }

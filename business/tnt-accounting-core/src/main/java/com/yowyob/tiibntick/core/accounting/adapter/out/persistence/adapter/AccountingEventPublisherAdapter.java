@@ -1,19 +1,36 @@
 package com.yowyob.tiibntick.core.accounting.adapter.out.persistence.adapter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yowyob.kernel.event.application.port.in.PublishEventUseCase;
+import com.yowyob.kernel.event.domain.model.DomainEventEnvelope;
 import com.yowyob.tiibntick.core.accounting.application.port.out.AccountingEventPublisher;
 import com.yowyob.tiibntick.core.accounting.domain.event.AccountingPeriodClosedEvent;
 import com.yowyob.tiibntick.core.accounting.domain.event.JournalEntryPostedEvent;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
+
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.UUID;
 
 /**
- * Kafka adapter implementing AccountingEventPublisher port.
- * Publishes accounting domain events to dedicated Kafka topics.
- * Author: MANFOUO Braun
+ * Outbox-backed adapter implementing {@link AccountingEventPublisher}.
+ *
+ * <p>Chantier C · Audit n°3 · P5 migration (see
+ * {@code docs/audits/remediation/chantier-c-p5-inventory.md}): delegates to
+ * {@link PublishEventUseCase} (yow-event-kernel's transactional outbox) instead of
+ * sending to Kafka directly. Envelopes are persisted in the same DB transaction as
+ * the business write (see the {@code @Transactional} boundaries on
+ * {@code AccountingApplicationService#postJournalEntry}/{@code #closePeriod}), and
+ * {@code OutboxPollerService} relays them to Kafka asynchronously with retry/DLQ — a
+ * business save can no longer succeed while its event is silently lost.
+ *
+ * <p>The Kafka wire format is unchanged: the payload is still simply
+ * {@code objectMapper.writeValueAsString(event)} — the raw event record serialized
+ * directly, with no extra wrapper envelope — so existing consumers require no change.
+ *
+ * @author MANFOUO Braun
  */
 @Component
 public class AccountingEventPublisherAdapter implements AccountingEventPublisher {
@@ -21,38 +38,51 @@ public class AccountingEventPublisherAdapter implements AccountingEventPublisher
     static final String TOPIC_JOURNAL_POSTED = "tnt.accounting.journal-entry.posted";
     static final String TOPIC_PERIOD_CLOSED  = "tnt.accounting.period.closed";
 
-    private final KafkaTemplate<String, String> kafkaTemplate;
+    private static final String AGGREGATE_TYPE_JOURNAL_ENTRY = "JournalEntry";
+    private static final String AGGREGATE_TYPE_ACCOUNTING_PERIOD = "AccountingPeriod";
+    private static final String SOLUTION_CODE = "TNT";
+
+    private final PublishEventUseCase publishEventUseCase;
     private final ObjectMapper objectMapper;
 
     public AccountingEventPublisherAdapter(
-            @Qualifier("tntKafkaTemplate") KafkaTemplate<String, String> kafkaTemplate,
+            PublishEventUseCase publishEventUseCase,
             @Qualifier("tntObjectMapper") ObjectMapper objectMapper) {
-        this.kafkaTemplate = kafkaTemplate;
-        this.objectMapper  = objectMapper;
+        this.publishEventUseCase = publishEventUseCase;
+        this.objectMapper = objectMapper;
     }
 
     @Override
     public Mono<Void> publishJournalEntryPosted(JournalEntryPostedEvent event) {
         return Mono.fromCallable(() -> objectMapper.writeValueAsString(event))
-                .flatMap(payload -> Mono.fromFuture(
-                        kafkaTemplate.send(TOPIC_JOURNAL_POSTED,
-                                event.journalEntryId().toString(), payload).toCompletableFuture()))
-                .then()
-                .subscribeOn(Schedulers.boundedElastic())
-                .onErrorResume(e -> {
-                    // Non-blocking: log and continue — event can be replayed from audit
-                    return Mono.empty();
-                });
+                .map(payload -> DomainEventEnvelope.wrap()
+                        .correlationId(UUID.randomUUID().toString())
+                        .eventType(event.getClass().getSimpleName())
+                        .aggregateId(event.journalEntryId().toString())
+                        .aggregateType(AGGREGATE_TYPE_JOURNAL_ENTRY)
+                        .tenantId(event.tenantId().toString())
+                        .solutionCode(SOLUTION_CODE)
+                        .payload(payload)
+                        .kafkaTopic(TOPIC_JOURNAL_POSTED)
+                        .occurredAt(LocalDateTime.ofInstant(event.occurredAt(), ZoneOffset.UTC))
+                        .build())
+                .flatMap(publishEventUseCase::publish);
     }
 
     @Override
     public Mono<Void> publishPeriodClosed(AccountingPeriodClosedEvent event) {
         return Mono.fromCallable(() -> objectMapper.writeValueAsString(event))
-                .flatMap(payload -> Mono.fromFuture(
-                        kafkaTemplate.send(TOPIC_PERIOD_CLOSED,
-                                event.periodId().toString(), payload).toCompletableFuture()))
-                .then()
-                .subscribeOn(Schedulers.boundedElastic())
-                .onErrorResume(e -> Mono.empty());
+                .map(payload -> DomainEventEnvelope.wrap()
+                        .correlationId(UUID.randomUUID().toString())
+                        .eventType(event.getClass().getSimpleName())
+                        .aggregateId(event.periodId().toString())
+                        .aggregateType(AGGREGATE_TYPE_ACCOUNTING_PERIOD)
+                        .tenantId(event.tenantId().toString())
+                        .solutionCode(SOLUTION_CODE)
+                        .payload(payload)
+                        .kafkaTopic(TOPIC_PERIOD_CLOSED)
+                        .occurredAt(LocalDateTime.ofInstant(event.closedAt(), ZoneOffset.UTC))
+                        .build())
+                .flatMap(publishEventUseCase::publish);
     }
 }

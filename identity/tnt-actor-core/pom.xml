@@ -57,11 +57,6 @@
             <artifactId>tnt-roles-core</artifactId>
         </dependency>
 
-        <dependency>
-            <groupId>com.yowyob.tiibntick.core</groupId>
-            <artifactId>tnt-incident-core</artifactId>
-        </dependency>
-
         <!-- ══════════════════════════════════════════════════════════
              SPRING (versions gérées par le BOM parent)
              ══════════════════════════════════════════════════ -->

@@ -5,6 +5,9 @@ import com.yowyob.tiibntick.core.accounting.adapter.in.web.dto.response.JournalE
 import com.yowyob.tiibntick.core.accounting.application.port.in.JournalEntryLineCommand;
 import com.yowyob.tiibntick.core.accounting.application.port.in.PostJournalEntryCommand;
 import com.yowyob.tiibntick.core.accounting.application.service.AccountingApplicationService;
+import com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser;
+import com.yowyob.tiibntick.core.auth.domain.model.TntUserIdentity;
+import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -34,7 +37,7 @@ public class JournalEntryController {
     @PostMapping
     @PreAuthorize("hasAuthority('accounting:write')")
     public Mono<ResponseEntity<JournalEntryResponse>> postJournalEntry(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestHeader("X-Organization-Id") UUID organizationId,
             @RequestHeader("X-User-Id") String userId,
             @Valid @RequestBody PostJournalEntryRequest req) {
@@ -45,7 +48,7 @@ public class JournalEntryController {
                         l.currency()))
                 .toList();
         PostJournalEntryCommand cmd = new PostJournalEntryCommand(
-                tenantId, organizationId, req.type(), req.referenceType(), req.referenceId(),
+                currentUser.tenantId(), organizationId, req.type(), req.referenceType(), req.referenceId(),
                 lines, req.description(), userId);
         return service.postJournalEntry(cmd)
                 .map(e -> ResponseEntity.status(HttpStatus.CREATED).body(JournalEntryResponse.from(e)));
@@ -54,20 +57,20 @@ public class JournalEntryController {
     @GetMapping("/{journalEntryId}")
     @PreAuthorize("hasAuthority('accounting:read')")
     public Mono<ResponseEntity<JournalEntryResponse>> getJournalEntry(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @PathVariable UUID journalEntryId) {
-        return service.getJournalEntry(tenantId, journalEntryId)
+        return service.getJournalEntry(currentUser.tenantId(), journalEntryId)
                 .map(e -> ResponseEntity.ok(JournalEntryResponse.from(e)));
     }
 
     @GetMapping
     @PreAuthorize("hasAuthority('accounting:read')")
     public Mono<ResponseEntity<List<JournalEntryResponse>>> listJournalEntries(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestHeader("X-Organization-Id") UUID organizationId,
             @RequestParam(required = false) String period) {
         YearMonth ym = period != null ? YearMonth.parse(period) : YearMonth.now();
-        return service.listJournalEntries(tenantId, organizationId, ym)
+        return service.listJournalEntries(currentUser.tenantId(), organizationId, ym)
                 .map(JournalEntryResponse::from)
                 .collectList()
                 .map(ResponseEntity::ok);

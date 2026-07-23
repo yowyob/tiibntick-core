@@ -136,11 +136,30 @@
             <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- In-process broker for the outbox integration test (Chantier C · Audit n°3 · P5) —
+             see KafkaDeliveryEventPublisherOutboxIntegrationTest's Javadoc in tnt-delivery-core
+             for why this repo standardises on spring-kafka-test for Kafka-side assertions. -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka-test</artifactId>
+            <scope>test</scope>
+        </dependency>
 
         <!-- ── tnt-auth-core (Foundation L1 ─ security context) ── -->
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>
             <artifactId>tnt-auth-core</artifactId>
+        </dependency>
+        <!-- tnt-common-core: TntTopics Kafka topic referential (Audit n5 P-03/P-12) -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-common-core</artifactId>
         </dependency>
 
         <!-- ── tnt-roles-core (Foundation L1 ─ RBAC / @RequirePermission) ── -->
@@ -154,6 +173,14 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-aop</artifactId>
             <version>4.0.0-M2</version>
+        </dependency>
+
+        <!-- @SchedulerLock annotation (Chantier D · Audit n°6 · S2) — distributed lock around
+             this module's @Scheduled job(s); LockProvider bean lives centrally in
+             tnt-bootstrap's TntSchedulerLockConfig. -->
+        <dependency>
+            <groupId>net.javacrumbs.shedlock</groupId>
+            <artifactId>shedlock-spring</artifactId>
         </dependency>
 
     </dependencies>

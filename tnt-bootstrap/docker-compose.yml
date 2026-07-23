@@ -108,6 +108,13 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_LOG_DIRS: /var/lib/kafka/data
       CLUSTER_ID: TiiBnTickKafkaClusterLocal01
+      # Dev/local only — kept enabled here to simplify local iteration. staging/prod MUST run
+      # with this disabled at the broker (Audit n5 P-03/P-12): the corresponding
+      # `spring.kafka.admin.auto-create: false` is already set for those profiles in
+      # tnt-bootstrap/src/main/resources/application.yml, but that only stops *this app* from
+      # auto-creating topics — the broker flag below is the actual enforcement point and must
+      # be turned off wherever this compose file's Kafka service config is reused/adapted for
+      # staging/prod infrastructure.
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
       KAFKA_LOG_RETENTION_HOURS: 168
     volumes:
@@ -131,6 +138,10 @@ services:
       - "9000:9000"   # S3 API
       - "9001:9001"   # Web console
     environment:
+      # Audit n°7 · #8 — these dev-only defaults must never reach prod: if
+      # MINIO_ACCESS_KEY/MINIO_SECRET_KEY are left unset (or copy-pasted from here) while
+      # SPRING_PROFILES_ACTIVE=prod on the app container, TntProdSecretsGuard
+      # (tnt-bootstrap) refuses to let the application context start.
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin123}
     volumes:
@@ -191,6 +202,10 @@ services:
     ports:
       - "3100:3000"
     environment:
+      # Audit n°7 · #8 — Grafana is a standalone container (not part of the tiibntick-core
+      # Spring app), so TntProdSecretsGuard cannot see or block this default: if this stack
+      # is ever pointed at a real environment, GRAFANA_ADMIN_USER/GRAFANA_ADMIN_PASSWORD
+      # must be overridden via .env — this file stays LOCAL DEV ONLY (see header comment).
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-tiibntick_grafana}
       GF_USERS_ALLOW_SIGN_UP: "false"

@@ -36,6 +36,13 @@
             <artifactId>tnt-common-core</artifactId>
         </dependency>
 
+        <!-- Transactional outbox (Chantier C · Audit n°3 · P5) — event publishing goes
+             through yow-event-kernel's PublishEventUseCase instead of direct Kafka sends. -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>yow-event-kernel</artifactId>
+        </dependency>
+
         <!-- ── tnt-organization-core: ManageAgencyUseCase — Agency TNT creation step ── -->
         <!-- ── of the agency onboarding orchestration (Bloc C).                       ── -->
         <dependency>

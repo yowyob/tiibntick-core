@@ -15,6 +15,7 @@ import com.yowyob.tiibntick.core.marketback.domain.model.VolumeTier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -66,6 +67,7 @@ public class MerchantContractApplicationService implements IManageMerchantContra
     }
 
     @Override
+    @Transactional
     public Mono<MerchantContractResponse> signByMerchant(UUID contractId, UUID merchantId, String tenantId) {
         return contractRepository.findById(ContractId.of(contractId))
                 .switchIfEmpty(Mono.error(new MarketDomainException("Contract not found: " + contractId)))
@@ -73,11 +75,12 @@ public class MerchantContractApplicationService implements IManageMerchantContra
                     contract.signByMerchant(merchantId);
                     return contractRepository.save(contract);
                 })
-                .flatMap(saved -> eventPublisher.publishAll(saved.pullDomainEvents()).thenReturn(saved))
+                .flatMap(saved -> eventPublisher.publishAll(saved.pullDomainEvents(), tenantId).thenReturn(saved))
                 .map(this::toResponse);
     }
 
     @Override
+    @Transactional
     public Mono<MerchantContractResponse> countersignByProvider(UUID contractId, UUID providerId, String tenantId) {
         return contractRepository.findById(ContractId.of(contractId))
                 .switchIfEmpty(Mono.error(new MarketDomainException("Contract not found: " + contractId)))
@@ -85,7 +88,7 @@ public class MerchantContractApplicationService implements IManageMerchantContra
                     contract.countersignByProvider(providerId);
                     return contractRepository.save(contract);
                 })
-                .flatMap(saved -> eventPublisher.publishAll(saved.pullDomainEvents()).thenReturn(saved))
+                .flatMap(saved -> eventPublisher.publishAll(saved.pullDomainEvents(), tenantId).thenReturn(saved))
                 .map(this::toResponse);
     }
 

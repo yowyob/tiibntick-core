@@ -54,10 +54,12 @@ public class TntDisputeCoreConfig {
             IDisputeNotificationPort notificationPort,
             IDeliveryStatusPort deliveryStatusPort,
             IBillingCompensationPort billingCompensationPort,
-            IBlockchainProofPort blockchainProofPort) {
+            IBlockchainProofPort blockchainProofPort,
+            IDisputeReferenceGenerator referenceGenerator) {
         return new DisputeCommandService(
                 repository, eventPublisher, notificationPort,
-                deliveryStatusPort, billingCompensationPort, blockchainProofPort);
+                deliveryStatusPort, billingCompensationPort, blockchainProofPort,
+                referenceGenerator);
     }
 
     @Bean

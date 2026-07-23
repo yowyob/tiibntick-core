@@ -4,6 +4,7 @@ import com.yowyob.tiibntick.core.dispute.application.command.OpenDisputeAgainstF
 import com.yowyob.tiibntick.core.dispute.application.command.OpenDisputeCommand;
 import com.yowyob.tiibntick.core.dispute.domain.enums.*;
 import com.yowyob.tiibntick.core.dispute.domain.model.Dispute;
+import com.yowyob.tiibntick.core.dispute.domain.model.DisputeReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -102,7 +103,7 @@ class DisputeFreelancerOrgTest {
                     "Damaged package",
                     "FRL-ORG-001", "SUB-001", true);
 
-            Dispute dispute = Dispute.open(cmd);
+            Dispute dispute = Dispute.open(cmd, DisputeReference.forSequence(1));
 
             assertThat(dispute.getRespondentType()).isEqualTo(RespondentType.FREELANCER_ORG);
             assertThat(dispute.getRespondentOrgId()).isEqualTo("FRL-ORG-001");

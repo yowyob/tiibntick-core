@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -114,6 +115,7 @@ public class SalesApplicationService implements
 
     // ─── Confirm ──────────────────────────────────────────────────────────────
 
+    @Transactional
     @Override
     public Mono<TntSalesOrder> confirmOrder(UUID tenantId, UUID orderId) {
         return orderRepository.findById(tenantId, orderId)
@@ -136,6 +138,7 @@ public class SalesApplicationService implements
 
     // ─── Dispatch ─────────────────────────────────────────────────────────────
 
+    @Transactional
     @Override
     public Mono<TntSalesOrder> dispatch(UUID tenantId, UUID orderId, UUID missionId) {
         return orderRepository.findById(tenantId, orderId)
@@ -158,6 +161,7 @@ public class SalesApplicationService implements
 
     // ─── Mark Delivered ───────────────────────────────────────────────────────
 
+    @Transactional
     @Override
     public Mono<TntSalesOrder> markDelivered(UUID tenantId, UUID orderId) {
         return orderRepository.findById(tenantId, orderId)
@@ -181,6 +185,7 @@ public class SalesApplicationService implements
 
     // ─── Cancel ───────────────────────────────────────────────────────────────
 
+    @Transactional
     @Override
     public Mono<TntSalesOrder> cancelOrder(UUID tenantId, UUID orderId, String reason) {
         return orderRepository.findById(tenantId, orderId)

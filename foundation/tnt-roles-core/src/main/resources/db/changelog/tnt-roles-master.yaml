@@ -1,0 +1,10 @@
+databaseChangeLog:
+  - include:
+      file: db/changelog/changes/001_create_tnt_roles_table.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/002_create_tnt_user_role_assignments_table.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/003_create_tnt_role_sync_outbox_table.sql
+      relativeToChangelogFile: false

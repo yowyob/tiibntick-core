@@ -16,6 +16,9 @@ import java.util.UUID;
  */
 public interface InvoiceR2dbcRepository extends ReactiveCrudRepository<InvoiceEntity, UUID> {
 
+    @Query("SELECT * FROM tnt_invoices WHERE id = :id AND tenant_id = :tenantId")
+    Mono<InvoiceEntity> findByIdAndTenantId(UUID id, UUID tenantId);
+
     @Query("SELECT * FROM tnt_invoices WHERE invoice_number = :number")
     Mono<InvoiceEntity> findByInvoiceNumber(String number);
 

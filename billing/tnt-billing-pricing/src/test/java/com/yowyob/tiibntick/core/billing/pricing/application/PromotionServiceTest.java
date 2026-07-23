@@ -91,7 +91,7 @@ class PromotionServiceTest {
     @DisplayName("valid PERCENTAGE promo code applies correct discount")
     void testPercentagePromo() {
         Promotion promo = activePromo("SAVE10", DiscountType.PERCENTAGE, new BigDecimal("10"));
-        when(policyRepository.findById(POLICY_ID)).thenReturn(Mono.just(policyWithPromo(promo)));
+        when(policyRepository.findByIdAndTenantId(POLICY_ID, TENANT_ID)).thenReturn(Mono.just(policyWithPromo(promo)));
 
         Money price = Money.of(2000L, "XAF");
 
@@ -105,7 +105,7 @@ class PromotionServiceTest {
     @DisplayName("valid FIXED promo code applies correct discount")
     void testFixedPromo() {
         Promotion promo = activePromo("FLAT500", DiscountType.FIXED, new BigDecimal("500"));
-        when(policyRepository.findById(POLICY_ID)).thenReturn(Mono.just(policyWithPromo(promo)));
+        when(policyRepository.findByIdAndTenantId(POLICY_ID, TENANT_ID)).thenReturn(Mono.just(policyWithPromo(promo)));
 
         Money price = Money.of(2000L, "XAF");
 
@@ -118,7 +118,7 @@ class PromotionServiceTest {
     @Test
     @DisplayName("unknown promo code returns empty Optional")
     void testUnknownPromoCode() {
-        when(policyRepository.findById(POLICY_ID))
+        when(policyRepository.findByIdAndTenantId(POLICY_ID, TENANT_ID))
                 .thenReturn(Mono.just(policyWithPromo(activePromo("VALID", DiscountType.FIXED, BigDecimal.TEN))));
 
         StepVerifier.create(promotionService.applyPromoCode(POLICY_ID, "WRONG", Money.of(2000L, "XAF"), simpleCtx()))
@@ -137,7 +137,7 @@ class PromotionServiceTest {
                 .currentUsages(0)
                 .build();
 
-        when(policyRepository.findById(POLICY_ID)).thenReturn(Mono.just(policyWithPromo(expired)));
+        when(policyRepository.findByIdAndTenantId(POLICY_ID, TENANT_ID)).thenReturn(Mono.just(policyWithPromo(expired)));
 
         StepVerifier.create(promotionService.applyPromoCode(POLICY_ID, "OLD", Money.of(2000L, "XAF"), simpleCtx()))
                 .expectNextMatches(Optional::isEmpty)
@@ -148,10 +148,24 @@ class PromotionServiceTest {
     @DisplayName("validatePromoCode returns true for valid active code")
     void testValidateActiveCode() {
         Promotion promo = activePromo("ACTIVE", DiscountType.FIXED, BigDecimal.TEN);
-        when(policyRepository.findById(POLICY_ID)).thenReturn(Mono.just(policyWithPromo(promo)));
+        when(policyRepository.findByIdAndTenantId(POLICY_ID, TENANT_ID)).thenReturn(Mono.just(policyWithPromo(promo)));
 
-        StepVerifier.create(promotionService.validatePromoCode(POLICY_ID, "ACTIVE"))
+        StepVerifier.create(promotionService.validatePromoCode(POLICY_ID, "ACTIVE", simpleCtx()))
                 .expectNext(true)
                 .verifyComplete();
+    }
+
+    @Test
+    @DisplayName("IDOR (Audit n°7 · #5): applyPromoCode must not probe another tenant's promotions")
+    void testApplyPromoCodeRejectsCrossTenantAccess() {
+        UUID otherTenantId = UUID.randomUUID();
+        PricingContext otherTenantCtx = simpleCtx().toBuilder().tenantId(otherTenantId).build();
+        when(policyRepository.findByIdAndTenantId(POLICY_ID, otherTenantId)).thenReturn(Mono.empty());
+
+        StepVerifier.create(promotionService.applyPromoCode(
+                        POLICY_ID, "SAVE10", Money.of(2000L, "XAF"), otherTenantCtx))
+                .expectError(com.yowyob.tiibntick.core.billing.pricing.domain.exception
+                        .BillingPolicyNotFoundException.class)
+                .verify();
     }
 }

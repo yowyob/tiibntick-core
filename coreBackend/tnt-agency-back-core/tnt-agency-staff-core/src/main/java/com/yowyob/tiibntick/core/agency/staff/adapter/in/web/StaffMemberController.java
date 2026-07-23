@@ -20,6 +20,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * Port of {@code StaffAdminController} — administrative staff (managers, dispatchers).
@@ -42,6 +43,7 @@ public class StaffMemberController {
     }
 
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/agencies/{agencyId}/staff")
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Register an administrative staff member")
     public Mono<ApiResponse<StaffMemberResponse>> register(
@@ -55,6 +57,7 @@ public class StaffMemberController {
     }
 
     @PatchMapping("/api/v1/tenants/{tenantId}/agency-registry/staff/{memberId}")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Update staff member profile")
     public Mono<ApiResponse<StaffMemberResponse>> update(
             @PathVariable UUID tenantId,
@@ -66,6 +69,7 @@ public class StaffMemberController {
     }
 
     @PatchMapping("/api/v1/tenants/{tenantId}/agency-registry/staff/{memberId}/suspend")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Suspend a staff member")
     public Mono<ApiResponse<StaffMemberResponse>> suspend(
             @PathVariable UUID tenantId,
@@ -74,6 +78,7 @@ public class StaffMemberController {
     }
 
     @PatchMapping("/api/v1/tenants/{tenantId}/agency-registry/staff/{memberId}/reactivate")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Reactivate a suspended staff member")
     public Mono<ApiResponse<StaffMemberResponse>> reactivate(
             @PathVariable UUID tenantId,

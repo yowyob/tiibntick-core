@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audit n°2 — Connexions inter-modules · Audit TiiBnTick</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --text: #1c2430; --muted: #5b6675;
+  --border: #e3e7ec; --accent: #0f5fa8; --accent-soft: #e8f1fa;
+  --code-bg: #f0f2f5; --sidebar-bg: #101823; --sidebar-text: #c7d0dc;
+  --crit: #c62828; --high: #e65100; --med: #f9a825; --low: #2e7d32;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1319; --panel: #161d27; --text: #dbe2ea; --muted: #8b97a5;
+    --border: #263140; --accent: #5aa2e0; --accent-soft: #17273a;
+    --code-bg: #1d2733; --sidebar-bg: #0a0f15; --sidebar-text: #a9b4c0;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--bg); color: var(--text); line-height: 1.65; }
+.layout { display: flex; min-height: 100vh; }
+nav.sidebar { width: 270px; flex-shrink: 0; background: var(--sidebar-bg);
+  color: var(--sidebar-text); padding: 1.4rem 1rem; position: sticky; top: 0;
+  height: 100vh; overflow-y: auto; }
+nav.sidebar .brand { font-size: 1.05rem; font-weight: 700; color: #fff;
+  margin-bottom: .2rem; }
+nav.sidebar .brand small { display:block; font-weight: 400; color: var(--sidebar-text);
+  font-size: .75rem; margin-top: .2rem; }
+nav.sidebar ul { list-style: none; padding: 0; margin: 1.2rem 0; }
+nav.sidebar li a { display: block; color: var(--sidebar-text); text-decoration: none;
+  padding: .45rem .6rem; border-radius: 6px; font-size: .86rem; }
+nav.sidebar li a:hover { background: rgba(255,255,255,.08); color: #fff; }
+nav.sidebar li a.active { background: var(--accent); color: #fff; }
+nav.sidebar .section-label { text-transform: uppercase; letter-spacing: .08em;
+  font-size: .68rem; color: #6b7683; margin: 1.4rem 0 .4rem .4rem; }
+main { flex: 1; min-width: 0; padding: 2.2rem 3rem 4rem; max-width: 1100px; }
+header.page { border-bottom: 1px solid var(--border); padding-bottom: 1.2rem;
+  margin-bottom: 1.6rem; }
+header.page .kicker { color: var(--accent); font-weight: 600; font-size: .85rem;
+  text-transform: uppercase; letter-spacing: .06em; }
+header.page h1 { margin: .25rem 0 .4rem; font-size: 1.9rem; }
+header.page .meta { color: var(--muted); font-size: .85rem; }
+h2 { margin-top: 2.4rem; padding-bottom: .35rem; border-bottom: 1px solid var(--border);
+  font-size: 1.35rem; }
+h3 { margin-top: 1.8rem; font-size: 1.08rem; }
+h4 { margin-top: 1.4rem; font-size: .98rem; }
+a { color: var(--accent); }
+code { background: var(--code-bg); padding: .12em .38em; border-radius: 4px;
+  font-size: .84em; font-family: "JetBrains Mono", Consolas, monospace; }
+pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem; overflow-x: auto; font-size: .82rem; line-height: 1.5; }
+pre code { background: none; padding: 0; }
+.table-wrap { overflow-x: auto; margin: 1rem 0; border: 1px solid var(--border);
+  border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: .85rem; background: var(--panel); }
+th, td { border-bottom: 1px solid var(--border); padding: .55rem .75rem; text-align: left;
+  vertical-align: top; }
+th { background: var(--accent-soft); color: var(--text); font-weight: 600;
+  white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+blockquote { border-left: 4px solid var(--accent); background: var(--accent-soft);
+  margin: 1rem 0; padding: .7rem 1rem; border-radius: 0 8px 8px 0; }
+blockquote p { margin: .3rem 0; }
+.badge { display: inline-block; padding: .1em .6em; border-radius: 999px;
+  font-size: .74rem; font-weight: 700; color: #fff; white-space: nowrap; }
+.badge.crit { background: var(--crit); } .badge.high { background: var(--high); }
+.badge.med { background: var(--med); color: #333; } .badge.low { background: var(--low); }
+.mermaid { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem; margin: 1rem 0; text-align: center; overflow-x: auto; }
+.toc { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem 1.4rem; margin: 1.4rem 0; font-size: .88rem; }
+.toc > ul { margin: .3rem 0; padding-left: 1.1rem; }
+.toc .toctitle { font-weight: 700; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1rem; margin: 1.4rem 0; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1.1rem 1.2rem; text-decoration: none; color: var(--text); display: block; }
+.card:hover { border-color: var(--accent); }
+.card .icon { font-size: 1.5rem; }
+.card h3 { margin: .4rem 0 .2rem; font-size: 1rem; }
+.card p { margin: 0; color: var(--muted); font-size: .82rem; }
+.stat-row { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1.2rem 0; }
+.stat { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: .8rem 1.2rem; min-width: 130px; }
+.stat .num { font-size: 1.6rem; font-weight: 800; }
+.stat .lbl { font-size: .74rem; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .05em; }
+.stat.crit .num { color: var(--crit); } .stat.high .num { color: var(--high); }
+.stat.med .num { color: var(--med); } .stat.low .num { color: var(--low); }
+footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border);
+  color: var(--muted); font-size: .78rem; }
+.progress-block { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1rem 1.2rem; margin: 1rem 0 1.6rem; }
+.progress-block .progress-label { display: flex; justify-content: space-between; align-items: baseline;
+  font-size: .85rem; margin-bottom: .5rem; }
+.progress-block .progress-label b { font-size: 1rem; }
+.progress-bar-track { background: var(--code-bg); border-radius: 999px; height: .6rem; overflow: hidden; }
+.progress-bar-fill { height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--low), var(--accent)); transition: width .3s ease; }
+.progress-note { font-size: .72rem; color: var(--muted); margin-top: .5rem; }
+li:has(> input.task-checkbox) { list-style: none; margin-left: -1.4rem; padding-left: .3rem;
+  display: list-item; }
+input.task-checkbox { width: 1rem; height: 1rem; margin-right: .5rem; vertical-align: middle;
+  accent-color: var(--accent); }
+li:has(> input.task-checkbox:checked) { color: var(--muted); }
+li:has(> input.task-checkbox:checked) code { opacity: .75; }
+@media (max-width: 900px) {
+  .layout { flex-direction: column; }
+  nav.sidebar { width: 100%; height: auto; position: static; }
+  main { padding: 1.4rem 1.2rem 3rem; }
+}
+@media print { nav.sidebar { display: none; } main { padding: 0; } }
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar"><div class="brand">TiiBnTick Core<small>Audit technique — juillet 2026</small></div>
+<ul><li><a href="index.html">🏠 Accueil</a></li>
+<li><a href="executive-summary.html">📋 Résumé exécutif global</a></li>
+</ul><div class="section-label">Rapports d'audit</div><ul>
+<li><a href="audit-1-architecture.html">🏛️ Audit n°1 — Architecture globale</a></li>
+<li><a href="audit-2-inter-modules.html" class="active">🔗 Audit n°2 — Connexions inter-modules</a></li>
+<li><a href="audit-3-yow-event-kernel.html">📨 Audit n°3 — yow-event-kernel</a></li>
+<li><a href="audit-4-yow-i18n-kernel.html">🌍 Audit n°4 — yow-i18n-kernel</a></li>
+<li><a href="audit-5-kafka.html">🧵 Audit n°5 — Kafka</a></li>
+<li><a href="audit-6-scalabilite.html">📈 Audit n°6 — Scalabilité</a></li>
+<li><a href="audit-7-system-design.html">🧭 Audit n°7 — System Design & Sécurité</a></li>
+</ul><div class="section-label">Plan de remédiation</div><ul>
+<li><a href="remediation/implementation-plan.html">🗂️ Plan — Plan d'implémentation — vue d'ensemble</a></li>
+<li><a href="remediation/phase-0-critical.html">🚨 P0 — Phase 0 — Bloquant production</a></li>
+<li><a href="remediation/phase-1-hardening.html">🛡️ P1 — Phase 1 — Durcissement</a></li>
+<li><a href="remediation/phase-2-target-architecture.html">🚀 P2 — Phase 2 — Architecture cible</a></li>
+<li><a href="remediation/workstream-payment-billing-kernel-delegation.html">💳 Chantier — Délégation paiement/facturation au Kernel</a></li>
+</ul></nav>
+<main>
+<header class="page">
+  <div class="kicker">Audit n°2</div>
+  <h1>🔗 Connexions inter-modules</h1>
+  <div class="meta">Projet TiiBnTick Core · dépôt <code>tiibntick-core</code> (34 modules Maven, y compris <code>trust/tnt-trust-core</code>) · Audit réalisé le 16 juillet 2026</div>
+</header>
+
+<div class="toc"><div class="toc"><span class="toctitle">Sommaire</span><ul>
+<li><a href="#1-resume-executif">1. Résumé exécutif</a></li>
+<li><a href="#2-cartographie-complete-des-dependances">2. Cartographie complète des dépendances</a><ul>
+<li><a href="#21-attribution-des-couches">2.1 Attribution des couches</a></li>
+<li><a href="#22-matrice-exhaustive-module-dependances-declarees-annotees-par-usage-reel">2.2 Matrice exhaustive module → dépendances (déclarées, annotées par usage réel)</a></li>
+<li><a href="#23-diagramme-mermaid-cur-l0-l7-aretes-effectives-uniquement">2.3 Diagramme Mermaid — cœur L0 → L7 (arêtes effectives uniquement)</a></li>
+<li><a href="#24-diagramme-mermaid-groupe-corebackend-aretes-effectives">2.4 Diagramme Mermaid — groupe coreBackend/ (arêtes effectives)</a></li>
+</ul>
+</li>
+<li><a href="#3-points-positifs">3. Points positifs</a></li>
+<li><a href="#4-problemes-detectes-tableau-de-synthese">4. Problèmes détectés — tableau de synthèse</a></li>
+<li><a href="#5-details-et-preuves">5. Détails et preuves</a><ul>
+<li><a href="#51-p1-tnt-actor-core-l2-tnt-incident-core-l3-pattern-de-port-inverse">5.1 P1 — tnt-actor-core (L2) → tnt-incident-core (L3), pattern de port inversé</a></li>
+<li><a href="#52-p2-le-graphe-maven-est-fictif-a-50">5.2 P2 — Le graphe Maven est fictif à 50 %</a></li>
+<li><a href="#53-p3-yow-event-kernel-module-fantome">5.3 P3 — yow-event-kernel, module fantôme</a></li>
+<li><a href="#54-p4-modules-agency-securite-declaree-mais-non-branchee">5.4 P4 — Modules agency : sécurité déclarée mais non branchée</a></li>
+<li><a href="#55-p6-assemblage-reel-assemblage-documente">5.5 P6 — Assemblage réel ≠ assemblage documenté</a></li>
+<li><a href="#56-p5-p7-p8-p10-dette-documentaire-et-ilots">5.6 P5, P7, P8, P10 — dette documentaire et îlots</a></li>
+<li><a href="#57-p9-fan-in-fan-out-chiffres">5.7 P9 — Fan-in / fan-out (chiffres)</a></li>
+<li><a href="#58-connexions-prevues-par-la-doc-vs-code-mission-8">5.8 Connexions prévues par la doc vs code (mission §8)</a></li>
+</ul>
+</li>
+<li><a href="#6-recommandations-priorisees">6. Recommandations priorisées</a></li>
+<li><a href="#7-conclusion">7. Conclusion</a></li>
+</ul>
+</div>
+</div>
+<h1 id="audit-n2-connexions-inter-modules">Audit n°2 — Connexions inter-modules</h1>
+<p><strong>Projet :</strong> TiiBnTick Core (<code>tiibntick-core</code>)
+<strong>Date :</strong> 2026-07-17
+<strong>Périmètre :</strong> les 52 modules Maven feuilles du réacteur (<code>pom.xml</code> racine, lignes 65–141), y compris le groupe <code>coreBackend/</code> (lignes 132–135 : <code>tnt-agency-back-core</code> et ses 14 sous-modules, <code>tnt-go-freelancer-point-back-core</code>, <code>tnt-link-back-core</code>, <code>tnt-market-back-core</code>).
+<strong>Méthode :</strong> parsing XML de tous les <code>pom.xml</code> (dépendances <code>com.yowyob.tiibntick.core:*</code>) ; calcul du préfixe de package Java de chaque module (aucune collision détectée) ; recherche exhaustive de chaque préfixe dans <code>src/main/java</code>, <code>src/test/java</code> et <code>src/main/resources</code> de chaque autre module pour établir le graphe <strong>effectif</strong> (usages réels) et le confronter au graphe <strong>déclaré</strong> ; détection de cycles (Tarjan) ; inspection manuelle de chaque anomalie avant publication (zéro affirmation sans preuve fichier:ligne).</p>
+<hr />
+<h2 id="1-resume-executif">1. Résumé exécutif</h2>
+<p>Le graphe Maven est <strong>acyclique</strong>, entièrement épinglé dans le <code>dependencyManagement</code> racine, et le pattern « port possédé par l'appelant / adaptateur dans <code>tnt-trust-core</code> » est correctement câblé (10/10 dépendances de trust réellement utilisées). En revanche :</p>
+<ul>
+<li><strong>50 % du graphe déclaré est mort</strong> : sur 223 arêtes inter-modules déclarées (hors <code>tnt-bootstrap</code>), <strong>112 ne correspondent à aucun usage</strong> dans le code (ni main, ni test, ni ressources). Le graphe Maven ne décrit plus l'architecture réelle.</li>
+<li><strong>2 violations de la règle de layering</strong> (jamais dépendre d'une couche strictement supérieure) : <code>tnt-actor-core</code> (L2) → <code>tnt-incident-core</code> (L3), utilisée dans le code avec un pattern de port <strong>inversé</strong> par rapport à la règle documentée dans CLAUDE.md ; et <code>yow-i18n-kernel</code> (L0) → <code>tnt-common-core</code> (L1), déclarée mais inutilisée.</li>
+<li><strong><code>yow-event-kernel</code> est un module fantôme</strong> : 60 classes, 21 consommateurs Maven déclarés, <strong>zéro import réel dans tout le dépôt</strong>.</li>
+<li>L'assemblage réel de l'application repose sur un <strong><code>@ComponentScan</code> global</strong> (<code>com.yowyob.tiibntick</code>) et non sur les <code>@Import</code> par module décrits par CLAUDE.md — c'est ce qui masque les dépendances mortes et rend le graphe Maven non contraignant à l'exécution.</li>
+<li>Le groupe <strong><code>coreBackend/</code> (17 modules, ~1/3 du réacteur) est absent du modèle de couches L0–L7 documenté</strong> ; les 14 modules <code>tnt-agency-*</code> déclarent tous <code>tnt-auth-core</code>/<code>tnt-roles-core</code> sans jamais utiliser <code>@RequirePermission</code> ni <code>TntSecurityContext</code>.</li>
+</ul>
+<p>Aucune dépendance implicite (usage sans déclaration Maven) n'a été trouvée : l'unique candidat détecté est un commentaire volontaire et documenté (voir §4, point positif n°6).</p>
+<hr />
+<h2 id="2-cartographie-complete-des-dependances">2. Cartographie complète des dépendances</h2>
+<h3 id="21-attribution-des-couches">2.1 Attribution des couches</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Couche</th>
+<th>Modules</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>L0</strong></td>
+<td><code>yow-event-kernel</code>, <code>yow-i18n-kernel</code></td>
+</tr>
+<tr>
+<td><strong>L1</strong></td>
+<td><code>tnt-common-core</code>, <code>tnt-auth-core</code>, <code>tnt-roles-core</code>, <code>tnt-platform-gateway-core</code></td>
+</tr>
+<tr>
+<td><strong>L2</strong></td>
+<td><code>tnt-actor-core</code>, <code>tnt-organization-core</code>, <code>tnt-tp-core</code>, <code>tnt-administration-core</code></td>
+</tr>
+<tr>
+<td><strong>L3</strong></td>
+<td><code>tnt-geo-core</code>, <code>tnt-route-core</code>, <code>tnt-delivery-core</code>, <code>tnt-dispute-core</code>, <code>tnt-incident-core</code>, <code>tnt-realtime-core</code>, <code>tnt-sync-core</code>, <code>tnt-notify-core</code>, <code>tnt-media-core</code></td>
+</tr>
+<tr>
+<td><strong>L4</strong></td>
+<td><code>tnt-resource-core</code>, <code>tnt-product-core</code>, <code>tnt-inventory-core</code>, <code>tnt-sales-core</code>, <code>tnt-accounting-core</code>, <code>tnt-hrm-core</code> (†)</td>
+</tr>
+<tr>
+<td><strong>L5</strong></td>
+<td><code>tnt-billing-dsl</code>, <code>tnt-billing-pricing</code>, <code>tnt-billing-cost</code>, <code>tnt-billing-invoice</code>, <code>tnt-billing-wallet</code>, <code>tnt-billing-report</code>, <code>tnt-billing-templates</code></td>
+</tr>
+<tr>
+<td><strong>L6</strong></td>
+<td><code>tnt-trust-core</code></td>
+</tr>
+<tr>
+<td><strong>L6-bis (†, non documentée)</strong></td>
+<td><code>coreBackend/</code> : 14 modules <code>tnt-agency-*</code> + <code>tnt-go-freelancer-point-back-core</code> + <code>tnt-link-back-core</code> + <code>tnt-market-back-core</code></td>
+</tr>
+<tr>
+<td><strong>L7</strong></td>
+<td><code>tnt-bootstrap</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>(†) <code>tnt-hrm-core</code> et l'intégralité de <code>coreBackend/</code> n'apparaissent pas dans le tableau des couches de <code>CLAUDE.md</code>. Les couches attribuées ici sont déduites de leur position dans le <code>pom.xml</code> racine (déclarés entre <code>trust/</code> et <code>tnt-bootstrap</code>, lignes 132–135) et de leurs dépendances effectives (ils consomment L1–L5 et personne ne dépend d'eux sauf <code>tnt-bootstrap</code> — ce sont bien des feuilles consommatrices, ce qui est cohérent).</p>
+<h3 id="22-matrice-exhaustive-module-dependances-declarees-annotees-par-usage-reel">2.2 Matrice exhaustive module → dépendances (déclarées, annotées par usage réel)</h3>
+<p>Colonne « Utilisées » : au moins une référence au package du module cible dans les sources. Colonne « Mortes » : déclarée dans le <code>pom.xml</code>, <strong>zéro</strong> référence (main + test + ressources).</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Dépendances utilisées</th>
+<th>Dépendances mortes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>yow-event-kernel</code></td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>yow-i18n-kernel</code></td>
+<td>—</td>
+<td>tnt-common-core ⚠️(violation L0→L1)</td>
+</tr>
+<tr>
+<td><code>tnt-common-core</code></td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>tnt-auth-core</code></td>
+<td>tnt-common-core, tnt-roles-core</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>tnt-roles-core</code></td>
+<td>tnt-common-core</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>tnt-platform-gateway-core</code></td>
+<td>tnt-auth-core, tnt-common-core, tnt-roles-core</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>tnt-actor-core</code></td>
+<td>tnt-auth-core, tnt-common-core, <strong>tnt-incident-core</strong> ⚠️(violation L2→L3), tnt-roles-core</td>
+<td>yow-event-kernel</td>
+</tr>
+<tr>
+<td><code>tnt-organization-core</code></td>
+<td>tnt-auth-core, tnt-common-core, tnt-roles-core</td>
+<td>tnt-actor-core, yow-event-kernel</td>
+</tr>
+<tr>
+<td><code>tnt-tp-core</code></td>
+<td>tnt-auth-core, tnt-common-core, tnt-roles-core</td>
+<td>yow-event-kernel</td>
+</tr>
+<tr>
+<td><code>tnt-administration-core</code></td>
+<td>tnt-auth-core, tnt-common-core, tnt-organization-core, tnt-roles-core</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>tnt-geo-core</code></td>
+<td>—</td>
+<td>tnt-common-core, yow-event-kernel</td>
+</tr>
+<tr>
+<td><code>tnt-route-core</code></td>
+<td>tnt-geo-core, tnt-incident-core</td>
+<td>tnt-auth-core, tnt-common-core, tnt-roles-core, yow-event-kernel</td>
+</tr>
+<tr>
+<td><code>tnt-delivery-core</code></td>
+<td>tnt-auth-core, tnt-incident-core, tnt-roles-core</td>
+<td>tnt-actor-core, tnt-geo-core, tnt-organization-core, tnt-route-core, yow-event-kernel, yow-i18n-kernel</td>
+</tr>
+<tr>
+<td><code>tnt-dispute-core</code></td>
+<td>—</td>
+<td>tnt-actor-core, tnt-common-core, tnt-delivery-core, tnt-notify-core, yow-event-kernel</td>
+</tr>
+<tr>
+<td><code>tnt-incident-core</code></td>
+<td>—</td>
+<td>tnt-common-core</td>
+</tr>
+<tr>
+<td><code>tnt-realtime-core</code></td>
+<td>—</td>
+<td>tnt-actor-core, tnt-common-core, tnt-geo-core, tnt-route-core, yow-event-kernel</td>
+</tr>
+<tr>
+<td><code>tnt-sync-core</code></td>
+<td>—</td>
+<td>tnt-common-core, yow-event-kernel</td>
+</tr>
+<tr>
+<td><code>tnt-notify-core</code></td>
+<td>tnt-common-core, tnt-incident-core, yow-i18n-kernel</td>
+<td>tnt-auth-core, tnt-realtime-core, tnt-roles-core, yow-event-kernel</td>
+</tr>
+<tr>
+<td><code>tnt-media-core</code></td>
+<td>tnt-incident-core</td>
+<td>yow-event-kernel</td>
+</tr>
+<tr>
+<td><code>tnt-resource-core</code></td>
+<td>tnt-auth-core, tnt-common-core, tnt-incident-core, tnt-roles-core</td>
+<td>yow-event-kernel</td>
+</tr>
+<tr>
+<td><code>tnt-product-core</code></td>
+<td>tnt-common-core</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>tnt-inventory-core</code></td>
+<td>—</td>
+<td>tnt-common-core, yow-event-kernel</td>
+</tr>
+<tr>
+<td><code>tnt-sales-core</code></td>
+<td>tnt-common-core</td>
+<td>yow-event-kernel</td>
+</tr>
+<tr>
+<td><code>tnt-accounting-core</code></td>
+<td>tnt-common-core</td>
+<td>yow-event-kernel</td>
+</tr>
+<tr>
+<td><code>tnt-hrm-core</code></td>
+<td>tnt-common-core</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>tnt-billing-dsl</code></td>
+<td>—</td>
+<td>tnt-common-core, yow-event-kernel, yow-i18n-kernel</td>
+</tr>
+<tr>
+<td><code>tnt-billing-pricing</code></td>
+<td>tnt-billing-dsl</td>
+<td>yow-event-kernel</td>
+</tr>
+<tr>
+<td><code>tnt-billing-cost</code></td>
+<td>— (aucune dépendance interne déclarée)</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>tnt-billing-invoice</code></td>
+<td>tnt-roles-core</td>
+<td>tnt-auth-core, tnt-tp-core, yow-event-kernel</td>
+</tr>
+<tr>
+<td><code>tnt-billing-wallet</code></td>
+<td>tnt-incident-core, tnt-roles-core</td>
+<td>tnt-auth-core</td>
+</tr>
+<tr>
+<td><code>tnt-billing-report</code></td>
+<td>tnt-billing-invoice, tnt-roles-core</td>
+<td>tnt-auth-core, yow-event-kernel</td>
+</tr>
+<tr>
+<td><code>tnt-billing-templates</code></td>
+<td>—</td>
+<td>tnt-billing-dsl, tnt-billing-pricing, tnt-common-core</td>
+</tr>
+<tr>
+<td><code>tnt-trust-core</code></td>
+<td>tnt-actor-core, tnt-auth-core, tnt-billing-pricing, tnt-billing-wallet, tnt-delivery-core, tnt-dispute-core, tnt-incident-core, tnt-organization-core, tnt-realtime-core, tnt-roles-core</td>
+<td>— (10/10 utilisées ✅)</td>
+</tr>
+<tr>
+<td><code>tnt-agency-eventing-core</code></td>
+<td>tnt-common-core</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>tnt-agency-org-core</code></td>
+<td>tnt-agency-eventing-core, tnt-common-core</td>
+<td>tnt-auth-core, tnt-roles-core</td>
+</tr>
+<tr>
+<td><code>tnt-agency-staff-core</code></td>
+<td>tnt-agency-org-core, tnt-common-core</td>
+<td>tnt-auth-core, tnt-roles-core</td>
+</tr>
+<tr>
+<td><code>tnt-agency-workforce-core</code></td>
+<td>tnt-agency-eventing-core, tnt-agency-org-core, tnt-common-core</td>
+<td>tnt-agency-staff-core, tnt-auth-core, tnt-roles-core</td>
+</tr>
+<tr>
+<td><code>tnt-agency-assignment-core</code></td>
+<td>tnt-agency-commission-core, tnt-agency-compliance-core, tnt-agency-eventing-core, tnt-agency-org-core, tnt-common-core</td>
+<td>tnt-auth-core, tnt-roles-core</td>
+</tr>
+<tr>
+<td><code>tnt-agency-commission-core</code></td>
+<td>tnt-agency-org-core, tnt-agency-workforce-core, tnt-common-core</td>
+<td>tnt-auth-core, tnt-roles-core</td>
+</tr>
+<tr>
+<td><code>tnt-agency-billing-core</code></td>
+<td>tnt-agency-assignment-core, tnt-common-core</td>
+<td>tnt-agency-org-core, tnt-auth-core, tnt-roles-core</td>
+</tr>
+<tr>
+<td><code>tnt-agency-onboarding-core</code></td>
+<td>tnt-agency-org-core, tnt-agency-staff-core, tnt-common-core</td>
+<td>tnt-auth-core, tnt-roles-core</td>
+</tr>
+<tr>
+<td><code>tnt-agency-intake-core</code></td>
+<td>tnt-agency-assignment-core, tnt-agency-org-core, tnt-common-core</td>
+<td>tnt-auth-core, tnt-roles-core</td>
+</tr>
+<tr>
+<td><code>tnt-agency-inbox-core</code></td>
+<td>tnt-agency-org-core, tnt-common-core</td>
+<td>tnt-auth-core, tnt-roles-core</td>
+</tr>
+<tr>
+<td><code>tnt-agency-fleet-local-core</code></td>
+<td>tnt-agency-org-core, tnt-agency-workforce-core, tnt-common-core</td>
+<td>tnt-auth-core, tnt-roles-core</td>
+</tr>
+<tr>
+<td><code>tnt-agency-compliance-core</code></td>
+<td>tnt-common-core</td>
+<td>tnt-agency-eventing-core, tnt-auth-core, tnt-roles-core</td>
+</tr>
+<tr>
+<td><code>tnt-agency-analytics-core</code></td>
+<td>tnt-agency-assignment-core, tnt-agency-commission-core, tnt-agency-fleet-local-core, tnt-agency-org-core, tnt-agency-workforce-core, tnt-common-core</td>
+<td>tnt-auth-core, tnt-roles-core</td>
+</tr>
+<tr>
+<td><code>tnt-agency-sync-core</code></td>
+<td>tnt-agency-org-core, tnt-common-core, tnt-sync-core</td>
+<td>tnt-auth-core</td>
+</tr>
+<tr>
+<td><code>tnt-go-freelancer-point-back-core</code></td>
+<td>—</td>
+<td><strong>les 19 déclarées</strong> : tnt-actor-core, tnt-auth-core, tnt-billing-cost, tnt-billing-pricing, tnt-billing-report, tnt-billing-wallet, tnt-common-core, tnt-delivery-core, tnt-geo-core, tnt-notify-core, tnt-organization-core, tnt-platform-gateway-core, tnt-realtime-core, tnt-resource-core, tnt-roles-core, tnt-route-core, tnt-sync-core, yow-event-kernel, yow-i18n-kernel</td>
+</tr>
+<tr>
+<td><code>tnt-link-back-core</code></td>
+<td>tnt-actor-core, tnt-auth-core, tnt-delivery-core, tnt-geo-core, tnt-notify-core</td>
+<td>tnt-common-core, tnt-incident-core, tnt-organization-core, tnt-realtime-core, tnt-roles-core, tnt-route-core, tnt-sync-core</td>
+</tr>
+<tr>
+<td><code>tnt-market-back-core</code></td>
+<td>tnt-actor-core, tnt-auth-core, tnt-billing-dsl, tnt-billing-invoice, tnt-billing-pricing, tnt-billing-wallet, tnt-delivery-core, tnt-dispute-core, tnt-geo-core, tnt-notify-core, tnt-organization-core, tnt-sales-core, tnt-sync-core, tnt-tp-core</td>
+<td>tnt-common-core, tnt-media-core, tnt-product-core, tnt-realtime-core, tnt-roles-core</td>
+</tr>
+<tr>
+<td><code>tnt-bootstrap</code></td>
+<td>(module d'assemblage : ses 50 dépendances sont légitimes au runtime via component-scan, même sans référence source — voir §5.5)</td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Bilan chiffré : 223 arêtes déclarées (hors bootstrap), 112 mortes (50 %).</strong></p>
+<h3 id="23-diagramme-mermaid-cur-l0-l7-aretes-effectives-uniquement">2.3 Diagramme Mermaid — cœur L0 → L7 (arêtes <strong>effectives</strong> uniquement)</h3>
+<p>Pour la lisibilité : les arêtes omniprésentes vers <code>tnt-common-core</code>, <code>tnt-auth-core</code>, <code>tnt-roles-core</code> (utilisées par presque tous les modules) ne sont pas dessinées ; les arêtes en pointillé rouge sont les violations de couche.</p>
+<pre class="mermaid">graph TD
+    subgraph L0["L0 — foundation kernels"]
+        EVK[yow-event-kernel<br/>⚠️ 0 usage repo]
+        I18N[yow-i18n-kernel]
+    end
+    subgraph L1["L1 — foundation"]
+        COMMON[tnt-common-core]
+        AUTH[tnt-auth-core]
+        ROLES[tnt-roles-core]
+        PGW[tnt-platform-gateway-core]
+    end
+    subgraph L2["L2 — identity"]
+        ACTOR[tnt-actor-core]
+        ORG[tnt-organization-core]
+        TP[tnt-tp-core]
+        ADMIN[tnt-administration-core]
+    end
+    subgraph L3["L3 — logistics"]
+        GEO[tnt-geo-core]
+        ROUTE[tnt-route-core]
+        DELIV[tnt-delivery-core]
+        DISPUTE[tnt-dispute-core]
+        INCIDENT[tnt-incident-core]
+        REALTIME[tnt-realtime-core]
+        SYNC[tnt-sync-core]
+        NOTIFY[tnt-notify-core]
+        MEDIA[tnt-media-core]
+    end
+    subgraph L4["L4 — business"]
+        RESOURCE[tnt-resource-core]
+        PRODUCT[tnt-product-core]
+        INVENTORY[tnt-inventory-core]
+        SALES[tnt-sales-core]
+        ACCOUNTING[tnt-accounting-core]
+        HRM[tnt-hrm-core]
+    end
+    subgraph L5["L5 — billing"]
+        DSL[tnt-billing-dsl]
+        PRICING[tnt-billing-pricing]
+        COST[tnt-billing-cost<br/>isolé]
+        INVOICE[tnt-billing-invoice]
+        WALLET[tnt-billing-wallet]
+        REPORT[tnt-billing-report]
+        TEMPLATES[tnt-billing-templates]
+    end
+    subgraph L6["L6 — trust"]
+        TRUST[tnt-trust-core]
+    end
+    subgraph L7["L7"]
+        BOOT[tnt-bootstrap]
+    end
+
+    I18N -. "pom seul, jamais utilisé ⚠️ L0→L1" .-> COMMON
+    AUTH --> ROLES
+    PGW --> AUTH
+    ACTOR -. "ActorReputationPortAdapter ⚠️ L2→L3" .-> INCIDENT
+    ADMIN --> ORG
+    ROUTE --> GEO
+    ROUTE --> INCIDENT
+    DELIV --> INCIDENT
+    NOTIFY --> INCIDENT
+    NOTIFY --> I18N
+    MEDIA --> INCIDENT
+    RESOURCE --> INCIDENT
+    WALLET --> INCIDENT
+    PRICING --> DSL
+    REPORT --> INVOICE
+    TRUST --> ACTOR
+    TRUST --> ORG
+    TRUST --> DELIV
+    TRUST --> DISPUTE
+    TRUST --> INCIDENT
+    TRUST --> REALTIME
+    TRUST --> PRICING
+    TRUST --> WALLET
+    BOOT --> TRUST
+
+    style ACTOR fill:#fdd,stroke:#c00
+    style I18N fill:#fdd,stroke:#c00
+    style EVK fill:#eee,stroke:#999,stroke-dasharray: 5 5
+    style COST fill:#ffe9c9,stroke:#c80
+</pre>
+<h3 id="24-diagramme-mermaid-groupe-corebackend-aretes-effectives">2.4 Diagramme Mermaid — groupe <code>coreBackend/</code> (arêtes effectives)</h3>
+<pre class="mermaid">graph TD
+    subgraph AGENCY["coreBackend/tnt-agency-back-core (14 sous-modules)"]
+        EVT[agency-eventing]
+        AORG[agency-org]
+        STAFF[agency-staff]
+        WORK[agency-workforce]
+        ASSIGN[agency-assignment]
+        COMM[agency-commission]
+        ABILL[agency-billing]
+        ONBOARD[agency-onboarding]
+        INTAKE[agency-intake]
+        INBOX[agency-inbox]
+        FLEET[agency-fleet-local]
+        COMPL[agency-compliance]
+        ANALYT[agency-analytics]
+        ASYNC[agency-sync]
+    end
+    subgraph BACKS["coreBackend/ — back-cores plateformes"]
+        GOFP[tnt-go-freelancer-point-back-core<br/>⚠️ 19/19 deps mortes]
+        LINK[tnt-link-back-core]
+        MARKET[tnt-market-back-core]
+    end
+    subgraph CORE["Cœur TiiBnTick (L1–L5)"]
+        CORE_MODS[actor / auth / delivery / geo / notify /<br/>organization / dispute / sales / tp / sync /<br/>billing-dsl / -invoice / -pricing / -wallet]
+        TSYNC[tnt-sync-core]
+    end
+
+    AORG --> EVT
+    STAFF --> AORG
+    WORK --> AORG
+    WORK --> EVT
+    ASSIGN --> AORG
+    ASSIGN --> COMM
+    ASSIGN --> COMPL
+    ASSIGN --> EVT
+    COMM --> AORG
+    COMM --> WORK
+    ABILL --> ASSIGN
+    ONBOARD --> AORG
+    ONBOARD --> STAFF
+    INTAKE --> AORG
+    INTAKE --> ASSIGN
+    INBOX --> AORG
+    FLEET --> AORG
+    FLEET --> WORK
+    ANALYT --> AORG
+    ANALYT --> WORK
+    ANALYT --> ASSIGN
+    ANALYT --> COMM
+    ANALYT --> FLEET
+    ASYNC --> AORG
+    ASYNC --> TSYNC
+    LINK --> CORE_MODS
+    MARKET --> CORE_MODS
+
+    style GOFP fill:#fdd,stroke:#c00
+</pre>
+<p>Les 4 modules <code>coreBackend</code> de premier niveau sont bien des <strong>feuilles consommatrices</strong> : aucun module du cœur ne dépend d'eux (fan-in Maven = 1, uniquement <code>tnt-bootstrap</code>), ce qui est la bonne direction. Le cluster agency est interne-cohérent (dépendances agency→agency + <code>tnt-common-core</code>, plus <code>agency-sync → tnt-sync-core</code>), sans cycle.</p>
+<hr />
+<h2 id="3-points-positifs">3. Points positifs</h2>
+<ol>
+<li><strong>Aucun cycle Maven</strong> — analyse SCC (Tarjan) sur les 223 arêtes : aucune composante fortement connexe de taille &gt; 1, y compris dans le cluster agency.</li>
+<li><strong><code>dependencyManagement</code> racine complet et propre</strong> — les 52 modules sont épinglés à <code>${project.version}</code> ; aucun module manquant, aucun épinglage orphelin (vérifié programmatiquement).</li>
+<li><strong>Le pattern trust est câblé exactement comme documenté</strong> — <code>tnt-trust-core</code> déclare 10 dépendances, <strong>toutes utilisées</strong> ; les ports sont possédés par les modules appelants et implémentés dans trust. Preuve (delivery) : le port <code>DeliveryProofAnchorPort</code> vit dans <code>logistics/tnt-delivery-core/src/main/java/com/yowyob/tiibntick/core/delivery/application/port/out/DeliveryProofAnchorPort.java</code> et son adaptateur dans <code>trust/tnt-trust-core/src/main/java/com/yowyob/tiibntick/core/trust/adapter/out/delivery/DeliveryProofAnchorAdapter.java</code>. Les répertoires <code>adapter/out/{actor,billing,delivery,dispute,incident,organization,realtime,wallet}</code> confirment le câblage complet (y compris realtime et organization, précédemment en attente).</li>
+<li><strong>Le toggle trust est protégé de l'assemblage global</strong> — <code>tnt-bootstrap/src/main/java/com/yowyob/tiibntick/bootstrap/TiiBnTickApplication.java:56-58</code> exclut <code>com.yowyob.tiibntick.core.trust.*</code> du component-scan pour préserver <code>tnt.trust.enabled</code> + <code>TrustNoOpFallbackConfig</code> (fallbacks <code>@ConditionalOnMissingBean</code>). Design délibéré et commenté.</li>
+<li><strong>Aucune dépendance implicite</strong> — aucun module n'utilise dans <code>src/main</code> le package d'un module qu'il ne déclare pas dans son <code>pom.xml</code> (ni en test). Le seul candidat détecté est un commentaire (point 6).</li>
+<li><strong>Découplage Kafka assumé et documenté pour éviter un cycle</strong> — <code>logistics/tnt-sync-core/src/main/java/com/yowyob/tiibntick/core/sync/adapter/in/kafka/EntityChangedEventConsumer.java:31-40</code> duplique volontairement les littéraux <code>MARKET_*</code> de <code>tnt-market-back-core</code> avec un commentaire expliquant que l'import direct créerait un cycle Maven (market dépend de sync). Choix cohérent avec l'architecture événementielle.</li>
+<li><strong>Communication inter-modules par topics Kafka cohérente avec les couches</strong> — les flux montants passent par des événements et non par des dépendances Maven : ex. <code>tnt.incident.escalated.to.dispute</code> (incident → dispute), <code>tnt.delivery.mission.status.changed</code>, <code>tnt.realtime.geofence.triggered</code>, <code>tnt.resource.vehicle.*</code>, <code>tnt.market.*</code> consommés par <code>tnt-sync-core</code>. Aucun contournement anormal du graphe détecté (pas de table Liquibase partagée entre modules : chaque module possède son propre changelog, ex. <code>logistics/tnt-incident-core/src/main/resources/db/changelog/</code>, <code>coreBackend/tnt-market-back-core/src/main/resources/db/changelog/</code>).</li>
+</ol>
+<hr />
+<h2 id="4-problemes-detectes-tableau-de-synthese">4. Problèmes détectés — tableau de synthèse</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>Problème</th>
+<th>Localisation (preuve)</th>
+<th>Criticité</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>P1</td>
+<td>Violation de couche <strong>L2 → L3</strong> utilisée dans le code : <code>tnt-actor-core</code> → <code>tnt-incident-core</code>, avec pattern de port inversé par rapport à la règle CLAUDE.md</td>
+<td><code>identity/tnt-actor-core/pom.xml</code> (dép. <code>tnt-incident-core</code>) ; <code>identity/tnt-actor-core/src/main/java/com/yowyob/tiibntick/core/actor/adapter/out/incident/ActorReputationPortAdapter.java:8</code></td>
+<td><span class="badge high">Élevé</span></td>
+</tr>
+<tr>
+<td>P2</td>
+<td><strong>50 % de dépendances mortes</strong> (112/223) : le graphe Maven ne reflète plus l'architecture ; cas extrêmes : <code>tnt-go-freelancer-point-back-core</code> 19/19 mortes, <code>tnt-dispute-core</code> 5/5, <code>tnt-realtime-core</code> 5/5, <code>tnt-delivery-core</code> 6/9</td>
+<td>§2.2 (liste exhaustive) ; vérifications manuelles par grep d'imports</td>
+<td><span class="badge high">Élevé</span></td>
+</tr>
+<tr>
+<td>P3</td>
+<td><strong><code>yow-event-kernel</code> totalement inutilisé</strong> : 60 classes, 21 dépendants Maven, 0 import de <code>com.yowyob.kernel.event</code> dans tout le dépôt (hors module lui-même)</td>
+<td><code>foundation/yow-event-kernel/</code> ; grep repo complet</td>
+<td><span class="badge high">Élevé</span></td>
+</tr>
+<tr>
+<td>P4</td>
+<td>Les 14 modules <code>tnt-agency-*</code> déclarent <code>tnt-auth-core</code>/<code>tnt-roles-core</code> <strong>sans aucun usage</strong> : aucun <code>@RequirePermission</code> ni <code>TntSecurityContext</code> dans tout <code>coreBackend/tnt-agency-back-core</code> → l'enforcement RBAC par module y est absent</td>
+<td>ex. <code>coreBackend/tnt-agency-back-core/tnt-agency-org-core/</code> : imports = <code>agency.*</code> + <code>common.*</code> uniquement ; grep <code>RequirePermission\|TntSecurityContext</code> = 0 résultat</td>
+<td><span class="badge high">Élevé</span></td>
+</tr>
+<tr>
+<td>P5</td>
+<td>Violation de couche <strong>L0 → L1</strong> : <code>yow-i18n-kernel</code> → <code>tnt-common-core</code> (déclarée, jamais utilisée)</td>
+<td><code>foundation/yow-i18n-kernel/pom.xml</code> ; 0 référence à <code>com.yowyob.tiibntick.common</code> dans <code>foundation/yow-i18n-kernel/src/</code></td>
+<td><span class="badge med">Moyen</span></td>
+</tr>
+<tr>
+<td>P6</td>
+<td>L'assemblage réel contredit la doc : <code>@ComponentScan("com.yowyob.tiibntick")</code> global au lieu des <code>@Import</code> par module ; c'est ce qui rend les dépendances mortes invisibles au runtime</td>
+<td><code>tnt-bootstrap/src/main/java/com/yowyob/tiibntick/bootstrap/TiiBnTickApplication.java:46-48</code> vs <code>TntCoreConfig.java:31-44</code> (seul <code>GoFreelancerPointCoreConfig</code> importé, avec commentaire erroné « L6 Core Backend Market ») ; import Java mort <code>MarketBackCoreConfig</code> à <code>TntCoreConfig.java:7</code></td>
+<td><span class="badge med">Moyen</span></td>
+</tr>
+<tr>
+<td>P7</td>
+<td><strong>17 modules <code>coreBackend/</code> (~1/3 du réacteur) hors du modèle de couches documenté</strong> ; <code>tnt-hrm-core</code> absent aussi du tableau L4 de CLAUDE.md</td>
+<td><code>CLAUDE.md</code> (tableau L0–L7) vs <code>pom.xml</code> racine lignes 107 et 132–135</td>
+<td><span class="badge med">Moyen</span></td>
+</tr>
+<tr>
+<td>P8</td>
+<td><code>tnt-billing-cost</code> est un <strong>îlot</strong> : 0 dépendance interne, <code>Money</code> dupliqué localement au lieu du type partagé, consommé effectivement par personne (la référence de <code>tnt-go-freelancer-point-back-core</code> est morte ; seul bootstrap l'embarque)</td>
+<td><code>billing/tnt-billing-cost/pom.xml</code> ; <code>billing/tnt-billing-cost/src/main/java/com/yowyob/tiibntick/core/billing/cost/domain/model/Money.java</code></td>
+<td><span class="badge med">Moyen</span></td>
+</tr>
+<tr>
+<td>P9</td>
+<td>Fan-in effectif = 0 pour 22 modules (dont 15 consommés uniquement par bootstrap) : attendu pour des feuilles (trust, back-cores, administration…), mais <code>tnt-go-freelancer-point-back-core</code> est une <strong>coquille</strong> (aucun usage entrant ni sortant)</td>
+<td>§5.7</td>
+<td><span class="badge low">Faible</span></td>
+</tr>
+<tr>
+<td>P10</td>
+<td>Incohérences mineures : ordre de build racine (<code>yow-i18n-kernel</code> déclaré ligne 66 avant sa dépendance <code>tnt-common-core</code> ligne 67 — Maven réordonne mais l'intention est illisible) ; commentaire trompeur « L6 Core Backend Market » sur <code>GoFreelancerPointCoreConfig</code></td>
+<td><code>pom.xml:66-67</code> ; <code>TntCoreConfig.java:43</code></td>
+<td><span class="badge low">Faible</span></td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="5-details-et-preuves">5. Détails et preuves</h2>
+<h3 id="51-p1-tnt-actor-core-l2-tnt-incident-core-l3-pattern-de-port-inverse">5.1 P1 — <code>tnt-actor-core</code> (L2) → <code>tnt-incident-core</code> (L3), pattern de port inversé</h3>
+<p><code>identity/tnt-actor-core/src/main/java/com/yowyob/tiibntick/core/actor/adapter/out/incident/ActorReputationPortAdapter.java:8</code> :</p>
+<pre><code class="language-java">import com.yowyob.tiibntick.core.incident.port.outbound.IActorReputationPort;
+</code></pre>
+<p>Le port <code>IActorReputationPort</code> est <strong>possédé par <code>tnt-incident-core</code></strong> (module supérieur, L3) et <strong>implémenté par <code>tnt-actor-core</code></strong> (module inférieur, L2), qui doit donc déclarer une dépendance Maven montante. C'est exactement l'inverse de la règle écrite dans CLAUDE.md (« le module appelant possède son port ; le module supérieur fournit l'adaptateur et dépend <em>vers le bas</em> ») et du pattern trust correctement appliqué ailleurs. <strong>Impact :</strong> brèche dans la règle de layering ; précédent qui légitime d'autres dépendances montantes ; couplage de compilation de l'identité vers la logistique. <strong>Recommandation :</strong> puisque <code>tnt-incident-core</code> (L3) a besoin de données d'acteur (L2), il peut légitimement dépendre vers le bas — déplacer <code>ActorReputationPortAdapter</code> dans <code>tnt-incident-core</code> (qui ajouterait la dépendance <code>tnt-actor-core</code>, licite L3→L2) et supprimer la dépendance <code>tnt-incident-core</code> du pom d'actor.</p>
+<p>À noter : les 9 autres consommateurs de <code>tnt-incident-core</code> (route, delivery, notify, media = L3 même couche ; resource = L4 ; billing-wallet = L5 ; trust = L6) sont licites.</p>
+<h3 id="52-p2-le-graphe-maven-est-fictif-a-50">5.2 P2 — Le graphe Maven est fictif à 50 %</h3>
+<p>Méthode : pour chaque arête déclarée, recherche du préfixe de package du module cible (ex. <code>com.yowyob.tiibntick.core.geo</code>) dans toutes les sources du module déclarant. 112/223 arêtes ont <strong>zéro</strong> occurrence. Vérifications manuelles (échantillon) :</p>
+<ul>
+<li><code>tnt-delivery-core</code> déclare 9 dépendances internes (<code>logistics/tnt-delivery-core/pom.xml</code>) mais ses imports réels se limitent à <code>core.delivery</code> (71), <code>core.auth</code> (2), <code>core.roles</code> (1), <code>core.incident</code> (1). Les dépendances <code>tnt-actor-core</code>, <code>tnt-geo-core</code>, <code>tnt-organization-core</code>, <code>tnt-route-core</code>, <code>yow-event-kernel</code>, <code>yow-i18n-kernel</code> sont mortes — le module a manifestement dupliqué localement ses value objects (héritage de la migration « Kernel HTTP-only »).</li>
+<li><code>tnt-dispute-core</code> : 5 dépendances déclarées (<code>common</code>, <code>yow-event-kernel</code>, <code>notify</code>, <code>delivery</code>, <code>actor</code>), <strong>aucune utilisée</strong> — le module est en réalité autonome (communication par événements Kafka).</li>
+<li><code>tnt-go-freelancer-point-back-core</code> : 19 dépendances déclarées (<code>coreBackend/tnt-go-freelancer-point-back-core/pom.xml</code>), 0 utilisée.</li>
+<li>Aucune dépendance « morte en main mais vivante en test » n'a été trouvée (pas de re-scoping <code>test</code> nécessaire).</li>
+</ul>
+<p><strong>Impact :</strong> temps de build gonflés (<code>-am</code> reconstruit des chaînes inutiles), image d'architecture mensongère pour tout nouveau développeur ou outil, invalidation silencieuse de la règle de layering (une violation morte reste une violation déclarée), risque de « réactivation » accidentelle d'un couplage non voulu. <strong>Recommandation :</strong> purge en une passe (la liste §2.2 est directement actionnable), puis garde-fou CI (voir §6).</p>
+<h3 id="53-p3-yow-event-kernel-module-fantome">5.3 P3 — <code>yow-event-kernel</code>, module fantôme</h3>
+<p><code>find foundation/yow-event-kernel/src/main/java -name "*.java" | wc -l</code> → 60 classes. <code>grep -rn "com.yowyob.kernel.event"</code> sur tout le dépôt (hors le module lui-même) → <strong>0 résultat</strong>, alors que 21 modules + bootstrap le déclarent. CLAUDE.md le présente pourtant comme le « event bus » L0. <strong>Impact :</strong> L0 le plus dépendu du graphe… pour rien ; entretien d'un module mort ; confusion avec l'event-bus réel (Kafka via <code>tntKafkaTemplate</code>). <strong>Recommandation :</strong> décider explicitement — soit le migrer réellement dans le Kernel (comme CLAUDE.md l'annonce en « candidate for future migration »), soit le retirer du réacteur ; dans tous les cas supprimer les 21 déclarations mortes.</p>
+<h3 id="54-p4-modules-agency-securite-declaree-mais-non-branchee">5.4 P4 — Modules agency : sécurité déclarée mais non branchée</h3>
+<p>Les 14 poms <code>coreBackend/tnt-agency-back-core/tnt-agency-*/pom.xml</code> déclarent <code>tnt-auth-core</code> et <code>tnt-roles-core</code>. Grep sur tout le sous-arbre : aucun import <code>com.yowyob.tiibntick.core.auth.*</code> ni <code>com.yowyob.tiibntick.core.roles.*</code>, aucun <code>@RequirePermission</code>, aucun <code>TntSecurityContext</code> (vérifié notamment sur <code>tnt-agency-org-core</code> : imports = 85× <code>core.agency</code>, 16× <code>common</code>). Les contrôleurs agency ne sont donc protégés que par la chaîne de sécurité globale de bootstrap (authentification), <strong>sans autorisation fine par permission</strong> contrairement au reste du cœur. <strong>Impact :</strong> écart de posture sécurité entre couches ; les dépendances mortes suggèrent une intention (« on mettra les permissions plus tard ») jamais réalisée. <strong>Recommandation :</strong> trancher — soit brancher <code>@RequirePermission</code> sur les endpoints agency (et garder les deps), soit documenter que le périmètre agency est volontairement authentifié-seulement et retirer les 27 déclarations mortes. À remonter à l'audit sécurité.</p>
+<h3 id="55-p6-assemblage-reel-assemblage-documente">5.5 P6 — Assemblage réel ≠ assemblage documenté</h3>
+<p>CLAUDE.md : « <code>tnt-bootstrap</code> <code>@Import</code>s each module's <code>@Configuration</code> class into <code>TntCoreConfig</code> ». Réalité :</p>
+<ul>
+<li><code>TiiBnTickApplication.java:46-48</code> : <code>@ComponentScan(basePackages = "com.yowyob.tiibntick", excludeFilters = …trust…)</code> — <strong>tout</strong> bean de <strong>tout</strong> module présent sur le classpath est enregistré, qu'il soit importé ou non.</li>
+<li><code>TntCoreConfig.java:31-44</code> : le bloc <code>@Import</code> ne contient que des configs transverses de bootstrap + <code>GoFreelancerPointCoreConfig</code> (annoté « ← L6 Core Backend Market », commentaire doublement faux : ce n'est ni L6 ni Market).</li>
+<li><code>TntCoreConfig.java:7</code> : <code>import com.yowyob.tiibntick.core.marketback.config.MarketBackCoreConfig;</code> — import Java mort (la classe n'est pas dans le <code>@Import</code> ; elle est ramassée par le scan global).</li>
+</ul>
+<p><strong>Impact :</strong> le graphe Maven n'a plus aucun rôle de contrainte au runtime — n'importe quel JAR sur le classpath est câblé ; c'est la cause racine de l'accumulation des dépendances mortes (elles « marchent » quand même). La granularité du toggle par module (comme <code>tnt.trust.enabled</code>) devient impossible sans exclusion regex ad hoc. <strong>Recommandation :</strong> soit assumer le scan global et corriger CLAUDE.md (+ supprimer l'import mort et le commentaire faux), soit revenir à un assemblage explicite par <code>@Import</code>/auto-configuration par module (plus conforme au design trust déjà en place).</p>
+<h3 id="56-p5-p7-p8-p10-dette-documentaire-et-ilots">5.6 P5, P7, P8, P10 — dette documentaire et îlots</h3>
+<ul>
+<li><strong>P5 :</strong> <code>foundation/yow-i18n-kernel/pom.xml</code> déclare <code>tnt-common-core</code> (L0→L1), jamais référencé dans <code>foundation/yow-i18n-kernel/src/</code>. Suppression triviale qui résout à la fois la violation et l'incohérence d'ordre de build (<code>pom.xml</code> racine lignes 66–67).</li>
+<li><strong>P7 :</strong> le tableau des couches de <code>CLAUDE.md</code> s'arrête à L7 avec ~34 modules ; le réacteur en compte 52. Les 17 modules <code>coreBackend/</code> (dont le sous-réacteur <code>tnt-agency-back-core-parent</code>) et <code>tnt-hrm-core</code> n'y figurent pas. Leur position effective (consomment L1–L5, consommés par personne sauf bootstrap) en fait une couche « L6-bis » à documenter, avec sa propre règle (feuilles consommatrices, jamais de dépendance entrante depuis le cœur).</li>
+<li><strong>P8 :</strong> <code>tnt-billing-cost</code> ne déclare aucune dépendance interne, redéfinit son propre <code>Money</code> (<code>billing/tnt-billing-cost/src/main/java/com/yowyob/tiibntick/core/billing/cost/domain/model/Money.java</code>), possède un port sortant <code>IRouteDataPort</code> implémenté <strong>en interne</strong> par <code>adapter/out/route/RouteDataAdapter</code> (pas par <code>tnt-route-core</code>). Son seul consommateur déclaré non-bootstrap (<code>tnt-go-freelancer-point-back-core</code>) ne l'utilise pas. Module fonctionnellement orphelin : à intégrer réellement (brancher <code>IRouteDataPort</code> sur les données route, unifier <code>Money</code>) ou à geler.</li>
+</ul>
+<h3 id="57-p9-fan-in-fan-out-chiffres">5.7 P9 — Fan-in / fan-out (chiffres)</h3>
+<p>Graphe <strong>déclaré</strong> (out = dépendances sortantes, in = modules dépendants) — extrait des extrêmes :</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Module</th>
+<th>out</th>
+<th>in</th>
+<th>Commentaire</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>tnt-bootstrap</code></td>
+<td>50</td>
+<td>0</td>
+<td>attendu (assembleur)</td>
+</tr>
+<tr>
+<td><code>tnt-common-core</code></td>
+<td>0</td>
+<td>41</td>
+<td>attendu (socle)</td>
+</tr>
+<tr>
+<td><code>tnt-auth-core</code> / <code>tnt-roles-core</code></td>
+<td>2 / 1</td>
+<td>30 / 30</td>
+<td>mais ~2/3 de ce fan-in est mort (agency, gofp…)</td>
+</tr>
+<tr>
+<td><code>yow-event-kernel</code></td>
+<td>0</td>
+<td>21</td>
+<td><strong>100 % du fan-in est mort</strong> (P3)</td>
+</tr>
+<tr>
+<td><code>tnt-go-freelancer-point-back-core</code></td>
+<td>19</td>
+<td>1</td>
+<td>100 % du fan-out mort (P9)</td>
+</tr>
+<tr>
+<td><code>tnt-market-back-core</code></td>
+<td>19</td>
+<td>1</td>
+<td>fan-out le plus élevé réellement utilisé (14) — god-module assumé de la plateforme Market, à surveiller</td>
+</tr>
+<tr>
+<td><code>tnt-agency-org-core</code></td>
+<td>4</td>
+<td>12</td>
+<td>hub du cluster agency (normal)</td>
+</tr>
+<tr>
+<td><code>tnt-incident-core</code></td>
+<td>1</td>
+<td>10</td>
+<td>hub de ports outbound ; contient la seule violation entrante (P1)</td>
+</tr>
+<tr>
+<td><code>tnt-delivery-core</code></td>
+<td>9</td>
+<td>6</td>
+<td>fan-out déclaré 9 mais réel 3 (P2)</td>
+</tr>
+<tr>
+<td><code>tnt-trust-core</code></td>
+<td>10</td>
+<td>1</td>
+<td>conforme au design (personne ne dépend de lui)</td>
+</tr>
+</tbody>
+</table></div>
+<p>Modules consommés <strong>uniquement par bootstrap</strong> (15) : accounting, administration, agency-{analytics,billing,inbox,intake,onboarding,sync}, billing-templates, go-freelancer-point-back, hrm, inventory, link-back, market-back, trust — normal pour des feuilles, sauf gofp (coquille vide, voir P9). Modules à fan-in <strong>effectif</strong> nul (personne ne référence leur package) : 22, dont — attendus : trust, platform-gateway, back-cores, administration ; problématiques : <code>yow-event-kernel</code> (P3), <code>tnt-billing-cost</code> (P8).</p>
+<h3 id="58-connexions-prevues-par-la-doc-vs-code-mission-8">5.8 Connexions prévues par la doc vs code (mission §8)</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Connexion annoncée</th>
+<th>Statut</th>
+<th>Preuve</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Trust ← delivery, incident, billing, actor, dispute (+realtime, organization) via ports possédés par l'appelant</td>
+<td>✅ câblé, 10/10 deps utilisées</td>
+<td>§3.3</td>
+</tr>
+<tr>
+<td><code>tnt-administration-core</code> orchestration onboarding s'appuyant sur organization</td>
+<td>✅ dépendance utilisée</td>
+<td>matrice §2.2</td>
+</tr>
+<tr>
+<td><code>tnt-platform-gateway-core</code> bridge auth/roles</td>
+<td>✅ 3/3 deps utilisées</td>
+<td>matrice §2.2</td>
+</tr>
+<tr>
+<td>Assemblage par <code>@Import</code> de chaque config module</td>
+<td>❌ remplacé par component-scan global</td>
+<td>P6, §5.5</td>
+</tr>
+<tr>
+<td><code>yow-event-kernel</code> = event bus L0</td>
+<td>❌ jamais utilisé</td>
+<td>P3, §5.3</td>
+</tr>
+<tr>
+<td>Tableau de couches CLAUDE.md = réacteur réel</td>
+<td>❌ 18 modules manquants</td>
+<td>P7</td>
+</tr>
+<tr>
+<td><code>tnt-auth-core</code>/<code>tnt-roles-core</code> consommés partout pour la sécurité</td>
+<td>⚠️ vrai pour le cœur, faux pour <code>coreBackend/agency</code></td>
+<td>P4</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="6-recommandations-priorisees">6. Recommandations priorisées</h2>
+<ol>
+<li><strong>(Élevé, effort faible)</strong> Corriger P1 : déplacer <code>ActorReputationPortAdapter</code> dans <code>tnt-incident-core</code> (L3→L2 licite), retirer <code>tnt-incident-core</code> du pom de <code>tnt-actor-core</code>.</li>
+<li><strong>(Élevé, effort moyen)</strong> Purger les 112 dépendances mortes (liste §2.2, directement actionnable pom par pom) ; en profiter pour supprimer <code>yow-i18n-kernel → tnt-common-core</code> (P5) et les 27 deps auth/roles mortes du cluster agency (après décision P4).</li>
+<li><strong>(Élevé, effort faible)</strong> Trancher le sort de <code>yow-event-kernel</code> : migration réelle vers le Kernel ou retrait ; supprimer ses 21 déclarations dans tous les cas.</li>
+<li><strong>(Élevé, décision produit/sécurité)</strong> P4 : brancher <code>@RequirePermission</code> sur les contrôleurs agency ou documenter explicitement le périmètre authentifié-seulement.</li>
+<li><strong>(Moyen)</strong> Mettre le mécanisme d'assemblage en cohérence : soit documenter le component-scan global dans CLAUDE.md et nettoyer <code>TntCoreConfig</code> (import mort ligne 7, commentaire faux ligne 43), soit revenir à l'assemblage explicite par module.</li>
+<li><strong>(Moyen)</strong> Documenter la couche <code>coreBackend/</code> (L6-bis, feuilles consommatrices) et <code>tnt-hrm-core</code> dans CLAUDE.md, avec sa règle : jamais de dépendance entrante depuis le cœur.</li>
+<li><strong>(Moyen)</strong> Intégrer ou geler <code>tnt-billing-cost</code> (brancher <code>IRouteDataPort</code>, unifier <code>Money</code>) ; donner un contenu réel à <code>tnt-go-freelancer-point-back-core</code> ou le retirer du réacteur tant qu'il est vide de connexions.</li>
+<li><strong>(Moyen, prévention)</strong> Ajouter un garde-fou automatique : règles ArchUnit par couche (interdire les imports montants) + <code>maven-enforcer</code> <code>bannedDependencies</code> par groupe de couches, exécutés en CI — c'est le seul moyen d'empêcher le graphe de redériver, surtout avec un component-scan global.</li>
+</ol>
+<hr />
+<h2 id="7-conclusion">7. Conclusion</h2>
+<p>La structure macro est saine : graphe acyclique, gestion centralisée des versions, pattern trust exemplaire, découplage Kafka assumé et documenté, et aucun contournement caché (pas de dépendance implicite, pas de table partagée). Mais le graphe Maven a cessé d'être une source de vérité : la moitié des arêtes sont mortes, le module L0 le plus dépendu n'est jamais importé, un tiers du réacteur vit hors du modèle de couches documenté, et l'assemblage runtime par component-scan global neutralise toute contrainte que le graphe pourrait exercer. Les deux violations de layering sont circonscrites et corrigeables à faible coût. La priorité n'est pas de re-architecturer mais de <strong>resynchroniser</strong> : purger le graphe déclaré sur le graphe réel, trancher les modules fantômes, documenter <code>coreBackend/</code>, puis verrouiller par ArchUnit/enforcer pour que l'écart ne se reforme pas.</p>
+<hr />
+<p><em>Audit réalisé par analyse statique exhaustive (parsing pom + grep de préfixes de packages sur main/test/ressources, détection SCC, inspection manuelle de chaque anomalie). Les chiffres sont reproductibles à partir de la matrice §2.2.</em></p>
+<footer>Audit technique TiiBnTick — généré à partir de l'analyse du code source réel. Chaque constat référence les fichiers et lignes concernés.</footer>
+</main>
+</div>
+
+<script type="module">
+  try {
+    const m = await import("https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs");
+    const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    m.default.initialize({ startOnLoad: true, theme: dark ? "dark" : "neutral", securityLevel: "loose" });
+  } catch (e) {
+    document.querySelectorAll(".mermaid").forEach(el => {
+      el.style.textAlign = "left";
+      el.innerHTML = "<div style='color:var(--muted);font-size:.75rem;margin-bottom:.5rem'>⚠ Diagramme Mermaid (connexion internet requise pour le rendu) — source :</div><pre>" + el.textContent.replace(/&/g,"&amp;").replace(/</g,"&lt;") + "</pre>";
+    });
+  }
+</script>
+
+</body>
+</html>

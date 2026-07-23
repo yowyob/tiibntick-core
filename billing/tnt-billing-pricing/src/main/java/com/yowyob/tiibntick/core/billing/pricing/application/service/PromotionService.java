@@ -29,13 +29,16 @@ public class PromotionService {
 
     public Mono<Optional<Money>> applyPromoCode(UUID policyId, String promoCode,
                                                  Money currentPrice, PricingContext ctx) {
-        return policyRepository.findById(policyId)
+        // Audit n°7 · #5 (IDOR) — scope the policy lookup to the caller's tenant, carried
+        // on the PricingContext, so a caller cannot apply/probe promo codes belonging to
+        // another tenant's policy.
+        return policyRepository.findByIdAndTenantId(policyId, ctx.getTenantId())
                 .switchIfEmpty(Mono.error(new BillingPolicyNotFoundException(policyId)))
                 .map(policy -> findAndApplyPromo(policy, promoCode, currentPrice, ctx));
     }
 
-    public Mono<Boolean> validatePromoCode(UUID policyId, String promoCode) {
-        return policyRepository.findById(policyId)
+    public Mono<Boolean> validatePromoCode(UUID policyId, String promoCode, PricingContext ctx) {
+        return policyRepository.findByIdAndTenantId(policyId, ctx.getTenantId())
                 .switchIfEmpty(Mono.error(new BillingPolicyNotFoundException(policyId)))
                 .map(policy -> isPromoValid(policy, promoCode));
     }

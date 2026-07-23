@@ -39,61 +39,79 @@ public interface IDslRuleUseCase {
     Mono<DslRule> createRule(DslRule rule);
 
     /**
-     * Updates an existing rule. Re-compiles expressions.
+     * Updates an existing rule, scoped to the caller's tenant. Re-compiles expressions.
      *
-     * @param rule the rule with updated fields
+     * <p>Audit n°7 · #5 (IDOR) — the existing rule is fetched with
+     * {@code findByIdAndTenantId} so a caller cannot mutate another tenant's rule.
+     *
+     * @param rule     the rule with updated fields
+     * @param tenantId the tenant the rule must belong to
      * @return the updated rule
      */
-    Mono<DslRule> updateRule(DslRule rule);
+    Mono<DslRule> updateRule(DslRule rule, UUID tenantId);
 
     /**
-     * Retrieves a rule by its identifier.
+     * Retrieves a rule by its identifier, scoped to the caller's tenant.
+     * Audit n°7 · #5 (IDOR) — never call without a tenant to check ownership.
      *
-     * @param ruleId the rule UUID
-     * @return the rule or an empty Mono if not found
+     * @param ruleId   the rule UUID
+     * @param tenantId the tenant the rule must belong to
+     * @return the rule or an empty Mono if not found or owned by a different tenant
      */
-    Mono<DslRule> findById(UUID ruleId);
+    Mono<DslRule> findById(UUID ruleId, UUID tenantId);
 
     /**
-     * Returns all active rules belonging to a given billing policy,
-     * ordered by priority ascending.
+     * Returns all active rules belonging to a given billing policy, scoped to the caller's
+     * tenant, ordered by priority ascending.
+     *
+     * <p>Audit n°7 · #5 (IDOR) — a policyId alone does not prove the caller owns the
+     * parent policy, so the tenant is required to scope the query.
      *
      * @param policyId the parent BillingPolicy identifier
+     * @param tenantId the tenant the parent policy must belong to
      * @return ordered flux of active DslRules
      */
-    Flux<DslRule> findActiveByPolicyId(UUID policyId);
+    Flux<DslRule> findActiveByPolicyId(UUID policyId, UUID tenantId);
 
     /**
-     * Returns all rules (active and inactive) for a policy.
+     * Returns all rules (active and inactive) for a policy, scoped to the caller's tenant.
+     * Audit n°7 · #5 (IDOR) — see {@link #findActiveByPolicyId}.
      *
      * @param policyId the parent BillingPolicy identifier
+     * @param tenantId the tenant the parent policy must belong to
      * @return flux of DslRules
      */
-    Flux<DslRule> findAllByPolicyId(UUID policyId);
+    Flux<DslRule> findAllByPolicyId(UUID policyId, UUID tenantId);
 
     /**
-     * Activates a rule.
+     * Activates a rule, scoped to the caller's tenant.
+     * Audit n°7 · #5 (IDOR) — tenant ownership is verified before mutation.
      *
-     * @param ruleId the rule UUID
+     * @param ruleId   the rule UUID
+     * @param tenantId the tenant the rule must belong to
      * @return the updated rule
      */
-    Mono<DslRule> activateRule(UUID ruleId);
+    Mono<DslRule> activateRule(UUID ruleId, UUID tenantId);
 
     /**
-     * Deactivates a rule without deleting it.
+     * Deactivates a rule without deleting it, scoped to the caller's tenant.
+     * Audit n°7 · #5 (IDOR) — tenant ownership is verified before mutation.
      *
-     * @param ruleId the rule UUID
+     * @param ruleId   the rule UUID
+     * @param tenantId the tenant the rule must belong to
      * @return the updated rule
      */
-    Mono<DslRule> deactivateRule(UUID ruleId);
+    Mono<DslRule> deactivateRule(UUID ruleId, UUID tenantId);
 
     /**
-     * Hard-deletes a rule.
+     * Hard-deletes a rule, scoped to the caller's tenant.
+     * Audit n°7 · #5 (IDOR) — tenant ownership is verified before deletion.
      *
-     * @param ruleId the rule UUID
+     * @param ruleId   the rule UUID
+     * @param tenantId the tenant the rule must belong to
      * @return completion signal
      */
-    Mono<Void> deleteRule(UUID ruleId);
+    Mono<Void> deleteRule(UUID ruleId, UUID tenantId);
 
     /**
      * Validates a raw DSL condition expression without persisting.

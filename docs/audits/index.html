@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TiiBnTick — Portail des audits · Audit TiiBnTick</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --text: #1c2430; --muted: #5b6675;
+  --border: #e3e7ec; --accent: #0f5fa8; --accent-soft: #e8f1fa;
+  --code-bg: #f0f2f5; --sidebar-bg: #101823; --sidebar-text: #c7d0dc;
+  --crit: #c62828; --high: #e65100; --med: #f9a825; --low: #2e7d32;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1319; --panel: #161d27; --text: #dbe2ea; --muted: #8b97a5;
+    --border: #263140; --accent: #5aa2e0; --accent-soft: #17273a;
+    --code-bg: #1d2733; --sidebar-bg: #0a0f15; --sidebar-text: #a9b4c0;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--bg); color: var(--text); line-height: 1.65; }
+.layout { display: flex; min-height: 100vh; }
+nav.sidebar { width: 270px; flex-shrink: 0; background: var(--sidebar-bg);
+  color: var(--sidebar-text); padding: 1.4rem 1rem; position: sticky; top: 0;
+  height: 100vh; overflow-y: auto; }
+nav.sidebar .brand { font-size: 1.05rem; font-weight: 700; color: #fff;
+  margin-bottom: .2rem; }
+nav.sidebar .brand small { display:block; font-weight: 400; color: var(--sidebar-text);
+  font-size: .75rem; margin-top: .2rem; }
+nav.sidebar ul { list-style: none; padding: 0; margin: 1.2rem 0; }
+nav.sidebar li a { display: block; color: var(--sidebar-text); text-decoration: none;
+  padding: .45rem .6rem; border-radius: 6px; font-size: .86rem; }
+nav.sidebar li a:hover { background: rgba(255,255,255,.08); color: #fff; }
+nav.sidebar li a.active { background: var(--accent); color: #fff; }
+nav.sidebar .section-label { text-transform: uppercase; letter-spacing: .08em;
+  font-size: .68rem; color: #6b7683; margin: 1.4rem 0 .4rem .4rem; }
+main { flex: 1; min-width: 0; padding: 2.2rem 3rem 4rem; max-width: 1100px; }
+header.page { border-bottom: 1px solid var(--border); padding-bottom: 1.2rem;
+  margin-bottom: 1.6rem; }
+header.page .kicker { color: var(--accent); font-weight: 600; font-size: .85rem;
+  text-transform: uppercase; letter-spacing: .06em; }
+header.page h1 { margin: .25rem 0 .4rem; font-size: 1.9rem; }
+header.page .meta { color: var(--muted); font-size: .85rem; }
+h2 { margin-top: 2.4rem; padding-bottom: .35rem; border-bottom: 1px solid var(--border);
+  font-size: 1.35rem; }
+h3 { margin-top: 1.8rem; font-size: 1.08rem; }
+h4 { margin-top: 1.4rem; font-size: .98rem; }
+a { color: var(--accent); }
+code { background: var(--code-bg); padding: .12em .38em; border-radius: 4px;
+  font-size: .84em; font-family: "JetBrains Mono", Consolas, monospace; }
+pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem; overflow-x: auto; font-size: .82rem; line-height: 1.5; }
+pre code { background: none; padding: 0; }
+.table-wrap { overflow-x: auto; margin: 1rem 0; border: 1px solid var(--border);
+  border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: .85rem; background: var(--panel); }
+th, td { border-bottom: 1px solid var(--border); padding: .55rem .75rem; text-align: left;
+  vertical-align: top; }
+th { background: var(--accent-soft); color: var(--text); font-weight: 600;
+  white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+blockquote { border-left: 4px solid var(--accent); background: var(--accent-soft);
+  margin: 1rem 0; padding: .7rem 1rem; border-radius: 0 8px 8px 0; }
+blockquote p { margin: .3rem 0; }
+.badge { display: inline-block; padding: .1em .6em; border-radius: 999px;
+  font-size: .74rem; font-weight: 700; color: #fff; white-space: nowrap; }
+.badge.crit { background: var(--crit); } .badge.high { background: var(--high); }
+.badge.med { background: var(--med); color: #333; } .badge.low { background: var(--low); }
+.mermaid { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem; margin: 1rem 0; text-align: center; overflow-x: auto; }
+.toc { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem 1.4rem; margin: 1.4rem 0; font-size: .88rem; }
+.toc > ul { margin: .3rem 0; padding-left: 1.1rem; }
+.toc .toctitle { font-weight: 700; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1rem; margin: 1.4rem 0; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1.1rem 1.2rem; text-decoration: none; color: var(--text); display: block; }
+.card:hover { border-color: var(--accent); }
+.card .icon { font-size: 1.5rem; }
+.card h3 { margin: .4rem 0 .2rem; font-size: 1rem; }
+.card p { margin: 0; color: var(--muted); font-size: .82rem; }
+.stat-row { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1.2rem 0; }
+.stat { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: .8rem 1.2rem; min-width: 130px; }
+.stat .num { font-size: 1.6rem; font-weight: 800; }
+.stat .lbl { font-size: .74rem; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .05em; }
+.stat.crit .num { color: var(--crit); } .stat.high .num { color: var(--high); }
+.stat.med .num { color: var(--med); } .stat.low .num { color: var(--low); }
+footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border);
+  color: var(--muted); font-size: .78rem; }
+.progress-block { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1rem 1.2rem; margin: 1rem 0 1.6rem; }
+.progress-block .progress-label { display: flex; justify-content: space-between; align-items: baseline;
+  font-size: .85rem; margin-bottom: .5rem; }
+.progress-block .progress-label b { font-size: 1rem; }
+.progress-bar-track { background: var(--code-bg); border-radius: 999px; height: .6rem; overflow: hidden; }
+.progress-bar-fill { height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--low), var(--accent)); transition: width .3s ease; }
+.progress-note { font-size: .72rem; color: var(--muted); margin-top: .5rem; }
+li:has(> input.task-checkbox) { list-style: none; margin-left: -1.4rem; padding-left: .3rem;
+  display: list-item; }
+input.task-checkbox { width: 1rem; height: 1rem; margin-right: .5rem; vertical-align: middle;
+  accent-color: var(--accent); }
+li:has(> input.task-checkbox:checked) { color: var(--muted); }
+li:has(> input.task-checkbox:checked) code { opacity: .75; }
+@media (max-width: 900px) {
+  .layout { flex-direction: column; }
+  nav.sidebar { width: 100%; height: auto; position: static; }
+  main { padding: 1.4rem 1.2rem 3rem; }
+}
+@media print { nav.sidebar { display: none; } main { padding: 0; } }
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar"><div class="brand">TiiBnTick Core<small>Audit technique — juillet 2026</small></div>
+<ul><li><a href="index.html" class="active">🏠 Accueil</a></li>
+<li><a href="executive-summary.html">📋 Résumé exécutif global</a></li>
+</ul><div class="section-label">Rapports d'audit</div><ul>
+<li><a href="audit-1-architecture.html">🏛️ Audit n°1 — Architecture globale</a></li>
+<li><a href="audit-2-inter-modules.html">🔗 Audit n°2 — Connexions inter-modules</a></li>
+<li><a href="audit-3-yow-event-kernel.html">📨 Audit n°3 — yow-event-kernel</a></li>
+<li><a href="audit-4-yow-i18n-kernel.html">🌍 Audit n°4 — yow-i18n-kernel</a></li>
+<li><a href="audit-5-kafka.html">🧵 Audit n°5 — Kafka</a></li>
+<li><a href="audit-6-scalabilite.html">📈 Audit n°6 — Scalabilité</a></li>
+<li><a href="audit-7-system-design.html">🧭 Audit n°7 — System Design & Sécurité</a></li>
+</ul><div class="section-label">Plan de remédiation</div><ul>
+<li><a href="remediation/implementation-plan.html">🗂️ Plan — Plan d'implémentation — vue d'ensemble</a></li>
+<li><a href="remediation/phase-0-critical.html">🚨 P0 — Phase 0 — Bloquant production</a></li>
+<li><a href="remediation/phase-1-hardening.html">🛡️ P1 — Phase 1 — Durcissement</a></li>
+<li><a href="remediation/phase-2-target-architecture.html">🚀 P2 — Phase 2 — Architecture cible</a></li>
+<li><a href="remediation/workstream-payment-billing-kernel-delegation.html">💳 Chantier — Délégation paiement/facturation au Kernel</a></li>
+</ul></nav>
+<main>
+<header class="page">
+  <div class="kicker">TiiBnTick</div>
+  <h1>🏠 Portail des audits</h1>
+  <div class="meta">Projet TiiBnTick Core · dépôt <code>tiibntick-core</code> (34 modules Maven, y compris <code>trust/tnt-trust-core</code>) · Audit réalisé le 16 juillet 2026</div>
+</header>
+
+
+<h1 id="portail-des-audits-techniques-tiibntick">Portail des audits techniques TiiBnTick</h1>
+<p>Audit technique exhaustif du dépôt <code>tiibntick-core</code>, réalisé les 16–17 juillet 2026 par une équipe d'agents spécialisés (architecture, systèmes distribués, plateforme, sécurité, performance). Périmètre : <strong>52 modules Maven</strong> — les couches L0–L7 historiques <strong>et</strong> les 4 backends produits de <code>coreBackend/</code> (<code>tnt-agency-back-core</code>, <code>tnt-go-freelancer-point-back-core</code>, <code>tnt-link-back-core</code>, <code>tnt-market-back-core</code>) — soit ~2 800 fichiers Java, configurations Spring/Docker/Liquibase, scripts, tests et documentation.</p>
+<p>Chaque constat est justifié par des preuves issues du code (références <code>fichier:ligne</code>), avec criticité (Critique / Élevé / Moyen / Faible), impact et recommandation.</p>
+<h2 id="par-ou-commencer">Par où commencer</h2>
+<p>Commencez par la <strong><a href="executive-summary.html">Synthèse exécutive</a></strong> : principaux constats transverses, risques majeurs et feuille de route priorisée P0 → P2 (dont la décision BFF Link et l'architecture temps réel cible).</p>
+<div class="cards">
+<a class="card" href="executive-summary.html"><div class="icon">📋</div><h3>Synthèse exécutive</h3><p>Constats majeurs, risques transverses, feuille de route priorisée P0/P1/P2.</p></a>
+<a class="card" href="remediation/implementation-plan.html"><div class="icon">🗂️</div><h3>Plan d'implémentation</h3><p>Document vivant, cases à cocher : 3 phases de bout en bout couvrant les 145 constats des 7 audits, sans omission.</p></a>
+<a class="card" href="audit-1-architecture.html"><div class="icon">🏛️</div><h3>Audit n°1 — Architecture globale</h3><p>Hexagonal, DDD, couches L0–L7, anti-patterns, dette — 17 problèmes.</p></a>
+<a class="card" href="audit-2-inter-modules.html"><div class="icon">🔗</div><h3>Audit n°2 — Connexions inter-modules</h3><p>Cartographie des 223 dépendances, 112 mortes, violations de couches.</p></a>
+<a class="card" href="audit-3-yow-event-kernel.html"><div class="icon">📨</div><h3>Audit n°3 — yow-event-kernel</h3><p>Module événementiel mort (0 import), événementiel ad-hoc généralisé.</p></a>
+<a class="card" href="audit-4-yow-i18n-kernel.html"><div class="icon">🌍</div><h3>Audit n°4 — yow-i18n-kernel</h3><p>Couverture i18n réelle, multidevise — 24 problèmes, verdict non prêt.</p></a>
+<a class="card" href="audit-5-kafka.html"><div class="icon">🧵</div><h3>Audit n°5 — Kafka</h3><p>Cartographie des flux, ~20 topics orphelins, fiabilité, sécurité.</p></a>
+<a class="card" href="audit-6-scalabilite.html"><div class="icon">📈</div><h3>Audit n°6 — Scalabilité</h3><p>10 goulots classés, SPOF, verrous du scale-out, Link temps réel.</p></a>
+<a class="card" href="audit-7-system-design.html"><div class="icon">🧭</div><h3>Audit n°7 — System Design & Sécurité</h3><p>Failles critiques, architecture cible, décision BFF Link, feuille de route.</p></a>
+</div>
+
+<h2 id="methodologie">Méthodologie</h2>
+<p>Sept agents spécialisés ont travaillé en parallèle sur le dépôt complet, chacun sur un domaine précis. Aucune affirmation sans preuve : chaque problème est localisé (<code>fichier:ligne</code>), qualifié (impact, criticité) et accompagné d'une recommandation. Les rapports sources (Markdown) sont conservés dans <code>docs/audits/raw/</code> ; les pages HTML sont régénérables via <code>python3 docs/audits/build_reports.py</code>.</p>
+<h2 id="plan-dimplementation">Plan d'implémentation</h2>
+<p>L'audit a produit un <strong>diagnostic</strong> ; le passage à l'implémentation vit désormais dans un document séparé et vivant, avec des cases à cocher au fur et à mesure de l'avancement : <strong><a href="remediation/implementation-plan.html">Plan d'implémentation</a></strong> — 3 phases de bout en bout (<a href="remediation/phase-0-critical.html">Phase 0</a>, <a href="remediation/phase-1-hardening.html">Phase 1</a>, <a href="remediation/phase-2-target-architecture.html">Phase 2</a>) couvrant l'intégralité des 145 constats des 7 audits, plus le chantier <a href="remediation/workstream-payment-billing-kernel-delegation.html">Délégation paiement/facturation au Kernel</a> (directive du 17/07/2026 : plus aucun mécanisme de paiement géré en propre par TiiBnTick Core).</p>
+<h2 id="rappel-des-criticites">Rappel des criticités</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Niveau</th>
+<th>Signification</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><span class="badge crit">Critique</span></td>
+<td>Perte/corruption de données, faille de sécurité exploitable, flux métier cassé — bloquant pour la production.</td>
+</tr>
+<tr>
+<td><span class="badge high">Élevé</span></td>
+<td>Casse à moyen terme ou sous charge ; à corriger avant la montée en charge.</td>
+</tr>
+<tr>
+<td><span class="badge med">Moyen</span></td>
+<td>Dette ou incohérence gênant la maintenabilité et l'évolution.</td>
+</tr>
+<tr>
+<td><span class="badge low">Faible</span></td>
+<td>Amélioration souhaitable, faible risque immédiat.</td>
+</tr>
+</tbody>
+</table></div>
+<footer>Audit technique TiiBnTick — généré à partir de l'analyse du code source réel. Chaque constat référence les fichiers et lignes concernés.</footer>
+</main>
+</div>
+
+<script type="module">
+  try {
+    const m = await import("https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs");
+    const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    m.default.initialize({ startOnLoad: true, theme: dark ? "dark" : "neutral", securityLevel: "loose" });
+  } catch (e) {
+    document.querySelectorAll(".mermaid").forEach(el => {
+      el.style.textAlign = "left";
+      el.innerHTML = "<div style='color:var(--muted);font-size:.75rem;margin-bottom:.5rem'>⚠ Diagramme Mermaid (connexion internet requise pour le rendu) — source :</div><pre>" + el.textContent.replace(/&/g,"&amp;").replace(/</g,"&lt;") + "</pre>";
+    });
+  }
+</script>
+
+</body>
+</html>

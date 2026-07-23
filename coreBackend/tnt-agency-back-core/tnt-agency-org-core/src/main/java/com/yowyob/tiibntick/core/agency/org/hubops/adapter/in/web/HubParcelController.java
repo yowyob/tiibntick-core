@@ -20,6 +20,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @Tag(name = "Agency ERP Hub Operations", description = "Relay hub parcel deposit and withdrawal")
 @RestController
@@ -38,6 +39,7 @@ public class HubParcelController {
     }
 
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/hubs/{hubId}/parcels/deposit")
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Deposit parcel at hub (orchestrates inventory-core)")
     public Mono<ApiResponse<HubParcelResponse>> deposit(
@@ -50,6 +52,7 @@ public class HubParcelController {
     }
 
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/hub-parcels/{trackingCode}/withdraw")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Withdraw parcel from hub")
     public Mono<ApiResponse<HubParcelResponse>> withdraw(
             @PathVariable UUID tenantId,
@@ -69,6 +72,7 @@ public class HubParcelController {
     }
 
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/hubs/expired/process")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Process expired hub parcels for tenant")
     public Mono<ApiResponse<ExpiredProcessResult>> processExpired(@PathVariable UUID tenantId) {
         return hubParcelExpiryService.processExpired(tenantId)

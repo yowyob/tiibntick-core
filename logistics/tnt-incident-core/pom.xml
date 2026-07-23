@@ -21,9 +21,23 @@
     </description>
 
     <dependencies>
+        <!-- TiiBnTick L0 foundation event bus — transactional outbox
+             (Chantier C · Audit n°3 · P5). -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>yow-event-kernel</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>
             <artifactId>tnt-common-core</artifactId>
+        </dependency>
+
+        <!-- tnt-actor-core (L2) : this module depends down into it purely to implement
+             ActorReputationPortAdapter (this module's own IActorReputationPort outbound port) —
+             the same one-directional pattern tnt-trust-core uses for IBlockchainAuditPort. -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-actor-core</artifactId>
         </dependency>
 
         <dependency>
@@ -90,5 +104,32 @@
             <artifactId>reactor-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- Outbox migration integration test (Chantier C · Audit n°3 · P5): real Postgres
+             Testcontainer for the event_bus schema + embedded Kafka broker (see the
+             tnt-delivery-core pilot for why EmbeddedKafka over a Testcontainers Kafka
+             container). -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- @SchedulerLock annotation (Chantier D · Audit n°6 · S2) — distributed lock around
+             this module's @Scheduled job(s); LockProvider bean lives centrally in
+             tnt-bootstrap's TntSchedulerLockConfig. -->
+        <dependency>
+            <groupId>net.javacrumbs.shedlock</groupId>
+            <artifactId>shedlock-spring</artifactId>
+        </dependency>
+
     </dependencies>
 </project>

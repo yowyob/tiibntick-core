@@ -40,6 +40,7 @@ class DisputeCommandServiceTest {
     @Mock private IDeliveryStatusPort deliveryStatusPort;
     @Mock private IBillingCompensationPort billingCompensationPort;
     @Mock private IBlockchainProofPort blockchainProofPort;
+    @Mock private IDisputeReferenceGenerator referenceGenerator;
 
     private DisputeCommandService service;
 
@@ -47,7 +48,10 @@ class DisputeCommandServiceTest {
     void setUp() {
         service = new DisputeCommandService(
                 repository, eventPublisher, notificationPort,
-                deliveryStatusPort, billingCompensationPort, blockchainProofPort);
+                deliveryStatusPort, billingCompensationPort, blockchainProofPort,
+                referenceGenerator);
+        when(referenceGenerator.nextReference())
+                .thenReturn(Mono.just(DisputeReference.forSequence(1)));
     }
 
     // =========================================================================
@@ -58,7 +62,7 @@ class DisputeCommandServiceTest {
     @DisplayName("openDispute() - should save dispute and publish events")
     void shouldOpenDispute() {
         OpenDisputeCommand cmd = buildOpenCmd();
-        Dispute saved = Dispute.open(cmd);
+        Dispute saved = Dispute.open(cmd, DisputeReference.forSequence(1));
 
         when(repository.existsActiveDisputeForPackage(anyString(), anyString()))
                 .thenReturn(Mono.just(false));
@@ -107,7 +111,7 @@ class DisputeCommandServiceTest {
                 "Payment dispute with no package",
                 null, null, false);
 
-        Dispute saved = Dispute.open(cmd);
+        Dispute saved = Dispute.open(cmd, DisputeReference.forSequence(1));
         when(repository.existsActiveDisputeForPackage(isNull(), anyString()))
                 .thenReturn(Mono.just(false));
         when(repository.save(any())).thenReturn(Mono.just(saved));

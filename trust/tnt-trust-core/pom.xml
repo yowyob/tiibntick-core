@@ -30,6 +30,12 @@
          ═══════════════════════════════════════════════════════════ -->
     <dependencies>
 
+        <!-- ── yow-event-kernel: PublishEventUseCase/PublishEventBatchUseCase (transactional
+             outbox) — Chantier C · Audit n°3 · P5 migration ── -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>yow-event-kernel</artifactId>
+        </dependency>
         <!-- ── tnt-auth-core: @CurrentUser in controllers ── -->
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>
@@ -224,11 +230,37 @@
             <artifactId>mockito-core</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- Embedded Kafka broker for the outbox end-to-end integration test -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka-test</artifactId>
+            <scope>test</scope>
+        </dependency>
         <!-- Stubs the yow-trust-event REST API in TrustEventRestClientAdapterTest -->
         <dependency>
             <groupId>org.wiremock</groupId>
             <artifactId>wiremock-standalone</artifactId>
             <version>3.9.2</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- ── Testcontainers: Postgres integration tests (Liquibase changelog end-to-end) ── -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
 

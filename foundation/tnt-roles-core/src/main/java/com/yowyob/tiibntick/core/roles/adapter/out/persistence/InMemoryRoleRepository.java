@@ -50,4 +50,22 @@ public class InMemoryRoleRepository implements RoleRepository {
         return Mono.fromRunnable(() -> roles.computeIfPresent(roleId,
                 (id, existing) -> tenantId.equals(existing.tenantId()) ? null : existing));
     }
+
+    /**
+     * No-op: {@link Role} carries no {@code kernelRoleId} field, so this process-lifetime
+     * fallback has nowhere to durably record it — matches this class's overall contract of
+     * not supporting anything beyond the in-memory {@link Role} record itself. Real
+     * deployments use {@code RoleRepositoryAdapter} (R2DBC), where the column exists on the
+     * persistence entity.
+     */
+    @Override
+    public Mono<Void> markKernelRoleId(UUID tenantId, UUID roleId, UUID kernelRoleId) {
+        return Mono.empty();
+    }
+
+    /** Always empty — see {@link #markKernelRoleId}: nothing was ever durably recorded. */
+    @Override
+    public Mono<UUID> findKernelRoleId(UUID tenantId, UUID roleId) {
+        return Mono.empty();
+    }
 }

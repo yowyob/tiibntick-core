@@ -56,6 +56,12 @@
     <dependencies>
 
         <!-- ─── Internal modules ────────────────────────────────────────── -->
+        <!-- L0 event bus — transactional outbox (Chantier C · Audit n°3 · P5) -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>yow-event-kernel</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>
             <artifactId>tnt-common-core</artifactId>
@@ -176,6 +182,21 @@
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Outbox integration test (Chantier C · Audit n°3 · P5): real Postgres
+             Testcontainer for the event_bus schema + EmbeddedKafka (spring-kafka-test
+             above) — same pattern as tnt-delivery-core's pilot. -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
 

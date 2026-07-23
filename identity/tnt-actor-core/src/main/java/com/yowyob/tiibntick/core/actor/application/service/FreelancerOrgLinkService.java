@@ -18,6 +18,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.Objects;
 import java.util.UUID;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Application service implementing {@link ILinkFreelancerOrgUseCase} and
@@ -61,6 +62,7 @@ public class FreelancerOrgLinkService
      * If linked to a <em>different</em> org, throws {@link FreelancerOrgLinkException}.
      */
     @Override
+    @Transactional
     public Mono<FreelancerProfile> linkToFreelancerOrg(LinkFreelancerOrgCommand command) {
         Objects.requireNonNull(command, "command must not be null");
         return freelancerRepository.findFirstByActorId(command.actorId())
@@ -103,6 +105,7 @@ public class FreelancerOrgLinkService
      * <p>If the actor is not linked to the specified org, the operation is a no-op.
      */
     @Override
+    @Transactional
     public Mono<FreelancerProfile> unlinkFromFreelancerOrg(UnlinkFreelancerOrgCommand command) {
         Objects.requireNonNull(command, "command must not be null");
         return freelancerRepository.findFirstByActorId(command.actorId())

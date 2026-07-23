@@ -17,6 +17,7 @@ import com.yowyob.tiibntick.core.billing.templates.port.outbound.ITemplateEventP
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Mono;
 
 import java.util.Map;
@@ -60,8 +61,13 @@ public class ApplyTemplateUseCase implements IApplyTemplateUseCase {
 
     /**
      * {@inheritDoc}
+     *
+     * <p>{@code @Transactional} so the optional custom-template save and the outbox
+     * envelope/entry written by {@link ITemplateEventPublisher} (Chantier C · Audit n°3 · P5)
+     * commit atomically.
      */
     @Override
+    @Transactional
     public Mono<UUID> apply(ApplyTemplateCommand command) {
         log.info("Applying template {} for actor {} (ownerType={})",
                 command.getTemplateCode(), command.getOwnerActorId(), command.getOwnerType());

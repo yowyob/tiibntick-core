@@ -7,7 +7,6 @@ import com.yowyob.tiibntick.core.actor.adapter.in.web.FreelancerController;
 import com.yowyob.tiibntick.core.actor.adapter.in.web.ActorKycController;
 import com.yowyob.tiibntick.core.actor.adapter.in.web.KycVerificationProxyController;
 import com.yowyob.tiibntick.core.actor.adapter.out.auth.ActorCoreYowAuthTntAdapter;
-import com.yowyob.tiibntick.core.actor.adapter.out.incident.ActorReputationPortAdapter;
 import com.yowyob.tiibntick.core.actor.adapter.out.kernel.KernelActorAdapter;
 import com.yowyob.tiibntick.core.actor.adapter.out.kernel.KernelKycVerificationAdapter;
 import com.yowyob.tiibntick.core.actor.adapter.out.messaging.KafkaActorEventPublisher;
@@ -28,16 +27,16 @@ import com.yowyob.tiibntick.core.actor.application.service.FreelancerService;
 import com.yowyob.tiibntick.core.actor.application.service.ActorKycService;
 import com.yowyob.tiibntick.core.actor.application.service.KycVerificationGatewayService;
 import com.yowyob.tiibntick.core.actor.application.service.RelayOperatorService;
-import org.apache.kafka.clients.producer.ProducerConfig;
-import org.apache.kafka.common.serialization.StringSerializer;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.data.r2dbc.repository.config.EnableR2dbcRepositories;
-import org.springframework.kafka.core.DefaultKafkaProducerFactory;
-import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.core.ProducerFactory;
+import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
+import org.springframework.kafka.core.ConsumerFactory;
+import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -75,8 +74,6 @@ import java.util.Map;
         KycVerificationProxyController.class,
         // ── tnt-auth-core outbound adapter ──────────────────────────────────────
         ActorCoreYowAuthTntAdapter.class,
-        // ── tnt-incident-core outbound adapter ─────────────────────────────────
-        ActorReputationPortAdapter.class,
         // ── Kernel outbound adapter ─────────────────────────────────────────────
         KernelActorAdapter.class,
         KernelKycVerificationAdapter.class,
@@ -93,19 +90,42 @@ import java.util.Map;
 )
 public class ActorCoreConfig {
 
-    @Bean
-    public KafkaTemplate<String, String> actorKafkaTemplate(
-            @Value("${spring.kafka.bootstrap-servers:localhost:9092}") String bootstrapServers) {
+    /**
+     * Dedicated consumer factory for tnt-actor-core Kafka listeners, using an explicit
+     * {@link StringDeserializer} for both key and value.
+     *
+     * <p>Fixes Audit n°5 · P-02: without this factory, {@code IncidentEventConsumer} and
+     * {@code FreelancerOrgEventConsumer} fell back to Spring Boot's autoconfigured
+     * {@code kafkaListenerContainerFactory}, whose value-deserializer is
+     * {@code ByteArrayDeserializer} (application.yml) — incompatible with their
+     * {@code ConsumerRecord<String, String>} signatures.
+     */
+    @Bean("actorKafkaConsumerFactory")
+    public ConsumerFactory<String, String> actorKafkaConsumerFactory(
+            @Value("${spring.kafka.bootstrap-servers:localhost:9092}") String bootstrapServers,
+            @Value("${spring.kafka.consumer.group-id:tnt-actor-core}") String groupId) {
 
         Map<String, Object> props = new HashMap<>();
-        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        props.put(ProducerConfig.ACKS_CONFIG, "all");
-        props.put(ProducerConfig.RETRIES_CONFIG, 3);
-        props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
+        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
+        return new DefaultKafkaConsumerFactory<>(props);
+    }
 
-        ProducerFactory<String, String> factory = new DefaultKafkaProducerFactory<>(props);
-        return new KafkaTemplate<>(factory);
+    /**
+     * Listener container factory backing {@code containerFactory = "actorKafkaListenerContainerFactory"}
+     * on tnt-actor-core's {@code @KafkaListener} methods.
+     */
+    @Bean("actorKafkaListenerContainerFactory")
+    public ConcurrentKafkaListenerContainerFactory<String, String> actorKafkaListenerContainerFactory(
+            ConsumerFactory<String, String> actorKafkaConsumerFactory) {
+        ConcurrentKafkaListenerContainerFactory<String, String> factory =
+                new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(actorKafkaConsumerFactory);
+        factory.setConcurrency(2);
+        return factory;
     }
 }

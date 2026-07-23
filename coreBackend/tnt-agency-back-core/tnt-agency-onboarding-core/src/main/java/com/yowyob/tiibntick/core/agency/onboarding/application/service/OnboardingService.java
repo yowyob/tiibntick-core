@@ -12,6 +12,8 @@ import com.yowyob.tiibntick.core.agency.onboarding.adapter.out.persistence.Onboa
 import com.yowyob.tiibntick.core.agency.onboarding.application.mapper.OnboardingMapper;
 import com.yowyob.tiibntick.core.agency.onboarding.domain.OnboardingApplication;
 import com.yowyob.tiibntick.core.agency.org.adapter.in.web.dto.AgencyRegistryResponse;
+import com.yowyob.tiibntick.core.agency.org.adapter.out.persistence.entity.AgencySettingsEntity;
+import com.yowyob.tiibntick.core.agency.org.application.mapper.AgencyOrgMapper;
 import com.yowyob.tiibntick.core.agency.org.application.service.AgencyRegistryService;
 import com.yowyob.tiibntick.core.agency.staff.application.service.StaffMemberService;
 import com.yowyob.tiibntick.core.agency.staff.domain.vo.StaffRole;
@@ -54,7 +56,8 @@ public class OnboardingService {
                                 input.addrCity(), input.addrRegion(), input.addrCountry(),
                                 input.addrPostalCode(), input.addrLat(), input.addrLon(),
                                 input.contactEmail(), input.contactPhone(), null, input.website()
-                        )).flatMap(agency -> agencyRegistry.updateSettings(
+                        )).map(AgencyOrgMapper::toAgencyResponse)
+                        .flatMap(agency -> agencyRegistry.updateSettings(
                                         new AgencyRegistryService.UpdateSettingsInput(
                                                 input.tenantId(), agency.id(),
                                                 input.autoAssignMissions(),
@@ -73,17 +76,21 @@ public class OnboardingService {
                                             input.docCniKey(), input.docRccmKey(), input.docProofKey(),
                                             now);
                                     return onboardingRepo.save(OnboardingMapper.toEntity(application))
-                                            .map(saved -> new SubmitResult(
+                                            .flatMap(saved -> tryCompleteKernelIdentity(
+                                                    input.tenantId(),
+                                                    input.applicantUserId(),
                                                     agency.id(),
                                                     saved.getId(),
-                                                    agency.status(),
-                                                    saved.getKernelBusinessActorId(),
-                                                    saved.getKernelBusinessActorId() != null));
+                                                    agency.status()));
                                 })))));
     }
 
+    /**
+     * Phase 1 — create Kernel BusinessActor (via Core) then persist, or persist a
+     * pre-created actor id when {@code kernelBusinessActorId} is provided (legacy).
+     */
     @Transactional
-    public Mono<KernelIdentityResult> linkKernelIdentity(LinkKernelIdentityInput input) {
+    public Mono<KernelIdentityResult> completeKernelIdentity(LinkKernelIdentityInput input) {
         return requireApplication(input.tenantId(), input.agencyId())
                 .flatMap(app -> {
                     if (!app.getApplicantUserId().equals(input.applicantUserId())) {
@@ -95,15 +102,47 @@ public class OnboardingService {
                                 app.getAgencyId(), app.getId(),
                                 app.getKernelBusinessActorId(), true));
                     }
-                    Instant now = Instant.now();
-                    app.linkKernelBusinessActor(input.kernelBusinessActorId(), now);
-                    return onboardingRepo.save(OnboardingMapper.toEntity(app))
-                            .then(agencyRegistry.linkKernelBusinessActor(
-                                    input.tenantId(), input.agencyId(), input.kernelBusinessActorId()))
-                            .thenReturn(new KernelIdentityResult(
-                                    app.getAgencyId(), app.getId(),
-                                    app.getKernelBusinessActorId(), true));
+                    if (input.kernelBusinessActorId() != null) {
+                        return persistKernelActor(app, input.tenantId(), input.kernelBusinessActorId());
+                    }
+                    return agencyRegistry.getById(input.tenantId(), input.agencyId())
+                            .map(AgencyOrgMapper::toAgencyResponse)
+                            .flatMap(agency -> onboardingKernel
+                                    .onboardApplicantBusinessActor(agency, app)
+                                    .flatMap(actorId -> persistKernelActor(app, input.tenantId(), actorId)))
+                            .onErrorMap(e -> new IllegalStateException(
+                                    "Échec identité Kernel candidat: " + e.getMessage()
+                                            + " — vérifiez JWT candidat et credentials Core.", e));
                 });
+    }
+
+    /** @deprecated use {@link #completeKernelIdentity(LinkKernelIdentityInput)} */
+    @Transactional
+    public Mono<KernelIdentityResult> linkKernelIdentity(LinkKernelIdentityInput input) {
+        return completeKernelIdentity(input);
+    }
+
+    private Mono<SubmitResult> tryCompleteKernelIdentity(
+            UUID tenantId, UUID applicantUserId, UUID agencyId,
+            UUID applicationId, String agencyStatus) {
+        return completeKernelIdentity(new LinkKernelIdentityInput(
+                        tenantId, applicantUserId, agencyId, null))
+                .map(k -> new SubmitResult(
+                        agencyId, applicationId, agencyStatus,
+                        k.kernelBusinessActorId(), k.readyForAdminApproval()))
+                .onErrorResume(e -> Mono.just(new SubmitResult(
+                        agencyId, applicationId, agencyStatus, null, false)));
+    }
+
+    private Mono<KernelIdentityResult> persistKernelActor(
+            OnboardingApplication app, UUID tenantId, UUID actorId) {
+        Instant now = Instant.now();
+        app.linkKernelBusinessActor(actorId, now);
+        return onboardingRepo.save(OnboardingMapper.toEntity(app))
+                .then(agencyRegistry.linkKernelBusinessActor(tenantId, app.getAgencyId(), actorId))
+                .thenReturn(new KernelIdentityResult(
+                        app.getAgencyId(), app.getId(),
+                        app.getKernelBusinessActorId(), true));
     }
 
     public Mono<MyOnboardingStatus> getForApplicant(UUID tenantId, UUID applicantUserId) {
@@ -113,6 +152,7 @@ public class OnboardingService {
                 .flatMap(entity -> {
                     OnboardingApplication app = OnboardingMapper.toDomain(entity);
                     return agencyRegistry.getById(tenantId, app.getAgencyId())
+                            .map(AgencyOrgMapper::toAgencyResponse)
                             .map(agency -> new MyOnboardingStatus(
                                     app.getId(), app.getAgencyId(), agency.name(),
                                     app.getApplicationStatus().name(), agency.status(),
@@ -128,6 +168,7 @@ public class OnboardingService {
     public Mono<OnboardingDetailResponse> getByAgencyId(UUID tenantId, UUID agencyId) {
         return requireApplication(tenantId, agencyId)
                 .flatMap(app -> agencyRegistry.getById(tenantId, agencyId)
+                        .map(AgencyOrgMapper::toAgencyResponse)
                         .map(agency -> OnboardingMapper.toDetail(app, agency)));
     }
 
@@ -141,8 +182,9 @@ public class OnboardingService {
                                         + "Le propriétaire doit compléter la phase 1 avant approbation."));
                     }
                     return agencyRegistry.getById(tenantId, agencyId)
+                            .map(AgencyOrgMapper::toAgencyResponse)
                             .flatMap(agency -> agencyRegistry.getSettings(tenantId, agencyId)
-                                    .map(settings -> settings.defaultCurrency())
+                                    .map(AgencySettingsEntity::getDefaultCurrency)
                                     .defaultIfEmpty("XAF")
                                     .flatMap(currency -> onboardingKernel
                                             .provisionOrganization(new OnboardingKernelPort.ProvisionRequest(
@@ -152,6 +194,7 @@ public class OnboardingService {
                                                     kernel.organizationId(),
                                                     kernel.businessActorId(),
                                                     kernel.coreAgencyId())
+                                                    .map(AgencyOrgMapper::toAgencyResponse)
                                                     .map(saved -> new ApprovalContext(saved, kernel)))
                                             .switchIfEmpty(Mono.just(new ApprovalContext(agency, null)))
                                             .flatMap(ctx -> syncPlatformCoreIfNeeded(tenantId, ctx))
@@ -165,6 +208,7 @@ public class OnboardingService {
             return Mono.just(ctx);
         }
         return agencyRegistry.syncPlatformCore(tenantId, agency.id())
+                .map(AgencyOrgMapper::toAgencyResponse)
                 .map(synced -> new ApprovalContext(synced, ctx.kernel()));
     }
 
@@ -194,6 +238,7 @@ public class OnboardingService {
         app.approve(reviewerId, now);
         return onboardingRepo.save(OnboardingMapper.toEntity(app))
                 .then(agencyRegistry.activate(tenantId, agencyId))
+                .map(AgencyOrgMapper::toAgencyResponse)
                 .flatMap(agency -> staffMemberService.register(new StaffMemberService.RegisterInput(
                         tenantId, agencyId, null,
                         app.getOwnerName(), app.getOwnerPhone(), app.getOwnerEmail(),
@@ -253,6 +298,7 @@ public class OnboardingService {
 
     private Mono<OnboardingListItemResponse> toListItem(UUID tenantId, OnboardingApplication app) {
         return agencyRegistry.getById(tenantId, app.getAgencyId())
+                .map(AgencyOrgMapper::toAgencyResponse)
                 .map(agency -> OnboardingMapper.toListItem(app, agency));
     }
 

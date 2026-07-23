@@ -17,6 +17,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * Thin, reusable pass-through over tnt-actor-core's
@@ -47,6 +48,7 @@ public class ActorIdentityController {
     @Operation(summary = "Resolve display identities for a batch of actor ids in one round trip — "
             + "for callers (e.g. the Link BFF's board screen) that would otherwise need one call per actor")
     @PostMapping("/identities/batch")
+    @PreAuthorize("isAuthenticated()")
     public Flux<ActorIdentityResponse> getIdentities(@RequestBody List<UUID> actorIds) {
         return Flux.fromIterable(actorIds)
                 .flatMap(actorId -> resolveActorIdentityUseCase.resolve(actorId)

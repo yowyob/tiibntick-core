@@ -12,6 +12,7 @@ import org.springframework.r2dbc.core.DatabaseClient;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 import reactor.test.StepVerifier;
 
 import java.time.LocalDateTime;
@@ -33,7 +34,8 @@ class R2dbcEntityVersionRepositoryIntegrationTest {
 
     @Container
     @SuppressWarnings("resource")
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgis/postgis:16-3.4")
+    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(
+            DockerImageName.parse("postgis/postgis:16-3.4").asCompatibleSubstituteFor("postgres"))
             .withDatabaseName("tnt_sync_test")
             .withUsername("tnt_test")
             .withPassword("tnt_test_secret");

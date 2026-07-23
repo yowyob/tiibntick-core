@@ -19,6 +19,7 @@ import com.yowyob.tiibntick.core.marketback.domain.model.ReviewId;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -64,6 +65,7 @@ public class ProviderReviewApplicationService implements IManageProviderReviewUs
     }
 
     @Override
+    @Transactional
     public Mono<ProviderReviewResponse> approveReview(UUID reviewId, UUID adminId, String tenantId) {
         return reviewRepository.findById(ReviewId.of(reviewId))
                 .switchIfEmpty(Mono.error(new MarketDomainException("Review not found: " + reviewId)))
@@ -73,7 +75,7 @@ public class ProviderReviewApplicationService implements IManageProviderReviewUs
                 })
                 .flatMap(saved -> {
                     List<Object> events = saved.pullDomainEvents();
-                    return eventPublisher.publishAll(events)
+                    return eventPublisher.publishAll(events, tenantId)
                             .then(updateListingRating(saved.getListingId(), tenantId))
                             .then(syncProviderRating(saved, tenantId))
                             .thenReturn(saved);

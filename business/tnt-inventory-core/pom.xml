@@ -25,6 +25,15 @@
 
     <dependencies>
 
+        <!-- ══ tnt-auth-core (Foundation L1 — security context, @CurrentUser) ══
+             Transitively brings in spring-boot-starter-security (for @PreAuthorize
+             on InventoryController's mutation endpoints) — same as tnt-product-core.
+        ══════════════════════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-auth-core</artifactId>
+        </dependency>
+
         <!-- ══ TiiBnTick Foundation ══════════════════════════════════════════
              tnt-common-core transitively provides:
                - RT-comops-common-core (BaseEntity, Money, Address, GeoCoordinates, etc.)
@@ -121,6 +130,18 @@
         <dependency>
             <groupId>io.projectreactor</groupId>
             <artifactId>reactor-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Chantier C · Audit n3 · P5 — outbox migration integration test
+             (real Postgres for the event_bus schema, embedded Kafka broker). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka-test</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

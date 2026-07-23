@@ -66,12 +66,12 @@ class CommissionCalculatorServiceTest {
                 .bonusRules(List.of())
                 .build();
 
-        when(policyRepository.findById(POLICY_ID))
+        when(policyRepository.findByIdAndTenantId(POLICY_ID, TENANT_ID))
                 .thenReturn(Mono.just(policyWith(rule, null)));
 
         Money selling = Money.of(2000L, "XAF");
 
-        StepVerifier.create(commissionService.compute(POLICY_ID, selling, CommissionAppliesTo.PERMANENT))
+        StepVerifier.create(commissionService.compute(POLICY_ID, selling, CommissionAppliesTo.PERMANENT, TENANT_ID))
                 .expectNextMatches(bd -> {
                     // deliverer = 20% × 2000 = 400
                     boolean delivererOk = bd.delivererCommission().getAmount()
@@ -85,6 +85,19 @@ class CommissionCalculatorServiceTest {
     }
 
     @Test
+    @DisplayName("IDOR (Audit n°7 · #5): compute must not reveal another tenant's commission rules")
+    void testComputeRejectsCrossTenantAccess() {
+        UUID otherTenantId = UUID.randomUUID();
+        when(policyRepository.findByIdAndTenantId(POLICY_ID, otherTenantId)).thenReturn(Mono.empty());
+
+        StepVerifier.create(commissionService.compute(
+                        POLICY_ID, Money.of(2000L, "XAF"), CommissionAppliesTo.ALL, otherTenantId))
+                .expectError(com.yowyob.tiibntick.core.billing.pricing.domain.exception
+                        .BillingPolicyNotFoundException.class)
+                .verify();
+    }
+
+    @Test
     @DisplayName("FIXED platform fee overrides percentage when platformFeeRule is present")
     void testFixedPlatformFee() {
         PlatformFeeRule feeRule = PlatformFeeRule.builder()
@@ -93,12 +106,12 @@ class CommissionCalculatorServiceTest {
                 .minimumFee(Money.of(200L, "XAF"))
                 .build();
 
-        when(policyRepository.findById(POLICY_ID))
+        when(policyRepository.findByIdAndTenantId(POLICY_ID, TENANT_ID))
                 .thenReturn(Mono.just(policyWith(null, feeRule)));
 
         Money selling = Money.of(2000L, "XAF");
 
-        StepVerifier.create(commissionService.compute(POLICY_ID, selling, CommissionAppliesTo.ALL))
+        StepVerifier.create(commissionService.compute(POLICY_ID, selling, CommissionAppliesTo.ALL, TENANT_ID))
                 .expectNextMatches(bd ->
                         bd.platformFee().getAmount().compareTo(new BigDecimal("300")) == 0)
                 .verifyComplete();
@@ -115,12 +128,12 @@ class CommissionCalculatorServiceTest {
                 .bonusRules(List.of())
                 .build();
 
-        when(policyRepository.findById(POLICY_ID))
+        when(policyRepository.findByIdAndTenantId(POLICY_ID, TENANT_ID))
                 .thenReturn(Mono.just(policyWith(freelancerRule, null)));
 
         Money selling = Money.of(2000L, "XAF");
 
-        StepVerifier.create(commissionService.compute(POLICY_ID, selling, CommissionAppliesTo.PERMANENT))
+        StepVerifier.create(commissionService.compute(POLICY_ID, selling, CommissionAppliesTo.PERMANENT, TENANT_ID))
                 .expectNextMatches(bd ->
                         bd.delivererCommission().getAmount().compareTo(BigDecimal.ZERO) == 0)
                 .verifyComplete();

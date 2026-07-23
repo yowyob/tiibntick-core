@@ -51,23 +51,6 @@ public class TntTrustProperties {
      */
     private boolean enabled = true;
 
-    /**
-     * Interval (ms) between {@code yow-trust-event} connectivity probes
-     * ({@code TrustEventConnectivityPoller}).
-     */
-    private long healthPollIntervalMs = 30_000;
-
-    /**
-     * Interval (ms) between {@code trust_retry_queue} drain attempts
-     * ({@code TrustRetryQueueDrainer}).
-     */
-    private long retryDrainIntervalMs = 60_000;
-
-    /**
-     * Maximum number of retry-queue rows drained per tick.
-     */
-    private int retryDrainBatchSize = 100;
-
     // ── Getters & Setters ─────────────────────────────────────────────────────
     public String getTrustEventBaseUrl() { return trustEventBaseUrl; }
     public void setTrustEventBaseUrl(String v) { this.trustEventBaseUrl = v; }
@@ -81,10 +64,4 @@ public class TntTrustProperties {
     public void setRestClientTimeoutMs(int v) { this.restClientTimeoutMs = v; }
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean v) { this.enabled = v; }
-    public long getHealthPollIntervalMs() { return healthPollIntervalMs; }
-    public void setHealthPollIntervalMs(long v) { this.healthPollIntervalMs = v; }
-    public long getRetryDrainIntervalMs() { return retryDrainIntervalMs; }
-    public void setRetryDrainIntervalMs(long v) { this.retryDrainIntervalMs = v; }
-    public int getRetryDrainBatchSize() { return retryDrainBatchSize; }
-    public void setRetryDrainBatchSize(int v) { this.retryDrainBatchSize = v; }
 }

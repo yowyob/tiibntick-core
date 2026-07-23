@@ -20,7 +20,9 @@ public class LoyaltyDiscountService {
     private final IBillingPolicyRepository policyRepository;
 
     public Mono<BigDecimal> getEligibleDiscountPct(UUID policyId, PricingContext ctx) {
-        return policyRepository.findById(policyId)
+        // Audit n°7 · #5 (IDOR) — scope the policy lookup to the caller's tenant, carried
+        // on the PricingContext, so a caller cannot infer another tenant's loyalty rules.
+        return policyRepository.findByIdAndTenantId(policyId, ctx.getTenantId())
                 .switchIfEmpty(Mono.error(new BillingPolicyNotFoundException(policyId)))
                 .map(policy -> {
                     List<LoyaltyRule> rules = policy.getLoyaltyRules();
@@ -33,7 +35,7 @@ public class LoyaltyDiscountService {
     }
 
     public Mono<Money> computeDiscount(UUID policyId, Money currentPrice, PricingContext ctx) {
-        return policyRepository.findById(policyId)
+        return policyRepository.findByIdAndTenantId(policyId, ctx.getTenantId())
                 .switchIfEmpty(Mono.error(new BillingPolicyNotFoundException(policyId)))
                 .map(policy -> {
                     List<LoyaltyRule> rules = policy.getLoyaltyRules();

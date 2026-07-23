@@ -159,6 +159,20 @@
             <artifactId>r2dbc</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- In-process broker for the outbox migration's Kafka wire-format integration test
+             (Chantier C · Audit n°3 · P5) — see tnt-delivery-core's pilot for why this repo
+             standardises on spring-kafka-test's EmbeddedKafka over a Testcontainers Kafka
+             container. -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka-test</artifactId>
+            <scope>test</scope>
+        </dependency>
 
     </dependencies>
 

@@ -25,6 +25,11 @@
     </description>
 
     <dependencies>
+        <!-- ── tnt-auth-core (Foundation L1 — security context, @CurrentUser) ── -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-auth-core</artifactId>
+        </dependency>
 
         <!-- ── TiiBnTick L0 — Event Bus ── -->
         <dependency>
@@ -146,6 +151,14 @@
             <groupId>org.awaitility</groupId>
             <artifactId>awaitility</artifactId>
             <scope>test</scope>
+        </dependency>
+
+        <!-- @SchedulerLock annotation (Chantier D · Audit n°6 · S2) — distributed lock around
+             this module's @Scheduled job(s); LockProvider bean lives centrally in
+             tnt-bootstrap's TntSchedulerLockConfig. -->
+        <dependency>
+            <groupId>net.javacrumbs.shedlock</groupId>
+            <artifactId>shedlock-spring</artifactId>
         </dependency>
 
     </dependencies>

@@ -28,15 +28,40 @@ public interface IBillingPolicyUseCase {
 
     Mono<BillingPolicy> createPolicy(BillingPolicy policy);
 
-    Mono<BillingPolicy> updatePolicy(BillingPolicy policy);
+    /**
+     * Updates an existing policy, scoped to the caller's tenant.
+     *
+     * <p>Audit n°7 · #5 (IDOR) — the existing policy is fetched with
+     * {@code findByIdAndTenantId} so a caller cannot mutate another tenant's policy.
+     *
+     * @param policy   the updated policy fields (identified by {@code policy.getId()})
+     * @param tenantId the tenant the policy must belong to
+     */
+    Mono<BillingPolicy> updatePolicy(BillingPolicy policy, UUID tenantId);
 
-    Mono<BillingPolicy> activatePolicy(UUID policyId);
+    /**
+     * Activates a policy, scoped to the caller's tenant.
+     * Audit n°7 · #5 (IDOR) — tenant ownership is verified before mutation.
+     */
+    Mono<BillingPolicy> activatePolicy(UUID policyId, UUID tenantId);
 
-    Mono<BillingPolicy> deactivatePolicy(UUID policyId);
+    /**
+     * Deactivates a policy, scoped to the caller's tenant.
+     * Audit n°7 · #5 (IDOR) — tenant ownership is verified before mutation.
+     */
+    Mono<BillingPolicy> deactivatePolicy(UUID policyId, UUID tenantId);
 
-    Mono<BillingPolicy> archivePolicy(UUID policyId);
+    /**
+     * Archives a policy, scoped to the caller's tenant.
+     * Audit n°7 · #5 (IDOR) — tenant ownership is verified before mutation.
+     */
+    Mono<BillingPolicy> archivePolicy(UUID policyId, UUID tenantId);
 
-    Mono<BillingPolicy> findById(UUID policyId);
+    /**
+     * Retrieves a policy by ID, scoped to the caller's tenant.
+     * Audit n°7 · #5 (IDOR) — never call without a tenant to check ownership.
+     */
+    Mono<BillingPolicy> findById(UUID policyId, UUID tenantId);
 
     Mono<BillingPolicy> findDefaultForTenant(UUID tenantId);
 
@@ -44,7 +69,11 @@ public interface IBillingPolicyUseCase {
 
     Flux<BillingPolicy> findActiveByTenantId(UUID tenantId);
 
-    Mono<Void> deletePolicy(UUID policyId);
+    /**
+     * Deletes a policy, scoped to the caller's tenant.
+     * Audit n°7 · #5 (IDOR) — tenant ownership is verified before deletion.
+     */
+    Mono<Void> deletePolicy(UUID policyId, UUID tenantId);
 
     // Multi-owner support ─────────────────────────────────────────────
 
@@ -76,9 +105,10 @@ public interface IBillingPolicyUseCase {
      * @param policyId    UUID of the policy to assign
      * @param orgId       UUID string of the FreelancerOrg (or other actor)
      * @param ownerType   type of the owner actor
+     * @param tenantId    the tenant the policy must belong to (Audit n°7 · #5 — IDOR fix)
      * @return the updated policy
      */
-    Mono<BillingPolicy> assignPolicyToOrg(UUID policyId, String orgId, PolicyOwnerType ownerType);
+    Mono<BillingPolicy> assignPolicyToOrg(UUID policyId, String orgId, PolicyOwnerType ownerType, UUID tenantId);
 
     /**
      * Finds all policies owned by the given actor ID.

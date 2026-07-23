@@ -2,6 +2,7 @@ package com.yowyob.tiibntick.core.marketback.adapter.out.messaging;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yowyob.tiibntick.common.kafka.TntTopics;
 import com.yowyob.tiibntick.core.marketback.application.port.in.IManageMarketOrderUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,7 +31,8 @@ public class MarketKafkaConsumer {
     private final IManageMarketOrderUseCase orderUseCase;
     private final ObjectMapper objectMapper;
 
-    @KafkaListener(topics = "tnt.delivery.mission.status-changed", groupId = "tnt-market-group")
+    @KafkaListener(topics = TntTopics.DELIVERY_MISSION_STATUS_CHANGED, groupId = "tnt-market-group",
+            containerFactory = "marketKafkaListenerContainerFactory")
     public void onMissionStatusChanged(String payload) {
         try {
             JsonNode node = objectMapper.readTree(payload);
@@ -50,7 +52,8 @@ public class MarketKafkaConsumer {
         }
     }
 
-    @KafkaListener(topics = "tnt.billing.payment.confirmed", groupId = "tnt-market-group")
+    @KafkaListener(topics = TntTopics.BILLING_WALLET_PAYMENT_CONFIRMED, groupId = "tnt-market-group",
+            containerFactory = "marketKafkaListenerContainerFactory")
     public void onPaymentConfirmed(String payload) {
         try {
             JsonNode node = objectMapper.readTree(payload);

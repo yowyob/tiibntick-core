@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audit n°4 — yow-i18n-kernel · Audit TiiBnTick</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --text: #1c2430; --muted: #5b6675;
+  --border: #e3e7ec; --accent: #0f5fa8; --accent-soft: #e8f1fa;
+  --code-bg: #f0f2f5; --sidebar-bg: #101823; --sidebar-text: #c7d0dc;
+  --crit: #c62828; --high: #e65100; --med: #f9a825; --low: #2e7d32;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1319; --panel: #161d27; --text: #dbe2ea; --muted: #8b97a5;
+    --border: #263140; --accent: #5aa2e0; --accent-soft: #17273a;
+    --code-bg: #1d2733; --sidebar-bg: #0a0f15; --sidebar-text: #a9b4c0;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--bg); color: var(--text); line-height: 1.65; }
+.layout { display: flex; min-height: 100vh; }
+nav.sidebar { width: 270px; flex-shrink: 0; background: var(--sidebar-bg);
+  color: var(--sidebar-text); padding: 1.4rem 1rem; position: sticky; top: 0;
+  height: 100vh; overflow-y: auto; }
+nav.sidebar .brand { font-size: 1.05rem; font-weight: 700; color: #fff;
+  margin-bottom: .2rem; }
+nav.sidebar .brand small { display:block; font-weight: 400; color: var(--sidebar-text);
+  font-size: .75rem; margin-top: .2rem; }
+nav.sidebar ul { list-style: none; padding: 0; margin: 1.2rem 0; }
+nav.sidebar li a { display: block; color: var(--sidebar-text); text-decoration: none;
+  padding: .45rem .6rem; border-radius: 6px; font-size: .86rem; }
+nav.sidebar li a:hover { background: rgba(255,255,255,.08); color: #fff; }
+nav.sidebar li a.active { background: var(--accent); color: #fff; }
+nav.sidebar .section-label { text-transform: uppercase; letter-spacing: .08em;
+  font-size: .68rem; color: #6b7683; margin: 1.4rem 0 .4rem .4rem; }
+main { flex: 1; min-width: 0; padding: 2.2rem 3rem 4rem; max-width: 1100px; }
+header.page { border-bottom: 1px solid var(--border); padding-bottom: 1.2rem;
+  margin-bottom: 1.6rem; }
+header.page .kicker { color: var(--accent); font-weight: 600; font-size: .85rem;
+  text-transform: uppercase; letter-spacing: .06em; }
+header.page h1 { margin: .25rem 0 .4rem; font-size: 1.9rem; }
+header.page .meta { color: var(--muted); font-size: .85rem; }
+h2 { margin-top: 2.4rem; padding-bottom: .35rem; border-bottom: 1px solid var(--border);
+  font-size: 1.35rem; }
+h3 { margin-top: 1.8rem; font-size: 1.08rem; }
+h4 { margin-top: 1.4rem; font-size: .98rem; }
+a { color: var(--accent); }
+code { background: var(--code-bg); padding: .12em .38em; border-radius: 4px;
+  font-size: .84em; font-family: "JetBrains Mono", Consolas, monospace; }
+pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem; overflow-x: auto; font-size: .82rem; line-height: 1.5; }
+pre code { background: none; padding: 0; }
+.table-wrap { overflow-x: auto; margin: 1rem 0; border: 1px solid var(--border);
+  border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: .85rem; background: var(--panel); }
+th, td { border-bottom: 1px solid var(--border); padding: .55rem .75rem; text-align: left;
+  vertical-align: top; }
+th { background: var(--accent-soft); color: var(--text); font-weight: 600;
+  white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+blockquote { border-left: 4px solid var(--accent); background: var(--accent-soft);
+  margin: 1rem 0; padding: .7rem 1rem; border-radius: 0 8px 8px 0; }
+blockquote p { margin: .3rem 0; }
+.badge { display: inline-block; padding: .1em .6em; border-radius: 999px;
+  font-size: .74rem; font-weight: 700; color: #fff; white-space: nowrap; }
+.badge.crit { background: var(--crit); } .badge.high { background: var(--high); }
+.badge.med { background: var(--med); color: #333; } .badge.low { background: var(--low); }
+.mermaid { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem; margin: 1rem 0; text-align: center; overflow-x: auto; }
+.toc { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem 1.4rem; margin: 1.4rem 0; font-size: .88rem; }
+.toc > ul { margin: .3rem 0; padding-left: 1.1rem; }
+.toc .toctitle { font-weight: 700; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1rem; margin: 1.4rem 0; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1.1rem 1.2rem; text-decoration: none; color: var(--text); display: block; }
+.card:hover { border-color: var(--accent); }
+.card .icon { font-size: 1.5rem; }
+.card h3 { margin: .4rem 0 .2rem; font-size: 1rem; }
+.card p { margin: 0; color: var(--muted); font-size: .82rem; }
+.stat-row { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1.2rem 0; }
+.stat { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: .8rem 1.2rem; min-width: 130px; }
+.stat .num { font-size: 1.6rem; font-weight: 800; }
+.stat .lbl { font-size: .74rem; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .05em; }
+.stat.crit .num { color: var(--crit); } .stat.high .num { color: var(--high); }
+.stat.med .num { color: var(--med); } .stat.low .num { color: var(--low); }
+footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border);
+  color: var(--muted); font-size: .78rem; }
+.progress-block { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1rem 1.2rem; margin: 1rem 0 1.6rem; }
+.progress-block .progress-label { display: flex; justify-content: space-between; align-items: baseline;
+  font-size: .85rem; margin-bottom: .5rem; }
+.progress-block .progress-label b { font-size: 1rem; }
+.progress-bar-track { background: var(--code-bg); border-radius: 999px; height: .6rem; overflow: hidden; }
+.progress-bar-fill { height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--low), var(--accent)); transition: width .3s ease; }
+.progress-note { font-size: .72rem; color: var(--muted); margin-top: .5rem; }
+li:has(> input.task-checkbox) { list-style: none; margin-left: -1.4rem; padding-left: .3rem;
+  display: list-item; }
+input.task-checkbox { width: 1rem; height: 1rem; margin-right: .5rem; vertical-align: middle;
+  accent-color: var(--accent); }
+li:has(> input.task-checkbox:checked) { color: var(--muted); }
+li:has(> input.task-checkbox:checked) code { opacity: .75; }
+@media (max-width: 900px) {
+  .layout { flex-direction: column; }
+  nav.sidebar { width: 100%; height: auto; position: static; }
+  main { padding: 1.4rem 1.2rem 3rem; }
+}
+@media print { nav.sidebar { display: none; } main { padding: 0; } }
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar"><div class="brand">TiiBnTick Core<small>Audit technique — juillet 2026</small></div>
+<ul><li><a href="index.html">🏠 Accueil</a></li>
+<li><a href="executive-summary.html">📋 Résumé exécutif global</a></li>
+</ul><div class="section-label">Rapports d'audit</div><ul>
+<li><a href="audit-1-architecture.html">🏛️ Audit n°1 — Architecture globale</a></li>
+<li><a href="audit-2-inter-modules.html">🔗 Audit n°2 — Connexions inter-modules</a></li>
+<li><a href="audit-3-yow-event-kernel.html">📨 Audit n°3 — yow-event-kernel</a></li>
+<li><a href="audit-4-yow-i18n-kernel.html" class="active">🌍 Audit n°4 — yow-i18n-kernel</a></li>
+<li><a href="audit-5-kafka.html">🧵 Audit n°5 — Kafka</a></li>
+<li><a href="audit-6-scalabilite.html">📈 Audit n°6 — Scalabilité</a></li>
+<li><a href="audit-7-system-design.html">🧭 Audit n°7 — System Design & Sécurité</a></li>
+</ul><div class="section-label">Plan de remédiation</div><ul>
+<li><a href="remediation/implementation-plan.html">🗂️ Plan — Plan d'implémentation — vue d'ensemble</a></li>
+<li><a href="remediation/phase-0-critical.html">🚨 P0 — Phase 0 — Bloquant production</a></li>
+<li><a href="remediation/phase-1-hardening.html">🛡️ P1 — Phase 1 — Durcissement</a></li>
+<li><a href="remediation/phase-2-target-architecture.html">🚀 P2 — Phase 2 — Architecture cible</a></li>
+<li><a href="remediation/workstream-payment-billing-kernel-delegation.html">💳 Chantier — Délégation paiement/facturation au Kernel</a></li>
+</ul></nav>
+<main>
+<header class="page">
+  <div class="kicker">Audit n°4</div>
+  <h1>🌍 yow-i18n-kernel</h1>
+  <div class="meta">Projet TiiBnTick Core · dépôt <code>tiibntick-core</code> (34 modules Maven, y compris <code>trust/tnt-trust-core</code>) · Audit réalisé le 16 juillet 2026</div>
+</header>
+
+<div class="toc"><div class="toc"><span class="toctitle">Sommaire</span><ul>
+<li><a href="#1-resume-executif">1. Résumé exécutif</a></li>
+<li><a href="#2-etat-actuel-inventaire-du-module">2. État actuel — Inventaire du module</a><ul>
+<li><a href="#21-structure-18-fichiers-15-main-3-test">2.1 Structure (18 fichiers : 15 main + 3 test)</a></li>
+<li><a href="#22-api-offerte">2.2 API offerte</a></li>
+<li><a href="#23-configuration">2.3 Configuration</a></li>
+<li><a href="#24-bundles-de-messages">2.4 Bundles de messages</a></li>
+<li><a href="#25-tests">2.5 Tests</a></li>
+</ul>
+</li>
+<li><a href="#3-cartographie-dutilisation-reelle">3. Cartographie d'utilisation réelle</a></li>
+<li><a href="#4-couverture-i18n-reelle-du-projet-par-module-echantillonnee">4. Couverture i18n réelle du projet (par module, échantillonnée)</a></li>
+<li><a href="#5-multidevise-etat-reel">5. Multidevise — état réel</a><ul>
+<li><a href="#51-types-monetaires-6-classes-money-dupliquees">5.1 Types monétaires : 6 classes Money dupliquées</a></li>
+<li><a href="#52-colonnes-devise-en-base">5.2 Colonnes devise en base</a></li>
+<li><a href="#53-conversion-taux-formatage">5.3 Conversion, taux, formatage</a></li>
+</ul>
+</li>
+<li><a href="#6-points-positifs">6. Points positifs</a></li>
+<li><a href="#7-problemes-detectes-tableau-de-synthese">7. Problèmes détectés — tableau de synthèse</a></li>
+<li><a href="#8-details-et-preuves-des-problemes-majeurs">8. Détails et preuves des problèmes majeurs</a><ul>
+<li><a href="#p-1-p-2-la-seule-chaine-i18n-branchee-produit-des-messages-casses-critique">P-1 / P-2 — La seule chaîne i18n branchée produit des messages cassés (Critique)</a></li>
+<li><a href="#p-3-trois-systemes-de-templates-paralleles">P-3 — Trois systèmes de templates parallèles</a></li>
+<li><a href="#p-6-p-7-multidevise-incoherent">P-6 / P-7 — Multidevise incohérent</a></li>
+<li><a href="#p-4-aucune-propagation-de-la-locale-client">P-4 — Aucune propagation de la locale client</a></li>
+<li><a href="#p-10-documents-financiers-non-localisables">P-10 — Documents financiers non localisables</a></li>
+</ul>
+</li>
+<li><a href="#9-recommandations-priorisees">9. Recommandations priorisées</a></li>
+<li><a href="#10-addendum-modules-corebackend-extension-de-perimetre">10. Addendum — modules coreBackend (extension de périmètre)</a><ul>
+<li><a href="#101-utilisent-ils-yow-i18n-kernel">10.1 Utilisent-ils yow-i18n-kernel ?</a></li>
+<li><a href="#102-chaines-en-dur">10.2 Chaînes en dur</a></li>
+<li><a href="#103-notifications-e-commerce-cassees-p-21-critique">10.3 Notifications e-commerce cassées (P-21, Critique)</a></li>
+<li><a href="#104-gestion-des-devises-dans-corebackend">10.4 Gestion des devises dans coreBackend</a></li>
+</ul>
+</li>
+<li><a href="#11-conclusion-verdict">11. Conclusion — verdict</a></li>
+</ul>
+</div>
+</div>
+<h1 id="audit-n4-module-yow-i18n-kernel-i18n-multidevise">Audit n°4 — Module <code>yow-i18n-kernel</code> (i18n &amp; multidevise)</h1>
+<ul>
+<li><strong>Projet</strong> : TiiBnTick Core (<code>tiibntick-core</code>)</li>
+<li><strong>Module audité</strong> : <code>foundation/yow-i18n-kernel</code> (L0 Foundation)</li>
+<li><strong>Date</strong> : 2026-07-16</li>
+<li><strong>Auditeur</strong> : Platform Engineering — Audit interne</li>
+<li><strong>Périmètre</strong> : inventaire du module, intégration réelle dans le monorepo, couverture i18n effective du projet, gestion multidevise, verdict de préparation « mondial ».</li>
+</ul>
+<hr />
+<h2 id="1-resume-executif">1. Résumé exécutif</h2>
+<p><code>yow-i18n-kernel</code> est un petit module hexagonal propre et testé (15 fichiers Java main, 3 classes de test, 14/14 tests verts) qui fournit deux capacités : traduction de clés de messages depuis des packs JSON (<code>/i18n/messages_{tag}.json</code>, 5 locales, 27 clés chacune) et formatage de prix localisé (6 devises, règle « XAF/XOF sans décimales » correcte).</p>
+<p><strong>Mais son intégration réelle est quasi nulle et partiellement cassée.</strong> Un seul fichier dans tout le dépôt importe le package (<code>NotifyCoreAutoConfiguration</code> de <code>tnt-notify-core</code>), et la chaîne de bout en bout est défaillante : tous les producteurs de notifications passent la langue <code>"fr"</code> (au lieu de <code>"fr_CM"</code>) et des clés de template (<code>notify.freelancer_org.*</code>, <code>incident.notification.*</code>) <strong>absentes des packs JSON</strong>. Résultat : chaque notification FreelancerOrg/incident envoyée par SMS/Email/Push contient littéralement le texte <code>⚠ Missing translation: &lt;clé&gt;</code>. Les catalogues FR/EN de secours (<code>FreelancerOrgNotificationTemplates</code>) sont du code mort jamais branché.</p>
+<p>Le reste du projet ignore l'i18n : ~200 messages d'exception en dur (anglais) dont 94 dans les 4 modules <code>coreBackend/</code> (633 fichiers, <strong>zéro</strong> usage du kernel — voir Addendum §10), messages de validation Jakarta en dur, sujet d'email en dur, gabarits PDF de facture 100 % français, doc Swagger gofp en français en dur, aucun traitement de l'en-tête <code>Accept-Language</code>, préférence de langue utilisateur stockée mais jamais consultée à l'envoi. Les 8 notifications e-commerce de <code>tnt-market-back-core</code> sont cassées de la même façon (clés <code>ORDER_PAID</code>… absentes des packs, langue <code>"fr"</code> invalide).</p>
+<p>Côté multidevise : <strong>6 classes <code>Money</code> dupliquées</strong> avec des règles d'arrondi divergentes, <code>'FCFA'</code> (non-ISO) utilisé comme code devise en base et dans le code, aucune conversion ni taux de change, et trois listes de devises/locales « supportées » incohérentes entre elles (enum du kernel, <code>SolutionContext</code>, colonnes SQL).</p>
+<p><strong>Verdict : NON.</strong> Le projet n'est prêt ni pour un support multilingue ni pour un support multidevise à l'échelle mondiale. Il est aujourd'hui monolingue de fait (français en dur + anglais technique) et monodevise de fait (XAF par défaut partout). Le kernel i18n est une bonne fondation embryonnaire, mais débranchée.</p>
+<hr />
+<h2 id="2-etat-actuel-inventaire-du-module">2. État actuel — Inventaire du module</h2>
+<h3 id="21-structure-18-fichiers-15-main-3-test">2.1 Structure (18 fichiers : 15 main + 3 test)</h3>
+<p>Package racine : <code>com.yowyob.kernel.i18n</code> (confirmé — conforme à la convention CLAUDE.md pour les modules kernel L0).</p>
+<pre><code>adapter/currency/JavaCurrencyFormatterAdapter.java   — formatage DecimalFormat par locale Java
+adapter/json/JsonLocalePackAdapter.java              — chargement des packs JSON en mémoire
+application/port/in/TranslateMessageUseCase.java      — port entrant : traduction
+application/port/in/PriceFormatterUseCase.java        — port entrant : formatage prix
+application/port/out/MessageTranslationPort.java      — port sortant : source de messages
+application/port/out/PriceFormatterPort.java          — port sortant : moteur de formatage
+application/service/TranslationService.java           — impl. traduction + interpolation
+application/service/PriceFormatterService.java        — impl. formatage
+config/I18nKernelProperties.java                      — @ConfigurationProperties &quot;yowyob.i18n&quot;
+config/YowI18nKernelAutoConfiguration.java            — auto-config Spring Boot (4 beans @ConditionalOnMissingBean)
+domain/enums/SupportedLanguage.java                   — FR_CM, EN_CM, PIDGIN_CM, EN_NG, FR_FR, EN_US
+domain/enums/SupportedCurrency.java                   — XAF, XOF, NGN, KES, USD, EUR
+domain/vo/LocaleConfig.java                           — (langue, devise)
+domain/vo/LocalizedMessage.java                       — message + interpolation {{var}}
+domain/vo/LocalizedPrice.java                         — montant + devise + représentation
+</code></pre>
+<h3 id="22-api-offerte">2.2 API offerte</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Capacité</th>
+<th>Présente ?</th>
+<th>Détail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Message source (traduction par clé)</td>
+<td>✅</td>
+<td><code>TranslateMessageUseCase.translate(key, language[, params])</code> → <code>Optional&lt;String&gt;</code></td>
+</tr>
+<tr>
+<td>Interpolation de variables</td>
+<td>✅</td>
+<td>Syntaxe <code>{{variable}}</code> (<code>LocalizedMessage.interpolate</code>)</td>
+</tr>
+<tr>
+<td>Formatage de prix par locale</td>
+<td>✅</td>
+<td><code>PriceFormatterUseCase.formatForLocale(amount, currency, language)</code></td>
+</tr>
+<tr>
+<td>Arrondi par devise</td>
+<td>✅ (dans le module)</td>
+<td>XAF/XOF → échelle 0, autres → 2 (<code>JavaCurrencyFormatterAdapter:52-67</code>)</td>
+</tr>
+<tr>
+<td><strong>Résolution de locale (Accept-Language, préférence utilisateur)</strong></td>
+<td>❌</td>
+<td>Aucune classe. L'appelant doit fournir la langue en <code>String</code> brut</td>
+</tr>
+<tr>
+<td><strong>Fallback de locale (fr_CM → fr_FR → défaut)</strong></td>
+<td>❌</td>
+<td>Commenté mais non implémenté (<code>JsonLocalePackAdapter.java:68-69</code>)</td>
+</tr>
+<tr>
+<td><strong>Conversion de devises / taux de change</strong></td>
+<td>❌</td>
+<td>Aucune</td>
+</tr>
+<tr>
+<td><strong>Formats de dates/nombres localisés (hors prix)</strong></td>
+<td>❌</td>
+<td>Aucun</td>
+</tr>
+<tr>
+<td><strong>Pluralisation, genre, ICU MessageFormat</strong></td>
+<td>❌</td>
+<td>Simple <code>String.replace</code></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="23-configuration">2.3 Configuration</h3>
+<ul>
+<li><code>application.yaml</code> du module (embarqué dans le JAR de la <strong>librairie</strong> — anti-pattern, voir P-13) : locales <code>fr_CM, en_CM, pidgin_CM, en_NG, fr_FR</code>, défaut <code>FR_CM</code>.</li>
+<li><code>I18nKernelProperties.java:21</code> : défaut programmatique = 3 locales camerounaises seulement.</li>
+<li>Auto-configuration déclarée dans <code>META-INF/spring/...AutoConfiguration.imports</code> — chargée automatiquement par <code>tnt-bootstrap</code> ; le bean <code>messageTranslationPort</code> exige un <code>ObjectMapper</code> qualifié <code>tntObjectMapper</code> (fourni par bootstrap).</li>
+</ul>
+<h3 id="24-bundles-de-messages">2.4 Bundles de messages</h3>
+<ul>
+<li><strong>Aucun <code>messages*.properties</code> dans tout le dépôt</strong> (vérifié par <code>find</code> global) — pas de <code>MessageSource</code> Spring nulle part.</li>
+<li>5 packs JSON dans <code>foundation/yow-i18n-kernel/src/main/resources/i18n/</code> : <code>fr_CM</code>, <code>en_CM</code>, <code>pidgin_CM</code>, <code>en_NG</code>, <code>fr_FR</code> — <strong>27 clés chacun</strong>, cohérents entre eux (familles <code>notification.*</code>, <code>error.*</code>, <code>billing.*</code>, <code>status.*</code>, <code>blockchain.*</code>, <code>account.*</code>).</li>
+<li><strong><code>messages_en_US.json</code> absent</strong> alors que <code>SupportedLanguage.EN_US</code> existe (<code>SupportedLanguage.java:516</code>) — locale déclarée mais non traduisible.</li>
+</ul>
+<h3 id="25-tests">2.5 Tests</h3>
+<p>3 classes, 14 tests, tous verts (surefire) : <code>JsonLocalePackAdapterTest</code> (6), <code>PriceFormatterServiceTest</code> (4), <code>TranslationServiceTest</code> (4). Couvrent le happy path et les cas vides ; ne couvrent ni <code>JavaCurrencyFormatterAdapter</code> directement, ni <code>LocaleConfig</code>, ni l'auto-configuration.</p>
+<hr />
+<h2 id="3-cartographie-dutilisation-reelle">3. Cartographie d'utilisation réelle</h2>
+<p>Grep exhaustif de <code>import com.yowyob.kernel.i18n</code> hors du module lui-même :</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Consommateur</th>
+<th>Type d'usage</th>
+<th>Constat</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>logistics/tnt-notify-core</code> — <code>NotifyCoreAutoConfiguration.java:3,69-77</code></td>
+<td><strong>Seul import du dépôt.</strong> Pont <code>TranslateMessageUseCase</code> → <code>ITranslationPort</code> (anti-corruption)</td>
+<td>Fonctionnel, mais fallback dangereux : <code>defaultIfEmpty("⚠ Missing translation: " + key)</code> <strong>envoyé tel quel à l'utilisateur final</strong></td>
+</tr>
+<tr>
+<td><code>logistics/tnt-delivery-core/pom.xml:55</code></td>
+<td>Dépendance Maven <strong>sans aucun import</strong></td>
+<td>Dépendance morte</td>
+</tr>
+<tr>
+<td><code>billing/tnt-billing-dsl/pom.xml:50</code></td>
+<td>Dépendance Maven <strong>sans aucun import</strong></td>
+<td>Dépendance morte</td>
+</tr>
+<tr>
+<td><code>coreBackend/tnt-go-freelancer-point-back-core/pom.xml:39</code></td>
+<td>Dépendance Maven <strong>sans aucun import</strong></td>
+<td>Dépendance morte</td>
+</tr>
+<tr>
+<td><code>tnt-bootstrap</code></td>
+<td>Dépendance transitive/agrégation, charge l'auto-config</td>
+<td>Beans créés mais consommés uniquement via tnt-notify-core</td>
+</tr>
+<tr>
+<td>Tous les autres modules (~30)</td>
+<td><strong>Aucun usage</strong></td>
+<td><code>PriceFormatterUseCase</code> n'a <strong>zéro</strong> consommateur dans tout le dépôt, alors que sa Javadoc (<code>PriceFormatterUseCase.java:161</code>) affirme « Used by billing modules (tnt-billing-cost, tnt-billing-invoice) » — faux</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Chaîne réelle de traduction (unique) :</strong> producteurs (<code>FreelancerOrgKafkaEventConsumer</code>, <code>IncidentNotificationPortAdapter</code>, <code>NotificationController</code>, <code>MarketNotificationAdapter</code>) → <code>NotificationModel(templateKey, targetLanguage, params)</code> → <code>NotificationService.send</code> → <code>ITranslationPort</code> → <code>TranslationService</code> → <code>JsonLocalePackAdapter</code>. Cette chaîne est cassée en amont (langues et clés invalides, voir P-1/P-2).</p>
+<hr />
+<h2 id="4-couverture-i18n-reelle-du-projet-par-module-echantillonnee">4. Couverture i18n réelle du projet (par module, échantillonnée)</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Messages d'exception</th>
+<th>Réponses API / DTO</th>
+<th>Validation</th>
+<th>Templates / sorties</th>
+<th>Verdict i18n</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>yow-i18n-kernel</code></td>
+<td>n/a</td>
+<td>n/a</td>
+<td>n/a</td>
+<td>5 packs JSON × 27 clés</td>
+<td>✅ seul îlot i18n</td>
+</tr>
+<tr>
+<td><code>tnt-notify-core</code></td>
+<td>Anglais en dur</td>
+<td>Fallback <code>⚠ Missing translation</code> exposé</td>
+<td>—</td>
+<td>Sujet email en dur <code>"TiiBnTick — Notification"</code> (<code>EmailNotificationAdapter.java:59</code>) ; catalogues FR/EN morts (<code>FreelancerOrgNotificationTemplates.java:47-98</code>)</td>
+<td>❌ cassé</td>
+</tr>
+<tr>
+<td><code>tnt-delivery-core</code></td>
+<td>15 <code>throw</code> anglais en dur (ex. <code>Parcel.java:33,48</code>, <code>DeliveryAnnouncement.java:217-229</code>)</td>
+<td>Anglais en dur</td>
+<td>—</td>
+<td>—</td>
+<td>❌</td>
+</tr>
+<tr>
+<td><code>tnt-dispute-core</code></td>
+<td>8 <code>throw</code> anglais (ex. <code>OpenDisputeAgainstFreelancerOrgCommand.java:57</code>)</td>
+<td>Anglais</td>
+<td>—</td>
+<td>—</td>
+<td>❌</td>
+</tr>
+<tr>
+<td><code>tnt-billing-wallet</code></td>
+<td>25 <code>throw</code> anglais (ex. <code>PaymentIntent.java:47,61,83</code>)</td>
+<td>Anglais</td>
+<td>—</td>
+<td>—</td>
+<td>❌</td>
+</tr>
+<tr>
+<td><code>tnt-billing-invoice</code></td>
+<td>6 <code>throw</code> anglais</td>
+<td>Anglais</td>
+<td>—</td>
+<td>PDF via tnt-media-core (voir ci-dessous)</td>
+<td>❌</td>
+</tr>
+<tr>
+<td><code>tnt-billing-dsl</code></td>
+<td>Anglais</td>
+<td>Anglais</td>
+<td><code>@NotBlank(message = "Rule name is required")</code> etc. en dur (<code>DslRuleRequest.java:16-35</code>)</td>
+<td>—</td>
+<td>❌</td>
+</tr>
+<tr>
+<td><code>tnt-billing-templates</code></td>
+<td>Anglais</td>
+<td>Titres ProblemDetail anglais en dur (<code>BillingTemplatesExceptionHandler.java:38,51,64</code>)</td>
+<td>—</td>
+<td>Libellés de paramètres <strong>bilingues FR/EN en dur dans le Java</strong> (<code>TemplateCatalogSeeder.java:119-174</code>) — 3e système i18n parallèle</td>
+<td>❌</td>
+</tr>
+<tr>
+<td><code>tnt-trust-core</code></td>
+<td>Anglais</td>
+<td>Anglais</td>
+<td><code>@NotBlank(message = "orgId is required")</code> en dur (<code>TrustApiController.java:306-309</code>)</td>
+<td>—</td>
+<td>❌</td>
+</tr>
+<tr>
+<td><code>tnt-media-core</code></td>
+<td>Anglais</td>
+<td>—</td>
+<td>—</td>
+<td><strong>8 gabarits JRXML monolingues français</strong> (<code>invoice.jrxml</code> : « FACTURE », « FACTURÉ À », « TVA », « TOTAL TTC ») ; <code>PDFRenderRequest.java:24</code> locale par défaut <code>"fr_CM"</code> ; <code>REPORT_LOCALE</code> n'affecte que les formats Jasper, pas les libellés</td>
+<td>❌ FR-only</td>
+</tr>
+<tr>
+<td><code>tnt-organization-core</code></td>
+<td>20 <code>throw</code> anglais</td>
+<td>Anglais</td>
+<td>—</td>
+<td>—</td>
+<td>❌</td>
+</tr>
+<tr>
+<td>Handlers d'exceptions (10 trouvés : bootstrap, delivery, geo, auth, actor, dispute, resource, wallet, invoice, templates)</td>
+<td>—</td>
+<td><strong>Aucun</strong> n'utilise le kernel i18n ni un <code>MessageSource</code> ; titres/détails anglais en dur</td>
+<td>—</td>
+<td>—</td>
+<td>❌</td>
+</tr>
+<tr>
+<td><code>coreBackend/tnt-agency-back-core</code> (223 fichiers)</td>
+<td>38 <code>throw</code> anglais (ex. <code>AgencyMission.java:112-159</code>)</td>
+<td>Anglais</td>
+<td>—</td>
+<td><code>XAF</code> en dur dans les clients sortants (<code>DeliveryMissionClient.java:100,109</code>, <code>MissionService.java:693</code>)</td>
+<td>❌</td>
+</tr>
+<tr>
+<td><code>coreBackend/tnt-market-back-core</code> (170 fichiers)</td>
+<td>31 <code>throw</code> anglais</td>
+<td>Anglais</td>
+<td>—</td>
+<td>8 clés de notif e-commerce absentes des packs + langue <code>"fr"</code> (<code>MarketNotificationAdapter.java:39-84</code>) — même bug que P-1/P-2</td>
+<td>❌ cassé</td>
+</tr>
+<tr>
+<td><code>coreBackend/tnt-link-back-core</code> (120 fichiers)</td>
+<td>18 <code>throw</code> anglais</td>
+<td>Anglais</td>
+<td>—</td>
+<td>—</td>
+<td>❌</td>
+</tr>
+<tr>
+<td><code>coreBackend/tnt-go-freelancer-point-back-core</code> (120 fichiers)</td>
+<td>7 <code>throw</code> anglais</td>
+<td>Anglais</td>
+<td>—</td>
+<td>Doc Swagger <strong>en français en dur</strong> (<code>DeliveryCoreController.java:24-74</code>, <code>RelayHubSubscriptionCoreController.java:65-77</code>) ; dépendance <code>yow-i18n-kernel</code> déclarée mais 0 import</td>
+<td>❌</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Locale du client :</strong> grep global de <code>Accept-Language</code>, <code>LocaleResolver</code>, <code>LocaleContextResolver</code>, <code>LocaleContextHolder</code> → <strong>0 résultat</strong>. L'en-tête HTTP standard n'est traité nulle part. La préférence utilisateur existe (<code>NotificationPreference.preferredLanguage</code>, <code>ManagePreferencesService.java:23</code> défaut <code>fr_CM</code>) mais <code>NotificationService.send</code> (<code>NotificationService.java:43-59</code>) ne la consulte jamais : la langue vient du producteur, en dur.</p>
+<hr />
+<h2 id="5-multidevise-etat-reel">5. Multidevise — état réel</h2>
+<h3 id="51-types-monetaires-6-classes-money-dupliquees">5.1 Types monétaires : 6 classes <code>Money</code> dupliquées</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Classe</th>
+<th>Arrondi</th>
+<th>Devise</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>foundation/tnt-common-core/.../common/vo/Money.java</code> (canonique)</td>
+<td>échelle = fraction ISO de la devise (XAF→0), HALF_UP</td>
+<td><code>java.util.Currency</code> (ISO validé)</td>
+</tr>
+<tr>
+<td><code>billing/tnt-billing-dsl/.../domain/model/Money.java</code></td>
+<td>idem (XAF→0)</td>
+<td><code>java.util.Currency</code></td>
+</tr>
+<tr>
+<td><code>billing/tnt-billing-invoice/.../domain/model/Money.java:25</code></td>
+<td><strong>échelle 2 forcée pour toutes devises, y compris XAF</strong></td>
+<td><code>String</code> libre (non validé ISO)</td>
+</tr>
+<tr>
+<td><code>billing/tnt-billing-wallet/.../domain/model/Money.java</code></td>
+<td>(variante locale)</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>billing/tnt-billing-cost/.../domain/model/Money.java</code></td>
+<td>(variante locale)</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>coreBackend/tnt-market-back-core/.../domain/model/Money.java</code></td>
+<td>(variante locale)</td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<p>Conséquence concrète : une facture XAF est représentée <code>15000.00</code> côté invoice mais <code>15000</code> côté DSL/pricing — divergence d'arrondi et de sérialisation entre modules qui échangent des montants par Kafka/REST.</p>
+<h3 id="52-colonnes-devise-en-base">5.2 Colonnes devise en base</h3>
+<ul>
+<li>~20 tables ont une colonne devise, quasi toutes <code>NOT NULL DEFAULT 'XAF'</code> (ex. <code>billing/tnt-billing-invoice/.../001_create_billing_invoice_tables.sql:32-67</code>, <code>business/tnt-sales-core/.../002-create-orders-tables.sql:14</code>). Le multidevise est donc <em>stockable</em>, mais le défaut systémique est XAF.</li>
+<li><strong>Incohérence de type</strong> : <code>CHAR(3)</code>, <code>VARCHAR(3)</code>, <code>VARCHAR(5)</code>, <code>VARCHAR(10)</code> selon les modules.</li>
+<li><strong><code>DEFAULT 'FCFA'</code></strong> (symbole, pas un code ISO 4217) dans <code>coreBackend/tnt-go-freelancer-point-back-core/.../011_create_delivery_person_pricing.sql:14</code> et <code>012_create_logistics_pricing.sql:16</code>, repris dans le code (<code>CommissionPolicy.java:21</code>, <code>PricingCoreService.java:41,67,119,129</code>). Tout passage de <code>'FCFA'</code> à <code>Currency.getInstance()</code> (Money canonique) lèverait <code>IllegalArgumentException</code>.</li>
+</ul>
+<h3 id="53-conversion-taux-formatage">5.3 Conversion, taux, formatage</h3>
+<ul>
+<li><strong>Aucun taux de change, aucune conversion</strong> : grep <code>exchangeRate|ExchangeRate|conversion</code> → 0 résultat monétaire. <code>Money.add/subtract</code> jettent en cas de devises différentes — correct mais signifie qu'aucune agrégation multi-devise (reporting multi-pays) n'est possible.</li>
+<li>Formatage localisé : seul <code>JavaCurrencyFormatterAdapter</code> le fait — et il n'a <strong>aucun consommateur</strong> (§3). Les PDF concatènent <code>montant + " " + code</code> sans format locale (<code>invoice.jrxml</code>).</li>
+<li>Listes « supportées » incohérentes : enum kernel = {XAF, XOF, NGN, KES, USD, EUR} ; <code>ApplicationProfileConfig.java:66</code> = idem <strong>+ GHS</strong> ; locales <code>ApplicationProfileConfig.java:65</code> = <code>pcm_NG, fr_SN, en_KE</code> qui n'existent pas dans <code>SupportedLanguage</code> (et <code>pcm_NG</code> ≠ <code>pidgin_CM</code>).</li>
+</ul>
+<hr />
+<h2 id="6-points-positifs">6. Points positifs</h2>
+<ol>
+<li><strong>Architecture hexagonale exemplaire</strong> du module : ports in/out, services purs sans annotation Spring, adaptateurs substituables, auto-configuration <code>@ConditionalOnMissingBean</code> — conforme aux conventions du repo.</li>
+<li><strong>Règle ISO 4217 XAF/XOF sans décimales correctement implémentée</strong> dans le module (<code>JavaCurrencyFormatterAdapter.java:52-67</code>) et dans les <code>Money</code> de common/dsl.</li>
+<li><strong>Pack pidgin camerounais</strong> : rare et pertinent pour le marché cible ; les 5 packs sont complets et synchronisés (27 clés partout).</li>
+<li><strong>Tests unitaires réels et verts</strong> (14/14), y compris chargement effectif des JSON du classpath.</li>
+<li><strong>Pont anti-corruption dans tnt-notify-core</strong> (<code>ITranslationPort</code>) : le pattern d'intégration est le bon, seul le contenu qui y transite est cassé.</li>
+<li>Le modèle <code>NotificationPreference.preferredLanguage</code> et le <code>SolutionContext</code> montrent une <strong>intention</strong> multilingue/multidevise dès la conception.</li>
+</ol>
+<hr />
+<h2 id="7-problemes-detectes-tableau-de-synthese">7. Problèmes détectés — tableau de synthèse</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Problème</th>
+<th>Localisation (preuve)</th>
+<th>Criticité</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>P-1</td>
+<td>Clés de notification inexistantes dans les packs → l'utilisateur reçoit <code>⚠ Missing translation: notify.freelancer_org.verified</code> par SMS/Email/Push</td>
+<td><code>FreelancerOrgKafkaEventConsumer.java:98-240</code> (clés <code>notify.*</code>), <code>IncidentNotificationPortAdapter.java:224</code> (clés <code>incident.notification.*</code>), fallback <code>NotifyCoreAutoConfiguration.java:74</code> ; packs JSON = familles <code>notification.*</code>/<code>error.*</code> uniquement</td>
+<td><span class="badge crit">Critique</span></td>
+</tr>
+<tr>
+<td>P-2</td>
+<td>Langue <code>"fr"</code> passée partout alors que les packs sont indexés <code>fr_CM</code>/<code>fr_FR</code> → lookup toujours vide même pour les clés existantes</td>
+<td><code>FreelancerOrgKafkaEventConsumer.java:99</code> et 5 autres occurrences, <code>IncidentNotificationPortAdapter.java:225</code>, <code>NotificationController.java:86</code> (défaut <code>"fr"</code>), <code>MarketNotificationAdapter.java:84</code></td>
+<td><span class="badge crit">Critique</span></td>
+</tr>
+<tr>
+<td>P-3</td>
+<td><code>FreelancerOrgNotificationTemplates.DEFAULT_FR_TEMPLATES</code>/<code>DEFAULT_EN_TEMPLATES</code> : catalogues complets jamais référencés (grep : 0 usage) + syntaxe <code>{var}</code> incompatible avec l'interpolateur <code>{{var}}</code> du kernel</td>
+<td><code>FreelancerOrgNotificationTemplates.java:47-98</code></td>
+<td><span class="badge high">Élevé</span></td>
+</tr>
+<tr>
+<td>P-4</td>
+<td>Aucune résolution de locale : <code>Accept-Language</code> jamais lu, <code>preferredLanguage</code> stocké mais jamais consulté à l'envoi</td>
+<td>grep global = 0 ; <code>NotificationService.java:43-59</code> ; <code>ManagePreferencesService.java:23</code></td>
+<td><span class="badge high">Élevé</span></td>
+</tr>
+<tr>
+<td>P-5</td>
+<td>Fallback de locale non implémenté (fr_CM→fr_FR) — commentaire TODO déguisé</td>
+<td><code>JsonLocalePackAdapter.java:68-69</code></td>
+<td><span class="badge med">Moyen</span></td>
+</tr>
+<tr>
+<td>P-6</td>
+<td>6 classes <code>Money</code> dupliquées, arrondis divergents (invoice force échelle 2 même en XAF)</td>
+<td><code>tnt-billing-invoice/.../Money.java:25</code> vs <code>tnt-common-core/.../Money.java:37-40</code> vs <code>tnt-billing-dsl/.../Money.java:33</code> (+ wallet, cost, market-back)</td>
+<td><span class="badge high">Élevé</span></td>
+</tr>
+<tr>
+<td>P-7</td>
+<td><code>'FCFA'</code> utilisé comme code devise (non ISO 4217) en base et en dur dans le code — incompatible avec <code>Currency.getInstance</code></td>
+<td><code>011_create_delivery_person_pricing.sql:14</code>, <code>012_create_logistics_pricing.sql:16</code>, <code>CommissionPolicy.java:21</code>, <code>PricingCoreService.java:41,67,119,129</code></td>
+<td><span class="badge high">Élevé</span></td>
+</tr>
+<tr>
+<td>P-8</td>
+<td>Aucun mécanisme de conversion/taux de change ; agrégations reporting mono-devise par construction</td>
+<td>grep global <code>ExchangeRate</code> = 0 ; <code>ReportingService.java:266-343</code> (une seule <code>cur</code> par requête)</td>
+<td>Moyen (bloquant pour « mondial »)</td>
+</tr>
+<tr>
+<td>P-9</td>
+<td>~100+ messages d'exception et titres ProblemDetail en dur (anglais), 10 exception handlers sans aucune traduction ; messages de validation Jakarta en dur</td>
+<td>échantillons : <code>Parcel.java:33</code>, <code>PaymentIntent.java:47</code>, <code>DslRuleRequest.java:16-35</code>, <code>TrustApiController.java:306-309</code>, <code>BillingTemplatesExceptionHandler.java:38,51,64</code></td>
+<td><span class="badge high">Élevé</span></td>
+</tr>
+<tr>
+<td>P-10</td>
+<td>Gabarits PDF (facture, reçus, manifeste…) monolingues français ; « FACTURE », « TVA », « TOTAL TTC » en dur ; montants non formatés par locale</td>
+<td><code>logistics/tnt-media-core/src/main/resources/templates/invoice.jrxml</code> (+7 autres JRXML), <code>PDFRenderRequest.java:24</code></td>
+<td><span class="badge high">Élevé</span></td>
+</tr>
+<tr>
+<td>P-11</td>
+<td>Sujet d'email unique en dur, non localisé</td>
+<td><code>EmailNotificationAdapter.java:59</code></td>
+<td><span class="badge med">Moyen</span></td>
+</tr>
+<tr>
+<td>P-12</td>
+<td><code>LocaleConfig.toLocaleTag()</code> bogué : <code>replace("_","_")</code> est un no-op et <code>PIDGIN_CM.name().toLowerCase()</code> = <code>pidgin_cm</code> ≠ tag de fichier <code>pidgin_CM</code> → lookup cassé si utilisé ; devrait retourner <code>language.getTag()</code></td>
+<td><code>LocaleConfig.java:46-48</code></td>
+<td>Moyen (latent — classe inutilisée)</td>
+</tr>
+<tr>
+<td>P-13</td>
+<td><code>application.yaml</code> embarqué dans le JAR d'une librairie : risque de masquer/entrer en collision avec la config de l'application hôte</td>
+<td><code>foundation/yow-i18n-kernel/src/main/resources/application.yaml</code></td>
+<td><span class="badge med">Moyen</span></td>
+</tr>
+<tr>
+<td>P-14</td>
+<td><code>SupportedLanguage.EN_US</code> déclaré sans pack <code>messages_en_US.json</code> ; <code>messages_en_NG</code>/<code>fr_FR</code> non chargés par le défaut programmatique (3 locales)</td>
+<td><code>SupportedLanguage.java:516</code>, <code>I18nKernelProperties.java:21</code></td>
+<td><span class="badge low">Faible</span></td>
+</tr>
+<tr>
+<td>P-15</td>
+<td>Référentiels incohérents : <code>SolutionContext</code> annonce <code>pcm_NG, fr_SN, en_KE</code> (inexistants dans l'enum) et <code>GHS</code> (absent de <code>SupportedCurrency</code>)</td>
+<td><code>ApplicationProfileConfig.java:65-66</code></td>
+<td><span class="badge med">Moyen</span></td>
+</tr>
+<tr>
+<td>P-16</td>
+<td><code>LocalizedPrice</code> interdit les montants négatifs (remboursements/avoirs impossibles) et <code>LocalizedPrice.of()</code> force l'échelle 2 même pour XAF, contredisant l'adaptateur</td>
+<td><code>LocalizedPrice.java:25-26,39</code></td>
+<td><span class="badge med">Moyen</span></td>
+</tr>
+<tr>
+<td>P-17</td>
+<td>Dépendances Maven mortes vers <code>yow-i18n-kernel</code> (aucun import)</td>
+<td><code>tnt-delivery-core/pom.xml:55</code>, <code>tnt-billing-dsl/pom.xml:50</code>, <code>tnt-go-freelancer-point-back-core/pom.xml:39</code></td>
+<td><span class="badge low">Faible</span></td>
+</tr>
+<tr>
+<td>P-18</td>
+<td>Javadoc mensongère : <code>PriceFormatterUseCase</code> « used by tnt-billing-cost, tnt-billing-invoice » — 0 consommateur réel</td>
+<td><code>PriceFormatterUseCase.java:160-165</code></td>
+<td><span class="badge low">Faible</span></td>
+</tr>
+<tr>
+<td>P-19</td>
+<td>Colonnes devise hétérogènes (<code>CHAR(3)</code> à <code>VARCHAR(10)</code>), défaut <code>XAF</code> codé en dur dans ~20 migrations</td>
+<td>ex. <code>001_create_billing_invoice_tables.sql:32-67</code>, <code>002-create-orders-tables.sql:14</code>, <code>v0002_create_tnt_agency.sql:30</code></td>
+<td><span class="badge low">Faible</span></td>
+</tr>
+<tr>
+<td>P-20</td>
+<td><code>TranslationService.translationPort</code> non <code>final</code> (mutabilité inutile d'un service « pur »)</td>
+<td><code>TranslationService.java:340</code> (champ ligne 18 du fichier)</td>
+<td><span class="badge low">Faible</span></td>
+</tr>
+<tr>
+<td>P-21</td>
+<td>Notifications e-commerce market-back : 8 clés (<code>CLIENT_QUOTE_RECEIVED</code>, <code>ORDER_PAID</code>, <code>LISTING_APPROVED</code>…) absentes des packs JSON + langue <code>"fr"</code> invalide → tout client/marchand reçoit <code>⚠ Missing translation: …</code></td>
+<td><code>MarketNotificationAdapter.java:39-84</code></td>
+<td><span class="badge crit">Critique</span></td>
+</tr>
+<tr>
+<td>P-22</td>
+<td>Variante market-back de <code>Money</code> (une des 6 de P-6) : <code>long</code> « unités mineures » avec commentaire erroné (« centimes for XAF » — XAF n'a pas de centimes, ISO 4217) → ambiguïté francs/centimes à la frontière <code>BigDecimal</code> (<code>MarketServiceOfferPersistenceAdapter.java:67</code>) ; <code>formatted()</code> utilise la locale JVM par défaut</td>
+<td><code>marketback/domain/model/Money.java:7,11,58-60</code></td>
+<td><span class="badge high">Élevé</span></td>
+</tr>
+<tr>
+<td>P-23</td>
+<td>Devise figée dans les contrats d'API e-commerce : 117 identifiants suffixés <code>Xaf</code> (<code>amountXaf</code>, <code>minPriceXaf</code>, <code>paidAmountXaf</code>…) dans les ports/commandes/DTO de market-back ; <code>"XAF"</code> en dur dans les clients agency</td>
+<td><code>IMarketNotificationPort.java:15</code>, <code>MarketOrderApplicationService.java:232</code>, <code>DeliveryMissionClient.java:100,109</code>, <code>MissionService.java:693</code></td>
+<td><span class="badge high">Élevé</span></td>
+</tr>
+<tr>
+<td>P-24</td>
+<td>coreBackend : 94 messages d'exception en dur (agency 38, market 31, link 18, gofp 7) et documentation OpenAPI/Swagger en français en dur (gofp) — troisième langue de code mélangée (code EN, Swagger FR, notifs FR)</td>
+<td><code>AgencyMission.java:112-159</code>, <code>DeliveryCoreController.java:24-74</code></td>
+<td><span class="badge med">Moyen</span></td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="8-details-et-preuves-des-problemes-majeurs">8. Détails et preuves des problèmes majeurs</h2>
+<h3 id="p-1-p-2-la-seule-chaine-i18n-branchee-produit-des-messages-casses-critique">P-1 / P-2 — La seule chaîne i18n branchée produit des messages cassés (Critique)</h3>
+<p>Le pont notify (<code>NotifyCoreAutoConfiguration.java:69-77</code>) :</p>
+<pre><code class="language-java">return model -&gt; Mono.justOrEmpty(
+        translateMessageUseCase.translate(model.templateKey(), model.targetLanguage(), model.parameters()))
+        .defaultIfEmpty(&quot;⚠ Missing translation: &quot; + model.templateKey());
+</code></pre>
+<p>Or <strong>tous</strong> les producteurs construisent <code>new NotificationModel(templateKey, "fr", …)</code> (6 occurrences dans <code>FreelancerOrgKafkaEventConsumer.java</code>, <code>IncidentNotificationPortAdapter.java:225</code>, défaut du contrôleur <code>NotificationController.java:86</code>) :
+1. <code>"fr"</code> n'est pas une clé de pack (packs indexés par <code>fr_CM</code>, <code>fr_FR</code>…) → <code>dictionary == null</code> → <code>Optional.empty()</code>.
+2. Même avec la bonne locale, <code>notify.freelancer_org.kyc_rejected</code> ou <code>incident.notification.*</code> n'existent dans <strong>aucun</strong> JSON (les packs ne contiennent que <code>notification.*</code>, <code>error.*</code>, <code>billing.*</code>, <code>status.*</code>, <code>blockchain.*</code>, <code>account.*</code>).</p>
+<p><strong>Impact</strong> : chaque notification KYC/suspension/mission/incident part vers l'utilisateur final (SMS payant inclus) avec le texte technique <code>⚠ Missing translation: …</code>. C'est un défaut de production, pas une dette esthétique.</p>
+<p><strong>Recommandation</strong> : (a) normaliser les tags de langue via <code>SupportedLanguage</code> au lieu de <code>String</code> libre ; (b) ajouter les clés manquantes aux 5 packs ; (c) remplacer le <code>defaultIfEmpty</code> par un fallback vers la locale par défaut + alerte métrique, jamais le texte brut de la clé ; (d) test d'intégration qui échoue si un <code>templateKey</code> référencé dans le code est absent d'un pack.</p>
+<h3 id="p-3-trois-systemes-de-templates-paralleles">P-3 — Trois systèmes de templates parallèles</h3>
+<ol>
+<li>Packs JSON du kernel (<code>{{var}}</code>), 2. <code>FreelancerOrgNotificationTemplates.DEFAULT_FR/EN_TEMPLATES</code> (<code>{var}</code>, jamais branchés — grep : aucune référence hors de la classe), 3. libellés bilingues en dur du <code>TemplateCatalogSeeder</code> (billing-templates) et templates Kernel RT-comops (<code>KernelNotificationTemplateAdapter</code>). Aucune source de vérité. <strong>Recommandation</strong> : fusionner 2 dans 1 (mêmes clés, syntaxe <code>{{}}</code>), supprimer le code mort.</li>
+</ol>
+<h3 id="p-6-p-7-multidevise-incoherent">P-6 / P-7 — Multidevise incohérent</h3>
+<p><code>tnt-billing-invoice/.../Money.java:25</code> : <code>amount.setScale(2, RoundingMode.HALF_UP)</code> inconditionnel — un total XAF <code>15000</code> devient <code>15000.00</code>, alors que le même montant sorti du DSL (<code>tnt-billing-dsl/.../Money.java:33</code> : <code>scale = max(fractionDigits,0)</code> → 0 pour XAF) vaut <code>15000</code>. Les comparaisons/égalités inter-modules (facture vs politique de prix) peuvent diverger d'un centime et les payloads JSON ne sont pas canoniques. Par ailleurs <code>'FCFA'</code> (go-freelancer) n'est pas un code ISO : toute future unification sur le <code>Money</code> canonique (qui fait <code>Currency.getInstance(code)</code>) plantera à l'exécution sur les lignes existantes en base. <strong>Recommandation</strong> : un seul <code>Money</code> dans <code>tnt-common-core</code>, migration Liquibase <code>'FCFA'→'XAF'</code>, contrainte <code>CHECK</code> ISO 4217 sur les colonnes devise.</p>
+<h3 id="p-4-aucune-propagation-de-la-locale-client">P-4 — Aucune propagation de la locale client</h3>
+<p>Aucun <code>LocaleResolver</code>/<code>Accept-Language</code> dans le dépôt ; <code>TntSecurityContext</code> ne porte pas de locale ; <code>NotificationService.send</code> ignore <code>NotificationPreference.preferredLanguage</code> pourtant persisté (défaut <code>fr_CM</code>, <code>ManagePreferencesService.java:23</code>). <strong>Recommandation</strong> : filtre WebFlux qui résout <code>Accept-Language</code> → <code>SupportedLanguage</code> (avec fallback), propagation via le contexte Reactor, et résolution de la langue du destinataire depuis ses préférences dans <code>NotificationService</code> (pas chez les producteurs Kafka).</p>
+<h3 id="p-10-documents-financiers-non-localisables">P-10 — Documents financiers non localisables</h3>
+<p><code>invoice.jrxml</code> : <code>FACTURE</code>, <code>FACTURÉ À:</code>, <code>TVA:</code>, <code>TOTAL TTC:</code> en dur ; montant rendu par concaténation <code>$P{amountHT} + " " + $P{currency}</code>. <code>InvoicePdfAdapter.generateAndStore</code> (<code>InvoicePdfAdapter.java:36-47</code>) ne transmet même pas de locale au service média. Une facture pour un client nigérian sortira en français avec la mention « TVA » (fiscalement inadaptée). <strong>Recommandation</strong> : externaliser les libellés JRXML en resource bundles Jasper (<code>$R{}</code>), passer la locale du client dans la requête PDF, formater les montants via <code>PriceFormatterUseCase</code> (enfin lui donner un consommateur).</p>
+<hr />
+<h2 id="9-recommandations-priorisees">9. Recommandations priorisées</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Priorité</th>
+<th>Action</th>
+<th>Problèmes couverts</th>
+<th>Effort estimé</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>P0 (immédiat)</strong></td>
+<td>Corriger les tags de langue (<code>"fr"</code>→<code>fr_CM</code> via enum) et ajouter les clés <code>notify.*</code>/<code>incident.notification.*</code>/market (<code>ORDER_PAID</code>…) aux 5 packs ; remplacer le fallback <code>⚠ Missing translation</code> par un repli sur la locale par défaut + log/métrique</td>
+<td>P-1, P-2, P-21</td>
+<td>1–2 j</td>
+</tr>
+<tr>
+<td><strong>P0</strong></td>
+<td>Test de non-régression : scanner les <code>templateKey</code> du code et vérifier leur présence dans chaque pack</td>
+<td>P-1, P-3</td>
+<td>0,5 j</td>
+</tr>
+<tr>
+<td><strong>P1</strong></td>
+<td>Unifier <code>Money</code> sur <code>tnt-common-core</code> (supprimer les 5 doublons, y compris market-back et sa sémantique long ambiguë), migrer <code>'FCFA'→'XAF'</code> en base, contrainte ISO 4217</td>
+<td>P-6, P-7, P-19, P-22</td>
+<td>4–6 j (touche billing + market — à traiter en ADR, cf. process feedback)</td>
+</tr>
+<tr>
+<td><strong>P1</strong></td>
+<td>Implémenter la résolution de locale : filtre <code>Accept-Language</code> → contexte Reactor ; consultation de <code>preferredLanguage</code> dans <code>NotificationService</code></td>
+<td>P-4</td>
+<td>2–3 j</td>
+</tr>
+<tr>
+<td><strong>P1</strong></td>
+<td>Implémenter le fallback de locale dans <code>JsonLocalePackAdapter</code> (fr_CM→fr_FR→défaut) et corriger <code>LocaleConfig.toLocaleTag()</code> (retourner <code>getTag()</code>)</td>
+<td>P-5, P-12</td>
+<td>0,5 j</td>
+</tr>
+<tr>
+<td><strong>P2</strong></td>
+<td>Localiser les handlers d'exceptions (clés <code>error.*</code> déjà présentes dans les packs !) et les messages de validation via un adaptateur <code>MessageSource</code> branché sur le kernel</td>
+<td>P-9</td>
+<td>3–5 j</td>
+</tr>
+<tr>
+<td><strong>P2</strong></td>
+<td>Internationaliser les JRXML (<code>$R{}</code> + bundles), transmettre la locale dans <code>InvoicePdfAdapter</code>, brancher <code>PriceFormatterUseCase</code> sur invoice/media</td>
+<td>P-10, P-18</td>
+<td>3 j</td>
+</tr>
+<tr>
+<td><strong>P2</strong></td>
+<td>Supprimer le code mort (<code>FreelancerOrgNotificationTemplates</code> maps) et les dépendances Maven mortes ; localiser le sujet email</td>
+<td>P-3, P-11, P-17</td>
+<td>0,5 j</td>
+</tr>
+<tr>
+<td><strong>P3</strong></td>
+<td>Réconcilier les référentiels (<code>SupportedLanguage</code>/<code>SupportedCurrency</code> ↔ <code>SolutionContext</code> ↔ colonnes SQL) ; ajouter <code>messages_en_US.json</code> ou retirer <code>EN_US</code> ; renommer <code>application.yaml</code> de la librairie en défauts programmatiques</td>
+<td>P-13, P-14, P-15</td>
+<td>1 j</td>
+</tr>
+<tr>
+<td><strong>P3</strong></td>
+<td>Décider d'une stratégie taux de change (service dédié ou intégration Kernel) avant toute expansion multi-pays ; autoriser les montants négatifs dans <code>LocalizedPrice</code> ou documenter l'usage avoirs</td>
+<td>P-8, P-16</td>
+<td>ADR</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="10-addendum-modules-corebackend-extension-de-perimetre">10. Addendum — modules coreBackend (extension de périmètre)</h2>
+<p>Périmètre ajouté : <code>coreBackend/</code> — 4 modules Maven, 633 fichiers Java main (<code>tnt-agency-back-core</code> 223, <code>tnt-market-back-core</code> 170, <code>tnt-link-back-core</code> 120, <code>tnt-go-freelancer-point-back-core</code> 120).</p>
+<h3 id="101-utilisent-ils-yow-i18n-kernel">10.1 Utilisent-ils yow-i18n-kernel ?</h3>
+<p><strong>Non — zéro import.</strong> Grep de <code>com.yowyob.kernel.i18n</code> sur tout <code>coreBackend/</code> : 0 résultat. Un seul module déclare la dépendance Maven (<code>tnt-go-freelancer-point-back-core/pom.xml:39</code>) sans jamais l'utiliser (dépendance morte, déjà P-17). <code>tnt-market-back-core</code> passe par le pont notify (<code>ISendNotificationUseCase</code> de tnt-notify-core), donc <em>indirectement</em> par le kernel — et hérite de sa chaîne cassée (voir 10.3).</p>
+<h3 id="102-chaines-en-dur">10.2 Chaînes en dur</h3>
+<ul>
+<li><strong>94 messages d'exception en dur</strong> (anglais) : agency 38 (ex. <code>AgencyMission.java:112-159</code> — machine à états entière), market 31, link 18, gofp 7 (P-24).</li>
+<li><strong>Documentation OpenAPI en français en dur</strong> dans gofp : <code>@Tag</code>/<code>@Operation</code> (« Créer une livraison depuis une annonce assignée », <code>DeliveryCoreController.java:24-74</code> ; <code>RelayHubSubscriptionCoreController.java:65-77</code>). Le Swagger exposé aux intégrateurs est monolingue FR alors que les exceptions sont EN — trois couches de langues incohérentes dans les mêmes modules.</li>
+</ul>
+<h3 id="103-notifications-e-commerce-cassees-p-21-critique">10.3 Notifications e-commerce cassées (P-21, Critique)</h3>
+<p><code>MarketNotificationAdapter.java:39-84</code> envoie 8 types de notifications au cœur du parcours marchand (<code>CLIENT_QUOTE_RECEIVED</code>, <code>PROVIDER_NEW_QUOTE_REQUEST</code>, <code>ORDER_CONFIRMED</code>, <code>ORDER_PAID</code>, <code>ORDER_COMPLETED</code>, <code>REVIEW_PUBLISHED</code>, <code>LISTING_APPROVED</code>, <code>LISTING_REJECTED</code>) avec <code>NotificationModel.of(templateKey, "fr", …)</code> : clés en MAJUSCULES absentes des 5 packs JSON <strong>et</strong> tag de langue invalide. Chaque acheteur/vendeur du marketplace reçoit donc <code>⚠ Missing translation: ORDER_PAID</code> — le même défaut de production que P-1/P-2, étendu au e-commerce.</p>
+<h3 id="104-gestion-des-devises-dans-corebackend">10.4 Gestion des devises dans coreBackend</h3>
+<ul>
+<li><strong>market-back (e-commerce)</strong> : sa variante de <code>Money</code> (<code>marketback/domain/model/Money.java</code>, une des 6 recensées en §5.1) — <code>record Money(long amount, String currency)</code> en « unités mineures, ex. centimes pour XAF » (Javadoc ligne 7) alors que <strong>XAF n'a pas d'unité mineure</strong> (ISO 4217, fraction 0). La frontière persistence convertit <code>BigDecimal.valueOf(minPriceXaf)</code> sans division (<code>MarketServiceOfferPersistenceAdapter.java:67</code>) : le <code>long</code> est donc traité tantôt comme francs, tantôt documenté comme centimes — bombe à retardement si une devise à 2 décimales (NGN, USD) est un jour activée (P-22). <code>formatted()</code> (<code>Money.java:58-60</code>) formate avec la locale JVM par défaut du serveur, pas celle du client.</li>
+<li><strong>Devise figée dans les contrats</strong> : 117 identifiants suffixés <code>Xaf</code> dans market-back (<code>amountXaf</code>, <code>paidAmountXaf</code>, <code>minimumPriceXaf</code>… ex. <code>IMarketNotificationPort.java:15</code>, <code>MarketOrderApplicationService.java:232</code>) — la devise fait partie des signatures de ports et des commandes ; passer au multi-devise imposerait de casser l'API interne (P-23).</li>
+<li><strong>Colonnes DB</strong> : 4 tables market (<code>orders</code>, <code>service-offers</code>, <code>merchant-contracts</code>, <code>campaigns</code>) ont <code>currency VARCHAR(10) DEFAULT 'XAF'</code> (<code>004-create-market-orders.xml:40</code> etc.) — stockage possible, défaut XAF ; les mappers retombent sur <code>"XAF"</code> si null (<code>MarketOrderMapper.java:122</code>, <code>ServiceOfferMapper.java:92</code>).</li>
+<li><strong>agency-back</strong> : <code>"XAF"</code> en dur dans les payloads sortants (<code>DeliveryMissionClient.java:100,109</code>, <code>MissionService.java:693</code>) ; seul point positif : l'onboarding propage un <code>defaultCurrency</code> paramétrable avec repli XAF (<code>OnboardingKernelClient.java:118</code>, <code>OnboardingService.java:180</code>).</li>
+<li><strong>gofp</strong> : <code>'FCFA'</code> non-ISO en base et en dur (déjà P-7).</li>
+<li><strong>link-back</strong> : pas de type monétaire propre ; champs devise limités aux réponses de board (<code>BoardEntryResponse.java</code>) — surface faible.</li>
+</ul>
+<p><strong>Conclusion de l'addendum</strong> : les 4 modules coreBackend confirment et aggravent le verdict — aucun n'utilise le kernel i18n, le e-commerce (market-back) a ses notifications utilisateur cassées et sa devise câblée XAF jusque dans les signatures de méthodes. Recommandations : intégrer P-21 au lot P0 (mêmes correctifs que P-1/P-2 : clés + tags de langue) ; inclure le <code>Money</code> de market-back dans l'unification P1 (attention à la sémantique long/BigDecimal) ; dé-suffixer progressivement les identifiants <code>Xaf</code> (P2).</p>
+<hr />
+<h2 id="11-conclusion-verdict">11. Conclusion — verdict</h2>
+<p><strong>Le projet n'est pas prêt pour un support multilingue et multidevise à l'échelle mondiale.</strong></p>
+<ul>
+<li><strong>Multilingue</strong> : l'infrastructure existe (kernel propre, 5 packs, pidgin inclus) mais elle est branchée sur un seul module, avec des langues et des clés erronées qui font fuiter des messages techniques vers les utilisateurs. 95 %+ des chaînes visibles (exceptions, validation, PDF, emails, ProblemDetails) sont en dur, et la locale du client n'est jamais résolue ni propagée. Couverture réelle estimée : <strong>~5 % des surfaces utilisateur</strong>, et la seule surface couverte est défectueuse.</li>
+<li><strong>Multidevise</strong> : le stockage par ligne le permet nominalement, mais 6 types <code>Money</code> divergents, <code>'FCFA'</code> non-ISO en base, l'absence totale de conversion/taux et le défaut XAF systémique en font une plateforme <strong>mono-devise XAF de fait</strong>. Le e-commerce (market-back) va plus loin : la devise est câblée dans les signatures mêmes de l'API interne (117 identifiants <code>*Xaf</code>) et la sémantique unités mineures/majeures de son <code>Money</code> est ambiguë. Une expansion Nigeria/Kenya déclencherait des incohérences d'arrondi et des erreurs d'exécution avant même la question des taux.</li>
+<li>Le chemin est néanmoins clair et borné : les correctifs P0 (quelques jours) réparent la production ; P1–P2 (2–3 semaines) donnent une base saine ; le « mondial » exige en plus une stratégie de taux de change et une gouvernance des référentiels — décisions d'architecture à acter en ADR, pas seulement du code.</li>
+</ul>
+<footer>Audit technique TiiBnTick — généré à partir de l'analyse du code source réel. Chaque constat référence les fichiers et lignes concernés.</footer>
+</main>
+</div>
+
+<script type="module">
+  try {
+    const m = await import("https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs");
+    const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    m.default.initialize({ startOnLoad: true, theme: dark ? "dark" : "neutral", securityLevel: "loose" });
+  } catch (e) {
+    document.querySelectorAll(".mermaid").forEach(el => {
+      el.style.textAlign = "left";
+      el.innerHTML = "<div style='color:var(--muted);font-size:.75rem;margin-bottom:.5rem'>⚠ Diagramme Mermaid (connexion internet requise pour le rendu) — source :</div><pre>" + el.textContent.replace(/&/g,"&amp;").replace(/</g,"&lt;") + "</pre>";
+    });
+  }
+</script>
+
+</body>
+</html>

@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
 import java.util.Objects;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
@@ -39,6 +40,7 @@ public class ActorBadgeService implements IEarnBadgeUseCase {
     }
 
     @Override
+    @Transactional
     public Mono<Void> earnBadge(EarnBadgeCommand command) {
         Objects.requireNonNull(command, "command must not be null");
 

@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /** Port of tnt-agency {@code SyncController} — agency-scoped offline sync. */
 @Tag(name = "Agency ERP Sync", description = "Offline delta sync for agency mobile clients")
@@ -61,6 +62,7 @@ public class AgencySyncController {
     }
 
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/agencies/{agencyId}/sync/push")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Push offline operations to Core engine (returns conflicts)")
     public Mono<ApiResponse<SyncPushResponse>> push(
             @PathVariable UUID tenantId,

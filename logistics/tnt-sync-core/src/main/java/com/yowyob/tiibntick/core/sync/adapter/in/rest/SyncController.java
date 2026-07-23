@@ -1,5 +1,7 @@
 package com.yowyob.tiibntick.core.sync.adapter.in.rest;
 
+import com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser;
+import com.yowyob.tiibntick.core.auth.domain.model.TntUserIdentity;
 import com.yowyob.tiibntick.core.sync.adapter.in.rest.dto.DuckDbSchemaResponse;
 import com.yowyob.tiibntick.core.sync.adapter.in.rest.dto.SyncPullResponse;
 import com.yowyob.tiibntick.core.sync.adapter.in.rest.dto.SyncPushRequest;
@@ -8,6 +10,7 @@ import com.yowyob.tiibntick.core.sync.application.port.in.IComputeDeltaUseCase;
 import com.yowyob.tiibntick.core.sync.application.port.in.IProcessSyncBatchUseCase;
 import com.yowyob.tiibntick.core.sync.application.port.out.IDuckDbSchemaProvider;
 import io.micrometer.core.annotation.Timed;
+import io.swagger.v3.oas.annotations.Parameter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -53,14 +56,14 @@ public class SyncController {
     @Timed(value = "tnt.sync.push.duration", description = "Duration of push-sync operations")
     public Mono<ResponseEntity<SyncPushResponse>> pushSync(
             @RequestHeader(value = "X-User-Id") String userId,
-            @RequestHeader(value = "X-Tenant-Id") String tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestHeader(value = "X-Device-Id", required = false, defaultValue = "unknown") String deviceId,
             @RequestBody SyncPushRequest request) {
 
-        log.debug("Push sync request from user={}, tenant={}, ops={}", userId, tenantId,
+        log.debug("Push sync request from user={}, tenant={}, ops={}", userId, currentUser.tenantId().toString(),
                 request.hasOperations() ? request.operations().size() : 0);
 
-        return processSyncBatch.processSyncBatch(userId, tenantId, deviceId, request)
+        return processSyncBatch.processSyncBatch(userId, currentUser.tenantId().toString(), deviceId, request)
                 .map(ResponseEntity::ok)
                 .doOnError(ex -> log.error("Push sync failed for user={}: {}", userId, ex.getMessage()));
     }
@@ -74,14 +77,14 @@ public class SyncController {
     @Timed(value = "tnt.sync.pull.duration", description = "Duration of delta pull operations")
     public Mono<ResponseEntity<SyncPullResponse>> pullSync(
             @RequestHeader(value = "X-User-Id") String userId,
-            @RequestHeader(value = "X-Tenant-Id") String tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestHeader(value = "X-Device-Id", required = false, defaultValue = "unknown") String deviceId,
             @RequestParam(value = "syncToken", required = false) String syncToken,
             @RequestParam(value = "filter", required = false) Set<String> filterAggregates) {
 
-        log.debug("Pull sync request from user={}, tenant={}, token={}", userId, tenantId, syncToken);
+        log.debug("Pull sync request from user={}, tenant={}, token={}", userId, currentUser.tenantId().toString(), syncToken);
 
-        return computeDelta.computeDelta(userId, tenantId, deviceId, syncToken, filterAggregates)
+        return computeDelta.computeDelta(userId, currentUser.tenantId().toString(), deviceId, syncToken, filterAggregates)
                 .map(ResponseEntity::ok)
                 .doOnError(ex -> log.error("Pull sync failed for user={}: {}", userId, ex.getMessage()));
     }
@@ -94,12 +97,12 @@ public class SyncController {
     @GetMapping(value = "/bootstrap", produces = MediaType.APPLICATION_JSON_VALUE)
     public Mono<ResponseEntity<SyncPullResponse>> bootstrap(
             @RequestHeader(value = "X-User-Id") String userId,
-            @RequestHeader(value = "X-Tenant-Id") String tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestHeader(value = "X-Device-Id", required = false, defaultValue = "unknown") String deviceId,
             @RequestParam(value = "filter", required = false) Set<String> filterAggregates) {
 
-        log.info("Bootstrap sync for user={}, tenant={}", userId, tenantId);
-        return computeDelta.computeDelta(userId, tenantId, deviceId, null, filterAggregates)
+        log.info("Bootstrap sync for user={}, tenant={}", userId, currentUser.tenantId().toString());
+        return computeDelta.computeDelta(userId, currentUser.tenantId().toString(), deviceId, null, filterAggregates)
                 .map(ResponseEntity::ok);
     }
 

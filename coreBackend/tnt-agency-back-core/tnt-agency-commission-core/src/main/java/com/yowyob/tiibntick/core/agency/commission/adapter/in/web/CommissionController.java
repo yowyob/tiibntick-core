@@ -19,6 +19,7 @@ import reactor.core.publisher.Mono;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /** Port of commission endpoints from tnt-agency {@code StaffController}. */
 @Tag(name = "Agency ERP Commissions", description = "Commission records lifecycle")
@@ -49,6 +50,7 @@ public class CommissionController {
     }
 
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/commissions")
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Create a commission record")
     public Mono<ApiResponse<CommissionResponse>> create(
@@ -61,6 +63,7 @@ public class CommissionController {
     }
 
     @PatchMapping("/api/v1/tenants/{tenantId}/agency-registry/commissions/{commissionId}/validate")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Validate a commission (CALCULATED → VALIDATED)")
     public Mono<ApiResponse<CommissionResponse>> validate(
             @PathVariable UUID tenantId, @PathVariable UUID commissionId) {
@@ -68,6 +71,7 @@ public class CommissionController {
     }
 
     @PatchMapping("/api/v1/tenants/{tenantId}/agency-registry/commissions/{commissionId}/pay")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Mark commission as paid and trigger wallet payout")
     public Mono<ApiResponse<CommissionResponse>> pay(
             @PathVariable UUID tenantId, @PathVariable UUID commissionId) {
@@ -75,6 +79,7 @@ public class CommissionController {
     }
 
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/commissions/{commissionId}/dispute")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Dispute a commission")
     public Mono<ApiResponse<CommissionResponse>> dispute(
             @PathVariable UUID tenantId,

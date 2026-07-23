@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>P2 — Phase 2 — Architecture cible · Audit TiiBnTick</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --text: #1c2430; --muted: #5b6675;
+  --border: #e3e7ec; --accent: #0f5fa8; --accent-soft: #e8f1fa;
+  --code-bg: #f0f2f5; --sidebar-bg: #101823; --sidebar-text: #c7d0dc;
+  --crit: #c62828; --high: #e65100; --med: #f9a825; --low: #2e7d32;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1319; --panel: #161d27; --text: #dbe2ea; --muted: #8b97a5;
+    --border: #263140; --accent: #5aa2e0; --accent-soft: #17273a;
+    --code-bg: #1d2733; --sidebar-bg: #0a0f15; --sidebar-text: #a9b4c0;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--bg); color: var(--text); line-height: 1.65; }
+.layout { display: flex; min-height: 100vh; }
+nav.sidebar { width: 270px; flex-shrink: 0; background: var(--sidebar-bg);
+  color: var(--sidebar-text); padding: 1.4rem 1rem; position: sticky; top: 0;
+  height: 100vh; overflow-y: auto; }
+nav.sidebar .brand { font-size: 1.05rem; font-weight: 700; color: #fff;
+  margin-bottom: .2rem; }
+nav.sidebar .brand small { display:block; font-weight: 400; color: var(--sidebar-text);
+  font-size: .75rem; margin-top: .2rem; }
+nav.sidebar ul { list-style: none; padding: 0; margin: 1.2rem 0; }
+nav.sidebar li a { display: block; color: var(--sidebar-text); text-decoration: none;
+  padding: .45rem .6rem; border-radius: 6px; font-size: .86rem; }
+nav.sidebar li a:hover { background: rgba(255,255,255,.08); color: #fff; }
+nav.sidebar li a.active { background: var(--accent); color: #fff; }
+nav.sidebar .section-label { text-transform: uppercase; letter-spacing: .08em;
+  font-size: .68rem; color: #6b7683; margin: 1.4rem 0 .4rem .4rem; }
+main { flex: 1; min-width: 0; padding: 2.2rem 3rem 4rem; max-width: 1100px; }
+header.page { border-bottom: 1px solid var(--border); padding-bottom: 1.2rem;
+  margin-bottom: 1.6rem; }
+header.page .kicker { color: var(--accent); font-weight: 600; font-size: .85rem;
+  text-transform: uppercase; letter-spacing: .06em; }
+header.page h1 { margin: .25rem 0 .4rem; font-size: 1.9rem; }
+header.page .meta { color: var(--muted); font-size: .85rem; }
+h2 { margin-top: 2.4rem; padding-bottom: .35rem; border-bottom: 1px solid var(--border);
+  font-size: 1.35rem; }
+h3 { margin-top: 1.8rem; font-size: 1.08rem; }
+h4 { margin-top: 1.4rem; font-size: .98rem; }
+a { color: var(--accent); }
+code { background: var(--code-bg); padding: .12em .38em; border-radius: 4px;
+  font-size: .84em; font-family: "JetBrains Mono", Consolas, monospace; }
+pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem; overflow-x: auto; font-size: .82rem; line-height: 1.5; }
+pre code { background: none; padding: 0; }
+.table-wrap { overflow-x: auto; margin: 1rem 0; border: 1px solid var(--border);
+  border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: .85rem; background: var(--panel); }
+th, td { border-bottom: 1px solid var(--border); padding: .55rem .75rem; text-align: left;
+  vertical-align: top; }
+th { background: var(--accent-soft); color: var(--text); font-weight: 600;
+  white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+blockquote { border-left: 4px solid var(--accent); background: var(--accent-soft);
+  margin: 1rem 0; padding: .7rem 1rem; border-radius: 0 8px 8px 0; }
+blockquote p { margin: .3rem 0; }
+.badge { display: inline-block; padding: .1em .6em; border-radius: 999px;
+  font-size: .74rem; font-weight: 700; color: #fff; white-space: nowrap; }
+.badge.crit { background: var(--crit); } .badge.high { background: var(--high); }
+.badge.med { background: var(--med); color: #333; } .badge.low { background: var(--low); }
+.mermaid { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem; margin: 1rem 0; text-align: center; overflow-x: auto; }
+.toc { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem 1.4rem; margin: 1.4rem 0; font-size: .88rem; }
+.toc > ul { margin: .3rem 0; padding-left: 1.1rem; }
+.toc .toctitle { font-weight: 700; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1rem; margin: 1.4rem 0; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1.1rem 1.2rem; text-decoration: none; color: var(--text); display: block; }
+.card:hover { border-color: var(--accent); }
+.card .icon { font-size: 1.5rem; }
+.card h3 { margin: .4rem 0 .2rem; font-size: 1rem; }
+.card p { margin: 0; color: var(--muted); font-size: .82rem; }
+.stat-row { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1.2rem 0; }
+.stat { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: .8rem 1.2rem; min-width: 130px; }
+.stat .num { font-size: 1.6rem; font-weight: 800; }
+.stat .lbl { font-size: .74rem; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .05em; }
+.stat.crit .num { color: var(--crit); } .stat.high .num { color: var(--high); }
+.stat.med .num { color: var(--med); } .stat.low .num { color: var(--low); }
+footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border);
+  color: var(--muted); font-size: .78rem; }
+.progress-block { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1rem 1.2rem; margin: 1rem 0 1.6rem; }
+.progress-block .progress-label { display: flex; justify-content: space-between; align-items: baseline;
+  font-size: .85rem; margin-bottom: .5rem; }
+.progress-block .progress-label b { font-size: 1rem; }
+.progress-bar-track { background: var(--code-bg); border-radius: 999px; height: .6rem; overflow: hidden; }
+.progress-bar-fill { height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--low), var(--accent)); transition: width .3s ease; }
+.progress-note { font-size: .72rem; color: var(--muted); margin-top: .5rem; }
+li:has(> input.task-checkbox) { list-style: none; margin-left: -1.4rem; padding-left: .3rem;
+  display: list-item; }
+input.task-checkbox { width: 1rem; height: 1rem; margin-right: .5rem; vertical-align: middle;
+  accent-color: var(--accent); }
+li:has(> input.task-checkbox:checked) { color: var(--muted); }
+li:has(> input.task-checkbox:checked) code { opacity: .75; }
+@media (max-width: 900px) {
+  .layout { flex-direction: column; }
+  nav.sidebar { width: 100%; height: auto; position: static; }
+  main { padding: 1.4rem 1.2rem 3rem; }
+}
+@media print { nav.sidebar { display: none; } main { padding: 0; } }
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar"><div class="brand">TiiBnTick Core<small>Audit technique — juillet 2026</small></div>
+<ul><li><a href="../index.html">🏠 Accueil</a></li>
+<li><a href="../executive-summary.html">📋 Résumé exécutif global</a></li>
+</ul><div class="section-label">Rapports d'audit</div><ul>
+<li><a href="../audit-1-architecture.html">🏛️ Audit n°1 — Architecture globale</a></li>
+<li><a href="../audit-2-inter-modules.html">🔗 Audit n°2 — Connexions inter-modules</a></li>
+<li><a href="../audit-3-yow-event-kernel.html">📨 Audit n°3 — yow-event-kernel</a></li>
+<li><a href="../audit-4-yow-i18n-kernel.html">🌍 Audit n°4 — yow-i18n-kernel</a></li>
+<li><a href="../audit-5-kafka.html">🧵 Audit n°5 — Kafka</a></li>
+<li><a href="../audit-6-scalabilite.html">📈 Audit n°6 — Scalabilité</a></li>
+<li><a href="../audit-7-system-design.html">🧭 Audit n°7 — System Design & Sécurité</a></li>
+</ul><div class="section-label">Plan de remédiation</div><ul>
+<li><a href="implementation-plan.html">🗂️ Plan — Plan d'implémentation — vue d'ensemble</a></li>
+<li><a href="phase-0-critical.html">🚨 P0 — Phase 0 — Bloquant production</a></li>
+<li><a href="phase-1-hardening.html">🛡️ P1 — Phase 1 — Durcissement</a></li>
+<li><a href="phase-2-target-architecture.html" class="active">🚀 P2 — Phase 2 — Architecture cible</a></li>
+<li><a href="workstream-payment-billing-kernel-delegation.html">💳 Chantier — Délégation paiement/facturation au Kernel</a></li>
+</ul></nav>
+<main>
+<header class="page">
+  <div class="kicker">P2</div>
+  <h1>🚀 Phase 2 — Architecture cible</h1>
+  <div class="meta">Plan d'implémentation — document vivant, mis à jour à chaque décision. Voir <code>docs/audits/raw/</code> pour le constat figé.</div>
+</header>
+<div class="progress-block">
+  <div class="progress-label"><span>Progression — Phase 2 — Architecture cible</span><b>0 / 50 (0%)</b></div>
+  <div class="progress-bar-track"><div class="progress-bar-fill" style="width:0%"></div></div>
+  <div class="progress-note">Lecture seule : ces cases reflètent l'état du fichier Markdown versionné dans git au moment de la génération. On les coche en éditant le <code>.md</code> (IDE ou <code>- [x]</code> par commit), jamais depuis cette page — régénérer avec <code>python3 docs/audits/build_reports.py</code> après un commit pour mettre à jour l'affichage.</div>
+</div>
+<div class="toc"><div class="toc"><span class="toctitle">Sommaire</span><ul>
+<li><a href="#vue-densemble">Vue d'ensemble</a></li>
+<li><a href="#chantier-h-infrastructure-exploitation">Chantier H — Infrastructure &amp; exploitation</a></li>
+<li><a href="#chantier-i-partitionnement-extraction-de-donnees">Chantier I — Partitionnement &amp; extraction de données</a></li>
+<li><a href="#chantier-j-extraction-microservices-conditionnelle-a-la-traction-reelle">Chantier J — Extraction microservices (conditionnelle à la traction réelle)</a></li>
+<li><a href="#chantier-k-hygiene-i18n-referentiels-audit-n4-p2p3">Chantier K — Hygiène i18n &amp; référentiels (Audit n°4, P2/P3)</a></li>
+<li><a href="#chantier-l-hygiene-evenementielle-si-option-a-retenue-pour-yow-event-kernel-en-phase-0">Chantier L — Hygiène événementielle (si Option A retenue pour yow-event-kernel en Phase 0)</a></li>
+<li><a href="#chantier-m-hygiene-architecture-documentation-residuelle">Chantier M — Hygiène architecture &amp; documentation résiduelle</a></li>
+<li><a href="#definition-of-done-phase-2">Definition of Done — Phase 2</a></li>
+</ul>
+</div>
+</div>
+<h1 id="phase-2-architecture-cible-trajectoire-long-terme">Phase 2 — Architecture cible (trajectoire long terme)</h1>
+<p><strong>Statut global : 🟡 Planifié — non commencé</strong>
+<strong>Horizon estimé : 3–18 mois, sous condition de traction ; à ne démarrer qu'après <a href="phase-0-critical.html">Phase 0</a> et <a href="phase-1-hardening.html">Phase 1</a></strong>
+<strong>Objectif :</strong> poser la trajectoire vers des centaines de millions d'utilisateurs sans sur-investir avant que la charge réelle ne le justifie. Principe directeur (Audit n°7) : <strong>rester monolithe modulaire</strong> aussi longtemps que possible — extraire seulement ce que la charge mesurée justifie, en gardant les coutures hexagonales propres pour que l'extraction reste peu coûteuse le jour venu.</p>
+<blockquote>
+<p>Cases à cocher : mode d'emploi en tête de la <a href="phase-0-critical.html">Phase 0</a>.</p>
+</blockquote>
+<h2 id="vue-densemble">Vue d'ensemble</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Chantier</th>
+<th>Nature</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>H — Infrastructure &amp; exploitation</td>
+<td>K8s, Kafka cluster, réplicas, DR</td>
+</tr>
+<tr>
+<td>I — Partitionnement &amp; extraction de données</td>
+<td>Tables volumineuses, pyramide DB</td>
+</tr>
+<tr>
+<td>J — Extraction microservices (conditionnelle)</td>
+<td>Premiers candidats</td>
+</tr>
+<tr>
+<td>K — Hygiène i18n &amp; référentiels</td>
+<td>Nettoyage, cohérence</td>
+</tr>
+<tr>
+<td>L — Hygiène événementielle (yow-event-kernel)</td>
+<td>Si Option A retenue en Phase 0</td>
+</tr>
+<tr>
+<td>M — Hygiène architecture &amp; documentation</td>
+<td>Dette résiduelle</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="chantier-h-infrastructure-exploitation">Chantier H — Infrastructure &amp; exploitation</h2>
+<ul>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°6 · S13 / Audit n°7 · item16]</strong> Kubernetes + HPA, Redis Sentinel/Cluster, MinIO distribué ou S3 managé + CDN pour les médias — élimine les SPOF actuels (Postgres, Redis, Kafka, MinIO tous mono-instance en docker-compose)</li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°6 · S21]</strong> Sortir l'exécution Liquibase du démarrage de chaque instance (verrou <code>DATABASECHANGELOGLOCK</code> sérialisant les rolling deploys) — migration hors ligne dédiée</li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°5 · P2 item9]</strong> Observabilité Kafka : enregistrer <code>MicrometerProducerListener</code>/<code>MicrometerConsumerListener</code> dans la factory commune (Phase 1) ; ajouter kafka-exporter (lag) à docker-compose + dashboard Grafana ; alerter sur lag et taux DLQ — couvre <strong>P-10</strong></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°5 · P2 item10]</strong> Sécurité Kafka staging/prod : SASL/SCRAM ou mTLS + ACLs par principal (un principal par plateforme backend, cohérent avec le modèle platform-client) — couvre <strong>P-09</strong></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°5 · P2 item11]</strong> Groupes et partitions : group-id explicite par module (supprimer le défaut global <code>tiibntick-core</code>), concurrency = nombre de partitions, revoir les clés tenantId (suffixe entité <code>tenantId:aggregateId</code>) — couvre <strong>P-11, P-16</strong></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°7 · item15 / Audit n°6 · S13]</strong> Kafka en cluster (3 brokers min, RF=3 partout), consumer groups dimensionnés par partition ; envisager le compactage pour les topics d'état</li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°7 · item16]</strong> Multi-AZ / DR : le monolithe stateless se réplique trivialement ; l'effort porte sur PostgreSQL (failover managé) et MinIO (erasure coding/réplication de site)</li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°6 · S22]</strong> Généraliser la gestion de backpressure (aujourd'hui un seul <code>onBackpressureBuffer(256)</code> dans tout le dépôt) — <code>TntStompWebSocketHandler.java:104</code></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°6 · S16/S19]</strong> Invalidation par pub/sub des caches sécurité (permissions 300 s, clients plateforme 45 s) ; protection anti-stampede sur les caches Redis (expiration L2 → reconstructions simultanées) — <code>PermissionCache.java:30</code>, <code>RoadNetworkProviderAdapter.java:85-89</code></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°5 · P2 item13]</strong> Exploiter systématiquement <code>X-Yow-Schema-Version</code> (aujourd'hui seul yow-event-kernel le pose) ; documenter chaque topic (payload, clé, producteur, consommateurs) dans <code>docs/kafka-topics.md</code> généré depuis le référentiel de Phase 0</li>
+</ul>
+<h2 id="chantier-i-partitionnement-extraction-de-donnees">Chantier I — Partitionnement &amp; extraction de données</h2>
+<ul>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°6 · S8 / Audit n°7 · item14]</strong> Partitionnement temporel/par <code>tenant_id</code> des tables volumineuses : deliveries, transactions wallet, audit logs, outbox — aucune table partitionnée aujourd'hui (<code>grep 'PARTITION BY'</code> = 0 résultat)</li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°6 · reco 13]</strong> Activer la « pyramide » de base de données : sortir delivery/realtime/wallet vers des instances PostgreSQL dédiées (les 8 factories de connexion existent déjà pour ça)</li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°7 · item14]</strong> Archivage froid vers MinIO/parquet des données partitionnées anciennes</li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°7 · item12]</strong> Cache Redis sur les lectures chaudes (policies pricing, zones géo), au-delà du read replica déjà mis en place en Phase 1</li>
+</ul>
+<h2 id="chantier-j-extraction-microservices-conditionnelle-a-la-traction-reelle">Chantier J — Extraction microservices (conditionnelle à la traction réelle)</h2>
+<ul>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°7 · item13]</strong> Premiers candidats d'extraction, dans cet ordre : <strong><code>tnt-billing-wallet</code></strong> (frontière financière déjà nette, schéma dédié, idempotence en place, communication événementielle) puis <strong><code>tnt-realtime-core</code></strong>/passerelle Link (profil de charge connexions-longues radicalement différent du CRUD transactionnel) — prérequis : chantiers A (RLS), C (Kafka fiable), et contrats d'événements versionnés</li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°6 · reco 16]</strong> Extraire les workloads CPU-bound/haut-débit divergents (VRP OR-Tools, ingestion GPS) en services dédiés — le découpage hexagonal actuel rend cette extraction peu coûteuse</li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°6 · S23/S26]</strong> ~~Refonte temps réel Link~~ — <strong>déjà traité en <a href="phase-1-hardening.html#chantier-g-link-bff-temps-reel-par-tuiles-geohash-priorite-n1-de-la-phase-1">Phase 1, chantier G</a></strong>, ne pas dupliquer ; ce chantier J ne couvre que l'extraction de la passerelle temps réel en microservice séparé une fois le modèle tuiles/BFF stabilisé et sa charge mesurée</li>
+</ul>
+<h2 id="chantier-k-hygiene-i18n-referentiels-audit-n4-p2p3">Chantier K — Hygiène i18n &amp; référentiels (Audit n°4, P2/P3)</h2>
+<ul>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°4 · P2]</strong> Localiser les handlers d'exceptions (clés <code>error.*</code> déjà présentes dans les packs) et les messages de validation Jakarta via un adaptateur <code>MessageSource</code> branché sur le kernel — couvre <strong>P-9</strong> ; étendre à <code>coreBackend/</code> (94 messages en dur : agency 38, market 31, link 18, gofp 7) — couvre <strong>P-24</strong></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°4 · P2]</strong> Internationaliser les JRXML (facture, reçus, manifeste) via <code>$R{}</code> + bundles, transmettre la locale dans <code>InvoicePdfAdapter</code>, brancher enfin <code>PriceFormatterUseCase</code> sur invoice/media — couvre <strong>P-10, P-18</strong></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°4 · P2]</strong> Supprimer le code mort (<code>FreelancerOrgNotificationTemplates</code> maps jamais branchées) et les dépendances Maven mortes vers <code>yow-i18n-kernel</code> (<code>tnt-delivery-core</code>, <code>tnt-billing-dsl</code>, <code>tnt-go-freelancer-point-back-core</code>) ; localiser le sujet d'email en dur — couvre <strong>P-3, P-11, P-17</strong></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°4 · P3]</strong> Réconcilier les référentiels : <code>SupportedLanguage</code>/<code>SupportedCurrency</code> ↔ <code>SolutionContext</code> (qui annonce <code>pcm_NG, fr_SN, en_KE, GHS</code> inexistants dans les enums) ↔ colonnes SQL ; ajouter <code>messages_en_US.json</code> ou retirer <code>EN_US</code> ; renommer <code>application.yaml</code> embarqué de la librairie en défauts programmatiques — couvre <strong>P-13, P-14, P-15</strong></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°4 · P3]</strong> ADR stratégie taux de change (service dédié ou intégration Kernel) avant toute expansion multi-pays ; autoriser les montants négatifs dans <code>LocalizedPrice</code> ou documenter l'usage avoirs — couvre <strong>P-8, P-16</strong></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°4]</strong> Colonnes devise hétérogènes (<code>CHAR(3)</code> à <code>VARCHAR(10)</code>) à uniformiser — couvre <strong>P-19</strong> ; champ <code>TranslationService.translationPort</code> à rendre <code>final</code> — couvre <strong>P-20</strong></li>
+</ul>
+<h2 id="chantier-l-hygiene-evenementielle-si-option-a-retenue-pour-yow-event-kernel-en-phase-0">Chantier L — Hygiène événementielle (si Option A retenue pour <code>yow-event-kernel</code> en Phase 0)</h2>
+<p>Sans objet si l'Option B (retrait du module) a été retenue en Phase 0 — cocher uniquement les items pertinents selon la décision actée dans <code>phase-0-critical.md</code>, chantier C.</p>
+<ul>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°3 · PR7]</strong> Corriger les javadocs mensongères (« exactly-once », fixed-delay, bulk-insert, imports file) — <code>DomainEventEnvelope.java:15</code>, <code>OutboxPollerService.java:78-92</code></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°3 · P12]</strong> Injecter <code>YowEventKernelProperties</code> dans le poller (le <code>batch-size</code> configuré est actuellement ignoré, constante 50 codée en dur) — <code>OutboxPollerService.java:50,110</code></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°3 · P13]</strong> Propager <code>entry.getTenantId()</code> dans <code>processEntry</code> au lieu de <code>findById(envelopeId, null)</code> — <code>OutboxPollerService.java:122</code></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°3 · P14]</strong> Implémenter ou retirer le contrôle de compatibilité Avro référencé par la javadoc (<code>AvroSchemaCompatibilityChecker</code> inexistant) — <code>SchemaRegistryService.java:23,49</code></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°3 · P15]</strong> Retirer le couplage inversé kernel→TiiBnTick (<code>@Qualifier("tntKafkaTemplate")</code> dans un module censé être générique) — <code>KafkaEventPublisher.java:60</code>, <code>RedisEventIdempotencyStore.java:33</code></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°3 · P16]</strong> Remplacer <code>LocalDateTime</code> par <code>Instant</code>/<code>OffsetDateTime</code> pour tous les horodatages d'un bus distribué — <code>DomainEventEnvelope.java:105-107</code>, <code>OutboxEntry.java:78-79</code></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°3 · P17]</strong> Remplacer le statut <code>PROCESSED</code> silencieux de <code>handleMissingEnvelope</code> par un statut d'erreur dédié (perte actuellement maquillée en succès) — <code>OutboxPollerService.java:209-214</code></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°3 · P18]</strong> Protéger le poller contre l'overlap de cycles (<code>@Scheduled</code> + <code>subscribe()</code> asynchrone annule la garantie fixed-delay) — <code>OutboxPollerService.java:85-92,105</code></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°3 · P19]</strong> <code>publishAll</code> : aligner l'implémentation sur la javadoc (« single bulk-insert ») ou corriger la javadoc — <code>EventPublisherService.java:75-100</code></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°3 · P20]</strong> Sortir <code>application.yaml</code> du jar bibliothèque (risque de collision de config avec l'app hôte) — <code>src/main/resources/application.yaml</code></li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°3 · P21]</strong> Retirer <code>@EnableScheduling</code> global d'une autoconfiguration de bibliothèque (effet de bord sur l'app hôte) — <code>YowEventKernelAutoConfiguration.java:56</code></li>
+</ul>
+<h2 id="chantier-m-hygiene-architecture-documentation-residuelle">Chantier M — Hygiène architecture &amp; documentation résiduelle</h2>
+<ul>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°1 · A8]</strong> Scinder les god classes : <code>LogisticTrustEvent.java</code> (772 lignes), <code>MissionService.java</code> (768), et les 2 autres classes &gt;500 lignes</li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°1 · A9]</strong> Déplacer <code>@RequirePermission</code> hors de <code>adapter/in/web</code> (package incohérent avec sa consommation par la couche application de tous les modules)</li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°1 · A14]</strong> Purger les fuites Spring du domaine : <code>@ResponseStatus</code> sur ~12 exceptions, <code>@Component</code> sur 2 services de domaine, <code>MediaType</code> dans un modèle</li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°1 · A10]</strong> Consolider l'assemblage bootstrap sur un seul mécanisme (auto-configuration), scan restreint, suppression de l'import mort <code>MarketBackCoreConfig</code> (<code>TntCoreConfig.java:7</code>) et du commentaire faux (<code>TntCoreConfig.java:43</code>)</li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°1 · A11]</strong> Fabriques communes <code>ObjectMapper</code>/Kafka dans <code>tnt-common-core</code> au lieu de 10+ beans <code>ObjectMapper</code> et 16 classes de config Kafka quasi identiques par module</li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°1 · A12]</strong> Auto-configuration du <code>kernelWebClient</code> dans <code>tnt-common-core</code> au lieu du contrat de bean caché actuel (10+ modules référencent un qualifier défini uniquement dans bootstrap)</li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°1 · A15]</strong> Hygiène du dépôt : retirer <code>BOOT-INF/</code> (jar décompressé) de la racine, nettoyer le code commenté dans bootstrap, mettre à jour CLAUDE.md (52 modules réels, pas ~34)</li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°2 · reco 7]</strong> Intégrer ou geler <code>tnt-billing-cost</code> : brancher <code>IRouteDataPort</code>, unifier son <code>Money</code> dupliqué sur le type partagé (chantier F Phase 1) ; donner un contenu réel à <code>tnt-go-freelancer-point-back-core</code> (0 dépendance entrante ni sortante) ou le retirer du réacteur</li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°2 · P9]</strong> Documenter les 22 modules à fan-in effectif nul comme feuilles légitimes (trust, back-cores, administration) dans CLAUDE.md, à l'exception de la coquille vide <code>tnt-go-freelancer-point-back-core</code> déjà traitée ci-dessus</li>
+<li><input type="checkbox" class="task-checkbox" disabled> <strong>[Audit n°2 · P10]</strong> Corriger les incohérences mineures d'ordre de build (<code>pom.xml:66-67</code>) et le commentaire trompeur « L6 Core Backend Market » (<code>TntCoreConfig.java:43</code>, déjà couvert par A10 — vérifier non-régression)</li>
+</ul>
+<hr />
+<h2 id="definition-of-done-phase-2">Definition of Done — Phase 2</h2>
+<ul>
+<li><input type="checkbox" class="task-checkbox" disabled> Chantier H : cluster Kafka 3 brokers en place ; observabilité Kafka complète (lag, DLQ rate) visible en Grafana ; SASL/TLS actif en prod.</li>
+<li><input type="checkbox" class="task-checkbox" disabled> Chantier I : au moins une table à forte volumétrie partitionnée et validée sous charge.</li>
+<li><input type="checkbox" class="task-checkbox" disabled> Chantier J : décision d'extraction documentée (ADR) pour <code>tnt-billing-wallet</code>, exécutée seulement si la charge mesurée le justifie.</li>
+<li><input type="checkbox" class="task-checkbox" disabled> Chantier K : 0 chaîne i18n cassée résiduelle ; référentiels de langue/devise cohérents entre eux.</li>
+<li><input type="checkbox" class="task-checkbox" disabled> Chantier L : <code>yow-event-kernel</code> soit pleinement fiable (Option A), soit entièrement retiré du réacteur (Option B) — aucun état intermédiaire.</li>
+<li><input type="checkbox" class="task-checkbox" disabled> Chantier M : CLAUDE.md à jour avec les 52 modules réels ; plus de god class &gt; 500 lignes sans justification documentée.</li>
+</ul>
+<footer>Audit technique TiiBnTick — généré à partir de l'analyse du code source réel. Chaque constat référence les fichiers et lignes concernés.</footer>
+</main>
+</div>
+
+<script type="module">
+  try {
+    const m = await import("https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs");
+    const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    m.default.initialize({ startOnLoad: true, theme: dark ? "dark" : "neutral", securityLevel: "loose" });
+  } catch (e) {
+    document.querySelectorAll(".mermaid").forEach(el => {
+      el.style.textAlign = "left";
+      el.innerHTML = "<div style='color:var(--muted);font-size:.75rem;margin-bottom:.5rem'>⚠ Diagramme Mermaid (connexion internet requise pour le rendu) — source :</div><pre>" + el.textContent.replace(/&/g,"&amp;").replace(/</g,"&lt;") + "</pre>";
+    });
+  }
+</script>
+
+</body>
+</html>

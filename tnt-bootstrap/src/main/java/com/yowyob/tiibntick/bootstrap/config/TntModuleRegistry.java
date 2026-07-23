@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.bootstrap.config;
 
+import com.yowyob.tiibntick.common.kafka.TntTopics;
 import jakarta.annotation.PostConstruct;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -112,7 +113,7 @@ public class TntModuleRegistry {
         register("yow-event-kernel",
                 "Event Bus (Kafka + Outbox Pattern + DLQ + Avro)",
                 ModuleLayer.FOUNDATION_L0, ModuleOrigin.KERNEL_CONTRIBUTION,
-                List.of(), List.of("tnt.outbox.events", "tnt.dlq"), null);
+                List.of(), List.of(TntTopics.OUTBOX_EVENTS, TntTopics.DLQ), null);
 
         register("yow-i18n-kernel",
                 "Internationalisation (FR/EN/Pidgin, XAF/NGN/KES/GHS)",
@@ -144,7 +145,7 @@ public class TntModuleRegistry {
                 "IYowAuthTntAdapter impl, IActorReputationPort impl)",
                 ModuleLayer.IDENTITY_L2, ModuleOrigin.TNT_EXTENSION,
                 List.of("comops-actor-core", "tnt-auth-core", "tnt-roles-core"),
-                List.of("tnt.actor.profile.updated", "tnt.actor.reputation.changed"),
+                List.of(TntTopics.ACTOR_PROFILE_UPDATED, TntTopics.ACTOR_REPUTATION_CHANGED),
                 "tnt_actor");
 
         register("tnt-organization-core",
@@ -171,14 +172,14 @@ public class TntModuleRegistry {
                 "Geo Core (PostGIS road graph, OSM geocoding, Weather, African POI)",
                 ModuleLayer.LOGISTICS_L3, ModuleOrigin.TNT_EXCLUSIVE,
                 List.of(),
-                List.of("tnt.geo.gps.position-updated"), "tnt_geo");
+                List.of(TntTopics.GEO_GPS_POSITION_UPDATED), "tnt_geo");
 
         register("tnt-route-core",
                 "Route Core (A* graph search, VRP OR-Tools 9.8.3296, Kalman ETA, ω(a,t), " +
                 "IRouteOptimizerPort impl for tnt-incident-core)",
                 ModuleLayer.LOGISTICS_L3, ModuleOrigin.TNT_EXCLUSIVE,
                 List.of("tnt-geo-core"),
-                List.of("tnt.realtime.eta.updated"), null);
+                List.of(TntTopics.REALTIME_ETA_UPDATED), null);
 
         register("tnt-delivery-core",
                 "Delivery Core (Mission AR, Package, HubDeposit, DeliveryProof, SLA, " +
@@ -186,9 +187,9 @@ public class TntModuleRegistry {
                 ModuleLayer.LOGISTICS_L3, ModuleOrigin.TNT_EXCLUSIVE,
                 List.of("tnt-geo-core", "tnt-actor-core", "tnt-organization-core",
                         "tnt-auth-core", "tnt-roles-core"),
-                List.of("tnt.delivery.mission.created", "tnt.delivery.mission.status-changed",
-                        "tnt.delivery.package.picked-up", "tnt.delivery.package.delivered",
-                        "tnt.delivery.hub-deposit.created", "tnt.delivery.hub-deposit.picked-up"),
+                List.of(TntTopics.DELIVERY_MISSION_CREATED, TntTopics.DELIVERY_MISSION_STATUS_CHANGED,
+                        TntTopics.DELIVERY_PACKAGE_PICKED_UP, TntTopics.DELIVERY_PACKAGE_DELIVERED,
+                        TntTopics.DELIVERY_HUB_DEPOSIT_CREATED, TntTopics.DELIVERY_HUB_DEPOSIT_PICKED_UP),
                 "tnt_delivery");
 
         register("tnt-incident-core",
@@ -199,12 +200,12 @@ public class TntModuleRegistry {
                         "tnt-route-core", "tnt-notify-core", "tnt-media-core",
                         "tnt-auth-core", "tnt-roles-core"),
                 List.of(
-                        "tnt.incident.created", "tnt.incident.status.changed",
-                        "tnt.incident.triaged", "tnt.incident.driver.assigned",
-                        "tnt.incident.handover.completed", "tnt.incident.resolved",
-                        "tnt.incident.closed", "tnt.incident.cancelled",
-                        "tnt.incident.escalated", "tnt.incident.escalated.to.dispute",
-                        "tnt.incident.interagency.requested", "tnt.incident.interagency.completed"),
+                        TntTopics.INCIDENT_CREATED, TntTopics.INCIDENT_STATUS_CHANGED,
+                        TntTopics.INCIDENT_TRIAGED, TntTopics.INCIDENT_DRIVER_ASSIGNED,
+                        TntTopics.INCIDENT_HANDOVER_COMPLETED, TntTopics.INCIDENT_RESOLVED,
+                        TntTopics.INCIDENT_CLOSED, TntTopics.INCIDENT_CANCELLED,
+                        TntTopics.INCIDENT_ESCALATED, TntTopics.INCIDENT_ESCALATED_TO_DISPUTE,
+                        TntTopics.INCIDENT_INTERAGENCY_REQUESTED, TntTopics.INCIDENT_INTERAGENCY_COMPLETED),
                 "tnt_incident");
 
         register("tnt-dispute-core",
@@ -212,9 +213,9 @@ public class TntModuleRegistry {
                 "consumes tnt.incident.escalated.to.dispute)",
                 ModuleLayer.LOGISTICS_L3, ModuleOrigin.TNT_EXCLUSIVE,
                 List.of("tnt-delivery-core", "tnt-actor-core", "tnt-auth-core", "tnt-roles-core"),
-                List.of("tnt.dispute.opened", "tnt.dispute.resolved", "tnt.dispute.escalated",
-                        "tnt.dispute.evidence-added", "tnt.dispute.refund-initiated",
-                        "tnt.dispute.compensation-paid", "tnt.dispute.closed"),
+                List.of(TntTopics.DISPUTE_OPENED, TntTopics.DISPUTE_RESOLVED, TntTopics.DISPUTE_ESCALATED,
+                        TntTopics.DISPUTE_EVIDENCE_ADDED, TntTopics.DISPUTE_REFUND_INITIATED,
+                        TntTopics.DISPUTE_COMPENSATION_PAID, TntTopics.DISPUTE_CLOSED),
                 "tnt_dispute");
 
         register("tnt-realtime-core",
@@ -222,23 +223,23 @@ public class TntModuleRegistry {
                 "enriched GPS events with trajectoryAnomaly/prolongedStop for tnt-incident-core)",
                 ModuleLayer.LOGISTICS_L3, ModuleOrigin.TNT_EXCLUSIVE,
                 List.of("tnt-route-core"),
-                List.of("tnt.realtime.presence.changed",
-                        "tnt.realtime.gps.position.updated",
-                        "tnt.realtime.geofence.triggered"), null);
+                List.of(TntTopics.REALTIME_PRESENCE_CHANGED,
+                        TntTopics.REALTIME_GPS_POSITION_UPDATED,
+                        TntTopics.REALTIME_GEOFENCE_TRIGGERED), null);
 
         register("tnt-sync-core",
                 "Sync Core (Offline-First PWA, DuckDB-Wasm bridge, Delta sync, Conflict LWW)",
                 ModuleLayer.LOGISTICS_L3, ModuleOrigin.TNT_EXCLUSIVE,
                 List.of(),
-                List.of("tnt.sync.delta.requested", "tnt.sync.conflict.detected"), null);
+                List.of(TntTopics.SYNC_DELTA_REQUESTED, TntTopics.SYNC_CONFLICT_DETECTED), null);
 
         register("tnt-notify-core",
                 "Notify Core (FCM, MTN SMS, Orange SMS, WhatsApp Meta, Email, in-app STOMP, " +
                 "INotificationPort impl for tnt-incident-core — 10+ incident notification types)",
                 ModuleLayer.LOGISTICS_L3, ModuleOrigin.TNT_EXTENSION,
                 List.of("yow-i18n-kernel", "tnt-auth-core"),
-                List.of("tnt.notify.notification.requested", "tnt.notify.notification.delivered",
-                        "tnt.notify.notification.failed"),
+                List.of(TntTopics.NOTIFY_NOTIFICATION_REQUESTED, TntTopics.NOTIFY_NOTIFICATION_DELIVERED,
+                        TntTopics.NOTIFY_NOTIFICATION_FAILED),
                 "tnt_notify");
 
         register("tnt-media-core",
@@ -246,7 +247,7 @@ public class TntModuleRegistry {
                 "IMediaStoragePort impl for tnt-incident-core — tnt-incident-evidences bucket)",
                 ModuleLayer.LOGISTICS_L3, ModuleOrigin.TNT_EXTENSION,
                 List.of("comops-file-core"),
-                List.of("tnt.media.file.uploaded", "tnt.media.file.deleted"),
+                List.of(TntTopics.MEDIA_FILE_UPLOADED, TntTopics.MEDIA_FILE_DELETED),
                 "tnt_media");
 
         // ── L4 — Business ──────────────────────────────────────────────────────
@@ -305,16 +306,17 @@ public class TntModuleRegistry {
                 "@RequirePermission guards on invoice:issue)",
                 ModuleLayer.BILLING_ENGINE_L5, ModuleOrigin.TNT_EXCLUSIVE,
                 List.of("tnt-billing-pricing", "tnt-media-core", "tnt-roles-core"),
-                List.of("tnt.billing.invoice.created"), "tnt_billing");
+                List.of(TntTopics.BILLING_INVOICE_CREATED), "tnt_billing");
 
         register("tnt-billing-wallet",
-                "Billing Wallet (MTN MoMo, Orange Money, Stripe, in-app wallet, " +
+                "Billing Wallet (in-app ledger; Mobile Money/card provider integration " +
+                "delegated to the Kernel's payment-controller via KernelPaymentGatewayAdapter, " +
                 "IPaymentFreezePort impl for tnt-incident-core, " +
                 "@RequirePermission guards on payment:process/refund)",
                 ModuleLayer.BILLING_ENGINE_L5, ModuleOrigin.TNT_EXCLUSIVE,
                 List.of("tnt-billing-invoice", "tnt-roles-core"),
-                List.of("tnt.billing.payment.confirmed", "tnt.billing.payment.failed",
-                        "tnt.billing.wallet.credited", "tnt.billing.wallet.debited"),
+                List.of(TntTopics.BILLING_WALLET_PAYMENT_CONFIRMED, TntTopics.BILLING_PAYMENT_FAILED,
+                        TntTopics.BILLING_WALLET_CREDITED_PROVISIONING_BEAN, TntTopics.BILLING_WALLET_DEBITED_PROVISIONING_BEAN),
                 "tnt_billing");
 
         register("tnt-billing-report",
@@ -331,7 +333,7 @@ public class TntModuleRegistry {
                 "Supports SIMPLIFIED (FreelancerOrg/Point, max 20 rules) and FULL (Agency/Admin, max 100 rules) DSL levels.",
                 ModuleLayer.BILLING_ENGINE_L5, ModuleOrigin.TNT_EXCLUSIVE,
                 List.of("tnt-billing-core", "tnt-administration-core"),
-                List.of("tnt.billing.template.applied", "tnt.billing.custom_template.saved"),
+                List.of(TntTopics.BILLING_TEMPLATE_APPLIED, TntTopics.BILLING_CUSTOM_TEMPLATE_SAVED),
                 "billing");
 
         // ── L6 — Core Backend (per-product official business backends) ────────

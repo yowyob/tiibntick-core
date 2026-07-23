@@ -13,6 +13,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @Tag(name = "GOFP — Annonces", description = "API métier générique — Annonces TiiBnPick")
 @RestController
@@ -24,6 +25,7 @@ public class AnnouncementCoreController {
 
     @Operation(summary = "Créer une annonce avec son colis")
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<AnnouncementEntity> create(@RequestBody Map<String, Object> body) {
         // Les DTOs complets seront ajoutés — simplification initiale avec entité directe
@@ -53,12 +55,14 @@ public class AnnouncementCoreController {
 
     @Operation(summary = "Publier une annonce DRAFT")
     @PatchMapping("/{id}/publish")
+    @PreAuthorize("isAuthenticated()")
     public Mono<AnnouncementEntity> publish(@PathVariable UUID id) {
         return announcementUseCase.publishAnnouncement(id);
     }
 
     @Operation(summary = "Assigner un livreur à une annonce")
     @PatchMapping("/{id}/assign/{freelancerActorId}")
+    @PreAuthorize("isAuthenticated()")
     public Mono<AnnouncementEntity> assign(@PathVariable UUID id,
                                             @PathVariable UUID freelancerActorId) {
         return announcementUseCase.assignFreelancer(id, freelancerActorId);
@@ -66,6 +70,7 @@ public class AnnouncementCoreController {
 
     @Operation(summary = "Annuler une annonce")
     @PatchMapping("/{id}/cancel")
+    @PreAuthorize("isAuthenticated()")
     public Mono<AnnouncementEntity> cancel(@PathVariable UUID id) {
         return announcementUseCase.cancelAnnouncement(id);
     }

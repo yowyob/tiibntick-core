@@ -1,6 +1,7 @@
 package com.yowyob.tiibntick.core.notify.config;
 
 import com.yowyob.kernel.i18n.application.port.in.TranslateMessageUseCase;
+import com.yowyob.kernel.i18n.config.I18nKernelProperties;
 import com.yowyob.tiibntick.core.notify.application.port.in.ISendNotificationUseCase;
 import com.yowyob.tiibntick.core.notify.application.port.in.IManageNotificationPreferencesUseCase;
 import com.yowyob.tiibntick.core.notify.application.port.in.ISearchNotificationsUseCase;
@@ -25,6 +26,8 @@ import com.yowyob.tiibntick.core.notify.infrastructure.adapter.kernel.KernelNoti
 import com.yowyob.tiibntick.core.notify.infrastructure.adapter.kernel.KernelNotificationProviderConfigAdapter;
 import com.yowyob.tiibntick.core.notify.infrastructure.adapter.kernel.KernelNotificationReminderAdapter;
 import com.yowyob.tiibntick.core.notify.infrastructure.adapter.kernel.KernelNotificationTemplateAdapter;
+import com.yowyob.tiibntick.core.notify.infrastructure.adapter.i18n.I18nTranslationPortAdapter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -38,7 +41,6 @@ import org.springframework.data.r2dbc.repository.config.EnableR2dbcRepositories;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
-import reactor.core.publisher.Mono;
 
 import java.util.HashMap;
 import java.util.List;
@@ -61,17 +63,16 @@ public class NotifyCoreAutoConfiguration {
      * Bridges yow-i18n-kernel's TranslateMessageUseCase into tnt-notify-core's
      * ITranslationPort.
      * Anti-corruption layer isolating the notification domain from the i18n kernel
-     * internals.
+     * internals. See {@link I18nTranslationPortAdapter} for the language
+     * normalization and missing-translation fallback logic — this is the single
+     * place every notification send routes through (Audit n°4, P-1/P-2/P-21/P0 item1).
      */
     @Bean
     @ConditionalOnMissingBean
-    public ITranslationPort translationPort(TranslateMessageUseCase translateMessageUseCase) {
-        return model -> Mono.justOrEmpty(
-                translateMessageUseCase.translate(
-                        model.templateKey(),
-                        model.targetLanguage(),
-                        model.parameters()))
-                .defaultIfEmpty("⚠ Missing translation: " + model.templateKey());
+    public ITranslationPort translationPort(TranslateMessageUseCase translateMessageUseCase,
+            I18nKernelProperties i18nKernelProperties,
+            MeterRegistry meterRegistry) {
+        return new I18nTranslationPortAdapter(translateMessageUseCase, i18nKernelProperties, meterRegistry);
     }
 
     /**

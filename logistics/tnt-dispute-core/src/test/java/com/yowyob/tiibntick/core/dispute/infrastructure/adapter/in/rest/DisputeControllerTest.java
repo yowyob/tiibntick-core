@@ -3,6 +3,10 @@ package com.yowyob.tiibntick.core.dispute.infrastructure.adapter.in.rest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.yowyob.tiibntick.core.auth.adapter.in.web.TntCurrentUserArgumentResolver;
+import com.yowyob.tiibntick.core.auth.application.port.in.ResolveCurrentUserUseCase;
+import com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext;
+import com.yowyob.tiibntick.core.auth.domain.model.TntUserIdentity;
 import com.yowyob.tiibntick.core.dispute.application.port.inbound.IDisputeCommandUseCase;
 import com.yowyob.tiibntick.core.dispute.application.port.inbound.IDisputeQueryUseCase;
 import com.yowyob.tiibntick.core.dispute.domain.enums.*;
@@ -19,6 +23,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Mono;
 
+import java.util.UUID;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -28,11 +34,21 @@ import static org.mockito.Mockito.when;
  * <p>Tests HTTP contract: status codes, response structure, header handling.
  * Application layer is mocked — only the HTTP adapter is under test.
  *
+ * <p>Since Audit n°7 · #4 (2026-07-18), the tenant is resolved via
+ * {@code @CurrentUser TntUserIdentity}, not the {@code X-Tenant-ID} header — the header is
+ * still sent below to mirror what a real caller does, but it is inert (see
+ * {@link DisputeControllerTenantHeaderIgnoredTest} for the regression test proving that).
+ * The custom {@link TntCurrentUserArgumentResolver} is registered here purely so this
+ * HTTP-contract test keeps working; the resolved tenant ({@link #TENANT_ID}) is what
+ * actually reaches the use case.
+ *
  * @author MANFOUO Braun
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("DisputeController")
 class DisputeControllerTest {
+
+    private static final String TENANT_ID = UUID.randomUUID().toString();
 
     private WebTestClient webClient;
 
@@ -50,7 +66,19 @@ class DisputeControllerTest {
 
     @BeforeEach
     void setUp() {
-        webClient = WebTestClient.bindToController(controller).build();
+        ResolveCurrentUserUseCase resolveCurrentUserUseCase = org.mockito.Mockito.mock(ResolveCurrentUserUseCase.class);
+        TntSecurityContext resolvedContext = TntSecurityContext.builder()
+                .userId(UUID.randomUUID())
+                .tenantId(UUID.fromString(TENANT_ID))
+                .authenticated(true)
+                .build();
+        org.mockito.Mockito.lenient().when(resolveCurrentUserUseCase.resolveCurrentIdentity())
+                .thenReturn(Mono.just(TntUserIdentity.from(resolvedContext)));
+
+        webClient = WebTestClient.bindToController(controller)
+                .argumentResolvers(configurer -> configurer.addCustomResolver(
+                        new TntCurrentUserArgumentResolver(resolveCurrentUserUseCase)))
+                .build();
         objectMapper = new ObjectMapper()
                 .registerModule(new JavaTimeModule())
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
@@ -76,7 +104,7 @@ class DisputeControllerTest {
 
         webClient.post()
                 .uri("/api/v1/disputes")
-                .header("X-Tenant-ID", "agency-douala-01")
+                .header("X-Tenant-ID", TENANT_ID)
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(objectMapper.writeValueAsString(request))
                 .exchange()
@@ -97,12 +125,12 @@ class DisputeControllerTest {
 
         webClient.get()
                 .uri("/api/v1/disputes/{id}", stubDispute.getId().getValue())
-                .header("X-Tenant-ID", "agency-douala-01")
+                .header("X-Tenant-ID", TENANT_ID)
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.id").isEqualTo(stubDispute.getId().getValue())
-                .jsonPath("$.tenantId").isEqualTo("agency-douala-01")
+                .jsonPath("$.tenantId").isEqualTo(TENANT_ID)
                 .jsonPath("$.status").isEqualTo("OPEN");
     }
 
@@ -115,7 +143,7 @@ class DisputeControllerTest {
 
         webClient.get()
                 .uri("/api/v1/disputes/nonexistent-id")
-                .header("X-Tenant-ID", "agency-douala-01")
+                .header("X-Tenant-ID", TENANT_ID)
                 .exchange()
                 .expectStatus().is5xxServerError(); // will be 404 with proper global exception handler
     }
@@ -126,7 +154,7 @@ class DisputeControllerTest {
 
     private Dispute buildStubDispute() {
         return Dispute.open(new com.yowyob.tiibntick.core.dispute.application.command.OpenDisputeCommand(
-                "agency-douala-01",
+                TENANT_ID,
                 "client-abc",
                 ClaimantType.CLIENT,
                 "freelancer-xyz",
@@ -140,6 +168,7 @@ class DisputeControllerTest {
                 "Package arrived damaged",
                 "org-789",
                 null,
-                false));
+                false),
+                com.yowyob.tiibntick.core.dispute.domain.model.DisputeReference.forSequence(1));
     }
 }

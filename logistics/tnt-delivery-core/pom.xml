@@ -40,6 +40,11 @@
             <groupId>com.yowyob.tiibntick.core</groupId>
             <artifactId>tnt-auth-core</artifactId>
         </dependency>
+        <!-- tnt-common-core: TntTopics Kafka topic referential (Audit n5 P-03/P-12) -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-common-core</artifactId>
+        </dependency>
         <!-- tnt-roles-core: @RequirePermission AOP guards -->
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>
@@ -202,6 +207,22 @@
             <groupId>org.testcontainers</groupId>
             <artifactId>kafka</artifactId>
             <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- In-process broker for the P6/P-01 topic-alignment integration test (no Docker
+             required — Testcontainers KafkaContainer hit an environment-specific
+             commons-compress/docker-java version conflict; EmbeddedKafka avoids that class
+             of issue entirely, matching the "or an embedded test" fallback in the remediation
+             plan for Chantier C). -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka-test</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

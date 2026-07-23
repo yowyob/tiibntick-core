@@ -17,7 +17,10 @@ import java.util.UUID;
 public class InventoryCoreClient implements InventoryCorePort {
 
     private static final Logger log = LoggerFactory.getLogger(InventoryCoreClient.class);
-    private static final String BASE = "/api/v1/inventory";
+    // tnt-inventory-core's InventoryController (replaced the old InventoryHandler/
+    // InventoryRouterConfig functional router — see its Javadoc) now serves this at
+    // the retired-v1-prefix-free "/api/inventory" convention.
+    private static final String BASE = "/api/inventory";
     private static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE =
             new ParameterizedTypeReference<>() {};
 

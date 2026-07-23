@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.core.notify.infrastructure.adapter.incident;
 
+import com.yowyob.kernel.i18n.domain.enums.SupportedLanguage;
 import com.yowyob.tiibntick.core.incident.port.outbound.INotificationPort;
 import com.yowyob.tiibntick.core.notify.application.port.in.ISendNotificationUseCase;
 import com.yowyob.tiibntick.core.notify.config.NotifyProperties;
@@ -222,6 +223,6 @@ public class IncidentNotificationPortAdapter implements INotificationPort {
     private NotificationModel buildModel(String type, Map<String, Object> params,
             NotificationPriority priority) {
         String templateKey = "incident.notification." + type.toLowerCase().replace("_", ".");
-        return new NotificationModel(templateKey, "fr", params, priority);
+        return new NotificationModel(templateKey, SupportedLanguage.FR_CM.getTag(), params, priority);
     }
 }

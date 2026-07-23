@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.core.billing.wallet.application.service;
 
+import com.yowyob.tiibntick.core.billing.wallet.adapter.out.kernel.dto.KernelPaymentOrderDto;
 import com.yowyob.tiibntick.core.billing.wallet.application.port.in.IWalletUseCase;
 import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.*;
 import com.yowyob.tiibntick.core.billing.wallet.application.port.out.*;
@@ -10,6 +11,9 @@ import com.yowyob.tiibntick.core.billing.wallet.domain.model.*;
 import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.core.LockAssert;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
@@ -54,11 +58,11 @@ public class WalletService implements IWalletUseCase {
 
     private final IWalletRepository walletRepository;
     private final IPaymentIntentRepository paymentIntentRepository;
-    private final IMoMoPaymentPort moMoPaymentPort;
     private final IIdempotencyStore idempotencyStore;
     private final IWalletEventPublisher eventPublisher;
     private final IWalletNotificationPort notificationPort;
     private final IPaymentAnchorPort paymentAnchorPort;
+    private final IKernelPaymentGatewayPort kernelPaymentGatewayPort;
 
     @Override
     @RequirePermission(resource = "wallet", action = "read")
@@ -84,7 +88,7 @@ public class WalletService implements IWalletUseCase {
                             command.amount(), command.referenceId(), command.description());
                     return walletRepository.save(wallet)
                             .then(walletRepository.saveTransaction(tx))
-                            .doOnSuccess(saved -> publishCreditEvents(wallet));
+                            .flatMap(saved -> publishCreditEvents(wallet).thenReturn(saved));
                 });
     }
 
@@ -99,7 +103,7 @@ public class WalletService implements IWalletUseCase {
                             command.channel(), command.description(), command.idempotencyKey());
                     return walletRepository.save(wallet)
                             .then(walletRepository.saveTransaction(tx))
-                            .doOnSuccess(saved -> publishDebitEvents(wallet));
+                            .flatMap(saved -> publishDebitEvents(wallet).thenReturn(saved));
                 });
     }
 
@@ -148,19 +152,31 @@ public class WalletService implements IWalletUseCase {
     public Mono<PaymentIntent> handlePaymentCallback(ConfirmPaymentCommand command) {
         return paymentIntentRepository.findByExternalRef(command.externalRef())
                 .switchIfEmpty(Mono.error(new PaymentIntentNotFoundException(command.externalRef())))
-                .flatMap(intent -> {
-                    if (!intent.isPending()) {
-                        log.warn("Received duplicate callback for intent {} status={}",
-                                intent.getId(), intent.getStatus());
-                        return Mono.just(intent);
-                    }
-                    boolean success = "SUCCESSFUL".equalsIgnoreCase(command.providerStatus());
-                    if (success) {
-                        return handleSuccessfulPayment(intent, command.financialTransactionId());
-                    } else {
-                        return handleFailedPayment(intent, command.failureReason());
-                    }
-                });
+                .flatMap(intent -> applyProviderStatus(intent, command.providerStatus(),
+                        command.financialTransactionId(), command.failureReason()));
+    }
+
+    /**
+     * Shared terminal-status handling for a PaymentIntent, whichever path discovered the
+     * outcome — the original webhook-driven {@link #handlePaymentCallback} above, or the
+     * Kernel order-reconciliation poller ({@link #pollPendingProviderOrders}). Called via
+     * plain self-invocation (not through the {@code IWalletUseCase} proxy) so the scheduled
+     * poller — which runs with no inbound request/security context — is never subject to
+     * {@link RequirePermission}'s reactive-context check.
+     */
+    private Mono<PaymentIntent> applyProviderStatus(PaymentIntent intent, String providerStatus,
+                                                     String financialTransactionId, String failureReason) {
+        if (!intent.isPending()) {
+            log.warn("Received duplicate confirmation for intent {} status={}",
+                    intent.getId(), intent.getStatus());
+            return Mono.just(intent);
+        }
+        boolean success = "SUCCESSFUL".equalsIgnoreCase(providerStatus);
+        if (success) {
+            return handleSuccessfulPayment(intent, financialTransactionId);
+        } else {
+            return handleFailedPayment(intent, failureReason);
+        }
     }
 
     @Override
@@ -360,8 +376,8 @@ public class WalletService implements IWalletUseCase {
         return getOrCreateWallet(command.userId(), command.tenantId())
                 .flatMap(wallet -> {
                     PaymentIntent intent = wallet.initiatePayment(request, PAYMENT_INTENT_TTL_MINUTES);
-                    return paymentIntentRepository.save(intent)
-                            .flatMap(savedIntent -> dispatchToProvider(savedIntent, request, wallet))
+                    return dispatchToProvider(intent, request, wallet)
+                            .flatMap(paymentIntentRepository::save)
                             .flatMap(savedIntent -> {
                                 WalletTransaction pendingTx = wallet.createPendingDebit(
                                         request.amount(), request.invoiceId(),
@@ -381,20 +397,126 @@ public class WalletService implements IWalletUseCase {
                 });
     }
 
+    /**
+     * Provider dispatch (Mobile Money/Stripe) used to be handled locally via
+     * {@code IMoMoPaymentPort} (MtnMoMoAdapter/OrangeMoneyAdapter/StripeAdapter) — removed as
+     * part of the payment/wallet Kernel-delegation workstream (step 6): those adapters had
+     * unverified or optional webhook signature checks (Audit n°7 #1/#2/#3) and are deleted
+     * outright rather than patched.
+     *
+     * <p>Step 4 correction (2026-07-18): the Kernel's {@code payment-gateway-controller}
+     * ({@code POST /api/payments/orders}) was wrongly believed not to exist — verified
+     * present. For channels backed by a real external provider (MTN_MOMO/ORANGE_MONEY via
+     * the Kernel's MYCOOLPAY aggregator, STRIPE for cards), this now calls
+     * {@link IKernelPaymentGatewayPort#initiateOrder} and records the returned Kernel order
+     * id on the intent (via {@link PaymentIntent#attachProviderReference}) so
+     * {@link #pollPendingProviderOrders()} can reconcile it later (step 5). Errors propagate
+     * (never fail-open) — a failed initiation must not leave behind a PaymentIntent that
+     * looks like a real provider dispatch happened.
+     *
+     * <p>{@code CASH_ON_DELIVERY} and {@code WALLET} never involve an external provider, so
+     * no Kernel call is made for them — the intent stays PENDING until confirmed through
+     * whatever local flow already applies to those channels (cash receipt recording /
+     * in-app wallet-to-wallet transfer confirmation), unchanged by this workstream.
+     */
     private Mono<PaymentIntent> dispatchToProvider(PaymentIntent intent, PaymentRequest request, Wallet wallet) {
-        MoMoPayload payload = MoMoPayload.fromRequest(request, UUID.randomUUID().toString());
-        Mono<PaymentIntent> dispatch = switch (request.channel()) {
-            case MTN_MOMO    -> moMoPaymentPort.initiateMtnCollection(payload, UUID.randomUUID().toString())
-                                               .thenReturn(intent);
-            case ORANGE_MONEY -> moMoPaymentPort.initiateOrangePayment(payload).thenReturn(intent);
-            case STRIPE      -> moMoPaymentPort.initiateStripePayment(payload, request.idempotencyKey())
-                                               .thenReturn(intent);
-            default          -> Mono.just(intent);
-        };
-        return dispatch.onErrorResume(e -> {
-            log.warn("Payment provider dispatch failed (non-fatal in dev): {}", e.getMessage());
+        ProviderMapping mapping = ProviderMapping.forChannel(request.channel());
+        if (mapping == null) {
+            log.debug("Channel {} has no external provider — skipping Kernel order dispatch (intentId={})",
+                    request.channel(), intent.getId());
             return Mono.just(intent);
-        });
+        }
+        return kernelPaymentGatewayPort.initiateOrder(
+                        mapping.provider(), mapping.method(),
+                        request.amount().amount(), request.amount().currencyCode(),
+                        request.payerPhone(), request.description(), request.callbackUrl(),
+                        request.idempotencyKey())
+                .doOnNext(order -> {
+                    intent.attachProviderReference(order.id());
+                    log.info("Dispatched payment intent {} to Kernel provider order {} (provider={}, method={})",
+                            intent.getId(), order.id(), mapping.provider(), mapping.method());
+                })
+                .thenReturn(intent);
+    }
+
+    /**
+     * Maps a TiiBnTick {@link PaymentChannel} to the {@code provider}/{@code method} pair
+     * confirmed by the Kernel's {@code InitiatePaymentRequest} schema enums ({@code provider}:
+     * {@code MYCOOLPAY}/{@code STRIPE}; {@code method}: {@code MOBILE_MONEY}/{@code CARD}) —
+     * {@code docs/kernel-api/openapi.json}. {@code null} for channels with no external
+     * provider ({@code CASH_ON_DELIVERY}, {@code WALLET}).
+     */
+    private record ProviderMapping(String provider, String method) {
+        static ProviderMapping forChannel(PaymentChannel channel) {
+            return switch (channel) {
+                case MTN_MOMO, ORANGE_MONEY -> new ProviderMapping("MYCOOLPAY", "MOBILE_MONEY");
+                case STRIPE -> new ProviderMapping("STRIPE", "CARD");
+                case CASH_ON_DELIVERY, WALLET -> null;
+            };
+        }
+    }
+
+    /**
+     * Scheduled reconciliation for provider-dispatched payments (workstream step 5). The
+     * Kernel documents no outbound webhook back to TiiBnTick for
+     * {@code payment-gateway-controller} orders (verified: no such path in
+     * {@code docs/kernel-api/openapi.json}), so PaymentIntents dispatched to a real
+     * provider by {@link #dispatchToProvider} are reconciled by actively polling
+     * {@code POST /api/payments/orders/{id}/refresh} until the Kernel reports a terminal
+     * status — the same {@link #applyProviderStatus} path {@link #handlePaymentCallback}
+     * uses, so {@code tnt-trust-core}'s {@code PaymentAnchorAdapter} keeps receiving
+     * {@code PaymentConfirmed} exactly as before.
+     *
+     * <p>Runs on a fixed delay (default 20s, configurable via
+     * {@code tnt.billing.wallet.kernel.order-poll-interval-ms}) — reasonable backoff for a
+     * flow where the user is actively waiting on a Mobile Money USSD prompt or card
+     * redirect, without hammering the Kernel every tick regardless of how many orders are
+     * in flight. Guarded by ShedLock (same pattern as
+     * {@link ReconciliationService#scheduledReconciliation()}) so only one app instance
+     * polls at a time in a multi-instance deployment.
+     */
+    @Scheduled(fixedDelayString = "${tnt.billing.wallet.kernel.order-poll-interval-ms:20000}")
+    @SchedulerLock(name = "wallet-payment-order-poll", lockAtMostFor = "PT1M", lockAtLeastFor = "PT5S")
+    public void pollPendingProviderOrders() {
+        LockAssert.assertLocked();
+        reconcilePendingProviderOrders();
+    }
+
+    /**
+     * The actual reconciliation sweep, split out from {@link #pollPendingProviderOrders()}
+     * so it can be unit-tested directly without going through the ShedLock-proxied
+     * {@code @Scheduled} entry point (which asserts a live lock via {@link LockAssert}).
+     */
+    void reconcilePendingProviderOrders() {
+        paymentIntentRepository.findAllPendingWithProviderReference()
+                .flatMap(this::reconcileProviderOrder)
+                .onErrorContinue((error, obj) -> log.warn(
+                        "Failed to reconcile a pending Kernel payment order (will retry next tick): {}",
+                        error.getMessage()))
+                .subscribe();
+    }
+
+    private Mono<PaymentIntent> reconcileProviderOrder(PaymentIntent intent) {
+        if (intent.isExpired()) {
+            intent.expire();
+            return paymentIntentRepository.save(intent);
+        }
+        return kernelPaymentGatewayPort.refreshOrder(intent.getExternalRef())
+                .flatMap(order -> reconcileFromOrder(intent, order))
+                .switchIfEmpty(Mono.just(intent)); // refreshOrder fail-open on error — retry next tick
+    }
+
+    private Mono<PaymentIntent> reconcileFromOrder(PaymentIntent intent, KernelPaymentOrderDto order) {
+        String financialTransactionId = order.providerReference() != null
+                ? order.providerReference() : order.id();
+        if (order.isSuccess()) {
+            return applyProviderStatus(intent, "SUCCESSFUL", financialTransactionId, null);
+        }
+        if (order.isFailure()) {
+            return applyProviderStatus(intent, "FAILED", null,
+                    "Kernel payment order status: " + order.status());
+        }
+        return Mono.just(intent); // still in-flight at the provider — retry next tick
     }
 
     private Mono<PaymentIntent> handleSuccessfulPayment(PaymentIntent intent, String financialTransactionId) {
@@ -469,13 +591,23 @@ public class WalletService implements IWalletUseCase {
                 });
     }
 
-    private void publishCreditEvents(Wallet wallet) {
-        wallet.getPendingCreditEvents().forEach(event -> eventPublisher.publish(event).subscribe());
-        wallet.getPendingCreditEvents().clear();
+    /**
+     * Publishes pending credit events as part of the caller's reactive chain (and hence the
+     * caller's {@code @Transactional} boundary) — previously fire-and-forget
+     * ({@code .subscribe()} inside {@code doOnSuccess}), which escaped the transaction and
+     * could silently drop events. With the transactional outbox (Chantier C · Audit n°3 · P5)
+     * the envelope must be persisted in the same transaction as the wallet write.
+     */
+    private Mono<Void> publishCreditEvents(Wallet wallet) {
+        return Flux.fromIterable(java.util.List.copyOf(wallet.getPendingCreditEvents()))
+                .concatMap(eventPublisher::publish)
+                .then(Mono.fromRunnable(() -> wallet.getPendingCreditEvents().clear()));
     }
 
-    private void publishDebitEvents(Wallet wallet) {
-        wallet.getPendingDebitEvents().forEach(event -> eventPublisher.publish(event).subscribe());
-        wallet.getPendingDebitEvents().clear();
+    /** Same contract as {@link #publishCreditEvents(Wallet)}, for debit events. */
+    private Mono<Void> publishDebitEvents(Wallet wallet) {
+        return Flux.fromIterable(java.util.List.copyOf(wallet.getPendingDebitEvents()))
+                .concatMap(eventPublisher::publish)
+                .then(Mono.fromRunnable(() -> wallet.getPendingDebitEvents().clear()));
     }
 }

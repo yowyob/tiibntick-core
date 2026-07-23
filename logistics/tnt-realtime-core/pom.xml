@@ -40,6 +40,11 @@
          DEPENDENCIES
          ========================================================= -->
     <dependencies>
+        <!-- ── tnt-auth-core (Foundation L1 — security context, @CurrentUser) ── -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-auth-core</artifactId>
+        </dependency>
 
         <!-- ── TiiBnTick Core Internal Modules (L2 Identity) ── -->
         <dependency>
@@ -157,6 +162,12 @@
             <artifactId>testcontainers</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- Outbox migration integration test (Chantier C · Audit n°3 · P5) — event_bus schema. -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>com.redis</groupId>
             <artifactId>testcontainers-redis</artifactId>
@@ -182,6 +193,14 @@
             <artifactId>spring-kafka-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- @SchedulerLock annotation (Chantier D · Audit n°6 · S2) — distributed lock around
+             this module's @Scheduled job(s); LockProvider bean lives centrally in
+             tnt-bootstrap's TntSchedulerLockConfig. -->
+        <dependency>
+            <groupId>net.javacrumbs.shedlock</groupId>
+            <artifactId>shedlock-spring</artifactId>
+        </dependency>
+
     </dependencies>
 
 </project>

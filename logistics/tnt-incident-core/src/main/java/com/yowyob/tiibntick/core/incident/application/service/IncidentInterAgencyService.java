@@ -8,6 +8,7 @@ import com.yowyob.tiibntick.core.incident.port.outbound.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
@@ -42,6 +43,7 @@ public class IncidentInterAgencyService implements IInterAgencyCooperationUseCas
      * @return the created cooperation record
      */
     @Override
+    @Transactional
     public Mono<IncidentInterAgencyCooperation> request(RequestCooperationCommand command) {
         return incidentRepository.findById(command.getIncidentId())
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Incident not found")))
@@ -111,6 +113,7 @@ public class IncidentInterAgencyService implements IInterAgencyCooperationUseCas
      * @return the completed cooperation record with blockchain proof
      */
     @Override
+    @Transactional
     public Mono<IncidentInterAgencyCooperation> complete(RecordCooperationCompletionCommand command) {
         return cooperationRepository.findCooperationById(command.getCooperationId())
                 .flatMap(coop -> blockchainAuditPort.writeIncidentEvent(

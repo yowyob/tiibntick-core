@@ -11,6 +11,7 @@ import com.yowyob.tiibntick.core.incident.port.outbound.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
@@ -58,6 +59,7 @@ public class IncidentAutoResolutionService implements IStartAutoResolutionUseCas
      * @return the driver replacement record
      */
     @Override
+    @Transactional
     public Mono<Incident> execute(UUID incidentId) {
         return incidentRepository.findById(incidentId)
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Incident not found: " + incidentId)))
@@ -143,6 +145,7 @@ public class IncidentAutoResolutionService implements IStartAutoResolutionUseCas
     }
 
     @Override
+    @Transactional
     public Mono<IncidentDriverReplacement> execute(AssignReplacementDriverCommand command) {
         return incidentRepository.findById(command.getIncidentId())
                 .flatMap(incident -> replacementRepository.findReplacementByIncidentId(incident.getId())

@@ -18,6 +18,12 @@ public interface InvoiceRepository {
 
     Mono<Invoice> findById(UUID invoiceId);
 
+    /**
+     * Tenant-scoped lookup — returns empty (not found) when the invoice exists
+     * but belongs to a different tenant, preventing cross-tenant IDOR access.
+     */
+    Mono<Invoice> findByIdAndTenantId(UUID invoiceId, UUID tenantId);
+
     Mono<Invoice> findByNumber(String invoiceNumber);
 
     Flux<Invoice> findByMissionId(String missionId);

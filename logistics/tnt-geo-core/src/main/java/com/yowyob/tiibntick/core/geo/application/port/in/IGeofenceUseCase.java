@@ -17,11 +17,15 @@ public interface IGeofenceUseCase {
     /**
      * Checks whether a geographic point falls within a named service zone.
      *
+     * <p>The zone lookup is scoped to {@code tenantId}: a zone belonging to another
+     * tenant is treated as not found, never leaked across tenants.
+     *
      * @param point    the coordinate to test
      * @param zoneId   the ID of the service zone polygon
+     * @param tenantId the tenant scope the zone must belong to
      * @return Mono<Boolean> true if the point is inside the zone
      */
-    Mono<Boolean> isPointInZone(GeoPoint point, UUID zoneId);
+    Mono<Boolean> isPointInZone(GeoPoint point, UUID zoneId, UUID tenantId);
 
     /**
      * Checks whether a geographic point is within any zone belonging to an agency.

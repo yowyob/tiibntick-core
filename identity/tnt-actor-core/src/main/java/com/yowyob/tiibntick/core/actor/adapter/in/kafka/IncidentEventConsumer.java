@@ -2,6 +2,7 @@ package com.yowyob.tiibntick.core.actor.adapter.in.kafka;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yowyob.tiibntick.common.kafka.TntTopics;
 import com.yowyob.tiibntick.core.actor.application.port.out.IDelivererRepository;
 import com.yowyob.tiibntick.core.actor.application.port.out.IFreelancerRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -64,9 +65,9 @@ public class IncidentEventConsumer {
      * @param record the Kafka consumer record
      */
     @KafkaListener(
-            topics = "tnt.incident.closed",
+            topics = TntTopics.INCIDENT_CLOSED,
             groupId = "${spring.kafka.consumer.group-id:tiibntick-core}",
-            containerFactory = "kafkaListenerContainerFactory")
+            containerFactory = "actorKafkaListenerContainerFactory")
     public void onIncidentClosed(ConsumerRecord<String, String> record) {
         log.debug("Received tnt.incident.closed event: key={}", record.key());
 

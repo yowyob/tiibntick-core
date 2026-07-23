@@ -1,18 +1,21 @@
 # Kernel API — Endpoints Reference
 
-Auto-generated from `IWM Backend API` v0.1.0-SNAPSHOT OpenAPI spec (`openapi.json` in this directory). Server: https://kernel-core.yowyob.com.
+Auto-generated from `IWM Backend API` v0.1.0-SNAPSHOT OpenAPI spec (`openapi.json` in this directory). Server: https://kernel-core.yowyob.com/kernel-api.
 
 **Do not edit by hand** — regenerate with `scripts/fetch-kernel-openapi.sh` (fetches spec) then `python3 scripts/gen_kernel_api_docs.py` (rebuilds this file + `schemas.md`).
 
-1526 operations across 1160 paths, 155 tags, 1078 schemas.
+1785 operations across 1372 paths, 193 tags, 1190 schemas.
 
 ## Tags (controllers)
 
 - [CRM Actions](#crm-actions) (5 ops)
+- [Commentaires](#commentaires) (4 ops)
+- [Réponses aux commentaires](#r-ponses-aux-commentaires) (5 ops)
 - [Tier Bulk Export](#tier-bulk-export) (1 ops)
 - [Tier Bulk Import](#tier-bulk-import) (2 ops)
 - [Tier Documents](#tier-documents) (3 ops)
 - [Tier Portal](#tier-portal) (5 ops)
+- [abonnement-controller](#abonnement-controller) (6 ops)
 - [account-connector-controller](#account-connector-controller) (4 ops)
 - [account-type-controller](#account-type-controller) (7 ops)
 - [accounting-bookkeeping-controller](#accounting-bookkeeping-controller) (49 ops)
@@ -31,7 +34,8 @@ Auto-generated from `IWM Backend API` v0.1.0-SNAPSHOT OpenAPI spec (`openapi.jso
 - [actor-controller](#actor-controller) (6 ops)
 - [actor-financial-profile-controller](#actor-financial-profile-controller) (1 ops)
 - [address-controller](#address-controller) (3 ops)
-- [administration-controller](#administration-controller) (25 ops)
+- [admin-redacteur-controller](#admin-redacteur-controller) (7 ops)
+- [administration-controller](#administration-controller) (27 ops)
 - [advanced-asset-management-controller](#advanced-asset-management-controller) (5 ops)
 - [agency-controller](#agency-controller) (6 ops)
 - [agency-schedule-controller](#agency-schedule-controller) (5 ops)
@@ -39,7 +43,7 @@ Auto-generated from `IWM Backend API` v0.1.0-SNAPSHOT OpenAPI spec (`openapi.jso
 - [artwork-controller](#artwork-controller) (19 ops)
 - [asset-portfolio-controller](#asset-portfolio-controller) (3 ops)
 - [audit-log-controller](#audit-log-controller) (2 ops)
-- [auth-controller](#auth-controller) (24 ops)
+- [auth-controller](#auth-controller) (27 ops)
 - [auth-oidc-controller](#auth-oidc-controller) (6 ops)
 - [bank-account-check-controller](#bank-account-check-controller) (4 ops)
 - [bank-category-controller](#bank-category-controller) (8 ops)
@@ -49,33 +53,47 @@ Auto-generated from `IWM Backend API` v0.1.0-SNAPSHOT OpenAPI spec (`openapi.jso
 - [billing-legacy-documents-controller](#billing-legacy-documents-controller) (64 ops)
 - [billing-legacy-payments-controller](#billing-legacy-payments-controller) (7 ops)
 - [blockchain-controller](#blockchain-controller) (11 ops)
+- [blog-controller](#blog-controller) (17 ops)
 - [budget-controller](#budget-controller) (7 ops)
 - [business-domain-controller](#business-domain-controller) (2 ops)
 - [cashier-operations-controller](#cashier-operations-controller) (80 ops)
+- [category-controller](#category-controller) (5 ops)
 - [chart-of-accounts-controller](#chart-of-accounts-controller) (6 ops)
 - [check-deposit-controller](#check-deposit-controller) (8 ops)
 - [check-payment-controller](#check-payment-controller) (8 ops)
 - [checkbook-controller](#checkbook-controller) (5 ops)
 - [client-application-controller](#client-application-controller) (10 ops)
 - [client-controller](#client-controller) (24 ops)
+- [commentaire-controller](#commentaire-controller) (4 ops)
+- [commercial-plan-checkout-controller](#commercial-plan-checkout-controller) (5 ops)
 - [contact-controller](#contact-controller) (3 ops)
+- [cool-pay-gateway-controller](#cool-pay-gateway-controller) (7 ops)
+- [course-controller](#course-controller) (25 ops)
 - [currency-controller](#currency-controller) (3 ops)
 - [customer-controller](#customer-controller) (27 ops)
 - [declaration-controller](#declaration-controller) (2 ops)
 - [department-controller](#department-controller) (7 ops)
+- [discussion-group-controller](#discussion-group-controller) (14 ops)
 - [document-governance-controller](#document-governance-controller) (5 ops)
 - [document-hub-controller](#document-hub-controller) (4 ops)
+- [domain-controller](#domain-controller) (1 ops)
+- [editor-application-controller](#editor-application-controller) (4 ops)
+- [email-controller](#email-controller) (1 ops)
 - [email-verification-page-controller](#email-verification-page-controller) (1 ops)
-- [employee-controller](#employee-controller) (31 ops)
+- [employee-controller](#employee-controller) (32 ops)
 - [employee-self-service-controller](#employee-self-service-controller) (4 ops)
 - [exchange-rate-controller](#exchange-rate-controller) (1 ops)
 - [expense-controller](#expense-controller) (9 ops)
+- [favorite-controller](#favorite-controller) (4 ops)
+- [feed-controller](#feed-controller) (3 ops)
 - [file-controller](#file-controller) (5 ops)
 - [final-settlement-controller](#final-settlement-controller) (4 ops)
 - [fiscal-year-controller](#fiscal-year-controller) (4 ops)
 - [fixed-asset-controller](#fixed-asset-controller) (7 ops)
+- [forum-categorie-controller](#forum-categorie-controller) (6 ops)
 - [gallery-event-controller](#gallery-event-controller) (6 ops)
 - [garnishment-controller](#garnishment-controller) (6 ops)
+- [gateway-forward-auth-controller](#gateway-forward-auth-controller) (1 ops)
 - [general-options-controller](#general-options-controller) (16 ops)
 - [generalized-inventory-campaign-controller](#generalized-inventory-campaign-controller) (5 ops)
 - [inventory-controller](#inventory-controller) (5 ops)
@@ -83,18 +101,25 @@ Auto-generated from `IWM Backend API` v0.1.0-SNAPSHOT OpenAPI spec (`openapi.jso
 - [jwk-set-controller](#jwk-set-controller) (1 ops)
 - [kyc-verification-controller](#kyc-verification-controller) (1 ops)
 - [leave-controller](#leave-controller) (9 ops)
+- [lecteur-controlleur](#lecteur-controlleur) (5 ops)
 - [ledger-controller](#ledger-controller) (3 ops)
 - [legacy-banking-catalog-controller](#legacy-banking-catalog-controller) (28 ops)
 - [legacy-banking-controller](#legacy-banking-controller) (5 ops)
 - [legacy-check-controller](#legacy-check-controller) (3 ops)
 - [legacy-point-of-interest-controller](#legacy-point-of-interest-controller) (4 ops)
 - [legacy-reconciliation-controller](#legacy-reconciliation-controller) (2 ops)
+- [legal-document-controller](#legal-document-controller) (3 ops)
 - [loan-advance-controller](#loan-advance-controller) (10 ops)
 - [lookup-table-admin-controller](#lookup-table-admin-controller) (5 ops)
 - [material-request-controller](#material-request-controller) (7 ops)
-- [medical-controller](#medical-controller) (8 ops)
+- [medical-controller](#medical-controller) (15 ops)
 - [medical-self-service-controller](#medical-self-service-controller) (1 ops)
 - [mission-order-controller](#mission-order-controller) (12 ops)
+- [newsletter-abonnement-controller](#newsletter-abonnement-controller) (3 ops)
+- [newsletter-categorie-controller](#newsletter-categorie-controller) (6 ops)
+- [newsletter-content-controller](#newsletter-content-controller) (11 ops)
+- [newsletter-entity-controller](#newsletter-entity-controller) (9 ops)
+- [newsletter-subscription-controller](#newsletter-subscription-controller) (4 ops)
 - [notification-controller](#notification-controller) (10 ops)
 - [observability-controller](#observability-controller) (5 ops)
 - [opening-hours-controller](#opening-hours-controller) (2 ops)
@@ -103,33 +128,41 @@ Auto-generated from `IWM Backend API` v0.1.0-SNAPSHOT OpenAPI spec (`openapi.jso
 - [operational-policy-controller](#operational-policy-controller) (4 ops)
 - [operational-site-governance-controller](#operational-site-governance-controller) (5 ops)
 - [operational-workspace-controller](#operational-workspace-controller) (6 ops)
+- [org-content-controller](#org-content-controller) (1 ops)
 - [organization-address-book-controller](#organization-address-book-controller) (12 ops)
 - [organization-controller](#organization-controller) (12 ops)
 - [organization-service-controller](#organization-service-controller) (11 ops)
 - [organization-structure-controller](#organization-structure-controller) (12 ops)
 - [pay-element-admin-controller](#pay-element-admin-controller) (5 ops)
 - [pay-variable-controller](#pay-variable-controller) (3 ops)
-- [payment-controller](#payment-controller) (7 ops)
+- [payment-controller](#payment-controller) (10 ops)
+- [payment-gateway-controller](#payment-gateway-controller) (5 ops)
 - [payroll-document-controller](#payroll-document-controller) (6 ops)
 - [payroll-employee-controller](#payroll-employee-controller) (9 ops)
 - [payroll-onboarding-controller](#payroll-onboarding-controller) (1 ops)
 - [payroll-run-controller](#payroll-run-controller) (11 ops)
-- [payslip-self-service-controller](#payslip-self-service-controller) (2 ops)
+- [payslip-self-service-controller](#payslip-self-service-controller) (3 ops)
 - [physical-space-controller](#physical-space-controller) (3 ops)
+- [plan-commercial-alias-controller](#plan-commercial-alias-controller) (16 ops)
 - [plan-controller](#plan-controller) (6 ops)
 - [platform-authorization-controller](#platform-authorization-controller) (1 ops)
 - [platform-service-controller](#platform-service-controller) (3 ops)
+- [podcast-controller](#podcast-controller) (15 ops)
 - [point-of-interest-controller](#point-of-interest-controller) (2 ops)
+- [post-controller](#post-controller) (9 ops)
 - [product-catalog-controller](#product-catalog-controller) (7 ops)
 - [product-controller](#product-controller) (6 ops)
 - [product-structure-controller](#product-structure-controller) (15 ops)
 - [product-transformation-controller](#product-transformation-controller) (3 ops)
 - [prospect-controller](#prospect-controller) (26 ops)
+- [public-newsletter-tracking-controller](#public-newsletter-tracking-controller) (1 ops)
 - [public-organization-branding-controller](#public-organization-branding-controller) (1 ops)
 - [purchase-order-controller](#purchase-order-controller) (5 ops)
 - [receipt-controller](#receipt-controller) (4 ops)
 - [reconciliation-match-controller](#reconciliation-match-controller) (12 ops)
 - [recruitment-controller](#recruitment-controller) (21 ops)
+- [redacteur-abonnement-controller](#redacteur-abonnement-controller) (3 ops)
+- [redacteur-controller](#redacteur-controller) (7 ops)
 - [resource-address-book-controller](#resource-address-book-controller) (6 ops)
 - [resource-controller](#resource-controller) (17 ops)
 - [resource-target-controller](#resource-target-controller) (8 ops)
@@ -141,6 +174,7 @@ Auto-generated from `IWM Backend API` v0.1.0-SNAPSHOT OpenAPI spec (`openapi.jso
 - [sales-agent-controller](#sales-agent-controller) (24 ops)
 - [sales-controller](#sales-controller) (7 ops)
 - [scoped-resource-controller](#scoped-resource-controller) (9 ops)
+- [service-bundle-controller](#service-bundle-controller) (6 ops)
 - [session-tokens-controller](#session-tokens-controller) (2 ops)
 - [settings-controller](#settings-controller) (2 ops)
 - [skill-controller](#skill-controller) (7 ops)
@@ -148,6 +182,7 @@ Auto-generated from `IWM Backend API` v0.1.0-SNAPSHOT OpenAPI spec (`openapi.jso
 - [statement-line-controller](#statement-line-controller) (2 ops)
 - [supplier-controller](#supplier-controller) (24 ops)
 - [system-audit-controller](#system-audit-controller) (4 ops)
+- [tag-controller](#tag-controller) (4 ops)
 - [tax-bracket-admin-controller](#tax-bracket-admin-controller) (5 ops)
 - [tax-controller](#tax-controller) (3 ops)
 - [third-party-address-book-controller](#third-party-address-book-controller) (6 ops)
@@ -158,11 +193,14 @@ Auto-generated from `IWM Backend API` v0.1.0-SNAPSHOT OpenAPI spec (`openapi.jso
 - [transaction-type-controller](#transaction-type-controller) (6 ops)
 - [treasury-controller](#treasury-controller) (11 ops)
 - [user-controller](#user-controller) (5 ops)
+- [user-follow-controller](#user-follow-controller) (5 ops)
+- [user-profile-controller](#user-profile-controller) (1 ops)
 - [warehouse-controller](#warehouse-controller) (4 ops)
 - [warehouse-layout-controller](#warehouse-layout-controller) (2 ops)
 - [warehouse-location-controller](#warehouse-location-controller) (3 ops)
 - [warehouse-transfer-controller](#warehouse-transfer-controller) (3 ops)
 - [workflow-request-controller](#workflow-request-controller) (4 ops)
+- [Évaluations](#valuations) (9 ops)
 
 ## CRM Actions
 
@@ -213,6 +251,87 @@ Modifier une action (statut, date, note…)
 **Request body:** `application/json` → `UpdateActionRequest` (required)
 
 **Responses:** 200 → `CrmAction`
+
+
+
+## Commentaires
+
+### GET `/api/v1/ratings/comments`
+Récupérer tous les commentaires
+
+**Responses:** 200 → `Comment[]`; 500 → `Comment[]`
+
+
+### POST `/api/v1/ratings/comments`
+Créer un commentaire
+
+**Request body:** `application/json` → `CommentDTO` (required)
+
+**Responses:** 201 → `Comment`; 400 → `Comment`
+
+
+### GET `/api/v1/ratings/comments/by-entityId`
+Récupérer les commentaires d'une entité
+
+**Parameters:**
+- `entityId` (query, string(uuid), required)
+
+**Responses:** 200 → `Comment[]`; 404 → `Comment[]`; 500 → `Comment[]`
+
+
+### DELETE `/api/v1/ratings/comments/{commentId}`
+Supprimer un commentaire
+
+**Parameters:**
+- `commentId` (path, string(uuid), required) — ID du commentaire à supprimer
+
+**Responses:** 204; 404
+
+
+
+## Réponses aux commentaires
+
+### POST `/api/v1/ratings/comment_replies`
+Créer une réponse à un commentaire
+
+**Request body:** `application/json` → `CommentReplyDTO` (required)
+
+**Responses:** 200 → `CommentReply`; 400 → `CommentReply`
+
+
+### GET `/api/v1/ratings/comment_replies/replies`
+Récupérer toutes les réponses
+
+**Responses:** 200 → `CommentReply[]`
+
+
+### GET `/api/v1/ratings/comment_replies/{commentId}`
+Récupérer toutes les réponses
+
+**Parameters:**
+- `commentId` (path, string(uuid), required) — L'ID du commentaire pour lequel récupérer les réponses
+
+**Responses:** 200 → `CommentReply[]`; 404 → `CommentReply[]`
+
+
+### POST `/api/v1/ratings/comment_replies/{commentId}`
+Créer une réponse à un commentaire
+
+**Parameters:**
+- `commentId` (path, string(uuid), required) — L'ID du commentaire auquel la réponse est liée
+
+**Request body:** `application/json` → `CommentReplyDTO` (required)
+
+**Responses:** 200 → `CommentReply`; 400 → `CommentReply`
+
+
+### DELETE `/api/v1/ratings/comment_replies/{replyId}`
+Supprimer une réponse
+
+**Parameters:**
+- `replyId` (path, string(uuid), required)
+
+**Responses:** 204 → `object`; 404 → `object`
 
 
 
@@ -324,6 +443,67 @@ Mettre à jour mon profil
 **Request body:** `application/json` → `ThirdParty` (required)
 
 **Responses:** 200 → `ThirdParty`
+
+
+
+## abonnement-controller
+
+### POST `/api/v1/education/abonnements`
+S'abonner à un contenu (Blog, Podcast, Course)
+
+**Parameters:**
+- `X-User-Id` (header, string(uuid), required)
+
+**Request body:** `application/json` → `AbonnementCreateDTO` (required)
+
+**Responses:** 201 → `AbonnementResponseDTO`; 400 → `AbonnementResponseDTO`
+
+
+### GET `/api/v1/education/abonnements/author/{authorId}/followers/count`
+Obtenir le nombre d'abonnés distincts pour un auteur (tous contenus confondus)
+
+**Parameters:**
+- `authorId` (path, string(uuid), required)
+
+**Responses:** 200 → `integer(int64)`
+
+
+### GET `/api/v1/education/abonnements/content/{contentId}/check`
+Vérifier si un utilisateur est abonné à un contenu
+
+**Parameters:**
+- `X-User-Id` (header, string(uuid), required)
+- `contentId` (path, string(uuid), required)
+
+**Responses:** 200 → `boolean`
+
+
+### GET `/api/v1/education/abonnements/content/{contentId}/count`
+Obtenir le nombre d'abonnés pour un contenu spécifique
+
+**Parameters:**
+- `contentId` (path, string(uuid), required)
+
+**Responses:** 200 → `integer(int64)`
+
+
+### GET `/api/v1/education/abonnements/user`
+Obtenir la liste des abonnements d'un utilisateur
+
+**Parameters:**
+- `X-User-Id` (header, string(uuid), required)
+
+**Responses:** 200 → `AbonnementResponseDTO[]`
+
+
+### DELETE `/api/v1/education/abonnements/{contentId}`
+Se désabonner d'un contenu
+
+**Parameters:**
+- `X-User-Id` (header, string(uuid), required)
+- `contentId` (path, string(uuid), required)
+
+**Responses:** 204
 
 
 
@@ -2929,6 +3109,60 @@ Mettre à jour mon profil
 
 
 
+## admin-redacteur-controller
+
+### GET `/api/v1/newsletter/admin/redacteurs/pending`
+**Parameters:**
+- `page` (query, integer(int32), optional)
+- `size` (query, integer(int32), optional)
+
+**Responses:** 200 → `RedacteurRequestResponse[]`
+
+
+### GET `/api/v1/newsletter/admin/redacteurs/pending/count`
+**Responses:** 200 → `integer(int64)`
+
+
+### GET `/api/v1/newsletter/admin/redacteurs/requests`
+**Parameters:**
+- `status` (query, string, optional)
+
+**Responses:** 200 → `RedacteurRequestResponse[]`
+
+
+### GET `/api/v1/newsletter/admin/redacteurs/requests/{id}`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `RedacteurRequestResponse`
+
+
+### POST `/api/v1/newsletter/admin/redacteurs/requests/{id}/approve`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `application/json` → `ApprovalRequest` (required)
+
+**Responses:** 200 → `RedacteurRequestResponse`
+
+
+### POST `/api/v1/newsletter/admin/redacteurs/requests/{id}/reject`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `application/json` → `RejectionRequest` (required)
+
+**Responses:** 200 → `RedacteurRequestResponse`
+
+
+### POST `/api/v1/newsletter/admin/redacteurs/requests/{id}/revoke`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `RedacteurRequestResponse`
+
+
+
 ## administration-controller
 
 ### GET `/api/administration/audit`
@@ -2978,7 +3212,23 @@ Mettre à jour mon profil
 **Responses:** 200 → `ApiResponseListOrganizationResponse`
 
 
+### GET `/api/administration/governance/organizations/all`
+**Parameters:**
+- `status` (query, string, optional)
+
+**Responses:** 200 → `ApiResponseListOrganizationResponse`
+
+
 ### POST `/api/administration/governance/organizations/{organizationId}`
+**Parameters:**
+- `organizationId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `GovernanceActionRequest` (required)
+
+**Responses:** 200 → `ApiResponseOrganizationResponse`
+
+
+### POST `/api/administration/governance/organizations/{organizationId}/all`
 **Parameters:**
 - `organizationId` (path, string(uuid), required)
 
@@ -3481,6 +3731,12 @@ Mettre à jour mon profil
 **Responses:** 200 → `ApiResponseCaptchaVerificationResponse`
 
 
+### POST `/api/auth/change-password`
+**Request body:** `application/json` → `ChangePasswordRequest` (required)
+
+**Responses:** 200 → `ApiResponseUserAccountResponse`
+
+
 ### POST `/api/auth/discover-contexts`
 **Request body:** `application/json` → `LoginRequest` (required)
 
@@ -3531,6 +3787,14 @@ Mettre à jour mon profil
 **Request body:** `application/json` → `ConfirmMfaLoginRequest` (required)
 
 **Responses:** 200 → `ApiResponseLoginResponse`
+
+
+### GET `/api/auth/me/memberships`
+**Responses:** 200 → `ApiResponseListUserMembershipResponse`
+
+
+### POST `/api/auth/me/spaces`
+**Responses:** 200 → `ApiResponseObject`
 
 
 ### POST `/api/auth/mfa/confirm`
@@ -4563,6 +4827,152 @@ Mettre à jour mon profil
 
 
 
+## blog-controller
+
+### GET `/api/v1/education/blogs`
+Obtenir tous les blogs 
+
+**Parameters:**
+- `authorId` (query, string, optional)
+- `status` (query, string, optional)
+
+**Responses:** 200 → `Blog[]`; 404 → `Blog[]`
+
+
+### POST `/api/v1/education/blogs`
+Créer un blog
+
+**Request body:** `application/json` → `BlogCreateDTO` (required)
+
+**Responses:** 201 → `Blog`; 400 → `Blog`; 500 → `Blog`
+
+
+### GET `/api/v1/education/blogs/count-by-author/{id}`
+Nombre de contenus par auteur
+
+**Parameters:**
+- `id` (path, string, required)
+
+**Responses:** 200 → `integer(int32)`
+
+
+### GET `/api/v1/education/blogs/published`
+Obtenir tous les blogs avec des paramètres optionnels
+
+**Parameters:**
+- `status` (query, string, required)
+
+**Responses:** 200 → `array`; 404 → `array`
+
+
+### GET `/api/v1/education/blogs/test`
+**Responses:** 200 → `string`
+
+
+### GET `/api/v1/education/blogs/{idBlog}/blogpodcast`
+**Responses:** 200 → `DataBuffer[]`
+
+
+### GET `/api/v1/education/blogs/{idBlog}/coverblog`
+**Parameters:**
+- `idBlog` (path, string(uuid), required)
+
+**Responses:** 200 → `DataBuffer[]`
+
+
+### GET `/api/v1/education/blogs/{idblogs}/categories`
+**Parameters:**
+- `idblogs` (path, string, required)
+
+**Responses:** 200 → `string[]`
+
+
+### GET `/api/v1/education/blogs/{idblogs}/tags`
+**Parameters:**
+- `idblogs` (path, string, required)
+
+**Responses:** 200 → `string[]`
+
+
+### GET `/api/v1/education/blogs/{id}`
+Obtenir un blog par son Id
+
+**Parameters:**
+- `id` (path, string, required)
+
+**Responses:** 200 → `Blog`; 400 → `Blog`
+
+
+### PUT `/api/v1/education/blogs/{id}`
+Modifier un blog en utilisant l'Id du blog concerné
+
+**Parameters:**
+- `id` (path, string, required)
+
+**Request body:** `application/json` → `BlogCreateDTO` (required)
+
+**Responses:** 200 → `Blog`; 404 → `Blog`
+
+
+### PATCH `/api/v1/education/blogs/{id}/archive`
+Supprimer un blog par son Id (l'action de suppression est traitée comme une archive)
+
+**Parameters:**
+- `id` (path, string, required)
+
+**Responses:** 200; 400; 404
+
+
+### POST `/api/v1/education/blogs/{id}/audio`
+Uploader l'audio du blog
+
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `multipart/form-data` → `object` (optional)
+
+**Responses:** 200 → `Blog`; 404 → `Blog`; 500 → `Blog`
+
+
+### POST `/api/v1/education/blogs/{id}/cover`
+Uploader la couverture du blog
+
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `multipart/form-data` → `object` (optional)
+
+**Responses:** 200 → `Blog`; 404 → `Blog`; 500 → `Blog`
+
+
+### PATCH `/api/v1/education/blogs/{id}/publish`
+Publier un blog en utilisant son Id
+
+**Parameters:**
+- `id` (path, string, required)
+
+**Responses:** 201 → `Blog`; 404 → `Blog`
+
+
+### PATCH `/api/v1/education/blogs/{id}/reject`
+Rejeter un blog soumis en utilisant son Id
+
+**Parameters:**
+- `id` (path, string, required)
+
+**Responses:** 200 → `Blog`; 404 → `Blog`
+
+
+### PATCH `/api/v1/education/blogs/{id}/submit`
+Soumettre un brouillon de blog pour validation par l'admin
+
+**Parameters:**
+- `id` (path, string, required)
+
+**Responses:** 200 → `Blog`; 400 → `Blog`; 404 → `Blog`
+
+
+
 ## budget-controller
 
 ### POST `/api/accounting/budgets`
@@ -5101,6 +5511,52 @@ Mettre à jour mon profil
 
 
 
+## category-controller
+
+### GET `/api/v1/education/categories`
+Récupérer toutes les catégories
+
+**Responses:** 200 → `CategoryEntity[]`; 500 → `CategoryEntity[]`
+
+
+### POST `/api/v1/education/categories`
+Créer une nouvelle catégorie
+
+**Request body:** `application/json` → `CategoryCreateDTO` (required)
+
+**Responses:** 201 → `CategoryEntity`; 400 → `CategoryEntity`
+
+
+### DELETE `/api/v1/education/categories/{categoryId}`
+Supprimer une catégorie
+
+**Parameters:**
+- `categoryId` (path, string, required)
+
+**Responses:** 204; 404
+
+
+### GET `/api/v1/education/categories/{categoryId}`
+Obtenir une catégorie par son ID
+
+**Parameters:**
+- `categoryId` (path, string, required)
+
+**Responses:** 200 → `CategoryEntity`; 404 → `CategoryEntity`
+
+
+### PUT `/api/v1/education/categories/{categoryId}`
+Mettre à jour une catégorie
+
+**Parameters:**
+- `categoryId` (path, string, required)
+
+**Request body:** `application/json` → `CategoryCreateDTO` (required)
+
+**Responses:** 200 → `CategoryEntity`; 400 → `CategoryEntity`; 404 → `CategoryEntity`
+
+
+
 ## chart-of-accounts-controller
 
 ### GET `/api/accounting/accounts`
@@ -5575,6 +6031,80 @@ Mettre à jour mon profil
 
 
 
+## commentaire-controller
+
+### POST `/api/v1/forum/commentaires/`
+**Request body:** `application/json` → `Commentaire` (required)
+
+**Responses:** 200 → `object`
+
+
+### GET `/api/v1/forum/commentaires/post/{postId}`
+**Parameters:**
+- `postId` (path, string(uuid), required)
+
+**Responses:** 200 → `Commentaire[]`
+
+
+### DELETE `/api/v1/forum/commentaires/{commentaireId}`
+**Parameters:**
+- `commentaireId` (path, string(uuid), required)
+
+**Responses:** 200
+
+
+### PUT `/api/v1/forum/commentaires/{commentaireId}`
+**Parameters:**
+- `commentaireId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `Commentaire` (required)
+
+**Responses:** 200 → `object`
+
+
+
+## commercial-plan-checkout-controller
+
+### GET `/api/commercial-plans/orders`
+**Parameters:**
+- `limit` (query, integer(int32), optional)
+
+**Responses:** 200 → `ApiResponseListCommercialPlanOrderResponse`
+
+
+### GET `/api/commercial-plans/orders/{orderId}`
+**Parameters:**
+- `orderId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseCommercialPlanOrderResponse`
+
+
+### POST `/api/commercial-plans/orders/{orderId}/refresh`
+**Parameters:**
+- `orderId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseCommercialPlanOrderResponse`
+
+
+### POST `/api/commercial-plans/{planCode}/checkout`
+**Parameters:**
+- `planCode` (path, string, required)
+
+**Request body:** `application/json` → `CommercialPlanCheckoutRequest` (required)
+
+**Responses:** 200 → `ApiResponseCommercialPlanCheckoutResponse`
+
+
+### POST `/api/commercial-plans/{planCode}/quote`
+**Parameters:**
+- `planCode` (path, string, required)
+
+**Request body:** `application/json` → `CommercialPlanQuoteRequest` (optional)
+
+**Responses:** 200 → `ApiResponseCommercialPlanQuoteResponse`
+
+
+
 ## contact-controller
 
 ### GET `/api/contacts`
@@ -5601,6 +6131,306 @@ Mettre à jour mon profil
 - `contactId` (path, string(uuid), required)
 
 **Responses:** 200 → `ApiResponseVoid`
+
+
+
+## cool-pay-gateway-controller
+
+### POST `/yowyob-pay/api/v1/coolpay/callback`
+**Parameters:**
+- `x-mycoolpay-signature` (header, string, optional)
+
+**Request body:** `application/json` → `string` (optional)
+
+**Responses:** 200 → `ApiResponseString`
+
+
+### GET `/yowyob-pay/api/v1/coolpay/cancel`
+**Parameters:**
+- `transaction_ref` (query, string, optional)
+
+**Responses:** 200
+
+
+### POST `/yowyob-pay/api/v1/coolpay/cancel`
+**Parameters:**
+- `transaction_ref` (query, string, optional)
+
+**Responses:** 200
+
+
+### GET `/yowyob-pay/api/v1/coolpay/error`
+**Parameters:**
+- `transaction_ref` (query, string, optional)
+
+**Responses:** 200
+
+
+### POST `/yowyob-pay/api/v1/coolpay/error`
+**Parameters:**
+- `transaction_ref` (query, string, optional)
+
+**Responses:** 200
+
+
+### GET `/yowyob-pay/api/v1/coolpay/success`
+**Parameters:**
+- `transaction_ref` (query, string, optional)
+
+**Responses:** 200
+
+
+### POST `/yowyob-pay/api/v1/coolpay/success`
+**Parameters:**
+- `transaction_ref` (query, string, optional)
+
+**Responses:** 200
+
+
+
+## course-controller
+
+### GET `/api/v1/education/courses`
+Obtenir tous les cours
+
+**Parameters:**
+- `authorId` (query, string, optional)
+- `status` (query, string, optional)
+
+**Responses:** 200 → `Course[]`; 404 → `Course[]`
+
+
+### POST `/api/v1/education/courses`
+Créer un cours
+
+**Request body:** `application/json` → `CourseCreateDto` (required)
+
+**Responses:** 201 → `Course`; 400 → `Course`; 500 → `Course`
+
+
+### GET `/api/v1/education/courses/count-by-author/{id}`
+Nombre de contenus par auteur
+
+**Parameters:**
+- `id` (path, string, required)
+
+**Responses:** 200 → `integer(int32)`
+
+
+### POST `/api/v1/education/courses/units/{unitId}/complete`
+Marquer une unité de cours comme complétée
+
+**Parameters:**
+- `unitId` (path, string(uuid), required)
+- `X-User-Id` (header, string(uuid), required)
+
+**Responses:** 200
+
+
+### GET `/api/v1/education/courses/{courseId}/units`
+Lister les unités (chapitres) d'un cours
+
+**Parameters:**
+- `courseId` (path, string(uuid), required)
+
+**Responses:** 200 → `UnitCourse[]`
+
+
+### POST `/api/v1/education/courses/{courseId}/units`
+Créer une unité (chapitre) pour un cours
+
+**Parameters:**
+- `courseId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `UnitCourseCreateDTO` (required)
+
+**Responses:** 200 → `UnitCourse`
+
+
+### DELETE `/api/v1/education/courses/{courseId}/units/{unitId}`
+Supprimer une unité de cours
+
+**Parameters:**
+- `courseId` (path, string(uuid), required)
+- `unitId` (path, string(uuid), required)
+
+**Responses:** 200
+
+
+### GET `/api/v1/education/courses/{courseId}/units/{unitId}`
+Obtenir une unité de cours par son Id
+
+**Parameters:**
+- `courseId` (path, string(uuid), required)
+- `unitId` (path, string(uuid), required)
+
+**Responses:** 200 → `UnitCourse`
+
+
+### PUT `/api/v1/education/courses/{courseId}/units/{unitId}`
+Modifier une unité de cours
+
+**Parameters:**
+- `courseId` (path, string(uuid), required)
+- `unitId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `UnitCourseCreateDTO` (required)
+
+**Responses:** 200 → `UnitCourse`
+
+
+### PATCH `/api/v1/education/courses/{courseId}/units/{unitId}/publish`
+Publier une unité de cours indépendamment du cours parent
+
+**Parameters:**
+- `courseId` (path, string(uuid), required)
+- `unitId` (path, string(uuid), required)
+
+**Responses:** 200 → `UnitCourse`
+
+
+### PATCH `/api/v1/education/courses/{courseId}/units/{unitId}/reject`
+Rejeter une unité de cours indépendamment du cours parent
+
+**Parameters:**
+- `courseId` (path, string(uuid), required)
+- `unitId` (path, string(uuid), required)
+
+**Responses:** 200 → `UnitCourse`
+
+
+### GET `/api/v1/education/courses/{idCourse}/audiocourse`
+Obtenir le fichier audio d'un cours
+
+**Parameters:**
+- `idCourse` (path, string(uuid), required)
+
+**Responses:** 200 → `DataBuffer[]`
+
+
+### GET `/api/v1/education/courses/{idCourse}/categories`
+Obtenir les catégories d'un cours
+
+**Parameters:**
+- `idCourse` (path, string, required)
+
+**Responses:** 200 → `string[]`
+
+
+### GET `/api/v1/education/courses/{idCourse}/covercourse`
+Obtenir l'image de couverture d'un cours
+
+**Parameters:**
+- `idCourse` (path, string(uuid), required)
+
+**Responses:** 200 → `DataBuffer[]`
+
+
+### GET `/api/v1/education/courses/{idCourse}/tags`
+Obtenir les tags d'un cours
+
+**Parameters:**
+- `idCourse` (path, string, required)
+
+**Responses:** 200 → `string[]`
+
+
+### GET `/api/v1/education/courses/{id}`
+Obtenir un cours par son Id
+
+**Parameters:**
+- `id` (path, string, required)
+
+**Responses:** 200 → `Course`; 404 → `Course`
+
+
+### PUT `/api/v1/education/courses/{id}`
+Modifier un cours en utilisant l'Id du cours concerné
+
+**Parameters:**
+- `id` (path, string, required)
+
+**Request body:** `application/json` → `CourseCreateDto` (required)
+
+**Responses:** 200 → `Course`; 404 → `Course`
+
+
+### PATCH `/api/v1/education/courses/{id}/archive`
+Supprimer un cours par son Id (l'action de suppression est traitée comme une archive)
+
+**Parameters:**
+- `id` (path, string, required)
+
+**Responses:** 200; 400; 404
+
+
+### POST `/api/v1/education/courses/{id}/audio`
+Uploader l'audio d'un cours
+
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `multipart/form-data` → `object` (optional)
+
+**Responses:** 200 → `Course`
+
+
+### POST `/api/v1/education/courses/{id}/cover`
+Uploader la couverture d'un cours
+
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `multipart/form-data` → `object` (optional)
+
+**Responses:** 200 → `Course`
+
+
+### POST `/api/v1/education/courses/{id}/enroll`
+S'inscrire à un cours
+
+**Parameters:**
+- `id` (path, string(uuid), required)
+- `X-User-Id` (header, string(uuid), required)
+
+**Responses:** 200
+
+
+### GET `/api/v1/education/courses/{id}/progress`
+Obtenir la progression d'un cours
+
+**Parameters:**
+- `id` (path, string(uuid), required)
+- `X-User-Id` (header, string(uuid), required)
+
+**Responses:** 200 → `CourseProgressView`
+
+
+### PATCH `/api/v1/education/courses/{id}/publish`
+Publier un cours en utilisant son Id
+
+**Parameters:**
+- `id` (path, string, required)
+
+**Responses:** 200 → `Course`; 404 → `Course`
+
+
+### PATCH `/api/v1/education/courses/{id}/reject`
+Rejeter un cours soumis en utilisant son Id
+
+**Parameters:**
+- `id` (path, string, required)
+
+**Responses:** 200 → `Course`; 404 → `Course`
+
+
+### PATCH `/api/v1/education/courses/{id}/submit`
+Soumettre un brouillon de cours pour validation par l'admin
+
+**Parameters:**
+- `id` (path, string, required)
+
+**Responses:** 200 → `Course`; 400 → `Course`; 404 → `Course`
 
 
 
@@ -5925,6 +6755,106 @@ Mettre à jour mon profil
 
 
 
+## discussion-group-controller
+
+### POST `/api/v1/forum/groups`
+**Request body:** `application/json` → `DiscussionGroup` (required)
+
+**Responses:** 200 → `object`
+
+
+### GET `/api/v1/forum/groups/all`
+**Responses:** 200 → `DiscussionGroup[]`
+
+
+### GET `/api/v1/forum/groups/mine`
+**Parameters:**
+- `userId` (query, string(uuid), required)
+
+**Responses:** 200 → `DiscussionGroup[]`
+
+
+### GET `/api/v1/forum/groups/public`
+**Responses:** 200 → `DiscussionGroup[]`
+
+
+### PUT `/api/v1/forum/groups/requests/{requestId}/approve`
+**Parameters:**
+- `requestId` (path, string(uuid), required)
+- `adminId` (query, string(uuid), required)
+
+**Responses:** 200 → `object`
+
+
+### PUT `/api/v1/forum/groups/requests/{requestId}/reject`
+**Parameters:**
+- `requestId` (path, string(uuid), required)
+- `adminId` (query, string(uuid), required)
+
+**Responses:** 200 → `object`
+
+
+### DELETE `/api/v1/forum/groups/{groupId}`
+**Parameters:**
+- `groupId` (path, string(uuid), required)
+
+**Responses:** 200 → `object`
+
+
+### GET `/api/v1/forum/groups/{groupId}`
+**Parameters:**
+- `groupId` (path, string(uuid), required)
+
+**Responses:** 200 → `DiscussionGroup`
+
+
+### PUT `/api/v1/forum/groups/{groupId}`
+**Parameters:**
+- `groupId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `DiscussionGroup` (required)
+
+**Responses:** 200 → `DiscussionGroup`
+
+
+### POST `/api/v1/forum/groups/{groupId}/members`
+**Parameters:**
+- `groupId` (path, string(uuid), required)
+- `memberId` (query, string(uuid), required)
+
+**Responses:** 200 → `object`
+
+
+### GET `/api/v1/forum/groups/{groupId}/requests`
+**Parameters:**
+- `groupId` (path, string(uuid), required)
+
+**Responses:** 200 → `JoinRequest[]`
+
+
+### POST `/api/v1/forum/groups/{groupId}/requests`
+**Parameters:**
+- `groupId` (path, string(uuid), required)
+- `userId` (query, string(uuid), required)
+
+**Responses:** 200 → `object`
+
+
+### PUT `/api/v1/forum/groups/{id}/reject`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `object`
+
+
+### PUT `/api/v1/forum/groups/{id}/validate`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `object`
+
+
+
 ## document-governance-controller
 
 ### POST `/api/document-governance/documents/{documentLinkId}/reviews`
@@ -6003,6 +6933,59 @@ Mettre à jour mon profil
 - `targetId` (path, string(uuid), required)
 
 **Responses:** 200 → `ApiResponseListDocumentLinkView`
+
+
+
+## domain-controller
+
+### GET `/api/v1/education/domains`
+**Responses:** 200 → `string[]`
+
+
+
+## editor-application-controller
+
+### GET `/api/v1/education/editor-applications`
+Lister les candidatures (admin), filtre ?status=
+
+**Parameters:**
+- `status` (query, string, optional)
+
+**Responses:** 200 → `EditorApplication[]`
+
+
+### POST `/api/v1/education/editor-applications`
+Soumettre une candidature pour devenir rédacteur
+
+**Request body:** `application/json` → `EditorApplicationCreateDTO` (required)
+
+**Responses:** 200 → `EditorApplication`
+
+
+### GET `/api/v1/education/editor-applications/me`
+Mes candidatures (utilisateur courant)
+
+**Responses:** 200 → `EditorApplication[]`
+
+
+### PATCH `/api/v1/education/editor-applications/{id}/status`
+Changer le statut d'une candidature (admin)
+
+**Parameters:**
+- `id` (path, string, required)
+
+**Request body:** `application/json` → `EditorApplicationStatusDTO` (required)
+
+**Responses:** 200 → `EditorApplication`
+
+
+
+## email-controller
+
+### POST `/api/v1/newsletter/emails/send`
+**Request body:** `application/json` → `EmailRequestDto` (required)
+
+**Responses:** 200 → `object`
 
 
 
@@ -6117,6 +7100,16 @@ Mettre à jour mon profil
 **Parameters:**
 - `employeeId` (path, string(uuid), required)
 - `contractId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseContractResponse`
+
+
+### PUT `/api/v1/hrm/employees/{employeeId}/contracts/{contractId}`
+**Parameters:**
+- `employeeId` (path, string(uuid), required)
+- `contractId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `UpdateContractRequest` (required)
 
 **Responses:** 200 → `ApiResponseContractResponse`
 
@@ -6375,6 +7368,77 @@ Mettre à jour mon profil
 
 
 
+## favorite-controller
+
+### GET `/api/v1/education/favorites/all`
+Obtenir tous les favoris
+
+**Responses:** 200 → `Favorite[]`
+
+
+### GET `/api/v1/education/favorites/count/{entity_id}`
+Obtenir le nombre total de favoris pour une entité
+
+**Parameters:**
+- `entity_id` (path, string, required) — ID de l'entité pour laquelle récupérer le nombre de favoris
+
+**Responses:** 200 → `integer(int32)`
+
+
+### POST `/api/v1/education/favorites/toggle`
+Ajouter ou supprimer un favori
+
+**Parameters:**
+- `userId` (query, string, required) — ID de l'utilisateur
+- `entity_id` (query, string, required) — ID de l'entité à ajouter ou retirer des favoris
+- `entityType` (query, string, required) — Type de l'entité (ex: blog, podcast)
+
+**Responses:** 200 → `string`; 400 → `string`
+
+
+### GET `/api/v1/education/favorites/{userId}`
+Récupérer les favoris d'un utilisateur
+
+**Parameters:**
+- `userId` (path, string, required) — Identifiant de l'utilisateur
+
+**Responses:** 200 → `Favorite[]`
+
+
+
+## feed-controller
+
+### GET `/api/v1/education/feed/blogs`
+Fil d'actualité des blogs (personnalisé si abonnements)
+
+**Parameters:**
+- `X-User-Id` (header, string(uuid), optional)
+- `limit` (query, integer(int32), optional)
+
+**Responses:** 200 → `FeedItemDTO[]`
+
+
+### GET `/api/v1/education/feed/courses`
+Fil d'actualité des cours (personnalisé si abonnements)
+
+**Parameters:**
+- `X-User-Id` (header, string(uuid), optional)
+- `limit` (query, integer(int32), optional)
+
+**Responses:** 200 → `FeedItemDTO[]`
+
+
+### GET `/api/v1/education/feed/podcasts`
+Fil d'actualité des podcasts (personnalisé si abonnements)
+
+**Parameters:**
+- `X-User-Id` (header, string(uuid), optional)
+- `limit` (query, integer(int32), optional)
+
+**Responses:** 200 → `FeedItemDTO[]`
+
+
+
 ## file-controller
 
 ### POST `/api/files`
@@ -6531,6 +7595,52 @@ Mettre à jour mon profil
 
 
 
+## forum-categorie-controller
+
+### GET `/api/v1/forum/categories/all`
+**Responses:** 200 → `Categorie[]`
+
+
+### GET `/api/v1/forum/categories/groupe/{groupeId}`
+**Parameters:**
+- `groupeId` (path, string(uuid), required)
+
+**Responses:** 200 → `Categorie[]`
+
+
+### DELETE `/api/v1/forum/categories/{categorieId}`
+**Parameters:**
+- `categorieId` (path, string(uuid), required)
+
+**Responses:** 200 → `object`
+
+
+### GET `/api/v1/forum/categories/{categorieId}`
+**Parameters:**
+- `categorieId` (path, string(uuid), required)
+
+**Responses:** 200 → `Categorie`
+
+
+### PUT `/api/v1/forum/categories/{categorieId}`
+**Parameters:**
+- `categorieId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `Categorie` (required)
+
+**Responses:** 200 → `Categorie`
+
+
+### POST `/api/v1/forum/categories/{groupeId}`
+**Parameters:**
+- `groupeId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `Categorie` (required)
+
+**Responses:** 200 → `object`
+
+
+
 ## gallery-event-controller
 
 ### GET `/api/yowpainter/events`
@@ -6617,6 +7727,20 @@ Mettre à jour mon profil
 - `id` (path, string(uuid), required)
 
 **Responses:** 200 → `ApiResponseGarnishmentResponse`
+
+
+
+## gateway-forward-auth-controller
+
+### GET `/api/gateway/forward-auth`
+**Parameters:**
+- `service` (query, string, optional)
+- `X-Forwarded-Host` (header, string, optional)
+- `X-Forwarded-Uri` (header, string, optional)
+- `X-Forwarded-Method` (header, string, optional)
+- `Authorization` (header, string, optional)
+
+**Responses:** 200 → `ApiResponseMapStringObject`
 
 
 
@@ -6927,6 +8051,49 @@ Mettre à jour mon profil
 **Request body:** `application/json` → `RejectLeaveRequest` (required)
 
 **Responses:** 200 → `ApiResponseLeaveResponse`
+
+
+
+## lecteur-controlleur
+
+### DELETE `/api/v1/newsletter/lecteurs/{userId}/categories`
+**Parameters:**
+- `userId` (path, string(uuid), required)
+
+**Responses:** 200 → `LecteurResponse`
+
+
+### PUT `/api/v1/newsletter/lecteurs/{userId}/categories`
+**Parameters:**
+- `userId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `UpdateCategoriesRequest` (required)
+
+**Responses:** 200 → `LecteurResponse`
+
+
+### GET `/api/v1/newsletter/lecteurs/{userId}/preferences`
+**Parameters:**
+- `userId` (path, string(uuid), required)
+
+**Responses:** 200 → `LecteurResponse`
+
+
+### POST `/api/v1/newsletter/lecteurs/{userId}/subscribe`
+**Parameters:**
+- `userId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `SubscribeRequest` (required)
+
+**Responses:** 200 → `LecteurResponse`
+
+
+### POST `/api/v1/newsletter/lecteurs/{userId}/unsubscribe/{newsletterId}`
+**Parameters:**
+- `userId` (path, string(uuid), required)
+- `newsletterId` (path, string(uuid), required)
+
+**Responses:** 204
 
 
 
@@ -7245,6 +8412,29 @@ Mettre à jour mon profil
 
 
 
+## legal-document-controller
+
+### GET `/api/settings/legal-documents`
+**Responses:** 200 → `ApiResponseListLegalDocumentResponse`
+
+
+### GET `/api/settings/legal-documents/{slug}`
+**Parameters:**
+- `slug` (path, string, required)
+
+**Responses:** 200 → `ApiResponseLegalDocumentResponse`
+
+
+### PUT `/api/settings/legal-documents/{slug}`
+**Parameters:**
+- `slug` (path, string, required)
+
+**Request body:** `application/json` → `UpsertLegalDocumentRequest` (required)
+
+**Responses:** 200 → `ApiResponseLegalDocumentResponse`
+
+
+
 ## loan-advance-controller
 
 ### GET `/api/v1/hrm/loan-advances`
@@ -7412,6 +8602,13 @@ Mettre à jour mon profil
 
 ## medical-controller
 
+### GET `/api/v1/hrm/medical/activity-report`
+**Parameters:**
+- `year` (query, integer(int32), required)
+
+**Responses:** 200 → `string(byte)`
+
+
 ### GET `/api/v1/hrm/medical/certificates`
 **Parameters:**
 - `organizationId` (query, string(uuid), required)
@@ -7432,6 +8629,33 @@ Mettre à jour mon profil
 **Responses:** 200 → `ApiResponseMedicalCertificateResponse`
 
 
+### GET `/api/v1/hrm/medical/convocations`
+**Parameters:**
+- `organizationId` (query, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListMedicalConvocationResponse`
+
+
+### POST `/api/v1/hrm/medical/convocations`
+**Request body:** `application/json` → `CreateMedicalConvocationRequest` (required)
+
+**Responses:** 200 → `ApiResponseMedicalConvocationResponse`
+
+
+### POST `/api/v1/hrm/medical/convocations/{id}/cancel`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseMedicalConvocationResponse`
+
+
+### POST `/api/v1/hrm/medical/convocations/{id}/honor`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseMedicalConvocationResponse`
+
+
 ### GET `/api/v1/hrm/medical/employees/{employeeId}/certificates`
 **Parameters:**
 - `employeeId` (path, string(uuid), required)
@@ -7444,6 +8668,13 @@ Mettre à jour mon profil
 - `employeeId` (path, string(uuid), required)
 
 **Responses:** 200 → `ApiResponseListMedicalVisitResponse`
+
+
+### GET `/api/v1/hrm/medical/fitness`
+**Parameters:**
+- `organizationId` (query, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListMedicalFitnessResponse`
 
 
 ### GET `/api/v1/hrm/medical/visits`
@@ -7464,6 +8695,13 @@ Mettre à jour mon profil
 - `id` (path, string(uuid), required)
 
 **Responses:** 200 → `ApiResponseMedicalVisitResponse`
+
+
+### GET `/api/v1/hrm/medical/visits/{id}/fitness-certificate`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `string(byte)`
 
 
 
@@ -7565,6 +8803,275 @@ Mettre à jour mon profil
 - `id` (path, string(uuid), required)
 
 **Responses:** 200 → `ApiResponseMissionOrderResponse`
+
+
+
+## newsletter-abonnement-controller
+
+### GET `/api/v1/newsletter/abonnements/categories`
+**Parameters:**
+- `userId` (query, string(uuid), required)
+
+**Responses:** 200 → `CategorieResponse[]`
+
+
+### DELETE `/api/v1/newsletter/abonnements/categories/{categorieId}`
+**Parameters:**
+- `categorieId` (path, string(uuid), required)
+- `userId` (query, string(uuid), required)
+
+**Responses:** 204
+
+
+### POST `/api/v1/newsletter/abonnements/categories/{categorieId}`
+**Parameters:**
+- `categorieId` (path, string(uuid), required)
+- `userId` (query, string(uuid), required)
+
+**Request body:** `application/json` → `SubscribeRequest` (required)
+
+**Responses:** 204
+
+
+
+## newsletter-categorie-controller
+
+### GET `/api/v1/newsletter/categorie`
+**Responses:** 200 → `CategorieResponse[]`
+
+
+### POST `/api/v1/newsletter/categorie`
+**Request body:** `application/json` → `CategorieRequest` (required)
+
+**Responses:** 201 → `CategorieResponse`
+
+
+### GET `/api/v1/newsletter/categorie/nom/{nom}`
+**Parameters:**
+- `nom` (path, string, required)
+
+**Responses:** 200 → `CategorieResponse`
+
+
+### DELETE `/api/v1/newsletter/categorie/{id}`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 204
+
+
+### GET `/api/v1/newsletter/categorie/{id}`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `CategorieResponse`
+
+
+### PUT `/api/v1/newsletter/categorie/{id}`
+**Parameters:**
+- `id` (path, string(uuid), required)
+- `description` (query, string, required)
+
+**Responses:** 200 → `CategorieResponse`
+
+
+
+## newsletter-content-controller
+
+### GET `/api/v1/newsletter/contents`
+**Parameters:**
+- `statut` (query, string, optional)
+
+**Responses:** 200 → `NewsletterContentResponse[]`
+
+
+### DELETE `/api/v1/newsletter/contents/{id}`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 204
+
+
+### PUT `/api/v1/newsletter/contents/{id}`
+**Parameters:**
+- `id` (path, string(uuid), required)
+- `userId` (query, string(uuid), required)
+
+**Request body:** `application/json` → `NewsletterContentUpdateRequest` (required)
+
+**Responses:** 200 → `NewsletterContentResponse`
+
+
+### GET `/api/v1/newsletter/contents/{id}/cover`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `DataBuffer[]`
+
+
+### POST `/api/v1/newsletter/contents/{id}/cover`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `multipart/form-data` → `object` (optional)
+
+**Responses:** 200 → `NewsletterContentResponse`
+
+
+### GET `/api/v1/newsletter/contents/{id}/open-rate`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `OpenRateResponse`
+
+
+### POST `/api/v1/newsletter/contents/{id}/publish`
+**Parameters:**
+- `id` (path, string(uuid), required)
+- `userId` (query, string(uuid), required)
+
+**Responses:** 200 → `NewsletterContentResponse`
+
+
+### POST `/api/v1/newsletter/contents/{id}/submit`
+**Parameters:**
+- `id` (path, string(uuid), required)
+- `userId` (query, string(uuid), required)
+
+**Responses:** 200 → `NewsletterContentResponse`
+
+
+### GET `/api/v1/newsletter/newsletters/{newsletterId}/contents`
+**Parameters:**
+- `newsletterId` (path, string(uuid), required)
+
+**Responses:** 200 → `NewsletterContentResponse[]`
+
+
+### POST `/api/v1/newsletter/newsletters/{newsletterId}/contents`
+**Parameters:**
+- `newsletterId` (path, string(uuid), required)
+- `userId` (query, string(uuid), required)
+
+**Request body:** `application/json` → `NewsletterContentCreateRequest` (required)
+
+**Responses:** 201 → `NewsletterContentResponse`
+
+
+### GET `/api/v1/newsletter/newsletters/{newsletterId}/contents/count`
+**Parameters:**
+- `newsletterId` (path, string(uuid), required)
+
+**Responses:** 200 → `NewsletterContentCountResponse`
+
+
+
+## newsletter-entity-controller
+
+### GET `/api/v1/newsletter/admin/newsletters`
+**Parameters:**
+- `status` (query, string, optional)
+
+**Responses:** 200 → `NewsletterResponse[]`
+
+
+### DELETE `/api/v1/newsletter/admin/newsletters/{id}`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 204
+
+
+### POST `/api/v1/newsletter/admin/newsletters/{id}/approve`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `NewsletterResponse`
+
+
+### POST `/api/v1/newsletter/admin/newsletters/{id}/reject`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `NewsletterResponse`
+
+
+### POST `/api/v1/newsletter/newsletters`
+**Parameters:**
+- `userId` (query, string(uuid), required)
+
+**Request body:** `application/json` → `NewsletterCreateRequest` (required)
+
+**Responses:** 201 → `NewsletterResponse`
+
+
+### GET `/api/v1/newsletter/newsletters/mine`
+**Parameters:**
+- `userId` (query, string(uuid), required)
+
+**Responses:** 200 → `NewsletterResponse[]`
+
+
+### GET `/api/v1/newsletter/newsletters/{id}`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `NewsletterResponse`
+
+
+### PUT `/api/v1/newsletter/newsletters/{id}`
+**Parameters:**
+- `id` (path, string(uuid), required)
+- `userId` (query, string(uuid), required)
+
+**Request body:** `application/json` → `NewsletterCreateRequest` (required)
+
+**Responses:** 200 → `NewsletterResponse`
+
+
+### GET `/api/v1/newsletter/newsletters/{newsletterId}/open-rate`
+**Parameters:**
+- `newsletterId` (path, string(uuid), required)
+
+**Responses:** 200 → `OpenRateResponse`
+
+
+
+## newsletter-subscription-controller
+
+### POST `/api/v1/newsletter/newsletters/subscribe/{token}`
+**Parameters:**
+- `token` (path, string(uuid), required)
+- `userId` (query, string(uuid), required)
+
+**Request body:** `application/json` → `SubscribeRequest` (required)
+
+**Responses:** 204
+
+
+### GET `/api/v1/newsletter/newsletters/subscriptions`
+**Parameters:**
+- `userId` (query, string(uuid), required)
+
+**Responses:** 200 → `NewsletterResponse[]`
+
+
+### DELETE `/api/v1/newsletter/newsletters/{newsletterId}/subscribe`
+**Parameters:**
+- `newsletterId` (path, string(uuid), required)
+- `userId` (query, string(uuid), required)
+
+**Responses:** 204
+
+
+### POST `/api/v1/newsletter/newsletters/{newsletterId}/subscribe`
+**Parameters:**
+- `newsletterId` (path, string(uuid), required)
+- `userId` (query, string(uuid), required)
+
+**Request body:** `application/json` → `SubscribeRequest` (required)
+
+**Responses:** 204
 
 
 
@@ -7921,6 +9428,18 @@ Mettre à jour mon profil
 - `warehouseId` (path, string(uuid), required)
 
 **Responses:** 200 → `ApiResponseOperationalSiteView`
+
+
+
+## org-content-controller
+
+### GET `/api/v1/education/org/content`
+Lister les contenus d'éducation de mon organisation active
+
+**Parameters:**
+- `type` (query, string, required)
+
+**Responses:** 200 → `array`
 
 
 
@@ -8373,6 +9892,20 @@ Mettre à jour mon profil
 **Responses:** 200 → `ApiResponseWalletResponse`
 
 
+### GET `/api/payments/wallets/recharge-orders/{orderId}`
+**Parameters:**
+- `orderId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseWalletRechargeResponse`
+
+
+### POST `/api/payments/wallets/recharge-orders/{orderId}/refresh`
+**Parameters:**
+- `orderId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseWalletRechargeResponse`
+
+
 ### GET `/api/payments/wallets/{walletId}`
 **Parameters:**
 - `walletId` (path, string(uuid), required)
@@ -8401,9 +9934,17 @@ Mettre à jour mon profil
 **Parameters:**
 - `walletId` (path, string(uuid), required)
 
-**Request body:** `application/json` → `TransactionRequest` (required)
+**Request body:** `application/json` → `WalletRechargeRequest` (required)
 
-**Responses:** 200 → `ApiResponseTransactionResponse`
+**Responses:** 200 → `ApiResponseWalletRechargeResponse`
+
+
+### GET `/api/payments/wallets/{walletId}/recharge-orders`
+**Parameters:**
+- `walletId` (path, string(uuid), required)
+- `limit` (query, integer(int32), optional)
+
+**Responses:** 200 → `ApiResponseListWalletRechargeResponse`
 
 
 ### GET `/api/payments/wallets/{walletId}/transactions`
@@ -8411,6 +9952,46 @@ Mettre à jour mon profil
 - `walletId` (path, string(uuid), required)
 
 **Responses:** 200 → `ApiResponseListTransactionResponse`
+
+
+
+## payment-gateway-controller
+
+### GET `/api/payments/orders`
+**Parameters:**
+- `limit` (query, integer(int32), optional)
+
+**Responses:** 200 → `ApiResponseListPaymentOrderResponse`
+
+
+### POST `/api/payments/orders`
+**Request body:** `application/json` → `InitiatePaymentRequest` (required)
+
+**Responses:** 200 → `ApiResponsePaymentOrderResponse`
+
+
+### POST `/api/payments/orders/callbacks/{provider}`
+**Parameters:**
+- `provider` (path, string, required)
+- `Stripe-Signature` (header, string, optional)
+
+**Request body:** `application/json` → `string` (optional)
+
+**Responses:** 200 → `ApiResponseString`
+
+
+### GET `/api/payments/orders/{id}`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponsePaymentOrderResponse`
+
+
+### POST `/api/payments/orders/{id}/refresh`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponsePaymentOrderResponse`
 
 
 
@@ -8632,6 +10213,13 @@ Mettre à jour mon profil
 **Responses:** 200 → `ApiResponseListPayslipLineResponse`
 
 
+### POST `/api/v1/payroll/my-entries/{entryId}/payslip`
+**Parameters:**
+- `entryId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseMyPayslipDocumentResponse`
+
+
 
 ## physical-space-controller
 
@@ -8662,10 +10250,141 @@ Mettre à jour mon profil
 
 
 
+## plan-commercial-alias-controller
+
+### GET `/api/commercial-plans/auto-renewals`
+**Parameters:**
+- `organizationId` (query, string(uuid), optional)
+- `limit` (query, integer(int32), optional)
+
+**Responses:** 200 → `ApiResponseListAutoRenewalResponse`
+
+
+### POST `/api/commercial-plans/auto-renewals/process`
+**Parameters:**
+- `daysBeforeExpiry` (query, integer(int32), optional)
+- `limit` (query, integer(int32), optional)
+
+**Responses:** 200 → `ApiResponseRenewalProcessResult`
+
+
+### GET `/api/commercial-plans/renewal-orders`
+**Parameters:**
+- `organizationId` (query, string(uuid), optional)
+- `limit` (query, integer(int32), optional)
+
+**Responses:** 200 → `ApiResponseListRenewalOrderResponse`
+
+
+### GET `/api/commercial-plans/renewal-orders/{orderId}`
+**Parameters:**
+- `orderId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseRenewalOrderResponse`
+
+
+### POST `/api/commercial-plans/renewal-orders/{orderId}/refresh`
+**Parameters:**
+- `orderId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseRenewalOrderResponse`
+
+
+### DELETE `/api/commercial-plans/{planCode}/auto-renewal`
+**Parameters:**
+- `planCode` (path, string, required)
+- `organizationId` (query, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseAutoRenewalResponse`
+
+
+### POST `/api/commercial-plans/{planCode}/auto-renewal`
+**Parameters:**
+- `planCode` (path, string, required)
+
+**Request body:** `application/json` → `AutoRenewalRequest` (required)
+
+**Responses:** 200 → `ApiResponseAutoRenewalResponse`
+
+
+### GET `/api/plans/auto-renewals`
+**Parameters:**
+- `organizationId` (query, string(uuid), optional)
+- `limit` (query, integer(int32), optional)
+
+**Responses:** 200 → `ApiResponseListAutoRenewalResponse`
+
+
+### POST `/api/plans/auto-renewals/process`
+**Parameters:**
+- `daysBeforeExpiry` (query, integer(int32), optional)
+- `limit` (query, integer(int32), optional)
+
+**Responses:** 200 → `ApiResponseRenewalProcessResult`
+
+
+### GET `/api/plans/renewal-orders`
+**Parameters:**
+- `organizationId` (query, string(uuid), optional)
+- `limit` (query, integer(int32), optional)
+
+**Responses:** 200 → `ApiResponseListRenewalOrderResponse`
+
+
+### GET `/api/plans/renewal-orders/{orderId}`
+**Parameters:**
+- `orderId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseRenewalOrderResponse`
+
+
+### POST `/api/plans/renewal-orders/{orderId}/refresh`
+**Parameters:**
+- `orderId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseRenewalOrderResponse`
+
+
+### DELETE `/api/plans/{planCode}/auto-renewal`
+**Parameters:**
+- `planCode` (path, string, required)
+- `organizationId` (query, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseAutoRenewalResponse`
+
+
+### POST `/api/plans/{planCode}/auto-renewal`
+**Parameters:**
+- `planCode` (path, string, required)
+
+**Request body:** `application/json` → `AutoRenewalRequest` (required)
+
+**Responses:** 200 → `ApiResponseAutoRenewalResponse`
+
+
+### POST `/api/plans/{planCode}/checkout`
+**Parameters:**
+- `planCode` (path, string, required)
+
+**Request body:** `application/json` → `CommercialPlanCheckoutRequest` (required)
+
+**Responses:** 200 → `ApiResponseCommercialPlanCheckoutResponse`
+
+
+### POST `/api/plans/{planCode}/quote`
+**Parameters:**
+- `planCode` (path, string, required)
+
+**Request body:** `application/json` → `CommercialPlanQuoteRequest` (optional)
+
+**Responses:** 200 → `ApiResponseCommercialPlanQuoteResponse`
+
+
+
 ## plan-controller
 
 ### GET `/api/plans`
-**Responses:** 200 → `ApiResponseListPlanResponse`
+**Responses:** 200 → `ApiResponseListCommercialPlanResponse`
 
 
 ### GET `/api/plans/subscriptions`
@@ -8683,7 +10402,7 @@ Mettre à jour mon profil
 **Parameters:**
 - `code` (path, string, required)
 
-**Responses:** 200 → `ApiResponsePlanResponse`
+**Responses:** 200 → `ApiResponseCommercialPlanResponse`
 
 
 ### PUT `/api/plans/{code}`
@@ -8735,6 +10454,142 @@ Mettre à jour mon profil
 
 
 
+## podcast-controller
+
+### GET `/api/v1/education/podcasts`
+Obtenir tous les podcasts ✅ 
+
+**Parameters:**
+- `authorId` (query, string, optional)
+- `status` (query, string, optional)
+
+**Responses:** 200 → `PodcastEntity[]`; 404 → `PodcastEntity[]`
+
+
+### POST `/api/v1/education/podcasts`
+Créer un podcast
+
+**Request body:** `application/json` → `PodcastCreateDTO` (required)
+
+**Responses:** 201 → `PodcastEntity`; 400 → `PodcastEntity`
+
+
+### GET `/api/v1/education/podcasts/count-by-author/{id}`
+Nombre de contenus par auteur
+
+**Parameters:**
+- `id` (path, string, required)
+
+**Responses:** 200 → `integer(int32)`
+
+
+### GET `/api/v1/education/podcasts/{idPodcast}/audiopodcast`
+**Parameters:**
+- `idPodcast` (path, string(uuid), required)
+
+**Responses:** 200 → `DataBuffer[]`
+
+
+### GET `/api/v1/education/podcasts/{idPodcast}/coverpodcast`
+**Parameters:**
+- `idPodcast` (path, string(uuid), required)
+
+**Responses:** 200 → `DataBuffer[]`
+
+
+### GET `/api/v1/education/podcasts/{idpodcast}/categories`
+**Parameters:**
+- `idpodcast` (path, string, required)
+
+**Responses:** 200 → `string[]`
+
+
+### GET `/api/v1/education/podcasts/{idpodcast}/tags`
+**Parameters:**
+- `idpodcast` (path, string, required)
+
+**Responses:** 200 → `string[]`
+
+
+### GET `/api/v1/education/podcasts/{id}`
+Récupérer un podcast par son ID
+
+**Parameters:**
+- `id` (path, string, required)
+
+**Responses:** 200 → `PodcastEntity`; 404 → `PodcastEntity`
+
+
+### PUT `/api/v1/education/podcasts/{id}`
+Mettre à jour un podcast
+
+**Parameters:**
+- `id` (path, string, required)
+
+**Request body:** `application/json` → `PodcastCreateDTO` (required)
+
+**Responses:** 200 → `PodcastEntity`; 404 → `PodcastEntity`
+
+
+### PATCH `/api/v1/education/podcasts/{id}/archive`
+Supprimer un podcast par son Id (traité comme une archive)
+
+**Parameters:**
+- `id` (path, string, required)
+
+**Responses:** 200; 400; 404
+
+
+### POST `/api/v1/education/podcasts/{id}/audio`
+Uploader l'audio d'un podcast
+
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `multipart/form-data` → `object` (optional)
+
+**Responses:** 200 → `PodcastEntity`
+
+
+### POST `/api/v1/education/podcasts/{id}/cover`
+Uploader la couverture d'un podcast
+
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `multipart/form-data` → `object` (optional)
+
+**Responses:** 200 → `PodcastEntity`
+
+
+### PATCH `/api/v1/education/podcasts/{id}/publish`
+Publier un podcast
+
+**Parameters:**
+- `id` (path, string, required)
+
+**Responses:** 200 → `PodcastEntity`; 404 → `PodcastEntity`
+
+
+### PATCH `/api/v1/education/podcasts/{id}/reject`
+Rejeter un podcast soumis
+
+**Parameters:**
+- `id` (path, string, required)
+
+**Responses:** 200 → `PodcastEntity`; 404 → `PodcastEntity`
+
+
+### PATCH `/api/v1/education/podcasts/{id}/submit`
+Soumettre un brouillon de podcast pour validation par l'admin
+
+**Parameters:**
+- `id` (path, string, required)
+
+**Responses:** 200 → `PodcastEntity`; 400 → `PodcastEntity`; 404 → `PodcastEntity`
+
+
+
 ## point-of-interest-controller
 
 ### POST `/api/organizations/points-of-interest`
@@ -8749,6 +10604,80 @@ Mettre à jour mon profil
 - `agencyId` (path, string(uuid), required)
 
 **Responses:** 200 → `ApiResponseListPointOfInterestResponse`
+
+
+
+## post-controller
+
+### POST `/api/v1/forum/posts`
+**Request body:** `application/json` → `Post` (required)
+
+**Responses:** 200 → `Post`
+
+
+### GET `/api/v1/forum/posts/auteur/{auteurId}`
+**Parameters:**
+- `auteurId` (path, string(uuid), required)
+- `memberId` (query, string(uuid), required)
+
+**Responses:** 200 → `Post[]`
+
+
+### GET `/api/v1/forum/posts/categorie/{categorieId}`
+**Parameters:**
+- `categorieId` (path, string(uuid), required)
+- `memberId` (query, string(uuid), required)
+
+**Responses:** 200 → `Post[]`
+
+
+### GET `/api/v1/forum/posts/groupe/{groupeId}`
+**Parameters:**
+- `groupeId` (path, string(uuid), required)
+
+**Responses:** 200 → `Post[]`
+
+
+### DELETE `/api/v1/forum/posts/{postId}`
+**Parameters:**
+- `postId` (path, string(uuid), required)
+- `memberId` (query, string(uuid), required)
+
+**Responses:** 200 → `object`
+
+
+### GET `/api/v1/forum/posts/{postId}`
+**Parameters:**
+- `postId` (path, string(uuid), required)
+- `memberId` (query, string(uuid), required)
+
+**Responses:** 200 → `Post`
+
+
+### PUT `/api/v1/forum/posts/{postId}`
+**Parameters:**
+- `postId` (path, string(uuid), required)
+- `memberId` (query, string(uuid), required)
+
+**Request body:** `application/json` → `Post` (required)
+
+**Responses:** 200 → `Post`
+
+
+### POST `/api/v1/forum/posts/{postId}/dislike`
+**Parameters:**
+- `postId` (path, string(uuid), required)
+- `memberId` (query, string(uuid), required)
+
+**Responses:** 200 → `ReactionResponse`
+
+
+### POST `/api/v1/forum/posts/{postId}/like`
+**Parameters:**
+- `postId` (path, string(uuid), required)
+- `memberId` (query, string(uuid), required)
+
+**Responses:** 200 → `Post`
 
 
 
@@ -9216,6 +11145,16 @@ Mettre à jour mon profil
 
 
 
+## public-newsletter-tracking-controller
+
+### GET `/api/public/newsletter/track/open/{token}`
+**Parameters:**
+- `token` (path, string(uuid), required)
+
+**Responses:** 200 → `string(byte)`
+
+
+
 ## public-organization-branding-controller
 
 ### GET `/api/public/organizations/{organizationId}/branding`
@@ -9523,6 +11462,88 @@ Mettre à jour mon profil
 - `id` (path, string(uuid), required)
 
 **Responses:** 200 → `ApiResponseOnboardingTaskResponse`
+
+
+
+## redacteur-abonnement-controller
+
+### GET `/api/v1/newsletter/redacteurs/abonnements`
+**Parameters:**
+- `userId` (query, string(uuid), required)
+
+**Responses:** 200 → `RedacteurResponse[]`
+
+
+### DELETE `/api/v1/newsletter/redacteurs/{redacteurId}/subscribe`
+**Parameters:**
+- `redacteurId` (path, string(uuid), required)
+- `userId` (query, string(uuid), required)
+
+**Responses:** 204
+
+
+### POST `/api/v1/newsletter/redacteurs/{redacteurId}/subscribe`
+**Parameters:**
+- `redacteurId` (path, string(uuid), required)
+- `userId` (query, string(uuid), required)
+
+**Request body:** `application/json` → `SubscribeRequest` (required)
+
+**Responses:** 204
+
+
+
+## redacteur-controller
+
+### POST `/api/v1/newsletter/redacteurs`
+**Parameters:**
+- `userId` (query, string(uuid), required)
+
+**Request body:** `application/json` → `RedacteurCreationRequest` (required)
+
+**Responses:** 201 → `RedacteurRequestResponse`
+
+
+### GET `/api/v1/newsletter/redacteurs/by-user/{userId}`
+**Parameters:**
+- `userId` (path, string(uuid), required)
+
+**Responses:** 200 → `RedacteurResponse`
+
+
+### GET `/api/v1/newsletter/redacteurs/email`
+**Parameters:**
+- `email` (query, string, required)
+
+**Responses:** 200 → `Redacteur`
+
+
+### GET `/api/v1/newsletter/redacteurs/exists-by-email`
+**Parameters:**
+- `email` (query, string, required)
+
+**Responses:** 200 → `boolean`
+
+
+### GET `/api/v1/newsletter/redacteurs/me`
+**Parameters:**
+- `userId` (query, string(uuid), required)
+
+**Responses:** 200 → `RedacteurRequestResponse`
+
+
+### GET `/api/v1/newsletter/redacteurs/request/{id}`
+**Parameters:**
+- `id` (path, string, required)
+
+**Responses:** 200 → `RedacteurRequestResponse`
+
+
+### GET `/api/v1/newsletter/redacteurs/{redacteurId}/open-rate`
+**Parameters:**
+- `redacteurId` (path, string(uuid), required)
+
+**Responses:** 200 → `OpenRateResponse`
 
 
 
@@ -10311,6 +12332,46 @@ Mettre à jour mon profil
 
 
 
+## service-bundle-controller
+
+### POST `/api/service-bundles/checkout`
+**Request body:** `application/json` → `ServiceBundleCheckoutRequest` (required)
+
+**Responses:** 200 → `ApiResponseServiceBundleCheckoutResponse`
+
+
+### GET `/api/service-bundles/orders`
+**Parameters:**
+- `limit` (query, integer(int32), optional)
+
+**Responses:** 200 → `ApiResponseListServiceBundleOrderResponse`
+
+
+### GET `/api/service-bundles/orders/{orderId}`
+**Parameters:**
+- `orderId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseServiceBundleOrderResponse`
+
+
+### POST `/api/service-bundles/orders/{orderId}/refresh`
+**Parameters:**
+- `orderId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseServiceBundleOrderResponse`
+
+
+### POST `/api/service-bundles/quote`
+**Request body:** `application/json` → `ServiceBundleQuoteRequest` (required)
+
+**Responses:** 200 → `ApiResponseServiceBundleQuoteResponse`
+
+
+### GET `/api/service-pricing`
+**Responses:** 200 → `ApiResponseListServicePriceResponse`
+
+
+
 ## session-tokens-controller
 
 ### POST `/api/auth/logout`
@@ -10693,6 +12754,43 @@ Mettre à jour mon profil
 - `organizationId` (query, string(uuid), optional)
 
 **Responses:** 200 → `ApiResponseAuditPage`
+
+
+
+## tag-controller
+
+### GET `/api/v1/education/tags`
+Récupérer tous les tags
+
+**Responses:** 200 → `TagEntity[]`; 500 → `TagEntity[]`
+
+
+### POST `/api/v1/education/tags`
+Créer un nouveau tag 
+
+**Request body:** `application/json` → `TagCreateDTO` (required)
+
+**Responses:** 201 → `TagEntity`; 400 → `TagEntity`
+
+
+### GET `/api/v1/education/tags/{tagId}`
+Récupérer un tag par ID
+
+**Parameters:**
+- `tagId` (path, string, required)
+
+**Responses:** 200 → `TagEntity`; 404 → `TagEntity`
+
+
+### PUT `/api/v1/education/tags/{tagId}`
+Mettre à jour un tag existant
+
+**Parameters:**
+- `tagId` (path, string, required)
+
+**Request body:** `application/json` → `TagCreateDTO` (required)
+
+**Responses:** 200 → `TagEntity`; 400 → `TagEntity`; 404 → `TagEntity`
 
 
 
@@ -11272,6 +13370,58 @@ Mettre à jour mon profil
 
 
 
+## user-follow-controller
+
+### DELETE `/api/v1/education/follows/{followedId}`
+**Parameters:**
+- `followedId` (path, string(uuid), required)
+- `X-User-Id` (header, string(uuid), required)
+
+**Responses:** 200
+
+
+### POST `/api/v1/education/follows/{followedId}`
+**Parameters:**
+- `followedId` (path, string(uuid), required)
+- `X-User-Id` (header, string(uuid), required)
+
+**Responses:** 200
+
+
+### GET `/api/v1/education/follows/{userId}/counts`
+**Parameters:**
+- `userId` (path, string(uuid), required)
+- `X-User-Id` (header, string(uuid), optional)
+
+**Responses:** 200 → `FollowCountsView`
+
+
+### GET `/api/v1/education/follows/{userId}/followers`
+**Parameters:**
+- `userId` (path, string(uuid), required)
+
+**Responses:** 200 → `string(uuid)[]`
+
+
+### GET `/api/v1/education/follows/{userId}/following`
+**Parameters:**
+- `userId` (path, string(uuid), required)
+
+**Responses:** 200 → `string(uuid)[]`
+
+
+
+## user-profile-controller
+
+### GET `/api/v1/education/users/{userId}/profile`
+**Parameters:**
+- `userId` (path, string(uuid), required)
+- `X-User-Id` (header, string(uuid), optional)
+
+**Responses:** 200 → `UserPublicProfile`
+
+
+
 ## warehouse-controller
 
 ### GET `/api/warehouses`
@@ -11398,5 +13548,92 @@ Mettre à jour mon profil
 - `id` (path, string(uuid), required)
 
 **Responses:** 200 → `ApiResponseWorkflowRequestResponse`
+
+
+
+## Évaluations
+
+### GET `/api/v1/ratings`
+Obtenir toutes les évaluations
+
+**Responses:** 200 → `Ratings[]`
+
+
+### GET `/api/v1/ratings/hasDisliked`
+Vérifie si un utilisateur a disliké
+
+**Parameters:**
+- `userId` (query, string(uuid), required)
+- `entityId` (query, string(uuid), required)
+
+**Responses:** 200 → `boolean`
+
+
+### GET `/api/v1/ratings/hasLiked`
+Vérifie si un utilisateur a liké
+
+**Parameters:**
+- `userId` (query, string(uuid), required)
+- `entityId` (query, string(uuid), required)
+
+**Responses:** 200 → `boolean`
+
+
+### POST `/api/v1/ratings/like-or-dislike`
+Donner un like ou un dislike
+
+**Parameters:**
+- `userId` (query, string(uuid), required)
+- `entityId` (query, string(uuid), required)
+- `entityType` (query, string, required)
+- `isLike` (query, boolean, required)
+
+**Responses:** 200 → `string`; 400 → `string`
+
+
+### GET `/api/v1/ratings/most-commented`
+Contenu le plus commenté
+
+**Responses:** 200 → `string(uuid)`
+
+
+### GET `/api/v1/ratings/most-liked`
+Contenu le plus liké
+
+**Parameters:**
+- `entityType` (query, string, optional)
+
+**Responses:** 200 → `EntityStats`
+
+
+### POST `/api/v1/ratings/rate-application`
+Évaluer 
+
+**Parameters:**
+- `userId` (query, string(uuid), required)
+- `entityId` (query, string(uuid), optional)
+- `entityType` (query, string, optional)
+- `score` (query, integer(int32), required)
+- `feedback` (query, string, optional)
+
+**Responses:** 200 → `string`
+
+
+### GET `/api/v1/ratings/totalDislikes`
+Obtenir le nombre total de dislikes
+
+**Parameters:**
+- `entityId` (query, string(uuid), required)
+
+**Responses:** 200 → `integer(int32)`
+
+
+### GET `/api/v1/ratings/totalLikes`
+Obtenir le nombre total de likes
+
+**Parameters:**
+- `entityId` (query, string(uuid), required)
+
+**Responses:** 200 → `integer(int32)`
 
 

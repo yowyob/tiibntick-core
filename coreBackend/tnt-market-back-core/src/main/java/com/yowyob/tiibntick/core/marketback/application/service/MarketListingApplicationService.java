@@ -19,6 +19,7 @@ import com.yowyob.tiibntick.core.organization.application.port.out.KernelOrganiz
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -57,6 +58,7 @@ public class MarketListingApplicationService implements IManageMarketListingUseC
     private final KernelOrganizationPort organizationPort;
 
     @Override
+    @Transactional
     public Mono<MarketListingResponse> createListing(CreateMarketListingCommand command) {
         log.debug("Creating MarketListing for provider={} tenant={}", command.providerId(), command.tenantId());
 
@@ -89,7 +91,7 @@ public class MarketListingApplicationService implements IManageMarketListingUseC
                 .flatMap(saved -> {
                     List<Object> events = saved.pullDomainEvents();
                     return Flux.fromIterable(events)
-                            .flatMap(eventPublisher::publish)
+                            .flatMap(event -> eventPublisher.publish(event, command.tenantId()))
                             .then(Mono.just(saved));
                 })
                 .map(this::toResponse);
@@ -187,6 +189,7 @@ public class MarketListingApplicationService implements IManageMarketListingUseC
     }
 
     @Override
+    @Transactional
     public Mono<MarketListingResponse> approveListing(UUID listingId, UUID adminId, String tenantId) {
         return listingRepository.findById(MarketListingId.of(listingId), tenantId)
                 .switchIfEmpty(Mono.error(new ListingNotFoundException(listingId.toString())))
@@ -204,7 +207,7 @@ public class MarketListingApplicationService implements IManageMarketListingUseC
                 })
                 .flatMap(saved -> {
                     List<Object> events = saved.pullDomainEvents();
-                    return eventPublisher.publishAll(events)
+                    return eventPublisher.publishAll(events, tenantId)
                             .then(searchIndexPort.indexListing(saved))
                             .then(notificationPort.notifyListingApproved(tenantId, saved.getProviderId(), saved.getId().toString()))
                             .thenReturn(saved);
@@ -213,6 +216,7 @@ public class MarketListingApplicationService implements IManageMarketListingUseC
     }
 
     @Override
+    @Transactional
     public Mono<MarketListingResponse> rejectListing(UUID listingId, UUID adminId, String reason, String tenantId) {
         return listingRepository.findById(MarketListingId.of(listingId), tenantId)
                 .switchIfEmpty(Mono.error(new ListingNotFoundException(listingId.toString())))
@@ -222,7 +226,7 @@ public class MarketListingApplicationService implements IManageMarketListingUseC
                 })
                 .flatMap(saved -> {
                     List<Object> events = saved.pullDomainEvents();
-                    return eventPublisher.publishAll(events)
+                    return eventPublisher.publishAll(events, tenantId)
                             .then(notificationPort.notifyListingRejected(tenantId, saved.getProviderId(), saved.getId().toString(), reason))
                             .thenReturn(saved);
                 })

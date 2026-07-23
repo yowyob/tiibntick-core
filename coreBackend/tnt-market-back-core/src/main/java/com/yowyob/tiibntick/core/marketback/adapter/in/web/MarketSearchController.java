@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * Generic Market discovery/search API — provider discovery, price comparison,
@@ -87,6 +88,7 @@ public class MarketSearchController {
 
     @Operation(summary = "Compare multiple providers")
     @PostMapping("/compare")
+    @PreAuthorize("isAuthenticated()")
     public Mono<ProviderComparisonResponse> compare(@RequestBody CompareProvidersQuery query) {
         return searchUseCase.compareProviders(query);
     }

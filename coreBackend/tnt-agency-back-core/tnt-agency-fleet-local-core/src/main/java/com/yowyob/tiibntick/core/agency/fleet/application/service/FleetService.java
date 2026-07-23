@@ -7,6 +7,7 @@ import com.yowyob.tiibntick.core.agency.fleet.adapter.in.web.dto.VehicleResponse
 import com.yowyob.tiibntick.core.agency.fleet.adapter.out.persistence.AgencyVehicleR2dbcRepository;
 import com.yowyob.tiibntick.core.agency.fleet.application.mapper.FleetMapper;
 import com.yowyob.tiibntick.core.agency.fleet.domain.Vehicle;
+import com.yowyob.tiibntick.core.agency.fleet.domain.vo.VehicleSource;
 import com.yowyob.tiibntick.core.agency.fleet.domain.vo.VehicleType;
 import com.yowyob.tiibntick.core.agency.fleet.adapter.out.clients.ResourceCorePort;
 import com.yowyob.tiibntick.core.agency.org.application.service.AgencyBranchService;
@@ -48,8 +49,8 @@ public class FleetService {
                                         ? Mono.just(input.coreVehicleId())
                                         : resourceCore.registerVehicle(new ResourceCorePort.RegisterVehicleRequest(
                                                 input.tenantId(),
-                                                agency.kernelOrganizationId(),
-                                                agency.coreAgencyId(),
+                                                agency.getKernelOrganizationId(),
+                                                agency.getCoreAgencyId(),
                                                 input.licensePlate(),
                                                 input.brand(),
                                                 input.model(),
@@ -57,10 +58,13 @@ public class FleetService {
                                                 input.vehicleType()));
                                 return coreVehicleIdMono.flatMap(coreVehicleId -> {
                                     Instant now = Instant.now();
+                                    VehicleSource source = input.source() != null
+                                            ? input.source() : VehicleSource.AGENCY;
                                     Vehicle vehicle = Vehicle.add(
                                             UUID.randomUUID(), input.tenantId(), input.agencyId(),
                                             input.branchId(), input.licensePlate(), input.brand(),
-                                            input.model(), input.year(), input.vehicleType(), now);
+                                            input.model(), input.year(), input.vehicleType(),
+                                            source, input.fleetmanVehicleId(), now);
                                     vehicle.linkCoreVehicle(coreVehicleId, now);
                                     return vehicleRepo.save(FleetMapper.toEntity(vehicle));
                                 });
@@ -68,6 +72,19 @@ public class FleetService {
                             .map(FleetMapper::toDomain)
                             .map(VehicleResponse::from);
                 });
+    }
+
+    @Transactional
+    public Mono<VehicleResponse> linkFleetMan(UUID tenantId, UUID vehicleId,
+                                              String fleetmanVehicleId, VehicleSource source) {
+        return requireVehicle(vehicleId, tenantId)
+                .flatMap(vehicle -> {
+                    vehicle.linkFleetMan(fleetmanVehicleId,
+                            source != null ? source : VehicleSource.AGENCY, Instant.now());
+                    return vehicleRepo.save(FleetMapper.toEntity(vehicle));
+                })
+                .map(FleetMapper::toDomain)
+                .map(VehicleResponse::from);
     }
 
     @Transactional
@@ -166,5 +183,14 @@ public class FleetService {
     public record AddInput(
             UUID tenantId, UUID agencyId, UUID branchId,
             String licensePlate, String brand, String model,
-            int year, VehicleType vehicleType, UUID coreVehicleId) {}
+            int year, VehicleType vehicleType, UUID coreVehicleId,
+            VehicleSource source, String fleetmanVehicleId) {
+
+        public AddInput(UUID tenantId, UUID agencyId, UUID branchId,
+                        String licensePlate, String brand, String model,
+                        int year, VehicleType vehicleType, UUID coreVehicleId) {
+            this(tenantId, agencyId, branchId, licensePlate, brand, model,
+                    year, vehicleType, coreVehicleId, VehicleSource.AGENCY, null);
+        }
+    }
 }

@@ -31,6 +31,12 @@ public interface OnboardingKernelPort {
     ) {}
 
     /**
+     * Phase 1 — create candidate Kernel BusinessActor via Core
+     * {@code POST .../kernel-identity} (requires candidate Bearer JWT).
+     */
+    Mono<UUID> onboardApplicantBusinessActor(AgencyRegistryResponse agency, OnboardingApplication application);
+
+    /**
      * Phase 2 — full orchestration via Core {@code POST .../approve}.
      */
     Mono<ProvisionResult> provisionOrganization(ProvisionRequest request);

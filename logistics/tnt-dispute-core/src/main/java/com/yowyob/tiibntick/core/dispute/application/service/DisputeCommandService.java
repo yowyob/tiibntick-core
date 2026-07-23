@@ -42,6 +42,7 @@ public class DisputeCommandService implements IDisputeCommandUseCase {
     private final IDeliveryStatusPort deliveryStatusPort;
     private final IBillingCompensationPort billingCompensationPort;
     private final IBlockchainProofPort blockchainProofPort;
+    private final IDisputeReferenceGenerator referenceGenerator;
 
     public DisputeCommandService(
             final IDisputeRepository repository,
@@ -49,13 +50,15 @@ public class DisputeCommandService implements IDisputeCommandUseCase {
             final IDisputeNotificationPort notificationPort,
             final IDeliveryStatusPort deliveryStatusPort,
             final IBillingCompensationPort billingCompensationPort,
-            final IBlockchainProofPort blockchainProofPort) {
+            final IBlockchainProofPort blockchainProofPort,
+            final IDisputeReferenceGenerator referenceGenerator) {
         this.repository = Objects.requireNonNull(repository);
         this.eventPublisher = Objects.requireNonNull(eventPublisher);
         this.notificationPort = Objects.requireNonNull(notificationPort);
         this.deliveryStatusPort = Objects.requireNonNull(deliveryStatusPort);
         this.billingCompensationPort = Objects.requireNonNull(billingCompensationPort);
         this.blockchainProofPort = Objects.requireNonNull(blockchainProofPort);
+        this.referenceGenerator = Objects.requireNonNull(referenceGenerator);
     }
 
     @Override
@@ -66,7 +69,8 @@ public class DisputeCommandService implements IDisputeCommandUseCase {
                 cmd.packageId(), cmd.claimantId(), cmd.tenantId());
 
         return checkNoDuplicateDispute(cmd)
-                .then(Mono.fromSupplier(() -> Dispute.open(cmd)))
+                .then(referenceGenerator.nextReference())
+                .map(reference -> Dispute.open(cmd, reference))
                 .flatMap(repository::save)
                 .flatMap(saved -> {
                     final String packageId = saved.getPackageId();

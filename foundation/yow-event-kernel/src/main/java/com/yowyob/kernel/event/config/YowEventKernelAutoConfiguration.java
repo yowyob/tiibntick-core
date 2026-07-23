@@ -46,7 +46,7 @@ import java.util.Map;
  *   <li>All beans are registered with {@code @ConditionalOnMissingBean} so that
  *       consuming applications (e.g. {@code tnt-bootstrap}) can override any
  *       component without touching this class.</li>
- *   <li>{@code @ComponentScan} is scoped to {@code yowyob.kernel.event} to avoid
+ *   <li>{@code @ComponentScan} is scoped to {@code com.yowyob.kernel.event} to avoid
  *       accidentally picking up beans from the consuming application's classpath.</li>
  *   <li>{@code @EnableScheduling} activates the outbox poller scheduler.</li>
  * </ul>
@@ -55,7 +55,7 @@ import java.util.Map;
 @AutoConfiguration
 @EnableScheduling
 @EnableConfigurationProperties(YowEventKernelProperties.class)
-@ComponentScan(basePackages = "yowyob.kernel.event")
+@ComponentScan(basePackages = "com.yowyob.kernel.event")
 public class YowEventKernelAutoConfiguration {
 
     // ── Kafka AdminClient ────────────────────────────────────────────────────

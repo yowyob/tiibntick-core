@@ -38,6 +38,29 @@ public class PaymentIntent {
     private LocalDateTime updatedAt;
 
     /**
+     * Attaches the Kernel {@code payment-gateway-controller} order id (returned by
+     * {@code POST /api/payments/orders}) while the intent is still {@code PENDING}, so a
+     * later reconciliation poll can locate this intent via
+     * {@code IPaymentIntentRepository.findByExternalRef}.
+     *
+     * <p>This reuses the same {@link #externalRef} field later overwritten by
+     * {@link #confirm} with the true provider financial-transaction id — once confirmed,
+     * the polling identifier is no longer needed, so no separate column/field exists for it
+     * (see {@code docs/audits/remediation/workstream-payment-billing-kernel-delegation.md},
+     * step 5).
+     *
+     * @param kernelOrderId the Kernel payment order id to poll for confirmation
+     */
+    public void attachProviderReference(String kernelOrderId) {
+        if (this.status != PaymentIntentStatus.PENDING) {
+            throw new IllegalStateException(
+                    "Cannot attach a provider reference to intent in status: " + this.status);
+        }
+        this.externalRef = kernelOrderId;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
      * Confirms this intent with the external provider reference.
      *
      * @param providerRef financial transaction ID returned by the provider

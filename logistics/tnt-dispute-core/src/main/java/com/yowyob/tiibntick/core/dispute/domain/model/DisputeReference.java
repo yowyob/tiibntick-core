@@ -3,7 +3,6 @@ package com.yowyob.tiibntick.core.dispute.domain.model;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Value Object representing a human-readable, unique reference number for a dispute.
@@ -13,12 +12,21 @@ import java.util.concurrent.atomic.AtomicInteger;
  * <p>The reference is used for customer communication, legal documents, and
  * cross-platform tracking. It is immutable once generated.
  *
+ * <p><b>Sequence source (Chantier D · Audit n°6 · S1):</b> the {@code SEQUENCE} portion
+ * must be supplied by the caller — see {@link #forSequence(long)} — obtained from the
+ * {@code dispute_reference_seq} PostgreSQL sequence via
+ * {@code IDisputeReferenceGenerator.nextReference()}. This value object used to generate
+ * that sequence itself from a static {@code AtomicInteger}, which is scoped to a single
+ * JVM: every application instance in a multi-instance deployment held its own independent
+ * counter, seeded from the same persisted max at startup, so two instances handling
+ * concurrent {@code openDispute()} calls were guaranteed to collide. A database sequence
+ * is atomic across every connection/instance sharing it, which removes that failure mode.
+ *
  * @author MANFOUO Braun
  */
 public final class DisputeReference {
 
     private static final DateTimeFormatter MONTH_FORMAT = DateTimeFormatter.ofPattern("yyyyMM");
-    private static final AtomicInteger SEQUENCE = new AtomicInteger(0);
 
     private final String value;
 
@@ -27,25 +35,18 @@ public final class DisputeReference {
     }
 
     /**
-     * Initializes the in-memory sequence counter from the persisted max value.
-     * Must be called once at application startup (before any reference is generated)
-     * to avoid duplicate key violations after restart.
+     * Builds a new {@code DisputeReference} from a sequence value obtained from the
+     * {@code dispute_reference_seq} PostgreSQL sequence (see
+     * {@code IDisputeReferenceGenerator}), combined with the current year/month.
      *
-     * @param maxSequence the highest sequence number already in the database
-     */
-    public static void initSequence(int maxSequence) {
-        SEQUENCE.set(maxSequence);
-    }
-
-    /**
-     * Generates a new dispute reference using the current date and an auto-incrementing sequence.
-     *
+     * @param sequence a value from {@code dispute_reference_seq} — must be unique and
+     *                 positive; the caller (the sequence adapter) guarantees this, not
+     *                 this value object
      * @return a new unique {@code DisputeReference}
      */
-    public static DisputeReference generate() {
+    public static DisputeReference forSequence(final long sequence) {
         final String month = LocalDateTime.now().format(MONTH_FORMAT);
-        final int seq = SEQUENCE.incrementAndGet();
-        return new DisputeReference(String.format("DSP-%s-%05d", month, seq));
+        return new DisputeReference(String.format("DSP-%s-%05d", month, sequence));
     }
 
     /**

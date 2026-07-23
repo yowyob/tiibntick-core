@@ -28,6 +28,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * Generic Link business API for the delivery bulletin board — a thin façade over
@@ -49,6 +50,7 @@ public class LinkBoardController {
 
     @Operation(summary = "Publish a new delivery announcement to the board")
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     public Mono<BoardEntryResponse> publish(
             @Valid @RequestBody PublishBoardEntryRequest request,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
@@ -69,6 +71,7 @@ public class LinkBoardController {
 
     @Operation(summary = "Bid on an open board entry")
     @PostMapping("/{announcementId}/bid")
+    @PreAuthorize("isAuthenticated()")
     public Mono<BoardEntryResponse> bid(
             @PathVariable UUID announcementId,
             @Valid @RequestBody BidOnBoardEntryRequest request,
@@ -81,6 +84,7 @@ public class LinkBoardController {
 
     @Operation(summary = "Elect a delivery person's bid, creating the delivery")
     @PostMapping("/{announcementId}/elect/{responseId}")
+    @PreAuthorize("isAuthenticated()")
     public Mono<BoardEntryResponse> elect(
             @PathVariable UUID announcementId,
             @PathVariable UUID responseId,
@@ -92,6 +96,7 @@ public class LinkBoardController {
 
     @Operation(summary = "Cancel a board entry")
     @DeleteMapping("/{announcementId}")
+    @PreAuthorize("isAuthenticated()")
     public Mono<Void> cancel(
             @PathVariable UUID announcementId,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {

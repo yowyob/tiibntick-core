@@ -7,6 +7,8 @@ import com.yowyob.tiibntick.core.dispute.application.port.outbound.IDisputeRepos
 import com.yowyob.tiibntick.core.dispute.domain.enums.ClosureType;
 import com.yowyob.tiibntick.core.dispute.domain.enums.DisputeStatus;
 import com.yowyob.tiibntick.core.dispute.domain.model.Dispute;
+import net.javacrumbs.shedlock.core.LockAssert;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -51,7 +53,9 @@ public class DisputeSLAScheduler {
      * A dispute is expired when its resolution deadline has passed without any closure.
      */
     @Scheduled(cron = "0 0 * * * *")
+    @SchedulerLock(name = "dispute-process-expired", lockAtMostFor = "PT55M", lockAtLeastFor = "PT1M")
     public void processExpiredDisputes() {
+        LockAssert.assertLocked();
         log.info("Running SLA expiry check at {}", LocalDateTime.now());
         final LocalDateTime now = LocalDateTime.now();
 
@@ -69,7 +73,9 @@ public class DisputeSLAScheduler {
      * Issues an alert but does not close the dispute automatically.
      */
     @Scheduled(cron = "0 0/30 * * * *")
+    @SchedulerLock(name = "dispute-check-response-sla-breaches", lockAtMostFor = "PT25M", lockAtLeastFor = "PT30S")
     public void checkResponseSlaBreaches() {
+        LockAssert.assertLocked();
         log.debug("Checking response SLA breaches at {}", LocalDateTime.now());
         final LocalDateTime now = LocalDateTime.now();
 

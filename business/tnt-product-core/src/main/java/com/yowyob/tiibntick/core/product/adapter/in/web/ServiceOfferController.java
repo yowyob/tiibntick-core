@@ -1,14 +1,18 @@
 package com.yowyob.tiibntick.core.product.adapter.in.web;
 
+import com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser;
+import com.yowyob.tiibntick.core.auth.domain.model.TntUserIdentity;
 import com.yowyob.tiibntick.core.product.application.port.in.*;
 import com.yowyob.tiibntick.core.product.domain.model.OfferComparison;
 import com.yowyob.tiibntick.core.product.domain.model.ServiceOffer;
 import com.yowyob.tiibntick.core.product.domain.model.ServiceType;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -38,13 +42,14 @@ public class ServiceOfferController {
     @Operation(summary = "Create a new service offer")
     @PostMapping("/api/service-offers")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("isAuthenticated()")
     public Mono<ServiceOffer> createOffer(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestBody CreateOfferRequest body) {
         UUID catalogProductId = body.catalogProductId() != null
                 ? UUID.fromString(body.catalogProductId()) : null;
         CreateServiceOfferCommand cmd = new CreateServiceOfferCommand(
-                tenantId, UUID.fromString(body.providerId()), catalogProductId,
+                currentUser.tenantId(), UUID.fromString(body.providerId()), catalogProductId,
                 body.name(), body.description(), ServiceType.valueOf(body.type()),
                 body.maxWeightKg(), body.maxDistanceKm(), body.deliveryWindowHours(),
                 body.coverageZoneId() != null ? UUID.fromString(body.coverageZoneId()) : null,
@@ -61,18 +66,18 @@ public class ServiceOfferController {
     @Operation(summary = "List service offers by provider (agency/org)")
     @GetMapping("/api/providers/{providerId}/service-offers")
     public Flux<ServiceOffer> listByProvider(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @PathVariable UUID providerId) {
-        return listOffersUseCase.listByProvider(tenantId, providerId);
+        return listOffersUseCase.listByProvider(currentUser.tenantId(), providerId);
     }
 
     @Operation(summary = "Find offers matching cargo weight and distance")
     @GetMapping("/api/service-offers/matching")
     public Flux<ServiceOffer> findMatching(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestParam(defaultValue = "0") double weightKg,
             @RequestParam(defaultValue = "0") double distanceKm) {
-        return findMatchingUseCase.findMatchingOffers(tenantId, weightKg, distanceKm);
+        return findMatchingUseCase.findMatchingOffers(currentUser.tenantId(), weightKg, distanceKm);
     }
 
     @Operation(summary = "Compare multiple service offers side by side")
@@ -85,6 +90,7 @@ public class ServiceOfferController {
     @Operation(summary = "Publish a service offer to the marketplace")
     @PostMapping("/api/service-offers/{offerId}/publish")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("isAuthenticated()")
     public Mono<Void> publishOffer(@PathVariable UUID offerId) {
         return publishOfferUseCase.publishToMarket(offerId);
     }
@@ -92,6 +98,7 @@ public class ServiceOfferController {
     @Operation(summary = "Unpublish (withdraw) a service offer from the marketplace")
     @DeleteMapping("/api/service-offers/{offerId}/publish")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("isAuthenticated()")
     public Mono<Void> unpublishOffer(@PathVariable UUID offerId) {
         return publishOfferUseCase.unpublishFromMarket(offerId);
     }

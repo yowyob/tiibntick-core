@@ -49,6 +49,14 @@ public class VehicleEntity {
     @Column("core_vehicle_id")
     private UUID coreVehicleId;
 
+    private String source;
+
+    @Column("fleetman_vehicle_id")
+    private String fleetmanVehicleId;
+
+    @Column("last_synced_at")
+    private Instant lastSyncedAt;
+
     @Column("created_at")
     private Instant createdAt;
 

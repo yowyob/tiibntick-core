@@ -22,7 +22,18 @@ public class PlatformScopeRegistry {
     private static final List<ScopeResourceDefinition> KNOWN_RESOURCES = List.of(
             new ScopeResourceDefinition("AUTH", "Kernel auth-controller/auth-oidc-controller proxy (Bloc A)", Set.of("*")),
             new ScopeResourceDefinition("SSO", "YowYob SSO handshake proxy (Bloc B)", Set.of("*")),
-            new ScopeResourceDefinition("ONBOARDING", "Agency onboarding orchestration proxy (Bloc C)", Set.of("*"))
+            new ScopeResourceDefinition("ONBOARDING", "Agency onboarding orchestration proxy (Bloc C)", Set.of("*")),
+            // Audit n°7 · #4 remediation (2026-07-18): tnt-dispute-core and tnt-sales-core are
+            // called server-to-server by coreBackend/tnt-agency-back-core (DisputeCoreClient,
+            // DeliveryMissionClient) with no end-user JWT available (Kafka-driven flows have no
+            // live user session to forward). Unlike AUTH/SSO/ONBOARDING these are NOT proxied
+            // under /api/v1/platform/** — they are tnt-dispute-core's and tnt-sales-core's own
+            // native paths (/api/v1/disputes/**, /api/sales/orders/**), now dual-authenticated:
+            // either an end-user JWT (tenant resolved from the JWT, unchanged) or this scope via
+            // Client-Id/Api-Key (tenant resolved from the request, now safe only because the
+            // caller is authenticated/audited — see TntPlatformGatewaySecurityConfig @Order(11)).
+            new ScopeResourceDefinition("DISPUTE", "tnt-dispute-core server-to-server calls (Agency ERP)", Set.of("*")),
+            new ScopeResourceDefinition("SALES", "tnt-sales-core server-to-server calls (Agency ERP)", Set.of("*"))
     );
 
     public List<ScopeResourceDefinition> listAll() {

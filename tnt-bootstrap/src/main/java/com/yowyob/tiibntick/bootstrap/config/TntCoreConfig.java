@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.bootstrap.config;
 
+import com.yowyob.kernel.event.config.YowEventKernelAutoConfiguration;
 import com.yowyob.tiibntick.bootstrap.registry.TntExtensionRegistry;
 import com.yowyob.tiibntick.bootstrap.registry.TntRoleRegistrar;
 import com.yowyob.tiibntick.bootstrap.registry.TntSettingsRegistrar;
@@ -32,6 +33,7 @@ import org.springframework.web.reactive.function.client.WebClient;
         ApplicationProfileConfig.class,
         TntDataSourceConfig.class,
         LiquibaseConfig.class,
+        TntSchedulerLockConfig.class,
         TntSecurityConfig.class,
         TntAopConfiguration.class,
         TntWebFluxConfig.class,
@@ -40,7 +42,8 @@ import org.springframework.web.reactive.function.client.WebClient;
         TntOpenApiConfig.class,
         TntMetricsConfig.class,
         TntActuatorConfig.class,
-        GoFreelancerPointCoreConfig.class   // ← L6 Core Backend Market
+        GoFreelancerPointCoreConfig.class,  // ← L6 Core Backend Market
+        YowEventKernelAutoConfiguration.class // ← L0 event bus (Chantier C · Audit n°3 P1: reactivated 2026-07-18)
 })
 public class TntCoreConfig {
 

@@ -27,6 +27,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * REST controller — MarketListing management endpoints (provider showcase,
@@ -58,6 +59,7 @@ public class MarketListingController {
 
     @Operation(summary = "Create a new MarketListing for the calling tenant")
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<MarketListingResponse> create(
             @Valid @RequestBody CreateMarketListingCommand request,
@@ -85,6 +87,7 @@ public class MarketListingController {
 
     @Operation(summary = "Update a MarketListing's vitrine profile / coverage zone")
     @PutMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     public Mono<MarketListingResponse> update(
             @PathVariable UUID id,
             @RequestBody UpdateMarketListingCommand command,
@@ -94,6 +97,7 @@ public class MarketListingController {
 
     @Operation(summary = "Submit a DRAFT/REJECTED listing for moderation review")
     @PostMapping("/{id}/publish")
+    @PreAuthorize("isAuthenticated()")
     public Mono<MarketListingResponse> publish(
             @PathVariable UUID id,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
@@ -102,6 +106,7 @@ public class MarketListingController {
 
     @Operation(summary = "Admin: approve a listing pending review (generates SEO slug, publishes)")
     @PostMapping("/{id}/approve")
+    @PreAuthorize("isAuthenticated()")
     public Mono<MarketListingResponse> approve(
             @PathVariable UUID id,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
@@ -110,6 +115,7 @@ public class MarketListingController {
 
     @Operation(summary = "Admin: reject a listing pending review with a reason")
     @PostMapping("/{id}/reject")
+    @PreAuthorize("isAuthenticated()")
     public Mono<MarketListingResponse> reject(
             @PathVariable UUID id,
             @RequestParam String reason,
@@ -119,6 +125,7 @@ public class MarketListingController {
 
     @Operation(summary = "Temporarily remove a published listing from public visibility")
     @PostMapping("/{id}/unpublish")
+    @PreAuthorize("isAuthenticated()")
     public Mono<MarketListingResponse> unpublish(
             @PathVariable UUID id,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
@@ -127,6 +134,7 @@ public class MarketListingController {
 
     @Operation(summary = "Admin: suspend a listing for a policy violation")
     @PostMapping("/{id}/suspend")
+    @PreAuthorize("isAuthenticated()")
     public Mono<MarketListingResponse> suspend(
             @PathVariable UUID id,
             @RequestParam String reason,
@@ -167,6 +175,7 @@ public class MarketListingController {
 
     @Operation(summary = "Record a public view of the listing (analytics)")
     @PostMapping("/{id}/track-view")
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public Mono<Void> trackView(
             @PathVariable UUID id,
@@ -176,6 +185,7 @@ public class MarketListingController {
 
     @Operation(summary = "Archive (soft-delete) a listing and remove it from the search index")
     @DeleteMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public Mono<Void> delete(
             @PathVariable UUID id,

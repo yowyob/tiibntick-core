@@ -28,6 +28,7 @@ import reactor.core.publisher.Mono;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Application service implementing {@link ManageFreelancerOrgUseCase}.
@@ -82,6 +83,7 @@ public class FreelancerOrgService implements ManageFreelancerOrgUseCase {
      */
     @Override
     @RequirePermission(resource = "freelancer_org", action = "write")
+    @Transactional
     public Mono<FreelancerOrganization> registerFreelancerOrg(UUID organizationId,
                                                                UUID ownerActorId,
                                                                String tradeName) {
@@ -110,6 +112,7 @@ public class FreelancerOrgService implements ManageFreelancerOrgUseCase {
      */
     @Override
     @RequirePermission(resource = "freelancer_org", action = "write")
+    @Transactional
     public Mono<FreelancerOrganization> upgradeKycToBasic(OrganizationId orgId) {
         return repository.findById(orgId)
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND,
@@ -132,6 +135,7 @@ public class FreelancerOrgService implements ManageFreelancerOrgUseCase {
      */
     @Override
     @RequirePermission(resource = "freelancer_org", action = "write")
+    @Transactional
     public Mono<FreelancerOrganization> upgradeKycToFull(OrganizationId orgId) {
         return repository.findById(orgId)
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND,
@@ -166,6 +170,7 @@ public class FreelancerOrgService implements ManageFreelancerOrgUseCase {
     /** {@inheritDoc} Requires permission: {@code freelancer_org:admin}. */
     @Override
     @RequirePermission(resource = "freelancer_org", action = "admin")
+    @Transactional
     public Mono<FreelancerOrganization> verifyFreelancerOrg(OrganizationId orgId,
                                                              UUID adminActorId) {
         return repository.findById(orgId)
@@ -222,6 +227,7 @@ public class FreelancerOrgService implements ManageFreelancerOrgUseCase {
     /** {@inheritDoc} Requires permission: {@code freelancer_org:admin}. */
     @Override
     @RequirePermission(resource = "freelancer_org", action = "admin")
+    @Transactional
     public Mono<FreelancerOrganization> suspendFreelancerOrg(OrganizationId orgId,
                                                               String reason,
                                                               UUID adminActorId) {
@@ -329,6 +335,7 @@ public class FreelancerOrgService implements ManageFreelancerOrgUseCase {
     /** {@inheritDoc} Requires permission: {@code freelancer_org:write}. */
     @Override
     @RequirePermission(resource = "freelancer_org", action = "write")
+    @Transactional
     public Mono<AssociatedDelivererRef> acceptSubDelivererInvitation(OrganizationId orgId,
                                                                       UUID delivererActorId) {
         return repository.findById(orgId)
@@ -355,6 +362,7 @@ public class FreelancerOrgService implements ManageFreelancerOrgUseCase {
     /** {@inheritDoc} Requires permission: {@code freelancer_org:write}. */
     @Override
     @RequirePermission(resource = "freelancer_org", action = "write")
+    @Transactional
     public Mono<AssociatedDelivererRef> revokeSubDeliverer(OrganizationId orgId,
                                                             UUID delivererActorId) {
         return repository.findById(orgId)

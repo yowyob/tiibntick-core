@@ -13,6 +13,7 @@ import com.yowyob.tiibntick.core.incident.port.outbound.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
@@ -44,6 +45,7 @@ public class IncidentAgencyManagementService implements IStartAgencyHandlingUseC
     //private final IMediaStoragePort mediaStoragePort;
 
     @Override
+    @Transactional
     public Mono<Incident> execute(StartAgencyHandlingCommand command) {
         return incidentRepository.findById(command.getIncidentId())
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Incident not found")))
@@ -67,6 +69,7 @@ public class IncidentAgencyManagementService implements IStartAgencyHandlingUseC
     }
 
     @Override
+    @Transactional
     public Mono<Incident> execute(ResolveIncidentCommand command) {
         return incidentRepository.findById(command.getIncidentId())
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Incident not found")))

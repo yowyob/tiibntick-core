@@ -1,5 +1,7 @@
 package com.yowyob.tiibntick.core.billing.dsl.infrastructure.adapter.in.web;
 
+import com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser;
+import com.yowyob.tiibntick.core.auth.domain.model.TntUserIdentity;
 import com.yowyob.tiibntick.core.billing.dsl.domain.model.DslAccessLevel;
 import com.yowyob.tiibntick.core.billing.dsl.domain.model.DslRule;
 import com.yowyob.tiibntick.core.billing.dsl.domain.model.PricingContext;
@@ -10,6 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -31,6 +34,19 @@ import java.util.UUID;
  *       fields (FreelancerOrg, enriched parcel, geographic, client, temporal, Hub, Link).</li>
  * </ul>
  *
+ * <h3>Security (Audit n°7 · #5 / #6)</h3>
+ * <p>Single-resource endpoints ({@code getById}, {@code update}, {@code listByPolicy},
+ * {@code listActiveByPolicy}, {@code activate}, {@code deactivate}, {@code delete}) resolve
+ * the tenant from the JWT security context via {@code @CurrentUser TntUserIdentity} and pass
+ * it down to {@link IDslRuleUseCase}, which scopes the repository lookup with
+ * {@code findByIdAndTenantId} / {@code findByPolicyIdAndTenantId...} — closing an IDOR that
+ * previously let any caller read or mutate another tenant's DSL rule by ID (or list another
+ * tenant's rules given nothing but a policyId). Mutation endpoints are additionally gated
+ * with {@code @PreAuthorize("isAuthenticated()")} as a minimum baseline: no dedicated
+ * {@code dsl-rule:*} permission exists yet in the {@code tnt-roles-core} role catalog, so
+ * fine-grained {@code @RequirePermission} enforcement is deferred until that catalog is
+ * extended.</p>
+ *
  * @author MANFOUO Braun
  */
 @RestController
@@ -45,6 +61,7 @@ public class DslRuleController {
 
     @PostMapping("/rules")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Create a new DSL tariff rule")
     public Mono<DslRuleResponse> create(@Valid @RequestBody DslRuleRequest request) {
         return dslRuleUseCase.createRule(toDomain(null, request))
@@ -52,54 +69,71 @@ public class DslRuleController {
     }
 
     @PutMapping("/rules/{ruleId}")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Update an existing DSL tariff rule")
     public Mono<DslRuleResponse> update(
+            @CurrentUser TntUserIdentity currentUser,
             @PathVariable UUID ruleId,
             @Valid @RequestBody DslRuleRequest request) {
-        return dslRuleUseCase.updateRule(toDomain(ruleId, request))
+        return dslRuleUseCase.updateRule(toDomain(ruleId, request), currentUser.tenantId())
                 .map(DslRuleResponse::from);
     }
 
     @GetMapping("/rules/{ruleId}")
     @Operation(summary = "Get a DSL rule by ID")
-    public Mono<DslRuleResponse> getById(@PathVariable UUID ruleId) {
-        return dslRuleUseCase.findById(ruleId)
+    public Mono<DslRuleResponse> getById(
+            @CurrentUser TntUserIdentity currentUser,
+            @PathVariable UUID ruleId) {
+        return dslRuleUseCase.findById(ruleId, currentUser.tenantId())
                 .map(DslRuleResponse::from);
     }
 
     @GetMapping("/policies/{policyId}/rules")
     @Operation(summary = "List all rules for a billing policy (ordered by priority)")
-    public Flux<DslRuleResponse> listByPolicy(@PathVariable UUID policyId) {
-        return dslRuleUseCase.findAllByPolicyId(policyId)
+    public Flux<DslRuleResponse> listByPolicy(
+            @CurrentUser TntUserIdentity currentUser,
+            @PathVariable UUID policyId) {
+        return dslRuleUseCase.findAllByPolicyId(policyId, currentUser.tenantId())
                 .map(DslRuleResponse::from);
     }
 
     @GetMapping("/policies/{policyId}/rules/active")
     @Operation(summary = "List active rules for a billing policy (ordered by priority)")
-    public Flux<DslRuleResponse> listActiveByPolicy(@PathVariable UUID policyId) {
-        return dslRuleUseCase.findActiveByPolicyId(policyId)
+    public Flux<DslRuleResponse> listActiveByPolicy(
+            @CurrentUser TntUserIdentity currentUser,
+            @PathVariable UUID policyId) {
+        return dslRuleUseCase.findActiveByPolicyId(policyId, currentUser.tenantId())
                 .map(DslRuleResponse::from);
     }
 
     @PatchMapping("/rules/{ruleId}/activate")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Activate a DSL rule")
-    public Mono<DslRuleResponse> activate(@PathVariable UUID ruleId) {
-        return dslRuleUseCase.activateRule(ruleId)
+    public Mono<DslRuleResponse> activate(
+            @CurrentUser TntUserIdentity currentUser,
+            @PathVariable UUID ruleId) {
+        return dslRuleUseCase.activateRule(ruleId, currentUser.tenantId())
                 .map(DslRuleResponse::from);
     }
 
     @PatchMapping("/rules/{ruleId}/deactivate")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Deactivate a DSL rule")
-    public Mono<DslRuleResponse> deactivate(@PathVariable UUID ruleId) {
-        return dslRuleUseCase.deactivateRule(ruleId)
+    public Mono<DslRuleResponse> deactivate(
+            @CurrentUser TntUserIdentity currentUser,
+            @PathVariable UUID ruleId) {
+        return dslRuleUseCase.deactivateRule(ruleId, currentUser.tenantId())
                 .map(DslRuleResponse::from);
     }
 
     @DeleteMapping("/rules/{ruleId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Delete a DSL rule")
-    public Mono<Void> delete(@PathVariable UUID ruleId) {
-        return dslRuleUseCase.deleteRule(ruleId);
+    public Mono<Void> delete(
+            @CurrentUser TntUserIdentity currentUser,
+            @PathVariable UUID ruleId) {
+        return dslRuleUseCase.deleteRule(ruleId, currentUser.tenantId());
     }
 
     // ─────────────────── VALIDATION ──────────────────────────────────────────

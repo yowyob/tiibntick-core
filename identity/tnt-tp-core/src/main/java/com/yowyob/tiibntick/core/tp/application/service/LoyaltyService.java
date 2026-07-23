@@ -14,6 +14,7 @@ import reactor.core.publisher.Mono;
 
 import java.time.Instant;
 import java.util.UUID;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Application service for loyalty program management.
@@ -42,6 +43,7 @@ public class LoyaltyService {
      * Creates the loyalty account if it does not exist yet.
      */
     @RequirePermission(resource = "billing", action = "write")
+    @Transactional
     public Mono<LoyaltyAccount> earn(EarnLoyaltyPointsCommand command) {
         return getOrCreateAccount(command.tenantId(), command.thirdPartyId())
                 .flatMap(account -> {
@@ -68,6 +70,7 @@ public class LoyaltyService {
      * Redeems loyalty points for a discount on a delivery invoice.
      */
     @RequirePermission(resource = "billing", action = "write")
+    @Transactional
     public Mono<LoyaltyAccount> redeem(RedeemLoyaltyPointsCommand command) {
         return loyaltyAccountRepository.findByThirdPartyId(command.tenantId(), command.thirdPartyId())
                 .switchIfEmpty(Mono.error(new IllegalStateException(

@@ -2,6 +2,8 @@ package com.yowyob.tiibntick.core.sync.config;
 
 import com.yowyob.tiibntick.core.sync.config.properties.SyncProperties;
 import com.yowyob.tiibntick.core.sync.domain.service.SyncSessionManager;
+import net.javacrumbs.shedlock.core.LockAssert;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -30,7 +32,9 @@ public class SyncMaintenanceScheduler {
     }
 
     @Scheduled(fixedDelayString = "${tnt.sync.session-cleanup-interval:21600000}")
+    @SchedulerLock(name = "sync-cleanup-expired-sessions", lockAtMostFor = "PT30M", lockAtLeastFor = "PT1M")
     public void cleanupExpiredSessions() {
+        LockAssert.assertLocked();
         sessionManager.cleanupExpired(properties.getSessionRetention())
                 .subscribe(null, ex -> log.error("Session cleanup failed: {}", ex.getMessage()));
     }

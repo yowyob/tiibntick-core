@@ -9,6 +9,7 @@ import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -31,6 +32,11 @@ import java.util.UUID;
  *   <li>{@code payment:process} — mark invoice as paid</li>
  *   <li>{@code report:read} — export PDF / get download URL</li>
  * </ul>
+ *
+ * <p>Use-case methods that persist the aggregate and then publish its domain events are
+ * {@code @Transactional} so that the invoice row and the outbox envelope/entry written by
+ * {@link InvoiceEventPublisher} (Chantier C · Audit n°3 · P5) commit atomically — a business
+ * save can no longer succeed while its event is silently lost.
  *
  * @author MANFOUO Braun
  */
@@ -70,6 +76,7 @@ public class InvoiceService implements GenerateInvoiceUseCase {
      * @return the persisted, issued Invoice with PDF storage key populated
      */
     @Override
+    @Transactional
     @RequirePermission(resource = "invoice", action = "issue")
     public Mono<Invoice> generate(GenerateInvoiceCommand command) {
         int year = Year.now().getValue();
@@ -87,7 +94,7 @@ public class InvoiceService implements GenerateInvoiceUseCase {
                     return invoiceRepository.save(issued)
                             .flatMap(saved -> {
                                 var events = saved.collectAndClearEvents();
-                                return eventPublisher.publishAll(events)
+                                return eventPublisher.publishAll(events, saved.getTenantId())
                                         .then(pdfPort.generateAndStore(saved))
                                         .flatMap(pdfKey -> invoiceRepository.save(saved.withPdfStorageKey(pdfKey)))
                                         .doOnSuccess(inv -> log.info("Invoice generated: {}", inv.getNumber()))
@@ -101,15 +108,16 @@ public class InvoiceService implements GenerateInvoiceUseCase {
     }
 
     /**
-     * Retrieves an invoice by its UUID.
+     * Retrieves an invoice by its UUID, scoped to the caller's tenant.
      * Requires permission {@code invoice:read}.
      *
      * @param invoiceId the invoice UUID
-     * @return the matching Invoice or an error if not found
+     * @param tenantId  the tenant the invoice must belong to
+     * @return the matching Invoice or an error if not found (including cross-tenant access)
      */
     @RequirePermission(resource = "invoice", action = "read")
-    public Mono<Invoice> getById(UUID invoiceId) {
-        return invoiceRepository.findById(invoiceId)
+    public Mono<Invoice> getById(UUID invoiceId, UUID tenantId) {
+        return invoiceRepository.findByIdAndTenantId(invoiceId, tenantId)
                 .switchIfEmpty(Mono.error(new InvoiceNotFoundException(invoiceId)));
     }
 
@@ -158,16 +166,17 @@ public class InvoiceService implements GenerateInvoiceUseCase {
      * @param command cancel command with invoice ID and reason
      * @return the cancelled Invoice
      */
+    @Transactional
     @RequirePermission(resource = "invoice", action = "cancel")
     public Mono<Invoice> cancel(CancelInvoiceCommand command) {
-        return invoiceRepository.findById(command.invoiceId())
+        return invoiceRepository.findByIdAndTenantId(command.invoiceId(), command.tenantId())
                 .switchIfEmpty(Mono.error(new InvoiceNotFoundException(command.invoiceId())))
                 .flatMap(invoice -> {
                     Invoice cancelled = invoice.cancel(command.reason());
                     return invoiceRepository.save(cancelled)
                             .flatMap(saved -> {
                                 var events = saved.collectAndClearEvents();
-                                return eventPublisher.publishAll(events).thenReturn(saved);
+                                return eventPublisher.publishAll(events, saved.getTenantId()).thenReturn(saved);
                             });
                 });
     }
@@ -179,39 +188,43 @@ public class InvoiceService implements GenerateInvoiceUseCase {
      * @param command mark-paid command with invoice ID and payment reference
      * @return the updated Invoice in PAID status
      */
+    @Transactional
     @RequirePermission(resource = "payment", action = "process")
     public Mono<Invoice> markPaid(MarkInvoicePaidCommand command) {
-        return invoiceRepository.findById(command.invoiceId())
+        return invoiceRepository.findByIdAndTenantId(command.invoiceId(), command.tenantId())
                 .switchIfEmpty(Mono.error(new InvoiceNotFoundException(command.invoiceId())))
                 .flatMap(invoice -> {
                     Invoice paid = invoice.markPaid(command.paymentRef());
                     return invoiceRepository.save(paid)
                             .flatMap(saved -> {
                                 var events = saved.collectAndClearEvents();
-                                return eventPublisher.publishAll(events).thenReturn(saved);
+                                return eventPublisher.publishAll(events, saved.getTenantId()).thenReturn(saved);
                             });
                 });
     }
 
     /**
-     * Returns a pre-signed download URL for the invoice PDF.
+     * Returns a pre-signed download URL for the invoice PDF, scoped to the caller's tenant.
      * Requires permission {@code report:read}.
      *
      * @param invoiceId the invoice UUID
+     * @param tenantId  the tenant the invoice must belong to
      * @return a Mono emitting the pre-signed URL (valid for 1 hour)
      */
     @RequirePermission(resource = "report", action = "read")
-    public Mono<String> getPdfUrl(UUID invoiceId) {
-        return invoiceRepository.findById(invoiceId)
+    public Mono<String> getPdfUrl(UUID invoiceId, UUID tenantId) {
+        return invoiceRepository.findByIdAndTenantId(invoiceId, tenantId)
                 .switchIfEmpty(Mono.error(new InvoiceNotFoundException(invoiceId)))
-                .flatMap(invoice -> {
-                    if (invoice.getPdfStorageKey() != null) {
-                        return pdfPort.getDownloadUrl(invoice.getPdfStorageKey(), 3600);
-                    }
-                    return pdfPort.generateAndStore(invoice)
-                            .flatMap(key -> invoiceRepository.save(invoice.withPdfStorageKey(key))
-                                    .then(pdfPort.getDownloadUrl(key, 3600)));
-                });
+                .flatMap(this::resolvePdfUrl);
+    }
+
+    private Mono<String> resolvePdfUrl(Invoice invoice) {
+        if (invoice.getPdfStorageKey() != null) {
+            return pdfPort.getDownloadUrl(invoice.getPdfStorageKey(), 3600);
+        }
+        return pdfPort.generateAndStore(invoice)
+                .flatMap(key -> invoiceRepository.save(invoice.withPdfStorageKey(key))
+                        .then(pdfPort.getDownloadUrl(key, 3600)));
     }
 
     /**
@@ -240,7 +253,7 @@ public class InvoiceService implements GenerateInvoiceUseCase {
      */
     @RequirePermission(resource = "invoice", action = "issue")
     public Mono<CreditNote> issueCreditNote(UUID tenantId, UUID invoiceId, String reason) {
-        return invoiceRepository.findById(invoiceId)
+        return invoiceRepository.findByIdAndTenantId(invoiceId, tenantId)
                 .switchIfEmpty(Mono.error(new InvoiceNotFoundException(invoiceId)))
                 .flatMap(invoice -> {
                     CreditNote note = CreditNote.issue(invoiceId, tenantId, invoice.getNetAmount(), reason);

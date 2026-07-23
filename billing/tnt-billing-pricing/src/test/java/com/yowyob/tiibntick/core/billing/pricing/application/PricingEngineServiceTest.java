@@ -93,7 +93,7 @@ class PricingEngineServiceTest {
                 .priority(10)
                 .build();
 
-        when(policyRepository.findById(POLICY_ID))
+        when(policyRepository.findByIdAndTenantId(POLICY_ID, TENANT_ID))
                 .thenReturn(Mono.just(activePolicy(List.of(rule), null, null)));
 
         StepVerifier.create(pricingEngineService.evaluatePolicy(POLICY_ID, ydeCtx()))
@@ -117,7 +117,7 @@ class PricingEngineServiceTest {
                 .surchargeType(SurchargeType.FIXED)
                 .value(new BigDecimal("500")).build();
 
-        when(policyRepository.findById(POLICY_ID))
+        when(policyRepository.findByIdAndTenantId(POLICY_ID, TENANT_ID))
                 .thenReturn(Mono.just(activePolicy(List.of(rule), List.of(fragile), null)));
 
         StepVerifier.create(pricingEngineService.evaluatePolicy(POLICY_ID, ydeCtx()))
@@ -145,7 +145,7 @@ class PricingEngineServiceTest {
                 .conditionExpression("priority == 'HIGH'")
                 .surchargeType(SurchargeType.PERCENTAGE).value(new BigDecimal("15")).build();
 
-        when(policyRepository.findById(POLICY_ID))
+        when(policyRepository.findByIdAndTenantId(POLICY_ID, TENANT_ID))
                 .thenReturn(Mono.just(activePolicy(List.of(rule), List.of(fragile, highPriority), null)));
 
         StepVerifier.create(pricingEngineService.evaluatePolicy(POLICY_ID, ydeCtx()))
@@ -171,7 +171,7 @@ class PricingEngineServiceTest {
                 .minimumTransactionCount(10).periodDays(90)
                 .discountPercentage(new BigDecimal("5")).build();
 
-        when(policyRepository.findById(POLICY_ID))
+        when(policyRepository.findByIdAndTenantId(POLICY_ID, TENANT_ID))
                 .thenReturn(Mono.just(activePolicy(List.of(rule), null, List.of(loyalty))));
 
         StepVerifier.create(pricingEngineService.evaluatePolicy(POLICY_ID, ydeCtx()))
@@ -191,7 +191,7 @@ class PricingEngineServiceTest {
                 .conditionExpression("weight > 50")
                 .basePrice(Money.of(5000L, "XAF")).priority(10).build();
 
-        when(policyRepository.findById(POLICY_ID))
+        when(policyRepository.findByIdAndTenantId(POLICY_ID, TENANT_ID))
                 .thenReturn(Mono.just(activePolicy(List.of(rule), null, null)));
 
         StepVerifier.create(pricingEngineService.evaluatePolicy(POLICY_ID, ydeCtx()))
@@ -209,7 +209,7 @@ class PricingEngineServiceTest {
                 null, null)
                 .deactivate();
 
-        when(policyRepository.findById(POLICY_ID)).thenReturn(Mono.just(inactive));
+        when(policyRepository.findByIdAndTenantId(POLICY_ID, TENANT_ID)).thenReturn(Mono.just(inactive));
 
         StepVerifier.create(pricingEngineService.evaluatePolicy(POLICY_ID, ydeCtx()))
                 .expectError(PolicyNotActiveException.class)
@@ -227,7 +227,7 @@ class PricingEngineServiceTest {
                 .minimumPrice(Money.of(2000L, "XAF"))
                 .priority(10).build();
 
-        when(policyRepository.findById(POLICY_ID))
+        when(policyRepository.findByIdAndTenantId(POLICY_ID, TENANT_ID))
                 .thenReturn(Mono.just(activePolicy(List.of(rule), null, null)));
 
         StepVerifier.create(pricingEngineService.evaluatePolicy(POLICY_ID, ydeCtx()))
@@ -249,12 +249,30 @@ class PricingEngineServiceTest {
                 .conditionExpression("weight <= 100")
                 .basePrice(Money.of(1000L, "XAF")).priority(10).build();
 
-        when(policyRepository.findById(POLICY_ID))
+        when(policyRepository.findByIdAndTenantId(POLICY_ID, TENANT_ID))
                 .thenReturn(Mono.just(activePolicy(List.of(low, high), null, null)));
 
         StepVerifier.create(pricingEngineService.evaluatePolicy(POLICY_ID, ydeCtx()))
                 .expectNextMatches(eval ->
                         eval.getSellingPrice().getAmount().compareTo(new BigDecimal("1000")) == 0)
                 .verifyComplete();
+    }
+
+    @Test
+    @DisplayName("IDOR (Audit n°7 · #5): evaluatePolicy must not evaluate another tenant's policy")
+    void testEvaluatePolicyRejectsCrossTenantAccess() {
+        UUID otherTenantId = UUID.randomUUID();
+        PricingContext otherTenantCtx = ydeCtx().toBuilder().tenantId(otherTenantId).build();
+
+        // The policy exists under TENANT_ID, but the caller's context carries otherTenantId.
+        // findByIdAndTenantId(POLICY_ID, otherTenantId) must come back empty — the caller must
+        // not be able to evaluate (and thereby infer the pricing rules of) a policy belonging
+        // to a different tenant.
+        when(policyRepository.findByIdAndTenantId(POLICY_ID, otherTenantId)).thenReturn(Mono.empty());
+
+        StepVerifier.create(pricingEngineService.evaluatePolicy(POLICY_ID, otherTenantCtx))
+                .expectError(com.yowyob.tiibntick.core.billing.pricing.domain.exception
+                        .BillingPolicyNotFoundException.class)
+                .verify();
     }
 }

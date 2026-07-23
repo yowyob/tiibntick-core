@@ -22,7 +22,7 @@ import java.time.LocalDateTime;
  *     correlation_id      VARCHAR(36)  NOT NULL,
  *     causation_id        VARCHAR(36),
  *     event_type          VARCHAR(200) NOT NULL,
- *     aggregate_id        VARCHAR(36)  NOT NULL,
+ *     aggregate_id        VARCHAR(100) NOT NULL,
  *     aggregate_type      VARCHAR(100) NOT NULL,
  *     tenant_id           VARCHAR(36)  NOT NULL,
  *     solution_code       VARCHAR(10)  NOT NULL,
@@ -44,7 +44,7 @@ import java.time.LocalDateTime;
  * CREATE INDEX idx_dee_correlation ON event_bus.domain_event_envelopes (correlation_id, tenant_id);
  * }</pre>
  */
-@Table("event_bus.domain_event_envelopes")
+@Table(name = "domain_event_envelopes", schema = "event_bus")
 public class DomainEventEnvelopeEntity {
 
     @Id

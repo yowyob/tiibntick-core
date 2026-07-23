@@ -6,6 +6,8 @@ import com.yowyob.tiibntick.core.billing.wallet.domain.enums.ReconciliationStatu
 import com.yowyob.tiibntick.core.billing.wallet.domain.model.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.core.LockAssert;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -80,7 +82,9 @@ public class ReconciliationService implements IReconciliationUseCase {
      * Scheduled job: runs reconciliation for the previous month on the 1st of each month at 02:00.
      */
     @Scheduled(cron = "0 0 2 1 * *")
+    @SchedulerLock(name = "wallet-scheduled-reconciliation", lockAtMostFor = "PT2H", lockAtLeastFor = "PT1M")
     public void scheduledReconciliation() {
+        LockAssert.assertLocked();
         YearMonth lastMonth = YearMonth.now().minusMonths(1);
         log.info("Scheduled reconciliation started for period={}", lastMonth);
         // In a multi-tenant system, fetch all active tenants and reconcile each.

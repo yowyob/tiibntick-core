@@ -20,6 +20,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /** Admin validation of onboarding requests — port of tnt-agency {@code OnboardingAdminController}. */
 @Tag(name = "Agency ERP Onboarding Admin", description = "Platform admin validation of agency registrations")
@@ -43,6 +44,7 @@ public class OnboardingAdminController {
     }
 
     @PatchMapping("/api/v1/tenants/{tenantId}/agency-registry/admin/onboarding/requests/{agencyId}/approve")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Approve onboarding request (ERP: activate agency + register manager staff)")
     public Mono<ApiResponse<AgencyRegistryResponse>> approve(
             @PathVariable UUID tenantId,
@@ -52,6 +54,7 @@ public class OnboardingAdminController {
     }
 
     @PatchMapping("/api/v1/tenants/{tenantId}/agency-registry/admin/onboarding/requests/{agencyId}/reject")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Reject onboarding request")
     public Mono<ApiResponse<OnboardingListItemResponse>> reject(
             @PathVariable UUID tenantId,

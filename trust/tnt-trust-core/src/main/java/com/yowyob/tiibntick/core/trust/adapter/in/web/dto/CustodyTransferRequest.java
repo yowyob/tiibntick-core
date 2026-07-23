@@ -1,9 +1,9 @@
 package com.yowyob.tiibntick.core.trust.adapter.in.web.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.yowyob.tiibntick.core.trust.domain.model.valueobject.CustodyTransferRecord;
 import com.yowyob.tiibntick.core.trust.domain.model.enums.CustodyTransferType;
+import jakarta.validation.constraints.NotBlank;
 
 import java.time.LocalDateTime;
 
@@ -15,22 +15,25 @@ import java.time.LocalDateTime;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record CustodyTransferRequest(
-        String transferId,
-        String packageId,
-        String trackingCode,
+        @NotBlank(message = "transferId is required") String transferId,
+        @NotBlank(message = "packageId is required") String packageId,
+        @NotBlank(message = "trackingCode is required") String trackingCode,
         String tenantId,
         String fromActorId,
-        String toActorId,
-        String transferType,
+        @NotBlank(message = "toActorId is required") String toActorId,
+        @NotBlank(message = "transferType is required") String transferType,
         String hubId,
         String transferredAt) {
 
     /**
      * Converts this request to a {@link CustodyTransferRecord} domain value object.
+     *
+     * @param authenticatedTenantId the tenant ID resolved from the caller's JWT —
+     *                              always wins over any {@code tenantId} present in the request body.
      */
-    public CustodyTransferRecord toDomain() {
+    public CustodyTransferRecord toDomain(final String authenticatedTenantId) {
         return new CustodyTransferRecord(
-                transferId, packageId, trackingCode, tenantId,
+                transferId, packageId, trackingCode, authenticatedTenantId,
                 fromActorId, toActorId,
                 CustodyTransferType.valueOf(transferType),
                 hubId,

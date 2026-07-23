@@ -15,12 +15,18 @@ import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Mono;
 
 /**
  * Application service orchestrating delivery state machine transitions.
  *
  * <p>Each method: load aggregate → apply domain operation → persist → publish events.
+ *
+ * <p>Use-case methods that persist the aggregate and then publish its domain events are
+ * {@code @Transactional} so that the delivery row and the outbox envelope/entry written by
+ * {@link DeliveryEventPublisher} (Chantier C · Audit n°3 · P5) commit atomically — a business
+ * save can no longer succeed while its event is silently lost.
  *
  * @author MANFOUO Braun
  */
@@ -36,6 +42,7 @@ public class DeliveryLifecycleService implements DeliveryLifecycleUseCase {
     private final DeliveryProofAnchorPort deliveryProofAnchorPort;
 
     @Override
+    @Transactional
     @RequirePermission(resource = "delivery", action = "confirm")
     public Mono<Delivery> confirmPickup(ConfirmPickupCommand cmd) {
         log.info("Confirming pickup delivery={} by person={}", cmd.deliveryId(), cmd.deliveryPersonId());
@@ -49,6 +56,7 @@ public class DeliveryLifecycleService implements DeliveryLifecycleUseCase {
     }
 
     @Override
+    @Transactional
     @RequirePermission(resource = "mission", action = "start")
     public Mono<Delivery> startTransit(StartTransitCommand cmd) {
         log.info("Starting transit delivery={}", cmd.deliveryId());
@@ -71,6 +79,7 @@ public class DeliveryLifecycleService implements DeliveryLifecycleUseCase {
     }
 
     @Override
+    @Transactional
     public Mono<Delivery> depositAtRelayPoint(DepositAtRelayPointCommand cmd) {
         log.info("Depositing delivery={} at relay={}", cmd.deliveryId(), cmd.relayPointId());
         return loadDelivery(cmd.tenantId(), cmd.deliveryId())
@@ -83,6 +92,7 @@ public class DeliveryLifecycleService implements DeliveryLifecycleUseCase {
     }
 
     @Override
+    @Transactional
     public Mono<Delivery> resumeFromRelayPoint(ResumeFromRelayPointCommand cmd) {
         log.info("Resuming delivery={} from relay point", cmd.deliveryId());
         return loadDelivery(cmd.tenantId(), cmd.deliveryId())
@@ -133,6 +143,7 @@ public class DeliveryLifecycleService implements DeliveryLifecycleUseCase {
     }
 
     @Override
+    @Transactional
     @RequirePermission(resource = "mission", action = "complete")
     public Mono<Delivery> completeDelivery(CompleteDeliveryCommand cmd) {
         log.info("Completing delivery={}", cmd.deliveryId());
@@ -181,6 +192,7 @@ public class DeliveryLifecycleService implements DeliveryLifecycleUseCase {
     }
 
     @Override
+    @Transactional
     @RequirePermission(resource = "mission", action = "complete")
     public Mono<Delivery> failDelivery(FailDeliveryCommand cmd) {
         log.warn("Failing delivery={} reason={}", cmd.deliveryId(), cmd.reason());
@@ -201,6 +213,7 @@ public class DeliveryLifecycleService implements DeliveryLifecycleUseCase {
     }
 
     @Override
+    @Transactional
     @RequirePermission(resource = "mission", action = "assign")
     public Mono<Delivery> cancelDelivery(CancelDeliveryCommand cmd) {
         log.info("Cancelling delivery={} by={} reason={}", cmd.deliveryId(), cmd.requesterId(), cmd.reason());
@@ -214,6 +227,7 @@ public class DeliveryLifecycleService implements DeliveryLifecycleUseCase {
     // ── : FreelancerOrg integration ──────────────────────────────────
 
     @Override
+    @Transactional
     public Mono<Delivery> assignToFreelancerOrg(AssignFreelancerOrgCommand cmd) {
         log.info("Assigning FreelancerOrg={} (role={}) to delivery={} tenant={}",
                 cmd.freelancerOrgId(), cmd.freelancerRole(), cmd.deliveryId(), cmd.tenantId());

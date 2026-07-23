@@ -13,6 +13,7 @@ import com.yowyob.tiibntick.core.incident.port.outbound.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
@@ -49,6 +50,7 @@ public class IncidentClassificationService implements ITriageIncidentUseCase {
      * @return the triaged and scored incident
      */
     @Override
+    @Transactional
     public Mono<Incident> execute(TriageIncidentCommand command) {
         return incidentRepository.findById(command.getIncidentId())
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Incident not found: " + command.getIncidentId())))

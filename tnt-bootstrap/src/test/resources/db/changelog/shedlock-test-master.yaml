@@ -1,0 +1,18 @@
+databaseChangeLog:
+  # Test-only wrapper for TntSchedulerLockConfigIntegrationTest (Chantier D · Audit n°6 ·
+  # S2): Liquibase's SqlChangeLogParser cannot resolve a "--liquibase formatted sql" file
+  # as a ROOT changelog directly via ClassLoaderResourceAccessor (FileNotFoundException),
+  # only when included from a YAML/XML changelog — exactly like every module's own
+  # <module>-master.yaml includes its .sql changesets in production. This wrapper isolates
+  # just the one shedlock changeset the test needs, without running the full
+  # tnt-core-master.yaml (~50 changesets across every module).
+  # Deliberately under db/changelog/test-only/ rather than db/changelog/changes/: the main
+  # changelog (tnt-core-master.yaml) includes changes/000-create-shedlock-table.sql by that
+  # exact relative path, and target/classes + target/test-classes are BOTH on the test
+  # classpath — reusing the same relative path made Liquibase's classpath resource search
+  # find 2 matches for that path and fail EVERY test that loads tnt-core-master.yaml
+  # (including TiiBnTickApplicationTest, the full application-context smoke test), not just
+  # this file's own consumer. Found during Chantier C P5 post-merge verification.
+  - include:
+      file: db/changelog/test-only/000-create-shedlock-table.sql
+      relativeToChangelogFile: false

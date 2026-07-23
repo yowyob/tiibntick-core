@@ -25,12 +25,23 @@
     </description>
 
     <dependencies>
+        <!-- ── tnt-auth-core (Foundation L1 — security context, @CurrentUser) ── -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-auth-core</artifactId>
+        </dependency>
 
         <!-- ── TiiBnTick Foundation — provides RT-comops-common-core + RT-comops-kernel-core ── -->
         <!-- ── by Maven transitivity. Never import RT-comops-common-core directly here.       ── -->
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>
             <artifactId>tnt-common-core</artifactId>
+        </dependency>
+
+        <!-- ── TiiBnTick L0 — Event bus (transactional outbox, Chantier C P5) ── -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>yow-event-kernel</artifactId>
         </dependency>
 
         <!-- ── Spring Boot (non-runnable library module) ── -->
@@ -107,6 +118,23 @@
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Chantier C · Audit n3 · P5 — outbox migration integration test
+             (real Postgres for the event_bus schema, embedded Kafka broker). -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka-test</artifactId>
             <scope>test</scope>
         </dependency>
 

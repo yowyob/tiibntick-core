@@ -8,6 +8,7 @@ import com.yowyob.tiibntick.core.inventory.domain.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -125,6 +126,7 @@ public class InventoryApplicationService implements
     }
 
     /** {@inheritDoc} */
+    @Transactional
     @Override
     public Mono<Void> consumeStock(UUID tenantId, UUID productId, UUID warehouseId,
                                     double quantity, String reference, UUID performedBy) {

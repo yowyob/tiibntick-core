@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audit n°1 — Architecture globale · Audit TiiBnTick</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --text: #1c2430; --muted: #5b6675;
+  --border: #e3e7ec; --accent: #0f5fa8; --accent-soft: #e8f1fa;
+  --code-bg: #f0f2f5; --sidebar-bg: #101823; --sidebar-text: #c7d0dc;
+  --crit: #c62828; --high: #e65100; --med: #f9a825; --low: #2e7d32;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1319; --panel: #161d27; --text: #dbe2ea; --muted: #8b97a5;
+    --border: #263140; --accent: #5aa2e0; --accent-soft: #17273a;
+    --code-bg: #1d2733; --sidebar-bg: #0a0f15; --sidebar-text: #a9b4c0;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--bg); color: var(--text); line-height: 1.65; }
+.layout { display: flex; min-height: 100vh; }
+nav.sidebar { width: 270px; flex-shrink: 0; background: var(--sidebar-bg);
+  color: var(--sidebar-text); padding: 1.4rem 1rem; position: sticky; top: 0;
+  height: 100vh; overflow-y: auto; }
+nav.sidebar .brand { font-size: 1.05rem; font-weight: 700; color: #fff;
+  margin-bottom: .2rem; }
+nav.sidebar .brand small { display:block; font-weight: 400; color: var(--sidebar-text);
+  font-size: .75rem; margin-top: .2rem; }
+nav.sidebar ul { list-style: none; padding: 0; margin: 1.2rem 0; }
+nav.sidebar li a { display: block; color: var(--sidebar-text); text-decoration: none;
+  padding: .45rem .6rem; border-radius: 6px; font-size: .86rem; }
+nav.sidebar li a:hover { background: rgba(255,255,255,.08); color: #fff; }
+nav.sidebar li a.active { background: var(--accent); color: #fff; }
+nav.sidebar .section-label { text-transform: uppercase; letter-spacing: .08em;
+  font-size: .68rem; color: #6b7683; margin: 1.4rem 0 .4rem .4rem; }
+main { flex: 1; min-width: 0; padding: 2.2rem 3rem 4rem; max-width: 1100px; }
+header.page { border-bottom: 1px solid var(--border); padding-bottom: 1.2rem;
+  margin-bottom: 1.6rem; }
+header.page .kicker { color: var(--accent); font-weight: 600; font-size: .85rem;
+  text-transform: uppercase; letter-spacing: .06em; }
+header.page h1 { margin: .25rem 0 .4rem; font-size: 1.9rem; }
+header.page .meta { color: var(--muted); font-size: .85rem; }
+h2 { margin-top: 2.4rem; padding-bottom: .35rem; border-bottom: 1px solid var(--border);
+  font-size: 1.35rem; }
+h3 { margin-top: 1.8rem; font-size: 1.08rem; }
+h4 { margin-top: 1.4rem; font-size: .98rem; }
+a { color: var(--accent); }
+code { background: var(--code-bg); padding: .12em .38em; border-radius: 4px;
+  font-size: .84em; font-family: "JetBrains Mono", Consolas, monospace; }
+pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem; overflow-x: auto; font-size: .82rem; line-height: 1.5; }
+pre code { background: none; padding: 0; }
+.table-wrap { overflow-x: auto; margin: 1rem 0; border: 1px solid var(--border);
+  border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: .85rem; background: var(--panel); }
+th, td { border-bottom: 1px solid var(--border); padding: .55rem .75rem; text-align: left;
+  vertical-align: top; }
+th { background: var(--accent-soft); color: var(--text); font-weight: 600;
+  white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+blockquote { border-left: 4px solid var(--accent); background: var(--accent-soft);
+  margin: 1rem 0; padding: .7rem 1rem; border-radius: 0 8px 8px 0; }
+blockquote p { margin: .3rem 0; }
+.badge { display: inline-block; padding: .1em .6em; border-radius: 999px;
+  font-size: .74rem; font-weight: 700; color: #fff; white-space: nowrap; }
+.badge.crit { background: var(--crit); } .badge.high { background: var(--high); }
+.badge.med { background: var(--med); color: #333; } .badge.low { background: var(--low); }
+.mermaid { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem; margin: 1rem 0; text-align: center; overflow-x: auto; }
+.toc { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem 1.4rem; margin: 1.4rem 0; font-size: .88rem; }
+.toc > ul { margin: .3rem 0; padding-left: 1.1rem; }
+.toc .toctitle { font-weight: 700; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1rem; margin: 1.4rem 0; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1.1rem 1.2rem; text-decoration: none; color: var(--text); display: block; }
+.card:hover { border-color: var(--accent); }
+.card .icon { font-size: 1.5rem; }
+.card h3 { margin: .4rem 0 .2rem; font-size: 1rem; }
+.card p { margin: 0; color: var(--muted); font-size: .82rem; }
+.stat-row { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1.2rem 0; }
+.stat { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: .8rem 1.2rem; min-width: 130px; }
+.stat .num { font-size: 1.6rem; font-weight: 800; }
+.stat .lbl { font-size: .74rem; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .05em; }
+.stat.crit .num { color: var(--crit); } .stat.high .num { color: var(--high); }
+.stat.med .num { color: var(--med); } .stat.low .num { color: var(--low); }
+footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border);
+  color: var(--muted); font-size: .78rem; }
+.progress-block { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1rem 1.2rem; margin: 1rem 0 1.6rem; }
+.progress-block .progress-label { display: flex; justify-content: space-between; align-items: baseline;
+  font-size: .85rem; margin-bottom: .5rem; }
+.progress-block .progress-label b { font-size: 1rem; }
+.progress-bar-track { background: var(--code-bg); border-radius: 999px; height: .6rem; overflow: hidden; }
+.progress-bar-fill { height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--low), var(--accent)); transition: width .3s ease; }
+.progress-note { font-size: .72rem; color: var(--muted); margin-top: .5rem; }
+li:has(> input.task-checkbox) { list-style: none; margin-left: -1.4rem; padding-left: .3rem;
+  display: list-item; }
+input.task-checkbox { width: 1rem; height: 1rem; margin-right: .5rem; vertical-align: middle;
+  accent-color: var(--accent); }
+li:has(> input.task-checkbox:checked) { color: var(--muted); }
+li:has(> input.task-checkbox:checked) code { opacity: .75; }
+@media (max-width: 900px) {
+  .layout { flex-direction: column; }
+  nav.sidebar { width: 100%; height: auto; position: static; }
+  main { padding: 1.4rem 1.2rem 3rem; }
+}
+@media print { nav.sidebar { display: none; } main { padding: 0; } }
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar"><div class="brand">TiiBnTick Core<small>Audit technique — juillet 2026</small></div>
+<ul><li><a href="index.html">🏠 Accueil</a></li>
+<li><a href="executive-summary.html">📋 Résumé exécutif global</a></li>
+</ul><div class="section-label">Rapports d'audit</div><ul>
+<li><a href="audit-1-architecture.html" class="active">🏛️ Audit n°1 — Architecture globale</a></li>
+<li><a href="audit-2-inter-modules.html">🔗 Audit n°2 — Connexions inter-modules</a></li>
+<li><a href="audit-3-yow-event-kernel.html">📨 Audit n°3 — yow-event-kernel</a></li>
+<li><a href="audit-4-yow-i18n-kernel.html">🌍 Audit n°4 — yow-i18n-kernel</a></li>
+<li><a href="audit-5-kafka.html">🧵 Audit n°5 — Kafka</a></li>
+<li><a href="audit-6-scalabilite.html">📈 Audit n°6 — Scalabilité</a></li>
+<li><a href="audit-7-system-design.html">🧭 Audit n°7 — System Design & Sécurité</a></li>
+</ul><div class="section-label">Plan de remédiation</div><ul>
+<li><a href="remediation/implementation-plan.html">🗂️ Plan — Plan d'implémentation — vue d'ensemble</a></li>
+<li><a href="remediation/phase-0-critical.html">🚨 P0 — Phase 0 — Bloquant production</a></li>
+<li><a href="remediation/phase-1-hardening.html">🛡️ P1 — Phase 1 — Durcissement</a></li>
+<li><a href="remediation/phase-2-target-architecture.html">🚀 P2 — Phase 2 — Architecture cible</a></li>
+<li><a href="remediation/workstream-payment-billing-kernel-delegation.html">💳 Chantier — Délégation paiement/facturation au Kernel</a></li>
+</ul></nav>
+<main>
+<header class="page">
+  <div class="kicker">Audit n°1</div>
+  <h1>🏛️ Architecture globale</h1>
+  <div class="meta">Projet TiiBnTick Core · dépôt <code>tiibntick-core</code> (34 modules Maven, y compris <code>trust/tnt-trust-core</code>) · Audit réalisé le 16 juillet 2026</div>
+</header>
+
+<div class="toc"><div class="toc"><span class="toctitle">Sommaire</span><ul>
+<li><a href="#1-resume-executif">1. Résumé exécutif</a></li>
+<li><a href="#2-etat-actuel">2. État actuel</a><ul>
+<li><a href="#21-topologie-reelle-du-reactor">2.1 Topologie réelle du reactor</a></li>
+<li><a href="#22-frontiere-kernel-rt-comops">2.2 Frontière Kernel (RT-comops)</a></li>
+<li><a href="#23-structure-hexagonale-echantillon-audite-10-modules">2.3 Structure hexagonale — échantillon audité (10 modules)</a></li>
+<li><a href="#24-ddd-reel-ou-cosmetique">2.4 DDD — réel ou cosmétique ?</a></li>
+<li><a href="#25-zoom-sur-la-couche-corebackend-633-fichiers-java">2.5 Zoom sur la couche coreBackend/ (633 fichiers Java)</a></li>
+<li><a href="#26-assemblage-tnt-bootstrap">2.6 Assemblage tnt-bootstrap</a></li>
+</ul>
+</li>
+<li><a href="#3-points-positifs-constates-dans-le-code-pas-seulement-declares">3. Points positifs (constatés dans le code, pas seulement déclarés)</a></li>
+<li><a href="#4-problemes-detectes-tableau-recapitulatif">4. Problèmes détectés — tableau récapitulatif</a></li>
+<li><a href="#5-detail-des-problemes-avec-preuves">5. Détail des problèmes avec preuves</a><ul>
+<li><a href="#a1-yow-i18n-kernel-l0-depend-de-tnt-common-core-l1-eleve">A1 — yow-i18n-kernel (L0) dépend de tnt-common-core (L1) — Élevé</a></li>
+<li><a href="#a2-tnt-actor-core-l2-depend-de-tnt-incident-core-l3-eleve">A2 — tnt-actor-core (L2) dépend de tnt-incident-core (L3) — Élevé</a></li>
+<li><a href="#a3-block-en-production-reactive-6-occurrences-eleve">A3 — .block() en production réactive (6 occurrences) — Élevé</a></li>
+<li><a href="#a4-couche-corebackend-non-documentee-non-gouvernee-eleve">A4 — Couche coreBackend/ non documentée, non gouvernée — Élevé</a></li>
+<li><a href="#a5-controleurs-accedant-directement-a-la-persistance-bypass-des-ports-eleve">A5 — Contrôleurs accédant directement à la persistance (bypass des ports) — Élevé</a></li>
+<li><a href="#a6-dtos-web-fuites-dans-la-couche-application-moyen">A6 — DTOs web fuités dans la couche application — Moyen</a></li>
+<li><a href="#a7-couverture-de-test-tres-faible-nulle-sur-des-pans-entiers-eleve">A7 — Couverture de test très faible, nulle sur des pans entiers — Élevé</a></li>
+<li><a href="#a8-god-classes-classes-surdimensionnees-moyen">A8 — God classes / classes surdimensionnées — Moyen</a></li>
+<li><a href="#a9-requirepermission-place-dans-adapterinweb-de-tnt-roles-core-moyen">A9 — @RequirePermission placé dans adapter/in/web de tnt-roles-core — Moyen</a></li>
+<li><a href="#a10-assemblage-bootstrap-triple-mecanisme-et-doc-desynchronisee-moyen">A10 — Assemblage bootstrap : triple mécanisme et doc désynchronisée — Moyen</a></li>
+<li><a href="#a11-configuration-dupliquee-par-module-objectmapper-kafka-moyen">A11 — Configuration dupliquée par module (ObjectMapper, Kafka) — Moyen</a></li>
+<li><a href="#a12-contrat-de-bean-cache-kernelwebclient-moyen">A12 — Contrat de bean caché kernelWebClient — Moyen</a></li>
+<li><a href="#a13-responsabilites-dupliquees-cur-vs-agency-moyen">A13 — Responsabilités dupliquées cœur vs agency — Moyen</a></li>
+<li><a href="#a14-fuites-spring-dans-le-domaine-faible">A14 — Fuites Spring dans le domaine — Faible</a></li>
+<li><a href="#a15-hygiene-du-depot-faible">A15 — Hygiène du dépôt — Faible</a></li>
+<li><a href="#a16-tnt-link-back-core-architecture-propre-mais-non-dimensionnee-pour-des-millions-dutilisateurs-eleve">A16 — tnt-link-back-core : architecture propre mais non dimensionnée pour « des millions d'utilisateurs » — Élevé</a></li>
+<li><a href="#a17-dependances-maven-declarees-jamais-utilisees-link-back-faible">A17 — Dépendances Maven déclarées jamais utilisées (link-back) — Faible</a></li>
+</ul>
+</li>
+<li><a href="#6-recommandations-priorisees">6. Recommandations priorisées</a></li>
+<li><a href="#7-conclusion">7. Conclusion</a></li>
+</ul>
+</div>
+</div>
+<h1 id="audit-n1-architecture-globale-tiibntick-core">Audit n°1 — Architecture globale — TiiBnTick Core</h1>
+<p><strong>Date :</strong> 2026-07-16
+<strong>Auditeur :</strong> Principal Software Architect (audit indépendant, basé sur l'analyse directe du code)
+<strong>Périmètre :</strong> l'ensemble du reactor Maven <code>tiibntick-core-parent</code> (foundation, identity, logistics, business, billing, trust, coreBackend, tnt-bootstrap)
+<strong>Méthode :</strong> lecture du <code>pom.xml</code> racine et des poms de chaque module, cartographie complète des dépendances inter-modules, échantillonnage approfondi de 10+ modules (structure hexagonale, pureté du domaine, ports, adapters), greps systématiques (<code>.block(</code>, <code>Thread.sleep</code>, <code>TODO/FIXME/HACK</code>, <code>@Deprecated</code>, <code>@Table</code> dans le domaine, imports croisés d'adapters), lecture des classes d'assemblage de <code>tnt-bootstrap</code>.</p>
+<hr />
+<h2 id="1-resume-executif">1. Résumé exécutif</h2>
+<p>L'architecture de TiiBnTick Core est <strong>globalement saine et remarquablement disciplinée pour un projet de cette taille</strong> : l'architecture hexagonale est réellement appliquée (pas seulement cosmétique) dans les modules « cœur » (L0–L6), le DDD y est authentique (agrégats riches avec transitions d'état et événements de domaine collectés), la migration « Kernel HTTP-only » est effective (zéro dépendance Maven <code>RT-comops</code> résiduelle), et la dette marquée (TODO/FIXME) est quasi nulle.</p>
+<p>Cependant, l'audit révèle <strong>un décalage croissant entre l'architecture déclarée (CLAUDE.md, pom racine) et la réalité du code</strong>, concentré sur trois fronts :</p>
+<ol>
+<li><strong>La règle de couches L0–L7, pourtant qualifiée de « stricte », est violée deux fois</strong> dans le code livré : <code>yow-i18n-kernel</code> (L0) dépend de <code>tnt-common-core</code> (L1), et <code>tnt-actor-core</code> (L2) dépend de <code>tnt-incident-core</code> (L3).</li>
+<li><strong>Une couche entière (<code>coreBackend/</code>, 18 modules, ~350 classes) n'existe pas dans la documentation d'architecture</strong> et applique des standards nettement inférieurs au reste du code : contrôleurs accédant directement à la persistance, services applicatifs retournant des DTOs web, <strong>zéro test</strong> sur l'ensemble de la couche.</li>
+<li><strong>Six appels <code>.block()</code> subsistent dans du code de production réactif</strong>, dont un dans un aspect AOP transversal (<code>TenantValidationAspect</code>) potentiellement exécuté sur le chemin chaud des requêtes.</li>
+</ol>
+<p>Aucun problème n'est jugé « Critique » au sens d'un risque immédiat de corruption de données ou de faille de sécurité, mais deux problèmes « Élevé » (violations de couches, <code>.block()</code> dans l'aspect tenant) méritent une correction à court terme, et la dérive de la couche <code>coreBackend</code> doit être stoppée avant qu'elle ne devienne la norme de fait.</p>
+<hr />
+<h2 id="2-etat-actuel">2. État actuel</h2>
+<h3 id="21-topologie-reelle-du-reactor">2.1 Topologie réelle du reactor</h3>
+<p>Le pom racine (<code>/pom.xml</code>) déclare <strong>52 modules</strong> (et non ~34 comme documenté) :</p>
+<ul>
+<li>L0–L6 : 34 modules conformes à la documentation (dont <code>tnt-hrm-core</code>, L4, et <code>tnt-platform-gateway-core</code>, L1, ajoutés récemment).</li>
+<li><strong>Couche non documentée</strong> <code>coreBackend/</code> (déclarée entre L6 et L7, <code>pom.xml:132-135</code>) :</li>
+<li><code>tnt-go-freelancer-point-back-core</code>, <code>tnt-link-back-core</code>, <code>tnt-market-back-core</code> (backends de plateformes)</li>
+<li><code>tnt-agency-back-core</code> : agrégateur Maven de <strong>14 sous-modules</strong> <code>tnt-agency-*-core</code> (org, staff, workforce, assignment, commission, billing, onboarding, intake, inbox, fleet-local, compliance, analytics, sync, eventing).</li>
+<li>L7 : <code>tnt-bootstrap</code>, qui dépend désormais des 51 autres modules, y compris tous les backends de plateformes — l'application assemblée est donc un <strong>monolithe modulaire complet</strong> incluant les BFF Agency/Go/Link/Market.</li>
+</ul>
+<h3 id="22-frontiere-kernel-rt-comops">2.2 Frontière Kernel (RT-comops)</h3>
+<p><strong>Vérifié : la migration HTTP-only est réelle.</strong> <code>grep "RT-comops|yowyob.comops"</code> sur tous les <code>pom.xml</code> ne retourne que des commentaires descriptifs — aucune balise <code>&lt;dependency&gt;</code> vers un artefact <code>RT-comops-*</code>. Aucun <code>import com.yowyob.kernel.*</code> en dehors des deux modules foundation maison (<code>yow-event-kernel</code>, <code>yow-i18n-kernel</code>) qui possèdent légitimement ce package. L'accès au Kernel passe par des WebClients (<code>kernelWebClient</code>, <code>kernelOrganizationWebClient</code>, <code>kernelTpWebClient</code>) définis dans <code>tnt-bootstrap/src/main/java/com/yowyob/tiibntick/bootstrap/bridge/KernelBridgeConfig.java:57-93</code>.</p>
+<h3 id="23-structure-hexagonale-echantillon-audite-10-modules">2.3 Structure hexagonale — échantillon audité (10 modules)</h3>
+<p><code>tnt-delivery-core</code>, <code>tnt-geo-core</code>, <code>tnt-realtime-core</code>, <code>tnt-billing-dsl</code>, <code>tnt-billing-wallet</code>, <code>tnt-actor-core</code>, <code>tnt-organization-core</code>, <code>tnt-resource-core</code>, <code>tnt-platform-gateway-core</code>, <code>tnt-trust-core</code> : les 10 présentent la structure <code>adapter/{in,out}</code> + <code>application/port/{in,out}</code> + <code>application/service</code> + <code>domain/...</code> + <code>config</code> (variante <code>domain/port</code> + <code>infrastructure</code> pour <code>tnt-billing-dsl</code> et <code>tnt-organization-core</code>, conforme à la doc). Constats transverses :</p>
+<ul>
+<li><strong>Aucune entité R2DBC (<code>@Table</code>) dans un package <code>domain/</code></strong> : les entités de persistance vivent dans <code>adapter/out/persistence/entity</code> avec mappers dédiés (ex. <code>logistics/tnt-incident-core/.../adapter/persistence/IncidentMapper.java</code>, 341 lignes).</li>
+<li><strong>Aucun import croisé d'adapter à adapter entre modules</strong> détecté par grep sur tout le dépôt (<code>import com.yowyob.tiibntick.core.&lt;autre&gt;.adapter.*</code> : zéro occurrence hors module propriétaire).</li>
+<li>Les ports sont bien des interfaces ; les classes non-interfaces trouvées sous <code>application/port/in</code> sont des <strong>commandes/records</strong> (<code>CreateVehicleCommand</code>, <code>PublishEventCommand</code>…), ce qui est idiomatique.</li>
+<li>Fuites mineures de Spring dans <code>domain/</code> (détail A14) : essentiellement <code>@ResponseStatus</code> sur des exceptions de domaine et deux <code>@Component</code> sur des services de domaine.</li>
+</ul>
+<h3 id="24-ddd-reel-ou-cosmetique">2.4 DDD — réel ou cosmétique ?</h3>
+<p><strong>Réel dans le cœur.</strong> Preuve type : l'agrégat <code>Delivery</code> (<code>logistics/tnt-delivery-core/.../domain/model/aggregate/Delivery.java</code>, 564 lignes) expose une machine à états métier complète — <code>assignDeliveryPerson</code> (l.238), <code>confirmPickup</code> (l.259), <code>startTransit</code> (l.273), <code>depositAtRelayPoint</code> (l.287), <code>pauseForIncident</code> (l.444), <code>resumeFromIncident</code> (l.475) — et collecte ses événements de domaine (<code>getDomainEvents()</code> l.507, <code>clearDomainEvents()</code> l.515), publiés ensuite via les ports <code>out</code>. Même richesse observée sur <code>Dispute</code> (596 lignes), <code>Wallet</code> (470 lignes), <code>Invoice</code> (458 lignes). Les packages <code>domain/event</code> existent et sont peuplés dans tous les modules échantillonnés.</p>
+<p><strong>Nettement plus faible dans <code>coreBackend/</code></strong> : services applicatifs transaction-script retournant des DTOs web (détail A6), pas de couche domaine riche équivalente.</p>
+<h3 id="25-zoom-sur-la-couche-corebackend-633-fichiers-java">2.5 Zoom sur la couche <code>coreBackend/</code> (633 fichiers Java)</h3>
+<p>Audit détaillé des 4 modules déclarés dans le pom racine (<code>pom.xml:132-135</code>) :</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Classes</th>
+<th>Tests</th>
+<th>Hexagonal</th>
+<th>Observations</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>tnt-go-freelancer-point-back-core</code></td>
+<td>120</td>
+<td>0</td>
+<td><strong>Violé</strong></td>
+<td>9 contrôleurs accèdent directement à la persistance (A5)</td>
+</tr>
+<tr>
+<td><code>tnt-market-back-core</code></td>
+<td>170</td>
+<td>0</td>
+<td>Partiel</td>
+<td>Services transaction-script 588 lignes, 9 des 14 TODO du dépôt</td>
+</tr>
+<tr>
+<td><code>tnt-link-back-core</code></td>
+<td>120</td>
+<td>0</td>
+<td><strong>Respecté</strong></td>
+<td>Structure ports/adapters exemplaire, mais scalabilité non traitée (A16)</td>
+</tr>
+<tr>
+<td><code>tnt-agency-back-core</code> (14 sous-modules)</td>
+<td>~220</td>
+<td>0</td>
+<td>Partiel</td>
+<td>Services retournant des DTOs web (A6), <code>MissionService</code> 768 lignes (A8)</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Position dans les couches :</strong> le pom racine les déclare entre L6 (trust) et L7 (bootstrap) sans leur attribuer de couche ; leurs poms montrent des dépendances descendantes massives vers L1–L5 (ex. <code>tnt-market-back-core</code> → 19 modules cœur, <code>tnt-go-freelancer-point-back-core</code> → 19 modules dont billing). Aucune dépendance montante détectée (aucun module cœur ne dépend d'eux, hormis <code>tnt-bootstrap</code>) : leur position de facto est cohérente (« L6-bis »), mais <strong>non écrite</strong> — ni dans CLAUDE.md ni dans les commentaires du pom racine, qui documentent L0–L7 sans eux.</p>
+<p><strong>Cas particulier <code>tnt-link-back-core</code> (cartographie temps réel, cible « millions d'utilisateurs ») :</strong> c'est paradoxalement le module le plus propre de la couche (ports <code>in/command</code>, <code>in/result</code>, <code>out</code>, adapters de persistance dédiés, mappers, aucune classe &gt; 254 lignes, aucun état en mémoire, aucun <code>.block()</code>). Mais l'architecture <em>fonctionnelle</em> n'est pas dimensionnée pour sa cible — détail en A16.</p>
+<h3 id="26-assemblage-tnt-bootstrap">2.6 Assemblage <code>tnt-bootstrap</code></h3>
+<p>Trois mécanismes d'enregistrement de beans <strong>coexistent</strong> :
+1. <code>@ComponentScan(basePackages = "com.yowyob.tiibntick")</code> global (<code>TiiBnTickApplication.java:46-58</code>), avec exclusion regex du package trust ;
+2. Auto-configurations <code>META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports</code> dans la plupart des modules (dont <code>tnt-trust-core</code>) ;
+3. <code>@Import</code> explicite dans <code>TntCoreConfig</code> (<code>TntCoreConfig.java:31-44</code>) — qui, contrairement à la documentation, n'importe <strong>pas</strong> « chaque module » mais uniquement les configs bootstrap + <code>GoFreelancerPointCoreConfig</code>.</p>
+<p>Les beans de secours <code>@ConditionalOnMissingBean</code> (<code>TntKafkaConfig.java:67-68, 110-111</code> : <code>deliveryKafkaProducer</code>, <code>deliveryObjectMapper</code>) et les WebClients Kernel partagés complètent l'assemblage. Analyse de solidité en A10.</p>
+<hr />
+<h2 id="3-points-positifs-constates-dans-le-code-pas-seulement-declares">3. Points positifs (constatés dans le code, pas seulement déclarés)</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>Point fort</th>
+<th>Preuve</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>P1</td>
+<td><strong>Migration Kernel HTTP-only effective</strong> — zéro dépendance Maven RT-comops, zéro classe Kernel importée hors modules foundation dédiés</td>
+<td>grep exhaustif poms + sources</td>
+</tr>
+<tr>
+<td>P2</td>
+<td><strong>Hexagonal appliqué uniformément sur L0–L6</strong> : mêmes packages, ports = interfaces, entités R2DBC isolées avec mappers, aucun adapter→adapter inter-modules</td>
+<td>§2.3</td>
+</tr>
+<tr>
+<td>P3</td>
+<td><strong>DDD authentique</strong> : agrégats riches à transitions d'état + événements de domaine collectés/purgés (<code>Delivery.java:201-523</code>)</td>
+<td>§2.4</td>
+</tr>
+<tr>
+<td>P4</td>
+<td><strong>Pattern trust exemplaire</strong> : chaque module appelant possède son port outbound, <code>tnt-trust-core</code> (L6) implémente les adapters et dépend <em>vers le bas</em> (<code>trust/.../adapter/out/{actor,billing,delivery,dispute,incident,organization,realtime,wallet}/</code>) — l'inversion de dépendance inter-modules est réellement câblée</td>
+<td>arborescence trust + pom trust</td>
+</tr>
+<tr>
+<td>P5</td>
+<td><strong>Hygiène de dette remarquable</strong> : 14 TODO/FIXME/HACK sur tout le dépôt (dont 9 dans <code>tnt-market-back-core</code>), <strong>zéro</strong> <code>@Deprecated</code>, <strong>zéro</strong> <code>Thread.sleep</code> en production</td>
+<td>greps §Méthode</td>
+</tr>
+<tr>
+<td>P6</td>
+<td><strong>Gouvernance build sérieuse</strong> : <code>maven-enforcer-plugin</code> (ban commons-logging/log4j/postgresql compile-scope), <code>dependencyManagement</code> centralisé épinglant chaque module, profils CI/release propres</td>
+<td><code>/pom.xml</code></td>
+</tr>
+<tr>
+<td>P7</td>
+<td><strong>Utilitaires transverses non dupliqués</strong> : une seule implémentation de <code>PermissionMatcher</code> et de <code>KernelResponses</code>, toutes deux dans <code>tnt-common-core</code></td>
+<td>grep classes</td>
+</tr>
+<tr>
+<td>P8</td>
+<td><strong>Toggle trust soigné</strong> : exclusion du scan documentée ligne à ligne (<code>TiiBnTickApplication.java:48-58</code>) + fallbacks no-op <code>@ConditionalOnMissingBean</code> pour que l'app démarre trust désactivé</td>
+<td>lecture bootstrap</td>
+</tr>
+<tr>
+<td>P9</td>
+<td><strong>Réactif discipliné dans l'ensemble</strong> : seulement 6 <code>.block()</code> en production sur ~2000 classes, et un commentaire de garde explicite dans <code>TntStartupRunner.java:82</code> (« Never .block() here »)</td>
+<td>grep <code>.block(</code></td>
+</tr>
+<tr>
+<td>P10</td>
+<td><strong>Séparation write/read des schémas</strong> : Liquibase JDBC (runtime-only) vs R2DBC runtime, 40 configs <code>@EnableR2dbcRepositories</code> scoping chaque module sur ses propres repositories</td>
+<td>grep + enforcer</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="4-problemes-detectes-tableau-recapitulatif">4. Problèmes détectés — tableau récapitulatif</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Problème</th>
+<th>Localisation principale</th>
+<th>Criticité</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A1</td>
+<td>Violation de la règle de couches : <code>yow-i18n-kernel</code> (L0) → <code>tnt-common-core</code> (L1)</td>
+<td><code>foundation/yow-i18n-kernel/pom.xml:24-27</code></td>
+<td><span class="badge high">Élevé</span></td>
+</tr>
+<tr>
+<td>A2</td>
+<td>Violation de la règle de couches : <code>tnt-actor-core</code> (L2) → <code>tnt-incident-core</code> (L3)</td>
+<td><code>identity/tnt-actor-core/pom.xml:62</code></td>
+<td><span class="badge high">Élevé</span></td>
+</tr>
+<tr>
+<td>A3</td>
+<td><code>.block()</code> dans du code de production réactif (6 occurrences, dont un aspect AOP transversal)</td>
+<td><code>TenantValidationAspect.java:74</code> et 5 autres</td>
+<td><span class="badge high">Élevé</span></td>
+</tr>
+<tr>
+<td>A4</td>
+<td>Couche <code>coreBackend/</code> (18 modules) absente de la doc d'architecture, standards dégradés</td>
+<td><code>pom.xml:132-135</code>, <code>coreBackend/**</code></td>
+<td><span class="badge high">Élevé</span></td>
+</tr>
+<tr>
+<td>A5</td>
+<td>Contournement hexagonal : 9 contrôleurs accèdent directement à la persistance</td>
+<td><code>coreBackend/tnt-go-freelancer-point-back-core/.../adapter/in/web/*</code></td>
+<td><span class="badge high">Élevé</span></td>
+</tr>
+<tr>
+<td>A6</td>
+<td>Fuite de DTOs web dans la couche application (services retournant des <code>*Response</code> web)</td>
+<td><code>AgencyRegistryService.java:6-7</code>, <code>MissionService.java:9</code></td>
+<td><span class="badge med">Moyen</span></td>
+</tr>
+<tr>
+<td>A7</td>
+<td>Couverture de test très faible ; <strong>zéro test</strong> sur tout <code>coreBackend/</code>, <code>tnt-platform-gateway-core</code> (82 classes), <code>tnt-hrm-core</code> ; gate JaCoCo désactivée</td>
+<td>comptage A7</td>
+<td><span class="badge high">Élevé</span></td>
+</tr>
+<tr>
+<td>A8</td>
+<td>God classes / classes surdimensionnées (772, 768, 596, 588 lignes)</td>
+<td><code>LogisticTrustEvent.java</code>, <code>MissionService.java</code>…</td>
+<td><span class="badge med">Moyen</span></td>
+</tr>
+<tr>
+<td>A9</td>
+<td><code>@RequirePermission</code> défini dans un package <code>adapter/in/web</code> mais consommé par la couche application de tous les modules</td>
+<td><code>roles/adapter/in/web/RequirePermission</code></td>
+<td><span class="badge med">Moyen</span></td>
+</tr>
+<tr>
+<td>A10</td>
+<td>Triple mécanisme d'enregistrement de beans redondant + doc/<code>TntCoreConfig</code> désynchronisés (import mort, commentaire erroné)</td>
+<td><code>TntCoreConfig.java:7,43</code></td>
+<td><span class="badge med">Moyen</span></td>
+</tr>
+<tr>
+<td>A11</td>
+<td>Configuration dupliquée : 10+ beans <code>ObjectMapper</code> et 16 classes de config Kafka quasi identiques par module</td>
+<td>A11</td>
+<td><span class="badge med">Moyen</span></td>
+</tr>
+<tr>
+<td>A12</td>
+<td>Contrat de bean caché : 10+ modules référencent le qualifier <code>kernelWebClient</code> défini uniquement dans bootstrap</td>
+<td><code>KernelBridgeConfig.java:57</code></td>
+<td><span class="badge med">Moyen</span></td>
+</tr>
+<tr>
+<td>A13</td>
+<td>Responsabilités potentiellement dupliquées entre couche billing/sync core et sous-modules agency (<code>tnt-agency-sync-core</code> vs <code>tnt-sync-core</code>, <code>tnt-agency-billing-core</code> vs <code>billing/*</code>)</td>
+<td><code>coreBackend/tnt-agency-back-core/*</code></td>
+<td><span class="badge med">Moyen</span></td>
+</tr>
+<tr>
+<td>A14</td>
+<td>Fuites Spring dans <code>domain/</code> : <code>@ResponseStatus</code> sur ~12 exceptions, <code>@Component</code> sur 2 services de domaine, <code>MediaType</code> dans un modèle</td>
+<td>A14</td>
+<td><span class="badge low">Faible</span></td>
+</tr>
+<tr>
+<td>A15</td>
+<td>Hygiène du dépôt : répertoire <code>BOOT-INF/</code> (jar décompressé) à la racine, code commenté dans bootstrap, doc CLAUDE.md périmée (« ~34 modules »)</td>
+<td>racine du dépôt</td>
+<td><span class="badge low">Faible</span></td>
+</tr>
+<tr>
+<td>A16</td>
+<td><code>tnt-link-back-core</code> non dimensionné pour sa cible (« cartes temps réel, millions d'utilisateurs ») : requête bbox non spatiale et <strong>sans LIMIT</strong>, N+1 sur le batch, aucun cache, aucun push temps réel (dépendance <code>tnt-realtime-core</code> déclarée mais jamais utilisée)</td>
+<td><code>NetworkNodeR2dbcRepository.java:17-20</code>, <code>NetworkNodeController.java:109-128</code></td>
+<td><span class="badge high">Élevé</span></td>
+</tr>
+<tr>
+<td>A17</td>
+<td>Dépendances Maven déclarées jamais importées : 5 des 12 dépendances internes de <code>tnt-link-back-core</code> (<code>tnt-realtime-core</code>, <code>tnt-incident-core</code>, <code>tnt-sync-core</code>, <code>tnt-route-core</code>, <code>tnt-organization-core</code> — 0 import chacune)</td>
+<td><code>coreBackend/tnt-link-back-core/pom.xml</code></td>
+<td><span class="badge low">Faible</span></td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="5-detail-des-problemes-avec-preuves">5. Détail des problèmes avec preuves</h2>
+<h3 id="a1-yow-i18n-kernel-l0-depend-de-tnt-common-core-l1-eleve">A1 — <code>yow-i18n-kernel</code> (L0) dépend de <code>tnt-common-core</code> (L1) — Élevé</h3>
+<p><strong>Preuve :</strong> <code>foundation/yow-i18n-kernel/pom.xml:24-27</code> :</p>
+<pre><code class="language-xml">&lt;dependency&gt;
+    &lt;groupId&gt;com.yowyob.tiibntick.core&lt;/groupId&gt;
+    &lt;artifactId&gt;tnt-common-core&lt;/artifactId&gt;
+&lt;/dependency&gt;
+</code></pre>
+<p><strong>Impact :</strong> CLAUDE.md qualifie la règle de couches de « stricte » (« a module must never declare a Maven dependency on another module in a strictly higher-numbered layer »). Or L0 est décrit comme candidat à migration vers le Kernel Yowyob : cette dépendance vers un module L1 spécifique TiiBnTick <strong>rend la migration promise impossible sans refactoring</strong> et inverse la fondation (le socle dépend de ce qui est construit dessus). Le build fonctionne (Maven réordonne le reactor), ce qui masque la dérive.
+<strong>Recommandation :</strong> extraire les types de <code>tnt-common-core</code> réellement utilisés par <code>yow-i18n-kernel</code> vers <code>yow-i18n-kernel</code> lui-même (ou un micro-module L0 partagé), ou requalifier officiellement <code>yow-i18n-kernel</code> en L1 dans le pom racine et CLAUDE.md. Ajouter une règle enforcer (<code>bannedDependencies</code> par groupe de modules ou ArchUnit au niveau reactor) pour rendre la règle de couches exécutable et non purement documentaire.</p>
+<h3 id="a2-tnt-actor-core-l2-depend-de-tnt-incident-core-l3-eleve">A2 — <code>tnt-actor-core</code> (L2) dépend de <code>tnt-incident-core</code> (L3) — Élevé</h3>
+<p><strong>Preuve :</strong> <code>identity/tnt-actor-core/pom.xml:62</code> (<code>&lt;artifactId&gt;tnt-incident-core&lt;/artifactId&gt;</code>), consommé par <code>identity/tnt-actor-core/src/main/java/com/yowyob/tiibntick/core/actor/adapter/out/incident/ActorReputationPortAdapter.java</code>.
+<strong>Impact :</strong> violation directe de la règle du projet, et du pattern que le projet applique pourtant ailleurs correctement (cf. <code>tnt-trust-core</code>). Ironique : <code>tnt-delivery-core</code>, <code>tnt-route-core</code>, <code>tnt-resource-core</code>, <code>tnt-billing-wallet</code> (couches ≥ L3) dépendent légitimement de <code>tnt-incident-core</code> vers le bas — mais <code>tnt-actor-core</code> (L2) le fait vers le haut. Risque de cycle à terme (incident → actor est un besoin plausible).
+<strong>Recommandation :</strong> appliquer le pattern trust : <code>tnt-actor-core</code> conserve un port <code>out</code> (ex. <code>IActorReputationPort</code> avec ses propres types), et <strong><code>tnt-incident-core</code> fournit l'adapter</strong> et prend la dépendance vers <code>tnt-actor-core</code> (L3 → L2, légal). Alternativement, si la réputation basée sur les incidents est un concept incident, déplacer l'adapter entier dans <code>tnt-incident-core</code>.</p>
+<h3 id="a3-block-en-production-reactive-6-occurrences-eleve">A3 — <code>.block()</code> en production réactive (6 occurrences) — Élevé</h3>
+<p><strong>Preuves :</strong>
+| Fichier | Ligne | Contexte |
+|---|---|---|
+| <code>foundation/tnt-common-core/src/main/java/com/yowyob/tiibntick/common/aop/TenantValidationAspect.java</code> | 74 | <code>.block()</code> <strong>dans un aspect AOP transversal de validation tenant</strong> |
+| <code>foundation/tnt-auth-core/.../application/service/KernelPublicKeyProvider.java</code> | 57 | <code>.block(Duration.ofSeconds(15))</code> |
+| <code>identity/tnt-administration-core/.../service/TntAdministrationApplicationService.java</code> | 305 | <code>mono.block()</code> |
+| <code>logistics/tnt-sync-core/.../adapter/in/kafka/EntityChangedEventConsumer.java</code> | 125 | <code>.block(Duration.ofSeconds(30))</code> |
+| <code>logistics/tnt-dispute-core/.../adapter/in/messaging/DisputeEventConsumer.java</code> | 101 | <code>.block()</code> <strong>sans timeout</strong> |
+| <code>logistics/tnt-dispute-core/.../adapter/out/persistence/DisputeRepositoryAdapter.java</code> | 69 | <code>.block(Duration.ofSeconds(6))</code> |</p>
+<p><strong>Impact :</strong> dans une application WebFlux, un <code>.block()</code> sur un thread event-loop lève <code>IllegalStateException</code> (<code>block()/blockFirst()/blockLast() are blocking, which is not supported in thread reactor-http-nio-*</code>) ou, s'il s'exécute sur un thread Kafka/boundedElastic, <strong>gèle le thread consommateur</strong> (30 s pour sync-core) et détruit le débit. Le cas le plus grave est <code>TenantValidationAspect.java:74</code> : un aspect de <code>tnt-common-core</code> potentiellement tissé sur des méthodes appelées dans des chaînes réactives — bombe à retardement dépendant du thread d'exécution. <code>DisputeEventConsumer.java:101</code> bloque <strong>sans timeout</strong> : un incident Kernel/DB peut suspendre le consumer indéfiniment. À noter : le projet connaît le problème (<code>TntStartupRunner.java:82</code> commente explicitement « Never .block() here »), la règle n'est simplement pas appliquée partout.
+<strong>Recommandation :</strong> (1) refactorer l'aspect en interceptor réactif (retourner le <code>Mono</code> décoré plutôt que bloquer) — priorité 1 ; (2) dans les consumers Kafka, chaîner le traitement réactif à l'acknowledgment (reactor-kafka <code>receive().flatMap(...)</code>) au lieu de bloquer ; (3) <code>KernelPublicKeyProvider</code> : précharger/cacher la clé au démarrage (startup runner asynchrone) plutôt que bloquer à la demande ; (4) ajouter BlockHound en profil test pour empêcher toute régression.</p>
+<h3 id="a4-couche-corebackend-non-documentee-non-gouvernee-eleve">A4 — Couche <code>coreBackend/</code> non documentée, non gouvernée — Élevé</h3>
+<p><strong>Preuves :</strong> <code>pom.xml:132-135</code> déclare 4 modules <code>coreBackend/*</code> absents de la cartographie L0–L7 de CLAUDE.md (qui annonce « ~34 modules » ; le reactor en compte 52). <code>coreBackend/tnt-agency-back-core/pom.xml:30-43</code> agrège 14 sous-modules supplémentaires. <code>tnt-bootstrap/pom.xml</code> dépend de l'intégralité (y compris <code>tnt-agency-eventing-core</code>… <code>tnt-agency-sync-core</code>).
+<strong>Impact :</strong> (1) une couche représentant ~35 % des modules échappe à la règle de layering documentée — quelle est sa position ? Les poms montrent qu'elle dépend de L1→L5, donc de facto « L6-bis », mais rien ne l'écrit ni ne l'outille ; (2) le périmètre du monolithe change silencieusement : les BFF Agency/Go/Link/Market sont maintenant embarqués dans la même application que le cœur (surface de déploiement, temps de démarrage, couplage de release) ; (3) c'est précisément dans cette couche que se concentrent les violations hexagonales (A5, A6) et l'absence totale de tests (A7) — l'absence de gouvernance produit une architecture à deux vitesses.
+<strong>Recommandation :</strong> documenter officiellement la couche (position, règles de dépendance, droit ou non de définir des schémas propres), trancher si ces backends doivent être déployables séparément (auquel cas ils ne devraient pas être des dépendances obligatoires de <code>tnt-bootstrap</code> mais activables par profil), et imposer les mêmes standards (tests, hexagonal) avant toute nouvelle extension.</p>
+<h3 id="a5-controleurs-accedant-directement-a-la-persistance-bypass-des-ports-eleve">A5 — Contrôleurs accédant directement à la persistance (bypass des ports) — Élevé</h3>
+<p><strong>Preuve :</strong> 9 contrôleurs de <code>coreBackend/tnt-go-freelancer-point-back-core/src/main/java/com/yowyob/tiibntick/core/gofp/adapter/in/web/</code> importent <code>...adapter.out.persistence.*</code> ou <code>infrastructure.persistence.*</code> : <code>AnnouncementCoreController</code>, <code>DeliveryNeedCoreController</code>, <code>SubscriptionCoreController</code>, <code>PricingCoreController</code>, <code>RelayDepositCoreController</code>, <code>EvaluationCoreController</code>, <code>CommissionCoreController</code>, <code>RelayHubSubscriptionCoreController</code>, <code>DeliveryCoreController</code> ; plus <code>coreBackend/tnt-agency-back-core/tnt-agency-org-core/.../hubops/adapter/in/messaging/InventoryHubConsumer.java</code>.
+<strong>Impact :</strong> adapter <code>in</code> → adapter <code>out</code> sans passer par un port ni un service applicatif : logique métier dans les contrôleurs, aucune couture de test, invariants du domaine contournables, et rupture du contrat architectural que les 34 modules cœur respectent. Aucune occurrence de ce pattern n'existe hors <code>coreBackend/</code> — la dérive est localisée mais récente et donc réversible à faible coût.
+<strong>Recommandation :</strong> introduire pour chaque contrôleur un use-case <code>application/port/in</code> + service, comme dans les modules cœur. Verrouiller par un test ArchUnit global (<code>noClasses().that().resideInAPackage("..adapter.in..").should().dependOnClassesThat().resideInAPackage("..adapter.out..")</code>).</p>
+<h3 id="a6-dtos-web-fuites-dans-la-couche-application-moyen">A6 — DTOs web fuités dans la couche application — Moyen</h3>
+<p><strong>Preuves :</strong> <code>coreBackend/tnt-agency-back-core/tnt-agency-org-core/.../application/service/AgencyRegistryService.java:6-7</code> importe <code>adapter.in.web.dto.AgencyRegistryResponse</code> / <code>AgencySettingsResponse</code> ; <code>coreBackend/tnt-agency-back-core/tnt-agency-assignment-core/.../application/service/MissionService.java:9</code> importe <code>adapter.in.web.dto.MissionResponse</code>. Le pattern se répète dans ~15 services de <code>coreBackend/</code> (intake, billing, commission, fleet, inbox, onboarding, sync, hubops…).
+<strong>Impact :</strong> la couche application dépend du format de l'API web : impossible de réutiliser ces use-cases depuis Kafka/scheduler sans traîner les DTOs REST, et tout changement de contrat web se propage dans la logique applicative. Les modules cœur (delivery, wallet, invoice…) sont <strong>sains</strong> sur ce point (leurs seuls imports <code>adapter.in.web</code> sont l'annotation <code>@RequirePermission</code> — cf. A9).
+<strong>Recommandation :</strong> faire retourner aux services des modèles applicatifs/domaine (ou des records de résultat définis dans <code>application/port/in</code>), et mapper vers les <code>*Response</code> dans les contrôleurs — c'est déjà la convention du reste du dépôt.</p>
+<h3 id="a7-couverture-de-test-tres-faible-nulle-sur-des-pans-entiers-eleve">A7 — Couverture de test très faible, nulle sur des pans entiers — Élevé</h3>
+<p><strong>Preuves (comptage fichiers <code>src/test</code> vs <code>src/main</code>) :</strong> <code>coreBackend/tnt-market-back-core</code> : <strong>0 test / 170 classes</strong> ; <code>tnt-platform-gateway-core</code> : <strong>0 / 82</strong> (module qui gère les API keys et le périmètre de sécurité plateforme !) ; <code>business/tnt-hrm-core</code> : 0 / 25 ; les 14 sous-modules agency : 0 test chacun. Meilleurs élèves : <code>tnt-trust-core</code> 14/91, <code>tnt-billing-dsl</code> 8/54. La gate de couverture JaCoCo est présente mais commentée dans le pom racine (confirmé par CLAUDE.md).
+<strong>Impact :</strong> le risque est maximal exactement là où l'architecture est la plus faible (coreBackend) et là où l'enjeu sécurité est le plus fort (platform-gateway : authentification des backends, rotation d'API keys, scopes — 0 test). Les refactorings recommandés par cet audit (A3, A5, A6) seront difficiles à sécuriser sans filet.
+<strong>Recommandation :</strong> prioriser des tests sur <code>tnt-platform-gateway-core</code> (matching de scopes, chaîne de sécurité <code>@Order(10)</code>, rotation de clés), réactiver la gate JaCoCo à un seuil bas mais non nul (ex. 30 %) avec ratchet progressif, exiger des tests pour tout nouveau module coreBackend.</p>
+<h3 id="a8-god-classes-classes-surdimensionnees-moyen">A8 — God classes / classes surdimensionnées — Moyen</h3>
+<p><strong>Preuves :</strong>
+- <code>trust/tnt-trust-core/.../domain/model/valueobject/LogisticTrustEvent.java</code> : <strong>772 lignes</strong>, ~25 fabriques statiques (<code>forDeliveryProof</code> l.104 … <code>forParcelChainResumed</code> l.654). Point positif : la classe est autonome (imports limités à ses propres enums + <code>java.*</code>), donc pas de couplage inter-modules — mais chaque nouveau type d'événement ancré la fait encore grossir.
+- <code>coreBackend/tnt-agency-back-core/tnt-agency-assignment-core/.../application/service/MissionService.java</code> : <strong>768 lignes</strong> — service applicatif fourre-tout (création, cycle de vie, requêtes, mapping DTO).
+- <code>logistics/tnt-dispute-core/.../domain/model/Dispute.java</code> : 596 lignes ; <code>Delivery.java</code> : 564 ; <code>MarketOrderApplicationService.java</code> : 588 ; <code>FreelancerOrganization.java</code> : 554.
+<strong>Impact :</strong> pour les agrégats (Dispute, Delivery), la taille reflète une vraie richesse métier — acceptable mais à surveiller (extraire des policies/état). Pour <code>MissionService</code> et <code>MarketOrderApplicationService</code>, c'est le symptôme du transaction-script de coreBackend. Pour <code>LogisticTrustEvent</code>, chaque module consommateur du trust ajoute sa fabrique dans la même classe : goulet de contention Git et violation OCP.
+<strong>Recommandation :</strong> scinder <code>LogisticTrustEvent</code> en fabriques par domaine (ex. <code>TrustEventFactories.delivery()</code>, <code>.incident()</code>, …) ou passer à un builder + catalogues de types ; découper <code>MissionService</code> par use-case (pattern déjà en place dans <code>tnt-delivery-core</code> : <code>DeliveryLifecycleService</code> vs <code>DeliveryAnnouncementService</code>).</p>
+<h3 id="a9-requirepermission-place-dans-adapterinweb-de-tnt-roles-core-moyen">A9 — <code>@RequirePermission</code> placé dans <code>adapter/in/web</code> de tnt-roles-core — Moyen</h3>
+<p><strong>Preuves :</strong> <code>logistics/tnt-delivery-core/.../application/service/DeliveryLifecycleService.java:14</code>, <code>billing/tnt-billing-wallet/.../application/service/WalletService.java:10</code>, <code>billing/tnt-billing-invoice/.../application/service/InvoiceService.java:8</code> importent tous <code>com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission</code>.
+<strong>Impact :</strong> l'annotation de sécurité transverse — vocabulaire déclaré du projet — vit dans un package <em>adapter web</em> d'un autre module, si bien que <strong>toutes les couches application du dépôt dépendent formellement d'un package adapter</strong>. C'est le principal « faux positif hexagonal » du projet : le grep des fuites web pointe massivement sur cette seule classe.
+<strong>Recommandation :</strong> déplacer l'annotation (et son aspect) vers <code>com.yowyob.tiibntick.core.roles.api</code> ou <code>application.annotation</code> dans <code>tnt-roles-core</code>, en conservant un alias déprécié le temps de la migration mécanique (sed sur les imports).</p>
+<h3 id="a10-assemblage-bootstrap-triple-mecanisme-et-doc-desynchronisee-moyen">A10 — Assemblage bootstrap : triple mécanisme et doc désynchronisée — Moyen</h3>
+<p><strong>Preuves :</strong> (1) <code>TiiBnTickApplication.java:46-47</code> : scan global <code>com.yowyob.tiibntick</code> qui découvre déjà toutes les <code>@Configuration</code> des modules — rendant les <code>@Import</code> de <code>TntCoreConfig</code> largement redondants pour les modules cœur ; (2) mais les modules <code>com.yowyob.kernel.*</code> (yow-event/i18n-kernel) sont <strong>hors du scan</strong> et dépendent exclusivement de leurs <code>AutoConfiguration.imports</code> ; (3) <code>TntCoreConfig.java:7</code> importe <code>MarketBackCoreConfig</code> <strong>sans l'utiliser</strong> (absent du tableau <code>@Import</code> l.31-44) ; (4) le commentaire <code>TntCoreConfig.java:43</code> étiquette <code>GoFreelancerPointCoreConfig</code> « L6 Core Backend Market » (mauvais module, mauvaise couche) ; (5) la javadoc (<code>TntCoreConfig.java:17</code>, repris dans CLAUDE.md) affirme que la classe « imports and wires all module configs » — faux ; (6) code mort commenté : <code>TntCoreConfig.java:67-70</code>, <code>TiiBnTickApplication.java:63-66</code> (<code>@EnableR2dbcRepositories</code> désactivé).
+<strong>Impact :</strong> trois chemins d'activation différents selon le module = diagnostic difficile (« pourquoi ce bean existe-t-il ? »), risque de double enregistrement ou d'oubli (ex. <code>MarketBackCoreConfig</code> est-il activé par scan ? par imports ? l'import mort suggère une intention non aboutie). L'exclusion regex du package trust (<code>TiiBnTickApplication.java:56-58</code>) est correcte mais fragile : un renommage de package la casse silencieusement et ré-active trust inconditionnellement.
+<strong>Recommandation :</strong> choisir <strong>un</strong> mécanisme nominal — l'auto-configuration <code>AutoConfiguration.imports</code> par module (déjà majoritaire) — et restreindre le <code>@ComponentScan</code> au package bootstrap ; supprimer l'import mort et corriger les commentaires ; ajouter un test de contexte qui vérifie que trust désactivé ⇒ aucun bean <code>com.yowyob.tiibntick.core.trust.*</code>.</p>
+<h3 id="a11-configuration-dupliquee-par-module-objectmapper-kafka-moyen">A11 — Configuration dupliquée par module (ObjectMapper, Kafka) — Moyen</h3>
+<p><strong>Preuves :</strong> 10+ beans <code>ObjectMapper</code> qualifiés quasi identiques (<code>MediaCoreConfig.java:55</code>, <code>IncidentCoreConfig.java:57</code>, <code>GeoCoreConfig.java:38</code>, <code>TntDisputeCoreConfig.java:38</code>, <code>DeliveryModuleConfig.java:51</code>, <code>RouteCoreConfig.java:51</code>, <code>TntBillingReportAutoConfiguration.java:37</code>, <code>BillingTemplatesConfig.java:37</code>, <code>DslBillingAutoConfiguration.java:55</code>, <code>WalletModuleConfig.java:63</code>) ; 16 classes de configuration Kafka définissant chacune leurs producteurs (<code>IncidentKafkaConfig</code>, <code>SyncKafkaConfig</code>, <code>DisputeKafkaConfig</code>, <code>KafkaRealtimeConfig</code>, <code>TntTpKafkaConfig</code>, <code>KafkaProducerConfig</code> (trust), etc.), en plus des fallbacks de <code>TntKafkaConfig</code> (bootstrap).
+<strong>Impact :</strong> dérive de sérialisation probable (un module oublie <code>JavaTimeModule</code> ou un réglage de visibilité ⇒ bugs d'interop Kafka subtils entre modules) ; le contrat implicite « le fallback bootstrap doit rester synchronisé avec la config module » (documenté dans CLAUDE.md) est un couplage caché déjà matérialisé par <code>deliveryObjectMapper</code>/<code>deliveryKafkaProducer</code> (<code>TntKafkaConfig.java:67-68,110-111</code>).
+<strong>Recommandation :</strong> fournir dans <code>tnt-common-core</code> une fabrique statique unique (<code>TntJson.mapper()</code> / <code>TntKafkaSenders.create(props)</code>) que chaque config module appelle — les qualifiers restent par module, la <em>configuration</em> devient unique. Réduire progressivement les fallbacks bootstrap à mesure que les qualifiers convergent.</p>
+<h3 id="a12-contrat-de-bean-cache-kernelwebclient-moyen">A12 — Contrat de bean caché <code>kernelWebClient</code> — Moyen</h3>
+<p><strong>Preuve :</strong> le bean est défini uniquement dans <code>tnt-bootstrap/.../bridge/KernelBridgeConfig.java:57</code> mais référencé par qualifier dans 10+ modules (tnt-auth-core, tnt-common-core, tnt-platform-gateway-core, tous les modules business, tnt-billing-cost…).
+<strong>Impact :</strong> aucun module n'est démarrable/testable seul sans recréer ce bean à la main ; le nom du qualifier est un contrat non typé, invisible à la compilation. Les modules coreBackend destinés (peut-être) à devenir des applications séparées hériteraient du même trou.
+<strong>Recommandation :</strong> déplacer la définition du WebClient Kernel (avec ses properties <code>iwm.kernel.*</code>) dans une auto-configuration de <code>tnt-common-core</code> (<code>@ConditionalOnMissingBean</code>), bootstrap ne conservant que d'éventuels overrides.</p>
+<h3 id="a13-responsabilites-dupliquees-cur-vs-agency-moyen">A13 — Responsabilités dupliquées cœur vs agency — Moyen</h3>
+<p><strong>Preuves :</strong> <code>coreBackend/tnt-agency-back-core/tnt-agency-sync-core</code> (dépend de <code>tnt-sync-core</code>) recrée une couche sync spécifique agence ; <code>tnt-agency-billing-core</code> coexiste avec les 7 modules <code>billing/*</code> ; <code>tnt-agency-org-core</code> avec <code>tnt-organization-core</code> ; <code>tnt-agency-eventing-core</code> avec <code>yow-event-kernel</code>. Deux implémentations d'application de commissions (<code>tnt-agency-commission-core</code> vs logique pricing/cost billing).
+<strong>Impact :</strong> frontière conceptuelle floue : qu'est-ce qui relève du <em>cœur</em> (multi-plateformes) vs du <em>BFF Agency</em> ? Sans règle écrite, la logique métier va se dupliquer (le signe avant-coureur est <code>MissionService</code> 768 lignes côté agency alors que <code>tnt-delivery-core</code> possède déjà le cycle de vie mission/livraison).
+<strong>Recommandation :</strong> écrire la charte coreBackend (A4) avec la règle « un BFF orchestre les use-cases du cœur, il n'en réimplémente pas » ; auditer <code>tnt-agency-billing-core</code> et <code>tnt-agency-commission-core</code> pour rapatrier toute règle de calcul dans <code>billing/*</code>.</p>
+<h3 id="a14-fuites-spring-dans-le-domaine-faible">A14 — Fuites Spring dans le domaine — Faible</h3>
+<p><strong>Preuves :</strong> <code>@ResponseStatus</code>/<code>HttpStatus</code> sur des exceptions de domaine : <code>billing/tnt-billing-wallet/.../domain/exception/WalletNotFoundException.java:3-4</code> (idem <code>WalletFrozenException</code>, <code>InsufficientBalanceException</code>, <code>PaymentIntentNotFoundException</code>, <code>InvoiceNotFoundException</code>, <code>GeoNotFoundException</code>, <code>DelivererNotFoundException</code>, <code>FreelancerNotFoundException</code>, <code>TntThirdPartyNotFoundException</code>, 4 exceptions resource — ~12 fichiers) ; <code>@Component</code> sur des services de domaine : <code>identity/tnt-administration-core/.../domain/service/TntRoleTemplateRegistry.java:3</code>, <code>business/tnt-accounting-core/.../domain/service/OhadaChartOfAccountsInitializer.java:5</code> ; <code>MediaType</code> Spring dans <code>foundation/tnt-platform-gateway-core/.../domain/model/KernelRawResponse.java:3</code>.
+<strong>Impact :</strong> limité (annotations passives), mais le domaine cesse d'être compilable sans spring-web, et le mapping exception→HTTP est décidé par le domaine au lieu de l'adapter. C'est la seule entorse à une pureté domaine par ailleurs très bonne (zéro <code>@Table</code>, zéro repository Spring Data dans <code>domain/</code>).
+<strong>Recommandation :</strong> supprimer <code>@ResponseStatus</code> au profit des <code>@RestControllerAdvice</code>/handlers d'erreurs des adapters web (il en existe déjà) ; instancier les deux services de domaine via <code>@Bean</code> dans la config du module plutôt que <code>@Component</code>.</p>
+<h3 id="a15-hygiene-du-depot-faible">A15 — Hygiène du dépôt — Faible</h3>
+<p><strong>Preuves :</strong> répertoire <code>BOOT-INF/classes</code> à la racine du dépôt (jar Spring Boot décompressé ; ignoré par git mais pollue le workspace et les greps) ; <code>ENDPOINT_TEST_REPORT.md</code> à la racine ; blocs commentés dans <code>TntCoreConfig.java:67-70</code> et <code>TiiBnTickApplication.java:63-66</code> ; CLAUDE.md annonce « ~34 modules » et « tnt-bootstrap @Imports each module's @Configuration » alors que le reactor en compte 52 et que l'assemblage passe majoritairement par scan/auto-configuration (cf. A10) ; la couche coreBackend est absente du schéma L0–L7.
+<strong>Impact :</strong> faible techniquement, mais la doc d'architecture étant le contrat d'équipe (et l'entrée des outils IA), sa péremption accélère les dérives constatées en A1/A2/A4.
+<strong>Recommandation :</strong> supprimer <code>BOOT-INF/</code>, purger le code commenté, mettre à jour CLAUDE.md (couche coreBackend, mécanisme d'assemblage réel, compte de modules).</p>
+<h3 id="a16-tnt-link-back-core-architecture-propre-mais-non-dimensionnee-pour-des-millions-dutilisateurs-eleve">A16 — <code>tnt-link-back-core</code> : architecture propre mais non dimensionnée pour « des millions d'utilisateurs » — Élevé</h3>
+<p>Le module est destiné à la cartographie/cartes temps réel à très grande échelle. Quatre constats bloquants pour cette cible :</p>
+<ol>
+<li><strong>Requête de viewport non spatiale et sans limite.</strong> <code>coreBackend/tnt-link-back-core/.../adapter/out/persistence/repository/NetworkNodeR2dbcRepository.java:17-20</code> :</li>
+</ol>
+<pre><code class="language-sql">SELECT * FROM tnt_link.network_nodes WHERE tenant_id = :tenantId
+AND latitude BETWEEN :minLat AND :maxLat AND longitude BETWEEN :minLng AND :maxLng
+</code></pre>
+<p>Colonnes <code>latitude</code>/<code>longitude</code> scalaires (pas de <code>geometry</code> PostGIS ni d'index GIST, alors que PostGIS est dans la stack et que <code>tnt-geo-core</code> l'utilise), <strong>aucun <code>LIMIT</code></strong>, aucun clustering par niveau de zoom. Un viewport large (ou un client malveillant passant <code>-90/90/-180/180</code>) rapatrie <em>tous</em> les nœuds du tenant. L'endpoint <code>GET /nearby</code> (<code>NetworkNodeController.java:119-128</code>) n'impose ni taille maximale de bbox ni pagination.
+2. <strong>N+1 sur le batch.</strong> <code>NetworkNodeController.java:109-116</code> : <code>getByRefIds</code> exécute <code>Flux.fromIterable(refIds).flatMap(refId -&gt; queryUseCase.findByRefId(...))</code> — une requête SQL par refId au lieu d'une clause <code>IN</code>.
+3. <strong>Aucun cache, aucun push.</strong> Zéro usage de Redis/Caffeine dans le module ; le « temps réel » repose sur du polling REST (<code>PUT /{nodeId}/location</code> écrit en base, les clients relisent), alors que la plateforme possède déjà <code>tnt-realtime-core</code> (SSE/WebSocket/STOMP + Redis) — déclaré dans le pom du module mais <strong>jamais importé</strong> (0 occurrence).
+4. <strong>Zéro test</strong> (0 fichier dans <code>src/test</code>) pour un module à fort trafic attendu.</p>
+<p><strong>Impact :</strong> sous charge réelle, chaque déplacement de carte de chaque utilisateur déclenche un full-range-scan Postgres non borné ; le plan « millions d'utilisateurs » est irréaliste sans refonte de la couche requête. Le point positif : l'hexagonal étant respecté, la correction est localisée dans l'adapter de persistance et le contrôleur, sans toucher au domaine.
+<strong>Recommandation :</strong> (1) colonne <code>geometry(Point,4326)</code> + index GIST et requête <code>ST_Within</code>/<code>ST_DWithin</code> (aligné sur <code>tnt-geo-core</code>) ; (2) <code>LIMIT</code> obligatoire + validation de la taille de bbox + clustering côté serveur au-delà d'un seuil ; (3) batch par <code>WHERE ref_id IN (:refIds)</code> ; (4) brancher la diffusion des positions sur <code>tnt-realtime-core</code> (la dépendance existe déjà) avec throttling par nœud ; (5) cache Redis court (1–5 s) sur les viewports chauds.</p>
+<h3 id="a17-dependances-maven-declarees-jamais-utilisees-link-back-faible">A17 — Dépendances Maven déclarées jamais utilisées (link-back) — Faible</h3>
+<p><strong>Preuve :</strong> <code>coreBackend/tnt-link-back-core/pom.xml</code> déclare 12 dépendances internes ; 5 n'ont <strong>aucun</strong> import correspondant dans le code (<code>tnt-realtime-core</code>, <code>tnt-incident-core</code>, <code>tnt-sync-core</code>, <code>tnt-route-core</code>, <code>tnt-organization-core</code> — vérifié par grep des packages).
+<strong>Impact :</strong> temps de build et graphe de dépendances artificiellement gonflés, faux signal architectural (le pom suggère une intégration realtime qui n'existe pas — cf. A16.3).
+<strong>Recommandation :</strong> purger via <code>mvn dependency:analyze</code> (à généraliser aux autres modules coreBackend), ou implémenter réellement l'intégration realtime prévue.</p>
+<hr />
+<h2 id="6-recommandations-priorisees">6. Recommandations priorisées</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Priorité</th>
+<th>Action</th>
+<th>Problèmes couverts</th>
+<th>Effort estimé</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>P1 — immédiat</strong></td>
+<td>Éliminer le <code>.block()</code> de <code>TenantValidationAspect</code> (aspect → décorateur réactif) et ajouter un timeout à <code>DisputeEventConsumer.java:101</code></td>
+<td>A3</td>
+<td>1–2 j</td>
+</tr>
+<tr>
+<td><strong>P1 — immédiat</strong></td>
+<td>Rendre la règle de couches exécutable : test ArchUnit reactor-wide (couches Maven + interdiction adapter.in→adapter.out et application→adapter.in.web) ; corriger A1 (i18n) et A2 (actor→incident, inversion façon trust)</td>
+<td>A1, A2, A5, A6</td>
+<td>3–5 j</td>
+</tr>
+<tr>
+<td><strong>P2 — court terme</strong></td>
+<td>Charte <code>coreBackend/</code> : position dans les couches, règle « BFF orchestre, ne réimplémente pas », activation par profil dans bootstrap ; refactorer les 9 contrôleurs gofp vers des use-cases</td>
+<td>A4, A5, A13</td>
+<td>1–2 sem</td>
+</tr>
+<tr>
+<td><strong>P2 — court terme</strong></td>
+<td>Tests sur <code>tnt-platform-gateway-core</code> (sécurité) puis réactivation de la gate JaCoCo avec ratchet</td>
+<td>A7</td>
+<td>1–2 sem</td>
+</tr>
+<tr>
+<td><strong>P2 — court terme</strong></td>
+<td>Durcir <code>tnt-link-back-core</code> avant montée en charge : requête bbox PostGIS + LIMIT + validation viewport, batch <code>IN</code>, diffusion via <code>tnt-realtime-core</code>, cache Redis court</td>
+<td>A16, A17</td>
+<td>1 sem</td>
+</tr>
+<tr>
+<td><strong>P3 — moyen terme</strong></td>
+<td>Consolider l'assemblage : un seul mécanisme (auto-configuration), scan restreint au bootstrap, suppression import mort/commentaires faux ; fabriques communes <code>ObjectMapper</code>/Kafka dans tnt-common-core ; auto-configuration du <code>kernelWebClient</code> dans tnt-common-core</td>
+<td>A10, A11, A12</td>
+<td>1 sem</td>
+</tr>
+<tr>
+<td><strong>P3 — moyen terme</strong></td>
+<td>Déplacer <code>@RequirePermission</code> hors de <code>adapter/in/web</code> ; purger <code>@ResponseStatus</code> du domaine ; scinder <code>LogisticTrustEvent</code> et <code>MissionService</code></td>
+<td>A8, A9, A14</td>
+<td>3–5 j</td>
+</tr>
+<tr>
+<td><strong>P4 — continu</strong></td>
+<td>Mettre à jour CLAUDE.md/README (52 modules, coreBackend, assemblage réel), nettoyer BOOT-INF et le code commenté</td>
+<td>A15</td>
+<td>0,5 j</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="7-conclusion">7. Conclusion</h2>
+<p>TiiBnTick Core est un projet dont <strong>le cœur (L0–L6) tient réellement ses promesses architecturales</strong> : hexagonal appliqué et vérifiable, DDD riche et non cosmétique, frontière Kernel HTTP-only prouvée, dette marquée quasi nulle, et un pattern d'inversion de dépendance inter-modules (trust) qui est un modèle du genre. Les fondations de gouvernance (enforcer, dependencyManagement, conventions) existent et fonctionnent.</p>
+<p>Le risque principal n'est pas l'existant mais la <strong>dérive</strong> : la règle de couches « stricte » n'étant qu'un texte, elle a déjà cédé deux fois (A1, A2) ; la couche coreBackend, née hors de la documentation, applique des standards inférieurs (bypass hexagonal, DTOs web en couche application, zéro test) qui, non corrigés, deviendront le modèle copié par les prochains modules. Les six <code>.block()</code> — dont un dans un aspect transversal — sont le seul danger d'exploitation immédiat.</p>
+<p>La bonne nouvelle : chaque problème identifié a déjà sa solution <em>dans le dépôt lui-même</em> (le pattern trust pour A2, les use-cases delivery pour A5/A8, les handlers d'erreurs web pour A14). L'effort demandé est donc moins de l'invention que de l'<strong>uniformisation outillée</strong> : un test ArchUnit reactor-wide et la réactivation de la gate JaCoCo transformeraient les règles documentaires en règles exécutables, et verrouilleraient durablement la qualité déjà atteinte.</p>
+<hr />
+<p><em>Audit réalisé sur l'état du dépôt au 2026-07-16 (branche <code>master</code>, HEAD <code>c1c1732</code>). Toutes les localisations fichier:ligne ont été vérifiées dans le code source.</em></p>
+<footer>Audit technique TiiBnTick — généré à partir de l'analyse du code source réel. Chaque constat référence les fichiers et lignes concernés.</footer>
+</main>
+</div>
+
+<script type="module">
+  try {
+    const m = await import("https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs");
+    const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    m.default.initialize({ startOnLoad: true, theme: dark ? "dark" : "neutral", securityLevel: "loose" });
+  } catch (e) {
+    document.querySelectorAll(".mermaid").forEach(el => {
+      el.style.textAlign = "left";
+      el.innerHTML = "<div style='color:var(--muted);font-size:.75rem;margin-bottom:.5rem'>⚠ Diagramme Mermaid (connexion internet requise pour le rendu) — source :</div><pre>" + el.textContent.replace(/&/g,"&amp;").replace(/</g,"&lt;") + "</pre>";
+    });
+  }
+</script>
+
+</body>
+</html>

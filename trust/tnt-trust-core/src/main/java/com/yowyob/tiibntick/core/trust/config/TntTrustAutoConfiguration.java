@@ -12,8 +12,6 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.data.r2dbc.repository.config.EnableR2dbcRepositories;
-import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.Duration;
@@ -74,7 +72,6 @@ import java.time.Duration;
 @AutoConfiguration
 @ConditionalOnProperty(prefix = "tnt.trust", name = "enabled", havingValue = "true", matchIfMissing = true)
 @EnableConfigurationProperties(TntTrustProperties.class)
-@EnableScheduling
 @ComponentScan(basePackages = "com.yowyob.tiibntick.core.trust")
 @EnableR2dbcRepositories(basePackages = "com.yowyob.tiibntick.core.trust.adapter.out.persistence")
 public class TntTrustAutoConfiguration {

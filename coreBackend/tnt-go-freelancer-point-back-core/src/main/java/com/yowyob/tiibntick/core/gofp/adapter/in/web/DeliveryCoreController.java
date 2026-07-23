@@ -12,6 +12,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @Tag(name = "GOFP — Livraisons", description = "API métier générique — Cycle de vie livraison")
 @RestController
@@ -23,6 +24,7 @@ public class DeliveryCoreController {
 
     @Operation(summary = "Créer une livraison depuis une annonce assignée")
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<DeliveryEntity> create(@RequestParam UUID announcementId,
                                         @RequestParam UUID freelancerActorId) {
@@ -41,30 +43,35 @@ public class DeliveryCoreController {
 
     @Operation(summary = "Confirmer le pickup → PICKED_UP")
     @PatchMapping("/{id}/pickup")
+    @PreAuthorize("isAuthenticated()")
     public Mono<DeliveryEntity> confirmPickup(@PathVariable UUID id) {
         return deliveryUseCase.confirmPickup(id);
     }
 
     @Operation(summary = "Démarrer le transit → IN_TRANSIT")
     @PatchMapping("/{id}/transit")
+    @PreAuthorize("isAuthenticated()")
     public Mono<DeliveryEntity> startTransit(@PathVariable UUID id) {
         return deliveryUseCase.startTransit(id);
     }
 
     @Operation(summary = "Déposer au point relais → AT_RELAY")
     @PatchMapping("/{id}/relay/{relayHubId}")
+    @PreAuthorize("isAuthenticated()")
     public Mono<DeliveryEntity> depositAtRelay(@PathVariable UUID id, @PathVariable UUID relayHubId) {
         return deliveryUseCase.depositAtRelay(id, relayHubId);
     }
 
     @Operation(summary = "Reprendre depuis le point relais → IN_TRANSIT")
     @PatchMapping("/{id}/resume")
+    @PreAuthorize("isAuthenticated()")
     public Mono<DeliveryEntity> resumeFromRelay(@PathVariable UUID id) {
         return deliveryUseCase.resumeFromRelay(id);
     }
 
     @Operation(summary = "Livraison complétée → DELIVERED")
     @PatchMapping("/{id}/complete")
+    @PreAuthorize("isAuthenticated()")
     public Mono<DeliveryEntity> complete(@PathVariable UUID id,
                                           @RequestParam(required = false) Double lat,
                                           @RequestParam(required = false) Double lon) {
@@ -73,18 +80,21 @@ public class DeliveryCoreController {
 
     @Operation(summary = "Livraison échouée → FAILED")
     @PatchMapping("/{id}/fail")
+    @PreAuthorize("isAuthenticated()")
     public Mono<DeliveryEntity> fail(@PathVariable UUID id, @RequestParam String reason) {
         return deliveryUseCase.failDelivery(id, reason);
     }
 
     @Operation(summary = "Annuler une livraison → CANCELLED")
     @PatchMapping("/{id}/cancel")
+    @PreAuthorize("isAuthenticated()")
     public Mono<DeliveryEntity> cancel(@PathVariable UUID id) {
         return deliveryUseCase.cancelDelivery(id);
     }
 
     @Operation(summary = "Mettre à jour la position GPS du livreur")
     @PatchMapping("/{id}/location")
+    @PreAuthorize("isAuthenticated()")
     public Mono<Void> updateLocation(@PathVariable UUID id,
                                       @RequestParam double lat,
                                       @RequestParam double lon) {

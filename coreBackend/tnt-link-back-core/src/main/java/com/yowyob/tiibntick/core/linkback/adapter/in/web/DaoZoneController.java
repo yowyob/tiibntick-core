@@ -36,6 +36,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * Generic Link business API for DAO governance zones and their proposals —
@@ -62,6 +63,7 @@ public class DaoZoneController {
 
     @Operation(summary = "Create a new DAO governance zone")
     @PostMapping("/zones")
+    @PreAuthorize("isAuthenticated()")
     public Mono<DaoZoneResponse> createZone(
             @Valid @RequestBody CreateDaoZoneRequest request,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
@@ -74,6 +76,7 @@ public class DaoZoneController {
 
     @Operation(summary = "Archive a DAO zone")
     @DeleteMapping("/zones/{zoneId}")
+    @PreAuthorize("isAuthenticated()")
     public Mono<DaoZoneResponse> archiveZone(
             @PathVariable UUID zoneId,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
@@ -107,6 +110,7 @@ public class DaoZoneController {
 
     @Operation(summary = "Propose a governance change in a DAO zone")
     @PostMapping("/zones/{zoneId}/proposals")
+    @PreAuthorize("isAuthenticated()")
     public Mono<DaoProposalResponse> propose(
             @PathVariable UUID zoneId,
             @Valid @RequestBody ProposeDaoProposalRequest request,
@@ -119,6 +123,7 @@ public class DaoZoneController {
 
     @Operation(summary = "Vote on an open proposal (one vote per member)")
     @PostMapping("/proposals/{proposalId}/vote")
+    @PreAuthorize("isAuthenticated()")
     public Mono<DaoProposalResponse> vote(
             @PathVariable UUID proposalId,
             @Valid @RequestBody VoteOnProposalRequest request,
@@ -129,6 +134,7 @@ public class DaoZoneController {
 
     @Operation(summary = "Close a proposal, resolving it as APPROVED or REJECTED by vote tally")
     @PostMapping("/proposals/{proposalId}/close")
+    @PreAuthorize("isAuthenticated()")
     public Mono<DaoProposalResponse> close(
             @PathVariable UUID proposalId,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {

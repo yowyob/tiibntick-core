@@ -16,6 +16,7 @@ import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
@@ -25,6 +26,9 @@ import java.util.UUID;
  *
  * <p>No domain logic lives here — it delegates to aggregates and domain policies.
  * Persistence + event publishing happen after domain mutations (Unit of Work pattern).
+ * Methods combining a save with an event publish are {@code @Transactional} so the
+ * outbox envelope/entry (Chantier C · Audit n°3 · P5) commits atomically with the
+ * aggregate write.
  *
  * @author MANFOUO Braun
  */
@@ -41,6 +45,7 @@ public class DeliveryAnnouncementService implements DeliveryAnnouncementUseCase 
     private final DeliveryEventPublisher eventPublisher;
 
     @Override
+    @Transactional
     @RequirePermission(resource = "announcement", action = "create")
     public Mono<DeliveryAnnouncement> publishAnnouncement(CreateDeliveryAnnouncementCommand cmd) {
         log.info("Publishing delivery announcement for client={} tenant={}", cmd.clientId(), cmd.tenantId());
@@ -93,6 +98,7 @@ public class DeliveryAnnouncementService implements DeliveryAnnouncementUseCase 
     }
 
     @Override
+    @Transactional
     @RequirePermission(resource = "announcement", action = "elect")
     public Mono<DeliveryAnnouncement> selectResponse(SelectAnnouncementResponseCommand cmd) {
         log.info("Client={} selecting response={} on announcement={}", cmd.clientId(), cmd.responseId(), cmd.announcementId());

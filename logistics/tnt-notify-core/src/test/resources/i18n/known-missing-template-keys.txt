@@ -1,0 +1,35 @@
+# Known-missing i18n templateKey baseline for TemplateKeyI18nRegressionTest.
+#
+# Keys listed here are referenced in production code but not (yet) translated in all 5
+# yow-i18n-kernel language packs. This is pre-existing debt tracked separately as Chantier F
+# (docs/audits/remediation/phase-0-critical.md — Audit n4 P-1/P-21): FreelancerOrg notification
+# keys and market e-commerce keys were wired up without ever adding their translations.
+#
+# This file is a baseline, not a to-do list this test enforces fixing: it exists so the test
+# can distinguish "already-known, tracked debt" (build stays green) from "a brand new templateKey
+# was just added without its translations" (build fails). When Chantier F adds a key's
+# translations to all 5 packs, delete its line here.
+
+# Audit n4 P-21 — MarketNotificationAdapter e-commerce keys (upper-snake-case, doesn't even
+# match the packs' dotted-lowercase convention).
+CLIENT_QUOTE_RECEIVED
+PROVIDER_NEW_QUOTE_REQUEST
+ORDER_CONFIRMED
+ORDER_PAID
+ORDER_COMPLETED
+REVIEW_PUBLISHED
+LISTING_APPROVED
+LISTING_REJECTED
+
+# Audit n4 P-1 — FreelancerOrgNotificationTemplates / FreelancerOrgKafkaEventConsumer keys.
+notify.freelancer_org.verified
+notify.freelancer_org.kyc_level_upgraded
+notify.freelancer_org.suspended
+notify.freelancer_org.unsuspended
+notify.freelancer_org.kyc_rejected
+notify.freelancer_org.mission_assigned
+notify.sub_deliverer.invited
+notify.sub_deliverer.invitation_accepted
+notify.sub_deliverer.mission_assigned
+notify.billing.template_applied
+notify.billing.surcharge_triggered

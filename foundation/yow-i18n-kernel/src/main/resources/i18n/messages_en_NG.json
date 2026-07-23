@@ -29,5 +29,33 @@
   "blockchain.delivery.confirmed": "Package {{package_id}} delivery immutably recorded.",
 
   "account.welcome": "Welcome to TiiBnTick, {{name}}!",
-  "account.otp.sent": "Your OTP is {{otp}}. Expires in {{duration}} minutes."
+  "account.otp.sent": "Your OTP is {{otp}}. Expires in {{duration}} minutes.",
+
+  "notify.freelancer_org.verified": "🎉 Congratulations! Your organization {{orgId}} has been verified (KYC level {{kycLevel}}). You can now accept missions on TiiBnTick.",
+  "notify.freelancer_org.kyc_level_upgraded": "✅ KYC level upgraded for organization {{orgId}}: now certified at level {{kycLevel}}. New features unlocked.",
+  "notify.freelancer_org.kyc_rejected": "❌ KYC verification for organization {{orgId}} was rejected. Reason: {{reason}}. Kindly submit updated documents.",
+  "notify.freelancer_org.suspended": "⚠️ Your organization {{orgId}} has been suspended. Reason: {{reason}}. Kindly contact support for more information.",
+  "notify.freelancer_org.unsuspended": "✅ The suspension on your organization {{orgId}} has been lifted. You can resume your activities.",
+  "notify.freelancer_org.mission_assigned": "📦 Mission assigned to your organization {{freelancerOrgId}}. Delivery reference: {{deliveryId}}.",
+  "notify.sub_deliverer.mission_assigned": "🏍️ New mission {{deliveryId}} assigned for organization {{orgId}}. Prepare for pickup.",
+  "notify.billing.template_applied": "💼 Billing policy created from template {{templateCode}} by {{actorId}}. Policy ID: {{policyId}}.",
+
+  "incident.notification.incident.escalated": "{{title}} — {{body}} (Incident {{incidentId}})",
+  "incident.notification.incident.driver.proposal": "{{title}} — {{body}} (Incident {{incidentId}})",
+  "incident.notification.incident.auto.failed": "{{title}} — {{body}} (Incident {{incidentId}})",
+  "incident.notification.agency.handling.started": "{{title}} — {{body}} (Incident {{incidentId}})",
+  "incident.notification.incident.created": "{{title}} — {{body}} (Incident {{incidentId}})",
+  "incident.notification.interagency.coop.requested": "{{title}} — {{body}} (Incident {{incidentId}})",
+  "incident.notification.interagency.coop.updated": "{{title}} — {{body}} (Incident {{incidentId}})",
+  "incident.notification.handover.confirmed": "{{title}} — {{body}} (Incident {{incidentId}})",
+  "incident.notification.driver.mission.assigned": "{{title}} — {{body}} (Incident {{incidentId}})",
+
+  "CLIENT_QUOTE_RECEIVED": "You received a quote from {{providerName}} for your request {{quoteRequestId}}.",
+  "PROVIDER_NEW_QUOTE_REQUEST": "New quote request from {{clientCity}} (ref. {{quoteRequestId}}).",
+  "ORDER_CONFIRMED": "Your order {{orderId}} has been confirmed by {{providerName}}.",
+  "ORDER_PAID": "Payment received for order {{orderId}}: {{amountXaf}} XAF.",
+  "ORDER_COMPLETED": "Your order {{orderId}} has been completed.",
+  "REVIEW_PUBLISHED": "New review {{reviewId}} published: {{rating}}/5.",
+  "LISTING_APPROVED": "Your listing {{listingId}} has been approved.",
+  "LISTING_REJECTED": "Your listing {{listingId}} was rejected. Reason: {{reason}}."
 }

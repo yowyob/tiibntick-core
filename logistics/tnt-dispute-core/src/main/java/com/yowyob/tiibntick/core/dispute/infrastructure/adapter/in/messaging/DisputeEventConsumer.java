@@ -19,6 +19,8 @@ import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
+
 /**
  * Kafka consumer for inbound events triggering dispute lifecycle operations.
  *
@@ -52,6 +54,15 @@ import reactor.core.publisher.Mono;
 public class DisputeEventConsumer {
 
     private static final Logger log = LoggerFactory.getLogger(DisputeEventConsumer.class);
+
+    /**
+     * Chantier D · Audit n°6 · S14 / Audit n°1 · A3 — {@code .block()} below used to have
+     * no timeout: a stuck downstream call (DB, Kafka producer for domain events, etc.)
+     * would hang this Kafka consumer thread forever, stalling the whole partition. Bounded
+     * instead, matching the same pattern {@code EntityChangedEventConsumer} (tnt-sync-core)
+     * already uses for its own Kafka-listener-thread {@code .block()}.
+     */
+    private static final Duration PROCESSING_TIMEOUT = Duration.ofSeconds(30);
 
     /** Description prefix for auto-opened disputes from incident escalation. */
     private static final String AUTO_DISPUTE_DESCRIPTION_PREFIX =
@@ -98,7 +109,7 @@ public class DisputeEventConsumer {
                     .doOnError(e -> log.error("Failed to process record from topic={}: {}",
                             record.topic(), e.getMessage()))
                     .onErrorResume(e -> Mono.empty()) // skip unprocessable records without blocking
-                    .block();
+                    .block(PROCESSING_TIMEOUT);
 
         } catch (Exception e) {
             log.error("Error parsing or processing Kafka record from topic={}: {}",

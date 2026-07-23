@@ -3,10 +3,12 @@ package com.yowyob.tiibntick.core.billing.wallet.adapter.out.persistence;
 import com.yowyob.tiibntick.core.billing.wallet.adapter.out.persistence.mapper.WalletPersistenceMapper;
 import com.yowyob.tiibntick.core.billing.wallet.adapter.out.persistence.repository.PaymentIntentR2dbcRepository;
 import com.yowyob.tiibntick.core.billing.wallet.application.port.out.IPaymentIntentRepository;
+import com.yowyob.tiibntick.core.billing.wallet.domain.enums.PaymentIntentStatus;
 import com.yowyob.tiibntick.core.billing.wallet.domain.model.PaymentIntent;
 import com.yowyob.tiibntick.core.billing.wallet.domain.model.PaymentIntentId;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
@@ -49,5 +51,11 @@ public class PaymentIntentRepositoryAdapter implements IPaymentIntentRepository 
     @Override
     public Mono<PaymentIntent> findByInvoiceId(String invoiceId) {
         return repo.findByInvoiceId(invoiceId).map(mapper::toDomain);
+    }
+
+    @Override
+    public Flux<PaymentIntent> findAllPendingWithProviderReference() {
+        return repo.findByStatusAndExternalRefIsNotNull(PaymentIntentStatus.PENDING.name())
+                .map(mapper::toDomain);
     }
 }

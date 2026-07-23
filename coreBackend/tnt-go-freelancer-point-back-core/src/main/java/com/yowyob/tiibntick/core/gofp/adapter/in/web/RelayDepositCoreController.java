@@ -11,6 +11,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @Tag(name = "GOFP — Dépôts Relais", description = "API métier générique — Dépôts en points relais")
 @RestController
@@ -22,6 +23,7 @@ public class RelayDepositCoreController {
 
     @Operation(summary = "Créer un dépôt en point relais")
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<RelayDepositEntity> create(@RequestParam UUID packetId,
                                             @RequestParam UUID clientActorId,
@@ -41,6 +43,7 @@ public class RelayDepositCoreController {
     public Flux<RelayDepositEntity> findByClient(@PathVariable UUID clientActorId) { return relayDepositUseCase.findByClientActorId(clientActorId); }
 
     @PatchMapping("/{id}/retrieve")
+    @PreAuthorize("isAuthenticated()")
     public Mono<RelayDepositEntity> markRetrieved(@PathVariable UUID id) { return relayDepositUseCase.markRetrieved(id); }
 
     @GetMapping("/{id}/penalty")

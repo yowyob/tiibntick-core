@@ -2,6 +2,7 @@ package com.yowyob.tiibntick.core.billing.wallet.application.port.out;
 
 import com.yowyob.tiibntick.core.billing.wallet.domain.model.PaymentIntent;
 import com.yowyob.tiibntick.core.billing.wallet.domain.model.PaymentIntentId;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
@@ -14,4 +15,12 @@ public interface IPaymentIntentRepository {
     Mono<PaymentIntent> findByExternalRef(String externalRef);
     Mono<PaymentIntent> findByIdempotencyKey(String idempotencyKey);
     Mono<PaymentIntent> findByInvoiceId(String invoiceId);
+
+    /**
+     * All still-{@code PENDING} intents that already carry a Kernel
+     * {@code payment-gateway-controller} order id (set via
+     * {@code PaymentIntent#attachProviderReference}) — the working set for the payment
+     * order reconciliation poller (workstream step 5).
+     */
+    Flux<PaymentIntent> findAllPendingWithProviderReference();
 }

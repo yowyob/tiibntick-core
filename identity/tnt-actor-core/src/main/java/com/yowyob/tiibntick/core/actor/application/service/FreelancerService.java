@@ -18,6 +18,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.Objects;
 import java.util.UUID;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class FreelancerService implements ICreateFreelancerProfileUseCase, IFindFreelancerUseCase {
@@ -37,6 +38,7 @@ public class FreelancerService implements ICreateFreelancerProfileUseCase, IFind
     }
 
     @Override
+    @Transactional
     public Mono<FreelancerProfile> createFreelancerProfile(CreateFreelancerProfileCommand command) {
         Objects.requireNonNull(command, "command must not be null");
         return freelancerRepository.existsByActorId(command.tenantId(), command.actorId())

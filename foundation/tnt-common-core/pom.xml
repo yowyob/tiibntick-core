@@ -114,6 +114,18 @@
             <version>${reactor-test.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- TenantValidationAspectTest (Chantier D · Audit n°6 · S14 / Audit n°1 · A3) —
+             mocks ProceedingJoinPoint/CurrentTenantUseCase. -->
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
 
     </dependencies>
 

@@ -6,8 +6,6 @@ import com.yowyob.tiibntick.common.exception.TntNotFoundException;
 
 import com.yowyob.tiibntick.common.exception.TntValidationException;
 
-import com.yowyob.tiibntick.core.agency.assignment.adapter.in.web.dto.MissionResponse;
-
 import com.yowyob.tiibntick.core.agency.assignment.adapter.out.clients.DeliveryMissionPort;
 
 import com.yowyob.tiibntick.core.agency.assignment.adapter.out.persistence.AgencyMissionR2dbcRepository;
@@ -40,6 +38,7 @@ import com.yowyob.tiibntick.core.agency.org.adapter.out.persistence.AgencyRelayH
 
 import com.yowyob.tiibntick.core.agency.org.application.service.AgencyRegistryService;
 
+import com.yowyob.tiibntick.core.agency.org.adapter.out.clients.TrustPort;
 import com.yowyob.tiibntick.core.agency.org.hubops.application.service.HubParcelService;
 
 import lombok.RequiredArgsConstructor;
@@ -94,6 +93,8 @@ public class MissionService {
 
     private final HubParcelService hubParcelService;
 
+    private final TrustPort trust;
+
     private final CommissionService commissionService;
 
     private final AgencyEventPublisher eventPublisher;
@@ -134,7 +135,7 @@ public class MissionService {
 
     @Transactional
 
-    public Mono<MissionResponse> create(CreateMissionInput input) {
+    public Mono<AgencyMission> create(CreateMissionInput input) {
 
         Instant now = input.scheduledAt() != null ? input.scheduledAt() : Instant.now();
 
@@ -162,7 +163,7 @@ public class MissionService {
 
                     input.targetHubId(), Instant.now());
 
-            return persist(mission).flatMap(this::publishCreated).map(MissionResponse::from);
+            return persist(mission).flatMap(this::publishCreated);
 
         }
 
@@ -178,7 +179,7 @@ public class MissionService {
 
                 input.targetHubId()
 
-        )).map(r -> MissionResponse.from(r.mission()));
+        )).map(CreatedMissionResult::mission);
 
     }
 
@@ -200,7 +201,7 @@ public class MissionService {
 
                 .flatMap(agency -> {
 
-                    if (agency.coreAgencyId() == null || agency.kernelOrganizationId() == null) {
+                    if (agency.getCoreAgencyId() == null || agency.getKernelOrganizationId() == null) {
 
                         return Mono.error(new TntValidationException(
 
@@ -212,11 +213,11 @@ public class MissionService {
 
                             input.tenantId(),
 
-                            agency.kernelOrganizationId(),
+                            agency.getKernelOrganizationId(),
 
                             input.agencyId(),
 
-                            agency.coreAgencyId(),
+                            agency.getCoreAgencyId(),
 
                             agencyMissionId,
 
@@ -380,7 +381,21 @@ public class MissionService {
 
                 .flatMap(this::persist)
 
-                .flatMap(this::publishStarted);
+                .flatMap(this::publishStarted)
+
+                .flatMap(saved -> trust.recordPickup(new TrustPort.PickupTransaction(
+
+                        saved.getCoreMissionId() != null ? saved.getCoreMissionId() : saved.getId(),
+
+                        saved.getId(),
+
+                        delivererId,
+
+                        0.0,
+
+                        0.0,
+
+                        now)).thenReturn(saved));
 
     }
 
@@ -400,7 +415,25 @@ public class MissionService {
 
                 .flatMap(saved -> createAutoCommission(saved, delivererId).thenReturn(saved))
 
-                .flatMap(saved -> publishDelivered(saved, delivererId, proofReference));
+                .flatMap(saved -> publishDelivered(saved, delivererId, proofReference))
+
+                .flatMap(saved -> trust.recordDelivery(new TrustPort.DeliveryTransaction(
+
+                        saved.getId(),
+
+                        delivererId,
+
+                        "",
+
+                        proofReference != null ? proofReference : "",
+
+                        "",
+
+                        0.0,
+
+                        0.0,
+
+                        now)).thenReturn(saved));
 
     }
 
@@ -484,86 +517,132 @@ public class MissionService {
 
 
     @Transactional
-
     public Mono<AgencyMission> syncFromCoreStatus(UUID tenantId, UUID coreMissionId, String coreStatus) {
+        return syncFromCoreStatus(tenantId, coreMissionId, coreStatus, CoreMissionSyncHint.empty());
+    }
 
+    /**
+     * Syncs Core delivery status onto the local agency projection.
+     * If the projection is missing and {@code hint.agencyId()} is present, creates it first
+     * (Kafka create/status events that arrive before a local mission row).
+     */
+    @Transactional
+    public Mono<AgencyMission> syncFromCoreStatus(UUID tenantId, UUID coreMissionId, String coreStatus,
+                                                  CoreMissionSyncHint hint) {
         Instant now = Instant.now();
-
         return missionRepo.findByCoreMissionIdAndTenantId(coreMissionId, tenantId)
-
                 .map(MissionMapper::toDomain)
+                .switchIfEmpty(Mono.defer(() -> createProjectionFromCoreHint(
+                        tenantId, coreMissionId, coreStatus, hint, now)))
+                .flatMap(mission -> applySyncedStatus(mission, coreStatus, now));
+    }
 
-                .flatMap(mission -> {
+    private Mono<AgencyMission> createProjectionFromCoreHint(
+            UUID tenantId, UUID coreMissionId, String coreStatus,
+            CoreMissionSyncHint hint, Instant now) {
+        UUID agencyId = hint != null ? hint.agencyId() : null;
+        if (agencyId == null) {
+            log.warn("[Mission] skip create-on-Kafka: no agencyId for coreMissionId={} status={}",
+                    coreMissionId, coreStatus);
+            return Mono.empty();
+        }
+        AgencyMission mission = AgencyMission.create(
+                UUID.randomUUID(), tenantId, agencyId, coreMissionId, now, now);
+        Double distance = hint.distanceKm() != null ? hint.distanceKm() : DEFAULT_DISTANCE_KM;
+        Double weight = hint.weightKg() != null ? hint.weightKg() : 1.0;
+        mission.applyCreationSnapshot(
+                hint.branchId(),
+                hint.pickupAddress(),
+                hint.deliveryAddress(),
+                hint.senderName(),
+                hint.recipientName(),
+                hint.recipientPhone(),
+                weight,
+                distance,
+                hint.packagesCount() != null ? hint.packagesCount() : 1,
+                hint.priority() != null ? hint.priority() : "NORMAL",
+                hint.targetHubId(),
+                now);
+        log.info("[Mission] created local projection from Kafka coreMissionId={} agencyId={}",
+                coreMissionId, agencyId);
+        return Mono.just(mission);
+    }
 
-                    MissionStatus mapped = DeliveryStatusSyncMapper.toAgencyStatus(coreStatus);
+    private Mono<AgencyMission> applySyncedStatus(AgencyMission mission, String coreStatus, Instant now) {
+        MissionStatus mapped = DeliveryStatusSyncMapper.toAgencyStatus(coreStatus);
+        if (mapped == MissionStatus.CANCELLED) {
+            mission.cancel("Status synced from Core", now);
+        } else if (mapped == MissionStatus.FAILED) {
+            mission.fail("Status synced from Core", now);
+        } else if (mapped == MissionStatus.DELIVERED) {
+            mission.syncDeliveredFromCore(now);
+        } else {
+            DeliveryStatusSyncMapper.applyCoreStatus(mission, coreStatus, now);
+        }
+        return persist(mission);
+    }
 
-                    if (mapped == MissionStatus.CANCELLED) {
+    /** Optional fields from Core Kafka payloads when projecting a missing local mission. */
+    public record CoreMissionSyncHint(
+            UUID agencyId,
+            UUID branchId,
+            String pickupAddress,
+            String deliveryAddress,
+            String senderName,
+            String recipientName,
+            String recipientPhone,
+            Double weightKg,
+            Double distanceKm,
+            Integer packagesCount,
+            String priority,
+            UUID targetHubId
+    ) {
+        public static CoreMissionSyncHint empty() {
+            return new CoreMissionSyncHint(
+                    null, null, null, null, null, null, null, null, null, null, null, null);
+        }
 
-                        mission.cancel("Status synced from Core", now);
+        public static CoreMissionSyncHint ofAgency(UUID agencyId) {
+            return new CoreMissionSyncHint(
+                    agencyId, null, null, null, null, null, null, null, null, null, null, null);
+        }
+    }
 
-                    } else if (mapped == MissionStatus.FAILED) {
+    public Mono<AgencyMission> getById(UUID tenantId, UUID missionId) {
 
-                        mission.fail("Status synced from Core", now);
-
-                    } else if (mapped == MissionStatus.DELIVERED) {
-
-                        mission.syncDeliveredFromCore(now);
-
-                    } else {
-
-                        DeliveryStatusSyncMapper.applyCoreStatus(mission, coreStatus, now);
-
-                    }
-
-                    return persist(mission);
-
-                });
+        return requireMission(missionId, tenantId);
 
     }
 
 
 
-    public Mono<MissionResponse> getById(UUID tenantId, UUID missionId) {
-
-        return requireMission(missionId, tenantId).map(MissionResponse::from);
-
-    }
-
-
-
-    public Flux<MissionResponse> listByAgency(UUID tenantId, UUID agencyId) {
+    public Flux<AgencyMission> listByAgency(UUID tenantId, UUID agencyId) {
 
         return agencyRegistry.getById(tenantId, agencyId)
 
                 .thenMany(missionRepo.findByAgencyIdAndTenantId(agencyId, tenantId))
 
-                .map(MissionMapper::toDomain)
-
-                .map(MissionResponse::from);
+                .map(MissionMapper::toDomain);
 
     }
 
 
 
-    public Flux<MissionResponse> listByAgencyAndStatus(UUID tenantId, UUID agencyId, String status) {
+    public Flux<AgencyMission> listByAgencyAndStatus(UUID tenantId, UUID agencyId, String status) {
 
         return missionRepo.findByAgencyIdAndTenantIdAndStatus(agencyId, tenantId, status)
 
-                .map(MissionMapper::toDomain)
-
-                .map(MissionResponse::from);
+                .map(MissionMapper::toDomain);
 
     }
 
 
 
-    public Flux<MissionResponse> listByDeliverer(UUID tenantId, UUID delivererId) {
+    public Flux<AgencyMission> listByDeliverer(UUID tenantId, UUID delivererId) {
 
         return missionRepo.findByAssignedDelivererIdAndTenantId(delivererId, tenantId)
 
-                .map(MissionMapper::toDomain)
-
-                .map(MissionResponse::from);
+                .map(MissionMapper::toDomain);
 
     }
 

@@ -1,11 +1,14 @@
 package com.yowyob.tiibntick.core.billing.report.adapter.in.web;
 
+import com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser;
+import com.yowyob.tiibntick.core.auth.domain.model.TntUserIdentity;
 import com.yowyob.tiibntick.core.billing.report.adapter.in.web.dto.response.*;
 import com.yowyob.tiibntick.core.billing.report.adapter.in.web.mapper.ReportWebMapper;
 import com.yowyob.tiibntick.core.billing.report.application.port.in.query.*;
 import com.yowyob.tiibntick.core.billing.report.application.service.ReportingService;
 import com.yowyob.tiibntick.core.billing.report.domain.model.ReportPeriod;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
@@ -41,22 +44,22 @@ public class ReportingController {
     @GetMapping("/revenue")
     @Operation(summary = "Generate a revenue report for a given period")
     public Mono<RevenueReportResponse> getRevenueReport(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(defaultValue = "XAF") String currency) {
-        RevenueReportQuery query = new RevenueReportQuery(tenantId, ReportPeriod.of(from, to), currency);
+        RevenueReportQuery query = new RevenueReportQuery(currentUser.tenantId(), ReportPeriod.of(from, to), currency);
         return reportingService.generateRevenueReport(query).map(mapper::toResponse);
     }
 
     @GetMapping("/revenue/export/csv")
     @Operation(summary = "Export revenue report as CSV")
     public Mono<ResponseEntity<byte[]>> exportRevenueCsv(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(defaultValue = "XAF") String currency) {
-        RevenueReportQuery query = new RevenueReportQuery(tenantId, ReportPeriod.of(from, to), currency);
+        RevenueReportQuery query = new RevenueReportQuery(currentUser.tenantId(), ReportPeriod.of(from, to), currency);
         return reportingService.exportRevenueToCsv(query)
                 .map(csv -> ResponseEntity.ok()
                         .header(HttpHeaders.CONTENT_DISPOSITION,
@@ -70,22 +73,22 @@ public class ReportingController {
     @GetMapping("/commissions")
     @Operation(summary = "Generate a commission summary for a given period")
     public Mono<CommissionSummaryResponse> getCommissionSummary(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(defaultValue = "XAF") String currency) {
-        CommissionReportQuery query = new CommissionReportQuery(tenantId, ReportPeriod.of(from, to), currency);
+        CommissionReportQuery query = new CommissionReportQuery(currentUser.tenantId(), ReportPeriod.of(from, to), currency);
         return reportingService.generateCommissionSummary(query).map(mapper::toResponse);
     }
 
     @GetMapping("/commissions/export/csv")
     @Operation(summary = "Export commissions as CSV")
     public Mono<ResponseEntity<byte[]>> exportCommissionsCsv(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(defaultValue = "XAF") String currency) {
-        CommissionReportQuery query = new CommissionReportQuery(tenantId, ReportPeriod.of(from, to), currency);
+        CommissionReportQuery query = new CommissionReportQuery(currentUser.tenantId(), ReportPeriod.of(from, to), currency);
         return reportingService.exportCommissionsToCsv(query)
                 .map(csv -> ResponseEntity.ok()
                         .header(HttpHeaders.CONTENT_DISPOSITION,
@@ -99,22 +102,22 @@ public class ReportingController {
     @GetMapping("/margins")
     @Operation(summary = "Generate a margin report for a given period")
     public Mono<MarginReportResponse> getMarginReport(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(defaultValue = "XAF") String currency) {
-        MarginReportQuery query = new MarginReportQuery(tenantId, ReportPeriod.of(from, to), currency);
+        MarginReportQuery query = new MarginReportQuery(currentUser.tenantId(), ReportPeriod.of(from, to), currency);
         return reportingService.generateMarginReport(query).map(mapper::toResponse);
     }
 
     @GetMapping("/margins/export/csv")
     @Operation(summary = "Export margin report as CSV")
     public Mono<ResponseEntity<byte[]>> exportMarginCsv(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(defaultValue = "XAF") String currency) {
-        MarginReportQuery query = new MarginReportQuery(tenantId, ReportPeriod.of(from, to), currency);
+        MarginReportQuery query = new MarginReportQuery(currentUser.tenantId(), ReportPeriod.of(from, to), currency);
         return reportingService.exportMarginToCsv(query)
                 .map(csv -> ResponseEntity.ok()
                         .header(HttpHeaders.CONTENT_DISPOSITION,
@@ -128,9 +131,9 @@ public class ReportingController {
     @GetMapping("/kpi")
     @Operation(summary = "Get or refresh the current billing KPI snapshot")
     public Mono<BillingKPISnapshotResponse> getKPISnapshot(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestParam(defaultValue = "XAF") String currency) {
-        KPISnapshotQuery query = new KPISnapshotQuery(tenantId, currency);
+        KPISnapshotQuery query = new KPISnapshotQuery(currentUser.tenantId(), currency);
         return reportingService.getOrRefreshKPISnapshot(query).map(mapper::toResponse);
     }
     // ── : FreelancerOrg reports ───────────────────────────────────────────

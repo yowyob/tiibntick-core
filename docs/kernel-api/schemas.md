@@ -1,8 +1,27 @@
 # Kernel API — Schemas Reference
 
-Auto-generated from `openapi.json`. 1078 component schemas. Referenced by name from `endpoints.md` (request/response bodies).
+Auto-generated from `openapi.json`. 1190 component schemas. Referenced by name from `endpoints.md` (request/response bodies).
 
 **Do not edit by hand** — see regeneration instructions in `endpoints.md`.
+
+## AbonnementCreateDTO
+
+| Field | Type | Required |
+|---|---|---|
+| `contentId` | `string(uuid)` | yes |
+| `authorId` | `string(uuid)` | yes |
+| `contentType` | `string` | yes |
+
+## AbonnementResponseDTO
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `userId` | `string(uuid)` | no |
+| `authorId` | `string(uuid)` | no |
+| `contentId` | `string(uuid)` | no |
+| `contentType` | `string` | no |
+| `createdAt` | `string(date-time)` | no |
 
 ## AccountConnectorTypeResponse
 
@@ -415,6 +434,9 @@ Auto-generated from `openapi.json`. 1078 component schemas. Referenced by name f
 | `forcePasswordChange` | `boolean` | no |
 | `createdAt` | `string(date-time)` | no |
 | `updatedAt` | `string(date-time)` | no |
+| `firstName` | `string` | no |
+| `lastName` | `string` | no |
+| `roles` | `RoleRef[]` | no |
 
 ## AdministrationUserRoleAssignmentResponse
 
@@ -976,6 +998,16 @@ Auto-generated from `openapi.json`. 1078 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseAutoRenewalResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `AutoRenewalResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseBalanceDesComptesDto
 
 | Field | Type | Required |
@@ -1262,6 +1294,46 @@ Auto-generated from `openapi.json`. 1078 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `CommercialPlanCatalogResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseCommercialPlanCheckoutResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `CommercialPlanCheckoutResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseCommercialPlanOrderResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `CommercialPlanOrderResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseCommercialPlanQuoteResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `CommercialPlanQuoteResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseCommercialPlanResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `CommercialPlanResponse` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -1796,6 +1868,16 @@ Auto-generated from `openapi.json`. 1078 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseLegalDocumentResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `LegalDocumentResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseListAccountConnectorTypeResponse
 
 | Field | Type | Required |
@@ -2026,6 +2108,16 @@ Auto-generated from `openapi.json`. 1078 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseListAutoRenewalResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `AutoRenewalResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseListBankAccountResponse
 
 | Field | Type | Required |
@@ -2212,6 +2304,26 @@ Auto-generated from `openapi.json`. 1078 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `ClientApplicationResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListCommercialPlanOrderResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `CommercialPlanOrderResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListCommercialPlanResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `CommercialPlanResponse[]` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -2526,6 +2638,16 @@ Auto-generated from `openapi.json`. 1078 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseListLegalDocumentResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `LegalDocumentResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseListLoanAdvanceResponse
 
 | Field | Type | Required |
@@ -2612,6 +2734,26 @@ Auto-generated from `openapi.json`. 1078 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `MedicalCertificateResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListMedicalConvocationResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `MedicalConvocationResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListMedicalFitnessResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `MedicalFitnessResponse[]` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -2796,6 +2938,16 @@ Auto-generated from `openapi.json`. 1078 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseListPaymentOrderResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `PaymentOrderResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseListPayrollEmployeeResponse
 
 | Field | Type | Required |
@@ -2842,16 +2994,6 @@ Auto-generated from `openapi.json`. 1078 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `PhysicalSpaceResponse[]` | no |
-| `message` | `string` | no |
-| `errorCode` | `string` | no |
-| `timestamp` | `string(date-time)` | no |
-
-## ApiResponseListPlanResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `success` | `boolean` | no |
-| `data` | `PlanResponse[]` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -2976,6 +3118,16 @@ Auto-generated from `openapi.json`. 1078 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseListRenewalOrderResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `RenewalOrderResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseListResourceAssignmentResponse
 
 | Field | Type | Required |
@@ -3052,6 +3204,26 @@ Auto-generated from `openapi.json`. 1078 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `SalesOrderResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListServiceBundleOrderResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `ServiceBundleOrderResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListServicePriceResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `ServicePriceResponse[]` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -3236,6 +3408,16 @@ Auto-generated from `openapi.json`. 1078 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseListUserMembershipResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `UserMembershipResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseListVariantAttributeResponse
 
 | Field | Type | Required |
@@ -3262,6 +3444,16 @@ Auto-generated from `openapi.json`. 1078 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `VariantResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListWalletRechargeResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `WalletRechargeResponse[]` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -3386,6 +3578,16 @@ Auto-generated from `openapi.json`. 1078 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseMedicalConvocationResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `MedicalConvocationResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseMedicalVisitResponse
 
 | Field | Type | Required |
@@ -3412,6 +3614,16 @@ Auto-generated from `openapi.json`. 1078 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `MyClientApplicationResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseMyPayslipDocumentResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `MyPayslipDocumentResponse` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -3632,6 +3844,16 @@ Auto-generated from `openapi.json`. 1078 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `PayVariableResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponsePaymentOrderResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `PaymentOrderResponse` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -3866,6 +4088,26 @@ Auto-generated from `openapi.json`. 1078 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseRenewalOrderResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `RenewalOrderResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseRenewalProcessResult
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `RenewalProcessResult` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseResourceLocationObservationResponse
 
 | Field | Type | Required |
@@ -3932,6 +4174,36 @@ Auto-generated from `openapi.json`. 1078 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `SalesOrderResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseServiceBundleCheckoutResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `ServiceBundleCheckoutResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseServiceBundleOrderResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `ServiceBundleOrderResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseServiceBundleQuoteResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `ServiceBundleQuoteResponse` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -4032,6 +4304,16 @@ Auto-generated from `openapi.json`. 1078 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `StoredFileResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseString
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `string` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -4206,6 +4488,16 @@ Auto-generated from `openapi.json`. 1078 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseWalletRechargeResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `WalletRechargeResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseWalletResponse
 
 | Field | Type | Required |
@@ -4290,6 +4582,10 @@ Auto-generated from `openapi.json`. 1078 component schemas. Referenced by name f
 |---|---|---|
 | `planCode` | `string` | yes |
 | `addOnCodes` | `string[]` | no |
+
+## ApprovalRequest
+
+Type: `object`
 
 ## ApproveDocumentRequest
 
@@ -4590,6 +4886,36 @@ Auto-generated from `openapi.json`. 1078 component schemas. Referenced by name f
 | `linesProcessed` | `integer(int32)` | no |
 | `matchesCreated` | `integer(int32)` | no |
 
+## AutoRenewalRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationId` | `string(uuid)` | no |
+| `addOnCodes` | `string[]` | no |
+| `billingPeriod` | `string` | no |
+| `clientId` | `string` | no |
+| `provider` | `string` | no |
+| `method` | `string` | no |
+| `payerReference` | `string` | no |
+
+## AutoRenewalResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `tenantId` | `string(uuid)` | no |
+| `organizationId` | `string(uuid)` | no |
+| `planCode` | `string` | no |
+| `addOnCodes` | `string[]` | no |
+| `billingPeriod` | `string` | no |
+| `clientId` | `string` | no |
+| `provider` | `string` | no |
+| `method` | `string` | no |
+| `payerReference` | `string` | no |
+| `active` | `boolean` | no |
+| `createdAt` | `string(date-time)` | no |
+| `updatedAt` | `string(date-time)` | no |
+
 ## BalanceDesComptesDto
 
 | Field | Type | Required |
@@ -4820,6 +5146,49 @@ Auto-generated from `openapi.json`. 1078 component schemas. Referenced by name f
 | `transactionCount` | `integer(int32)` | no |
 | `minedBy` | `string` | no |
 | `minedAt` | `string(date-time)` | no |
+
+## Blog
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `title` | `string` | no |
+| `description` | `string` | no |
+| `authorId` | `string(uuid)` | no |
+| `tenantId` | `string(uuid)` | no |
+| `organizationId` | `string(uuid)` | no |
+| `createdAt` | `string(date-time)` | no |
+| `publishedAt` | `string(date-time)` | no |
+| `updatedAt` | `string(date-time)` | no |
+| `status` | `string` | no |
+| `contentType` | `string` | no |
+| `domain` | `string` | no |
+| `ressourceId` | `string(uuid)` | no |
+| `audioDuration` | `string` | no |
+| `freeTags` | `string[]` | no |
+| `freeCategories` | `string[]` | no |
+| `customDomain` | `string` | no |
+| `content` | `string` | no |
+| `rawContent` | `string` | no |
+| `readingTime` | `integer(int32)` | no |
+
+## BlogCreateDTO
+
+| Field | Type | Required |
+|---|---|---|
+| `title` | `string` | yes |
+| `description` | `string` | yes |
+| `authorId` | `string(uuid)` | yes |
+| `tenantId` | `string(uuid)` | yes |
+| `domain` | `string` | yes |
+| `content` | `string` | yes |
+| `rawContent` | `string` | no |
+| `tags` | `string[]` | no |
+| `freeTags` | `string[]` | no |
+| `freeCategories` | `string[]` | no |
+| `customDomain` | `string` | no |
+| `readingTime` | `integer(int32)` | yes |
+| `categories` | `string[]` | yes |
 
 ## BracketLine
 
@@ -5257,6 +5626,52 @@ Type: `object`
 | `nativeService` | `boolean` | no |
 | `active` | `boolean` | no |
 
+## Categorie
+
+| Field | Type | Required |
+|---|---|---|
+| `categorieId` | `string(uuid)` | no |
+| `categorieName` | `string` | no |
+| `groupeId` | `string(uuid)` | no |
+| `dateSuppression` | `string(date-time)` | no |
+| `postsIds` | `string(uuid)[]` | no |
+| `tenantId` | `string(uuid)` | no |
+
+## CategorieRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `nom` | `string` | yes |
+| `description` | `string` | no |
+
+## CategorieResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `nom` | `string` | no |
+| `description` | `string` | no |
+
+## CategoryCreateDTO
+
+| Field | Type | Required |
+|---|---|---|
+| `name` | `string` | no |
+| `description` | `string` | no |
+| `domain` | `string` | no |
+
+## CategoryEntity
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `name` | `string` | no |
+| `description` | `string` | no |
+| `domain` | `string` | no |
+| `tenantId` | `string(uuid)` | no |
+| `createdAt` | `string(date-time)` | no |
+| `updatedAt` | `string(date-time)` | no |
+
 ## CategoryI18nResponse
 
 | Field | Type | Required |
@@ -5446,11 +5861,75 @@ Type: `object`
 | `completedAt` | `string(date-time)` | no |
 | `blockingIssues` | `string[]` | no |
 
+## Comment
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `content` | `string` | no |
+| `commentByUser` | `string(uuid)` | no |
+| `commentByName` | `string` | no |
+| `createdAt` | `string(date-time)` | no |
+| `updatedAt` | `string(date-time)` | no |
+| `entityId` | `string(uuid)` | no |
+| `entityType` | `string` | no |
+| `tenantId` | `string(uuid)` | no |
+
 ## CommentArtworkRequest
 
 | Field | Type | Required |
 |---|---|---|
 | `content` | `string` | yes |
+
+## CommentDTO
+
+| Field | Type | Required |
+|---|---|---|
+| `content` | `string` | yes |
+| `commentByUser` | `string(uuid)` | yes |
+| `commentByName` | `string` | no |
+| `entityId` | `string(uuid)` | yes |
+| `entityType` | `string` | yes |
+
+## CommentReply
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `content` | `string` | no |
+| `replyByUserId` | `string(uuid)` | no |
+| `replyByName` | `string` | no |
+| `createdAt` | `string(date-time)` | no |
+| `updatedAt` | `string(date-time)` | no |
+| `commentId` | `string(uuid)` | no |
+| `tenantId` | `string(uuid)` | no |
+
+## CommentReplyDTO
+
+DTO représentant une réponse à un commentaire.
+
+| Field | Type | Required |
+|---|---|---|
+| `content` | `string` | yes |
+| `replyByUserId` | `string(uuid)` | yes |
+| `replyByName` | `string` | no |
+| `commentId` | `string(uuid)` | yes |
+
+## Commentaire
+
+| Field | Type | Required |
+|---|---|---|
+| `commentaireId` | `string(uuid)` | no |
+| `content` | `string` | no |
+| `authorId` | `string(uuid)` | no |
+| `authorName` | `string` | no |
+| `creationDate` | `string(date-time)` | no |
+| `modificationDate` | `string(date-time)` | no |
+| `suppressionDate` | `string(date-time)` | no |
+| `postId` | `string(uuid)` | no |
+| `commentaireParentId` | `string(uuid)` | no |
+| `responses` | `Commentaire[]` | no |
+| `tenantId` | `string(uuid)` | no |
 
 ## CommercialAddOnCatalogResponse
 
@@ -5462,6 +5941,16 @@ Type: `object`
 | `serviceCodes` | `string[]` | no |
 | `compatiblePlanCodes` | `string[]` | no |
 | `serviceQuotas` | `CommercialServiceQuotaResponse[]` | no |
+
+## CommercialAddOnResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `code` | `string` | no |
+| `displayName` | `string` | no |
+| `description` | `string` | no |
+| `serviceCodes` | `string[]` | no |
+| `compatiblePlanCodes` | `string[]` | no |
 
 ## CommercialDocumentLineView
 
@@ -5512,6 +6001,83 @@ Type: `object`
 | `serviceCodes` | `string[]` | no |
 | `compatibleAddOnCodes` | `string[]` | no |
 | `serviceQuotas` | `CommercialServiceQuotaResponse[]` | no |
+| `systemDefault` | `boolean` | no |
+
+## CommercialPlanCheckoutRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationId` | `string(uuid)` | no |
+| `addOnCodes` | `string[]` | no |
+| `billingPeriod` | `string` | no |
+| `clientId` | `string` | no |
+| `provider` | `string` | no |
+| `method` | `string` | no |
+| `payerReference` | `string` | no |
+| `idempotencyKey` | `string` | no |
+
+## CommercialPlanCheckoutResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `orderId` | `string(uuid)` | no |
+| `paymentOrderId` | `string(uuid)` | no |
+| `status` | `string` | no |
+| `planCode` | `string` | no |
+| `addOnCodes` | `string[]` | no |
+| `services` | `string[]` | no |
+| `amount` | `number` | no |
+| `currency` | `string` | no |
+| `redirectUrl` | `string` | no |
+| `providerReference` | `string` | no |
+
+## CommercialPlanOrderResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `tenantId` | `string(uuid)` | no |
+| `organizationId` | `string(uuid)` | no |
+| `planCode` | `string` | no |
+| `addOnCodes` | `string[]` | no |
+| `services` | `string[]` | no |
+| `billingPeriod` | `string` | no |
+| `amount` | `number` | no |
+| `currency` | `string` | no |
+| `paymentOrderId` | `string(uuid)` | no |
+| `status` | `string` | no |
+| `createdAt` | `string(date-time)` | no |
+| `updatedAt` | `string(date-time)` | no |
+
+## CommercialPlanQuoteRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `addOnCodes` | `string[]` | no |
+| `billingPeriod` | `string` | no |
+
+## CommercialPlanQuoteResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `plan` | `CommercialPlanResponse` | no |
+| `addOns` | `CommercialAddOnResponse[]` | no |
+| `billingPeriod` | `string` | no |
+| `lines` | `ServicePriceResponse[]` | no |
+| `total` | `number` | no |
+| `currency` | `string` | no |
+
+## CommercialPlanResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `code` | `string` | no |
+| `displayName` | `string` | no |
+| `description` | `string` | no |
+| `targetType` | `string` | no |
+| `packCodes` | `string[]` | no |
+| `serviceCodes` | `string[]` | no |
+| `compatibleAddOnCodes` | `string[]` | no |
 | `systemDefault` | `boolean` | no |
 
 ## CommercialServiceQuota
@@ -5741,6 +6307,60 @@ Type: `object`
 | `name` | `string` | no |
 | `role` | `string` | no |
 | `active` | `boolean` | no |
+
+## Course
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `title` | `string` | no |
+| `description` | `string` | no |
+| `authorId` | `string(uuid)` | no |
+| `tenantId` | `string(uuid)` | no |
+| `organizationId` | `string(uuid)` | no |
+| `createdAt` | `string(date-time)` | no |
+| `publishedAt` | `string(date-time)` | no |
+| `updatedAt` | `string(date-time)` | no |
+| `status` | `string` | no |
+| `contentType` | `string` | no |
+| `domain` | `string` | no |
+| `ressourceId` | `string(uuid)` | no |
+| `audioDuration` | `string` | no |
+| `freeTags` | `string[]` | no |
+| `freeCategories` | `string[]` | no |
+| `customDomain` | `string` | no |
+| `trainerName` | `string` | no |
+| `duration` | `string` | no |
+| `level` | `string` | no |
+
+## CourseCreateDto
+
+| Field | Type | Required |
+|---|---|---|
+| `title` | `string` | yes |
+| `description` | `string` | yes |
+| `authorId` | `string(uuid)` | yes |
+| `tenantId` | `string(uuid)` | yes |
+| `domain` | `string` | yes |
+| `content` | `string` | yes |
+| `rawContent` | `string` | no |
+| `tags` | `string[]` | no |
+| `freeTags` | `string[]` | no |
+| `freeCategories` | `string[]` | no |
+| `customDomain` | `string` | no |
+| `readingTime` | `integer(int32)` | yes |
+| `categories` | `string[]` | yes |
+| `trainerName` | `string` | yes |
+| `duration` | `string` | yes |
+| `level` | `string` | yes |
+
+## CourseProgressView
+
+| Field | Type | Required |
+|---|---|---|
+| `percent` | `integer(int32)` | no |
+| `completedUnitIds` | `string(uuid)[]` | no |
+| `enrolled` | `boolean` | no |
 
 ## CreateAccountGenerationRequest
 
@@ -6169,6 +6789,7 @@ Type: `object`
 
 | Field | Type | Required |
 |---|---|---|
+| `id` | `string(uuid)` | no |
 | `actorId` | `string(uuid)` | no |
 | `managerId` | `string(uuid)` | no |
 | `numCnps` | `string` | no |
@@ -6395,11 +7016,22 @@ Type: `object`
 | `statut` | `string` | no |
 | `fichierId` | `string(uuid)` | no |
 
+## CreateMedicalConvocationRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `employeeId` | `string(uuid)` | no |
+| `visitType` | `string` | no |
+| `dateConvocation` | `string(date)` | no |
+| `motif` | `string` | no |
+
 ## CreateMedicalVisitRequest
 
 | Field | Type | Required |
 |---|---|---|
 | `employeeId` | `string(uuid)` | no |
+| `visitType` | `string` | no |
+| `motif` | `string` | no |
 | `dateVisite` | `string(date)` | no |
 | `medecin` | `string` | no |
 | `resultatAptitude` | `string` | no |
@@ -6960,6 +7592,10 @@ Type: `object`
 | `superWholesale` | `boolean` | no |
 | `semiWholesale` | `boolean` | no |
 
+## DataBuffer
+
+Type: `object`
+
 ## DataSourceMode
 
 | Field | Type | Required |
@@ -7106,6 +7742,23 @@ Type: `object`
 | `userId` | `string(uuid)` | no |
 | `actorId` | `string(uuid)` | no |
 | `organizations` | `UserOrganizationAccessResponse[]` | no |
+
+## DiscussionGroup
+
+| Field | Type | Required |
+|---|---|---|
+| `groupId` | `string(uuid)` | no |
+| `creatorName` | `string` | no |
+| `creatorId` | `string(uuid)` | no |
+| `name` | `string` | no |
+| `type` | `string` | no |
+| `description` | `string` | no |
+| `members` | `string(uuid)[]` | no |
+| `createdAt` | `string(date-time)` | no |
+| `updatedAt` | `string(date-time)` | no |
+| `deletedAt` | `string(date-time)` | no |
+| `status` | `string` | no |
+| `tenantId` | `string(uuid)` | no |
 
 ## DocumentAnalysisResponse
 
@@ -7280,6 +7933,49 @@ Type: `object`
 | `createdAt` | `string(date-time)` | no |
 | `postedAt` | `string(date-time)` | no |
 
+## EditorApplication
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `userId` | `string(uuid)` | no |
+| `applicantEmail` | `string` | no |
+| `applicantName` | `string` | no |
+| `domains` | `string[]` | no |
+| `proofUrl` | `string` | no |
+| `motivation` | `string` | no |
+| `status` | `string` | no |
+| `tenantId` | `string(uuid)` | no |
+| `organizationId` | `string(uuid)` | no |
+| `createdAt` | `string(date-time)` | no |
+| `updatedAt` | `string(date-time)` | no |
+| `decidedAt` | `string(date-time)` | no |
+| `decidedBy` | `string(uuid)` | no |
+
+## EditorApplicationCreateDTO
+
+| Field | Type | Required |
+|---|---|---|
+| `domains` | `string[]` | no |
+| `proofUrl` | `string` | no |
+| `motivation` | `string` | no |
+| `applicantEmail` | `string` | no |
+| `applicantName` | `string` | no |
+
+## EditorApplicationStatusDTO
+
+| Field | Type | Required |
+|---|---|---|
+| `status` | `string` | no |
+
+## EmailRequestDto
+
+| Field | Type | Required |
+|---|---|---|
+| `emailDestinataire` | `string(email)` | yes |
+| `sujet` | `string` | yes |
+| `contenuEmail` | `string` | yes |
+
 ## EmergencyContactResponse
 
 | Field | Type | Required |
@@ -7416,6 +8112,18 @@ Type: `object`
 | `referenceCode` | `string` | no |
 | `displayName` | `string` | no |
 
+## EntityStats
+
+| Field | Type | Required |
+|---|---|---|
+| `entityId` | `string(uuid)` | no |
+| `entityType` | `string` | no |
+| `totalLikes` | `integer(int32)` | no |
+| `totalDislikes` | `integer(int32)` | no |
+| `likedUsers` | `string(uuid)[]` | no |
+| `dislikedUsers` | `string(uuid)[]` | no |
+| `tenantId` | `string(uuid)` | no |
+
 ## EntryLine
 
 | Field | Type | Required |
@@ -7512,6 +8220,31 @@ Type: `object`
 | `status` | `string` | no |
 | `missionOrderId` | `string(uuid)` | no |
 
+## Favorite
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `userId` | `string(uuid)` | no |
+| `entityId` | `string(uuid)` | no |
+| `contentType` | `string` | no |
+| `tenantId` | `string(uuid)` | no |
+| `createdAt` | `string(date-time)` | no |
+
+## FeedItemDTO
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `contentType` | `string` | no |
+| `title` | `string` | no |
+| `description` | `string` | no |
+| `authorId` | `string(uuid)` | no |
+| `tenantId` | `string(uuid)` | no |
+| `domain` | `string` | no |
+| `freeTags` | `string[]` | no |
+| `publishedAt` | `string(date-time)` | no |
+
 ## FinalSettlementResponse
 
 | Field | Type | Required |
@@ -7588,6 +8321,14 @@ Type: `object`
 | `status` | `string` | no |
 | `acquiredAt` | `string(date-time)` | no |
 | `lastDepreciatedAt` | `string(date-time)` | no |
+
+## FollowCountsView
+
+| Field | Type | Required |
+|---|---|---|
+| `followers` | `integer(int64)` | no |
+| `following` | `integer(int64)` | no |
+| `isFollowing` | `boolean` | no |
 
 ## ForgotPasswordRequest
 
@@ -7895,6 +8636,21 @@ Type: `object`
 | `totalExpenses` | `number` | no |
 | `netResult` | `number` | no |
 
+## InitiatePaymentRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `clientId` | `string` | no |
+| `serviceCode` | `string` | no |
+| `idempotencyKey` | `string` | no |
+| `amount` | `number` | no |
+| `currency` | `string` | no |
+| `provider` | `string` | no |
+| `method` | `string` | no |
+| `payerReference` | `string` | no |
+| `description` | `string` | no |
+| `callbackUrl` | `string` | no |
+
 ## IntegrityReport
 
 | Field | Type | Required |
@@ -8089,6 +8845,17 @@ Type: `object`
 | `packageSalarial` | `string` | no |
 | `status` | `string` | no |
 
+## JoinRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `requestId` | `string(uuid)` | no |
+| `groupId` | `string(uuid)` | no |
+| `userId` | `string(uuid)` | no |
+| `status` | `string` | no |
+| `createdAt` | `string(date-time)` | no |
+| `updatedAt` | `string(date-time)` | no |
+
 ## JournalAuditView
 
 | Field | Type | Required |
@@ -8200,6 +8967,18 @@ Type: `object`
 | `commentaireValideur` | `string` | no |
 | `justificatifFileId` | `string(uuid)` | no |
 
+## LecteurResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `userId` | `string(uuid)` | no |
+| `email` | `string` | no |
+| `nom` | `string` | no |
+| `prenom` | `string` | no |
+| `categories` | `CategorieResponse[]` | no |
+| `createdAt` | `string(date-time)` | no |
+
 ## LedgerResponse
 
 | Field | Type | Required |
@@ -8209,6 +8988,18 @@ Type: `object`
 | `label` | `string` | no |
 | `type` | `string` | no |
 | `organizationId` | `string(uuid)` | no |
+
+## LegalDocumentResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `slug` | `string` | no |
+| `locale` | `string` | no |
+| `title` | `string` | no |
+| `version` | `string` | no |
+| `content` | `string` | no |
+| `updatedAt` | `string(date-time)` | no |
 
 ## LetteringView
 
@@ -8373,8 +9164,11 @@ Type: `object`
 | `mfaChannel` | `string` | no |
 | `accessToken` | `string` | no |
 | `sessionToken` | `string` | no |
+| `refreshToken` | `string` | no |
 | `tokenType` | `string` | no |
 | `expiresInSeconds` | `integer(int64)` | no |
+| `refreshExpiresInSeconds` | `integer(int64)` | no |
+| `refreshExpiresAt` | `string(date-time)` | no |
 | `sharedSession` | `SharedSsoSessionResponse` | no |
 | `authorities` | `string[]` | no |
 | `organizations` | `UserOrganizationAccessResponse[]` | no |
@@ -8544,12 +9338,37 @@ Type: `object`
 | `statut` | `string` | no |
 | `fichierId` | `string(uuid)` | no |
 
+## MedicalConvocationResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `employeeId` | `string(uuid)` | no |
+| `visitType` | `string` | no |
+| `dateConvocation` | `string(date)` | no |
+| `motif` | `string` | no |
+| `statut` | `string` | no |
+
+## MedicalFitnessResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `employeeId` | `string(uuid)` | no |
+| `visitType` | `string` | no |
+| `dateVisite` | `string(date)` | no |
+| `resultatAptitude` | `string` | no |
+| `restrictions` | `string` | no |
+| `prochaineEcheance` | `string(date)` | no |
+
 ## MedicalVisitResponse
 
 | Field | Type | Required |
 |---|---|---|
 | `id` | `string(uuid)` | no |
 | `employeeId` | `string(uuid)` | no |
+| `visitType` | `string` | no |
+| `motif` | `string` | no |
 | `dateVisite` | `string(date)` | no |
 | `medecin` | `string` | no |
 | `resultatAptitude` | `string` | no |
@@ -8609,6 +9428,15 @@ Type: `object`
 | `nbEcheances` | `integer(int32)` | no |
 | `motif` | `string` | no |
 
+## MyPayslipDocumentResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `fileId` | `string(uuid)` | no |
+| `fileName` | `string` | no |
+| `verificationCode` | `string` | no |
+
 ## MyPayslipResponse
 
 | Field | Type | Required |
@@ -8662,6 +9490,69 @@ Type: `object`
 | `faxNumber` | `string` | no |
 | `email` | `string` | no |
 | `secondaryEmail` | `string` | no |
+
+## NewsletterContentCountResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `newsletterId` | `string(uuid)` | no |
+| `count` | `integer(int64)` | no |
+
+## NewsletterContentCreateRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `titre` | `string` | yes |
+| `contenu` | `string` | no |
+
+## NewsletterContentResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `newsletterId` | `string(uuid)` | no |
+| `newsletterTitre` | `string` | no |
+| `titre` | `string` | no |
+| `contenu` | `string` | no |
+| `statut` | `string` | no |
+| `coverId` | `string(uuid)` | no |
+| `authorId` | `string(uuid)` | no |
+| `categories` | `CategorieResponse[]` | no |
+| `createdAt` | `string(date-time)` | no |
+| `publishedAt` | `string(date-time)` | no |
+
+## NewsletterContentUpdateRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `titre` | `string` | no |
+| `contenu` | `string` | no |
+
+## NewsletterCreateRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `titre` | `string` | yes |
+| `description` | `string` | no |
+| `authorNom` | `string` | no |
+| `authorPrenom` | `string` | no |
+| `categorieIds` | `string(uuid)[]` | no |
+
+## NewsletterResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `titre` | `string` | no |
+| `description` | `string` | no |
+| `authorId` | `string(uuid)` | no |
+| `authorNom` | `string` | no |
+| `authorPrenom` | `string` | no |
+| `statut` | `string` | no |
+| `coverId` | `string(uuid)` | no |
+| `categories` | `CategorieResponse[]` | no |
+| `createdAt` | `string(date-time)` | no |
+| `subscriptionToken` | `string(uuid)` | no |
 
 ## NotificationDelivery
 
@@ -8832,6 +9723,15 @@ Type: `object`
 | `status` | `string` | no |
 | `paymentStatus` | `string` | no |
 | `direction` | `string` | no |
+
+## OpenRateResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `sentCount` | `integer(int64)` | no |
+| `openedCount` | `integer(int64)` | no |
+| `openRate` | `number(double)` | no |
 
 ## OpenReconciliationRequest
 
@@ -9349,6 +10249,25 @@ Type: `object`
 | `workedDaysOverride` | `integer(int32)` | no |
 | `locked` | `boolean` | no |
 
+## PaymentOrderResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string` | no |
+| `tenantId` | `string` | no |
+| `clientId` | `string` | no |
+| `serviceCode` | `string` | no |
+| `amount` | `number` | no |
+| `currency` | `string` | no |
+| `provider` | `string` | no |
+| `method` | `string` | no |
+| `payerReference` | `string` | no |
+| `status` | `string` | no |
+| `providerReference` | `string` | no |
+| `redirectUrl` | `string` | no |
+| `createdAt` | `string(date-time)` | no |
+| `updatedAt` | `string(date-time)` | no |
+
 ## PaymentScheduleRequest
 
 | Field | Type | Required |
@@ -9620,6 +10539,47 @@ Type: `object`
 | `nbPlaces` | `integer(int32)` | no |
 | `lieu` | `string` | no |
 
+## PodcastCreateDTO
+
+| Field | Type | Required |
+|---|---|---|
+| `title` | `string` | yes |
+| `authorId` | `string(uuid)` | yes |
+| `tenantId` | `string(uuid)` | yes |
+| `description` | `string` | yes |
+| `tags` | `string[]` | yes |
+| `transcript` | `string` | yes |
+| `domain` | `string` | yes |
+| `categories` | `string[]` | no |
+| `freeTags` | `string[]` | no |
+| `freeCategories` | `string[]` | no |
+| `customDomain` | `string` | no |
+
+## PodcastEntity
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `title` | `string` | no |
+| `description` | `string` | no |
+| `authorId` | `string(uuid)` | no |
+| `tenantId` | `string(uuid)` | no |
+| `organizationId` | `string(uuid)` | no |
+| `createdAt` | `string(date-time)` | no |
+| `publishedAt` | `string(date-time)` | no |
+| `updatedAt` | `string(date-time)` | no |
+| `status` | `string` | no |
+| `contentType` | `string` | no |
+| `domain` | `string` | no |
+| `ressourceId` | `string(uuid)` | no |
+| `audioDuration` | `string` | no |
+| `freeTags` | `string[]` | no |
+| `freeCategories` | `string[]` | no |
+| `customDomain` | `string` | no |
+| `audioUrl` | `string` | no |
+| `transcript` | `string` | no |
+| `listenCount` | `integer(int32)` | no |
+
 ## PointOfInterestResponse
 
 | Field | Type | Required |
@@ -9669,6 +10629,27 @@ Type: `object`
 | `approvalRequired` | `boolean` | no |
 | `expiryDays` | `integer(int32)` | no |
 | `reviewerResponsibilityType` | `string` | no |
+
+## Post
+
+| Field | Type | Required |
+|---|---|---|
+| `postId` | `string(uuid)` | no |
+| `authorId` | `string(uuid)` | no |
+| `authorName` | `string` | no |
+| `groupId` | `string(uuid)` | no |
+| `title` | `string` | no |
+| `content` | `string` | no |
+| `creationDate` | `string(date-time)` | no |
+| `modificationDate` | `string(date-time)` | no |
+| `suppressionDate` | `string(date-time)` | no |
+| `categoriesIds` | `string(uuid)[]` | no |
+| `postLikes` | `string(uuid)[]` | no |
+| `postDislikes` | `string(uuid)[]` | no |
+| `numberOfLikes` | `integer(int32)` | no |
+| `numberOfDislikes` | `integer(int32)` | no |
+| `commentCount` | `integer(int64)` | no |
+| `tenantId` | `string(uuid)` | no |
 
 ## PrepareInventoryCampaignRequest
 
@@ -9845,6 +10826,17 @@ Type: `object`
 | `clientApplication` | `ClientApplicationResponse` | no |
 | `clientSecret` | `string` | no |
 
+## PublicContentInfo
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `title` | `string` | no |
+| `description` | `string` | no |
+| `contentType` | `string` | no |
+| `domain` | `string` | no |
+| `publishedAt` | `string(date-time)` | no |
+
 ## PublicOrganizationBrandingResponse
 
 | Field | Type | Required |
@@ -9898,6 +10890,28 @@ Type: `object`
 | Field | Type | Required |
 |---|---|---|
 | `organizationId` | `string(uuid)` | no |
+
+## Ratings
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `entityType` | `string` | no |
+| `userId` | `string(uuid)` | no |
+| `likeCount` | `integer(int32)` | no |
+| `dislikeCount` | `integer(int32)` | no |
+| `score` | `integer(int32)` | no |
+| `entityId` | `string(uuid)` | no |
+| `feedback` | `string` | no |
+| `evaluationDate` | `string(date-time)` | no |
+| `tenantId` | `string(uuid)` | no |
+
+## ReactionResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `likes` | `integer(int32)` | no |
+| `dislike` | `integer(int32)` | no |
 
 ## ReasonRequest
 
@@ -10050,6 +11064,54 @@ Type: `object`
 | `referenceNumber` | `string` | no |
 | `sourceQuantity` | `number` | yes |
 | `targetQuantity` | `number` | yes |
+
+## Redacteur
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `userId` | `string(uuid)` | no |
+| `nom` | `string` | no |
+| `prenom` | `string` | no |
+| `email` | `string` | no |
+| `status` | `string` | no |
+| `createdAt` | `string(date-time)` | no |
+| `processedAt` | `string(date-time)` | no |
+| `rejectionReason` | `string` | no |
+| `tenantId` | `string(uuid)` | no |
+
+## RedacteurCreationRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `nom` | `string` | yes |
+| `prenom` | `string` | yes |
+| `email` | `string(email)` | yes |
+
+## RedacteurRequestResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `userId` | `string(uuid)` | no |
+| `email` | `string` | no |
+| `nom` | `string` | no |
+| `prenom` | `string` | no |
+| `status` | `string` | no |
+| `createdAt` | `string(date-time)` | no |
+| `processedAt` | `string(date-time)` | no |
+| `rejectionReason` | `string` | no |
+
+## RedacteurResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `email` | `string` | no |
+| `nom` | `string` | no |
+| `prenom` | `string` | no |
+| `password` | `string` | no |
+| `createdAt` | `string(date-time)` | no |
 
 ## RefreshTokenRequest
 
@@ -10279,11 +11341,51 @@ Type: `object`
 |---|---|---|
 | `reason` | `string` | yes |
 
+## RejectionRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `reason` | `string` | no |
+
 ## RenewContractRequest
 
 | Field | Type | Required |
 |---|---|---|
 | `newDateFin` | `string(date)` | no |
+
+## RenewalOrderResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `tenantId` | `string(uuid)` | no |
+| `organizationId` | `string(uuid)` | no |
+| `sourceOrderId` | `string(uuid)` | no |
+| `planCode` | `string` | no |
+| `addOnCodes` | `string[]` | no |
+| `services` | `string[]` | no |
+| `billingPeriod` | `string` | no |
+| `amount` | `number` | no |
+| `currency` | `string` | no |
+| `expiresAt` | `string(date-time)` | no |
+| `paymentOrderId` | `string(uuid)` | no |
+| `status` | `string` | no |
+| `upcomingNotificationSentAt` | `string(date-time)` | no |
+| `finalNotificationSentAt` | `string(date-time)` | no |
+| `createdAt` | `string(date-time)` | no |
+| `updatedAt` | `string(date-time)` | no |
+
+## RenewalProcessResult
+
+| Field | Type | Required |
+|---|---|---|
+| `inspected` | `integer(int32)` | no |
+| `due` | `integer(int32)` | no |
+| `created` | `integer(int32)` | no |
+| `refreshed` | `integer(int32)` | no |
+| `activated` | `integer(int32)` | no |
+| `failed` | `integer(int32)` | no |
+| `skipped` | `integer(int32)` | no |
 
 ## ReplaceRolePermissionsRequest
 
@@ -10457,6 +11559,16 @@ Type: `object`
 | `masseSalariale` | `number` | no |
 | `couvertureCompetences` | `number` | no |
 
+## RoleRef
+
+| Field | Type | Required |
+|---|---|---|
+| `assignmentId` | `string(uuid)` | no |
+| `roleId` | `string(uuid)` | no |
+| `code` | `string` | no |
+| `name` | `string` | no |
+| `scopeType` | `string` | no |
+
 ## RoleResponse
 
 | Field | Type | Required |
@@ -10491,6 +11603,7 @@ Type: `object`
 | `period` | `string` | no |
 | `agencyId` | `string(uuid)` | no |
 | `runType` | `string` | no |
+| `employeeIds` | `string(uuid)[]` | no |
 
 ## SaleSize
 
@@ -10666,6 +11779,63 @@ Type: `object`
 | `variables` | `object` | no |
 | `metadata` | `object` | no |
 
+## ServiceBundleCheckoutRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationId` | `string(uuid)` | no |
+| `services` | `string[]` | no |
+| `billingPeriod` | `string` | no |
+| `clientId` | `string` | no |
+| `provider` | `string` | no |
+| `method` | `string` | no |
+| `payerReference` | `string` | no |
+| `idempotencyKey` | `string` | no |
+
+## ServiceBundleCheckoutResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `orderId` | `string(uuid)` | no |
+| `paymentOrderId` | `string(uuid)` | no |
+| `status` | `string` | no |
+| `amount` | `number` | no |
+| `currency` | `string` | no |
+| `redirectUrl` | `string` | no |
+| `providerReference` | `string` | no |
+
+## ServiceBundleOrderResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `tenantId` | `string(uuid)` | no |
+| `organizationId` | `string(uuid)` | no |
+| `services` | `string[]` | no |
+| `billingPeriod` | `string` | no |
+| `amount` | `number` | no |
+| `currency` | `string` | no |
+| `paymentOrderId` | `string(uuid)` | no |
+| `status` | `string` | no |
+| `createdAt` | `string(date-time)` | no |
+| `updatedAt` | `string(date-time)` | no |
+
+## ServiceBundleQuoteRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `services` | `string[]` | no |
+| `billingPeriod` | `string` | no |
+
+## ServiceBundleQuoteResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `billingPeriod` | `string` | no |
+| `lines` | `ServicePriceResponse[]` | no |
+| `total` | `number` | no |
+| `currency` | `string` | no |
+
 ## ServiceEntitlement
 
 | Field | Type | Required |
@@ -10673,6 +11843,15 @@ Type: `object`
 | `code` | `string` | no |
 | `displayName` | `string` | no |
 | `description` | `string` | no |
+
+## ServicePriceResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `serviceCode` | `string` | no |
+| `billingPeriod` | `string` | no |
+| `amount` | `number` | no |
+| `currency` | `string` | no |
 
 ## ServiceWorkspaceView
 
@@ -10924,6 +12103,12 @@ Type: `object`
 | `requestQuotaLimit` | `integer(int64)` | no |
 | `requestQuotaWindowSeconds` | `integer(int64)` | no |
 
+## SubscribeRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `email` | `string(email)` | yes |
+
 ## SubscriptionResponse
 
 | Field | Type | Required |
@@ -10991,6 +12176,26 @@ Type: `object`
 | `httpMethod` | `string` | no |
 | `httpPath` | `string` | no |
 | `integrityHash` | `string` | no |
+
+## TagCreateDTO
+
+| Field | Type | Required |
+|---|---|---|
+| `name` | `string` | no |
+| `description` | `string` | no |
+| `categoryId` | `string(uuid)` | no |
+
+## TagEntity
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `name` | `string` | no |
+| `description` | `string` | no |
+| `createdAt` | `string(date-time)` | no |
+| `updatedAt` | `string(date-time)` | no |
+| `categoryId` | `string(uuid)` | no |
+| `tenantId` | `string(uuid)` | no |
 
 ## TargetView
 
@@ -11502,6 +12707,48 @@ Type: `object`
 | `closingDebit` | `number` | no |
 | `closingCredit` | `number` | no |
 
+## UnitCourse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `title` | `string` | no |
+| `description` | `string` | no |
+| `authorId` | `string(uuid)` | no |
+| `tenantId` | `string(uuid)` | no |
+| `organizationId` | `string(uuid)` | no |
+| `createdAt` | `string(date-time)` | no |
+| `publishedAt` | `string(date-time)` | no |
+| `updatedAt` | `string(date-time)` | no |
+| `status` | `string` | no |
+| `contentType` | `string` | no |
+| `domain` | `string` | no |
+| `ressourceId` | `string(uuid)` | no |
+| `audioDuration` | `string` | no |
+| `freeTags` | `string[]` | no |
+| `freeCategories` | `string[]` | no |
+| `customDomain` | `string` | no |
+| `trainerName` | `string` | no |
+| `duration` | `string` | no |
+| `level` | `string` | no |
+| `idUnitCourse` | `string(uuid)` | no |
+| `idCours` | `string(uuid)` | no |
+| `unit` | `integer(int32)` | no |
+
+## UnitCourseCreateDTO
+
+| Field | Type | Required |
+|---|---|---|
+| `title` | `string` | yes |
+| `authorId` | `string(uuid)` | yes |
+| `tenantId` | `string(uuid)` | yes |
+| `description` | `string` | no |
+| `domain` | `string` | yes |
+| `unit` | `integer(int32)` | no |
+| `freeTags` | `string[]` | no |
+| `freeCategories` | `string[]` | no |
+| `customDomain` | `string` | no |
+
 ## UpdateAccountRequest
 
 | Field | Type | Required |
@@ -11686,6 +12933,12 @@ Type: `object`
 | `kind` | `string` | yes |
 | `active` | `boolean` | no |
 
+## UpdateCategoriesRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `categorieIds` | `string(uuid)[]` | yes |
+
 ## UpdateClientApplicationRequest
 
 | Field | Type | Required |
@@ -11696,6 +12949,18 @@ Type: `object`
 | `allowedServices` | `string[]` | no |
 | `requestQuotaLimit` | `integer(int64)` | no |
 | `requestQuotaWindowSeconds` | `integer(int64)` | no |
+
+## UpdateContractRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `type` | `string` | no |
+| `position` | `string` | no |
+| `dateDebut` | `string(date)` | no |
+| `dateFin` | `string(date)` | no |
+| `salaireBase` | `number` | no |
+| `avantagesNature` | `number` | no |
+| `periodeEssai` | `integer(int32)` | no |
 
 ## UpdateDepartmentRequest
 
@@ -11965,6 +13230,15 @@ Type: `object`
 | `paddingWidth` | `integer(int32)` | no |
 | `nextNumber` | `integer(int64)` | no |
 
+## UpsertLegalDocumentRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `locale` | `string` | no |
+| `title` | `string` | no |
+| `version` | `string` | no |
+| `content` | `string` | yes |
+
 ## UpsertOpeningHoursRequest
 
 | Field | Type | Required |
@@ -12113,6 +13387,19 @@ Type: `object`
 | `avatarId` | `string(uuid)` | no |
 | `organizations` | `UserOrganizationAccessResponse[]` | no |
 
+## UserMembershipResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `tenantId` | `string(uuid)` | no |
+| `organizationId` | `string(uuid)` | no |
+| `organizationCode` | `string` | no |
+| `organizationName` | `string` | no |
+| `roleCode` | `string` | no |
+| `roleName` | `string` | no |
+| `scopeType` | `string` | no |
+| `permissions` | `string[]` | no |
+
 ## UserOrganizationAccessResponse
 
 | Field | Type | Required |
@@ -12124,6 +13411,20 @@ Type: `object`
 | `displayName` | `string` | no |
 | `legalName` | `string` | no |
 | `services` | `string[]` | no |
+
+## UserPublicProfile
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `firstName` | `string` | no |
+| `lastName` | `string` | no |
+| `biography` | `string` | no |
+| `photoId` | `string(uuid)` | no |
+| `followersCount` | `integer(int64)` | no |
+| `followingCount` | `integer(int64)` | no |
+| `isFollowing` | `boolean` | no |
+| `contents` | `PublicContentInfo[]` | no |
 
 ## UserRoleAssignmentResponse
 
@@ -12203,6 +13504,34 @@ Type: `object`
 | `currency` | `string` | no |
 | `type` | `string` | no |
 | `linkedThirdPartyId` | `string(uuid)` | no |
+
+## WalletRechargeRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `amount` | `number` | no |
+| `currency` | `string` | no |
+| `clientId` | `string` | no |
+| `provider` | `string` | no |
+| `method` | `string` | no |
+| `payerReference` | `string` | no |
+| `idempotencyKey` | `string` | no |
+
+## WalletRechargeResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `orderId` | `string(uuid)` | no |
+| `walletId` | `string(uuid)` | no |
+| `paymentOrderId` | `string(uuid)` | no |
+| `transactionId` | `string(uuid)` | no |
+| `status` | `string` | no |
+| `amount` | `number` | no |
+| `currency` | `string` | no |
+| `redirectUrl` | `string` | no |
+| `providerReference` | `string` | no |
+| `createdAt` | `string(date-time)` | no |
+| `updatedAt` | `string(date-time)` | no |
 
 ## WalletResponse
 

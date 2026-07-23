@@ -1,6 +1,8 @@
 package com.yowyob.tiibntick.core.trust.adapter.out.persistence;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.domain.Persistable;
 import org.springframework.data.r2dbc.repository.Modifying;
 import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.relational.core.mapping.Column;
@@ -26,14 +28,29 @@ import java.time.LocalDateTime;
  * Anti-Corruption Layer between the {@link ActorBadge} domain VO
  * and the PostgreSQL persistence layer.
  *
+ * <p>Implements {@link Persistable} because {@code badgeId} is an
+ * application-assigned {@link String} (never {@code null}, never DB-generated).
+ * Without this, Spring Data R2DBC's default "is this new?" heuristic treats any
+ * entity with a non-null {@code @Id} as already persisted and silently turns
+ * {@code ReactiveCrudRepository.save()} into a no-op {@code UPDATE ... WHERE badge_id = ?}
+ * that matches zero rows for a brand-new badge — i.e. newly awarded badges would
+ * never actually be inserted. {@link #fromDomain(ActorBadge)} is the only place
+ * that constructs a "new" entity (for {@link ActorBadgeRepositoryAdapter#save(ActorBadge)});
+ * entities hydrated from a row (with the no-arg constructor + setters) keep the
+ * {@code isNew} field at its default {@code false}.
+ *
  * @author MANFOUO Braun
  */
 @Table(schema = "tnt_trust", name = "actor_badges")
-class ActorBadgeEntity {
+class ActorBadgeEntity implements Persistable<String> {
 
     @Id
     @Column("badge_id")
     private String badgeId;
+
+    /** Not persisted — {@code true} only for entities built via {@link #fromDomain(ActorBadge)}. */
+    @Transient
+    private boolean isNew = false;
 
     @Column("actor_id")
     private String actorId;
@@ -71,6 +88,7 @@ class ActorBadgeEntity {
         entity.awardedAt = badge.getAwardedAt();
         entity.blockchainTxHash = badge.getBlockchainTxHash();
         entity.revoked = badge.isRevoked();
+        entity.isNew = true;
         return entity;
     }
 
@@ -101,6 +119,14 @@ class ActorBadgeEntity {
     public void setBlockchainTxHash(final String v) { this.blockchainTxHash = v; }
     public boolean isRevoked() { return revoked; }
     public void setRevoked(final boolean v) { this.revoked = v; }
+
+    // ── Persistable ──────────────────────────────────────────────────────────
+
+    @Override
+    public String getId() { return badgeId; }
+
+    @Override
+    public boolean isNew() { return isNew; }
 }
 
 // ============================================================

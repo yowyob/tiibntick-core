@@ -113,10 +113,11 @@ management:
       group:
         liveness:
           include: livenessState
-        # trustEventGateway deliberately excluded: a down yow-trust-event must
-        # degrade tnt-trust-core to best-effort/retry-queue mode, never take
-        # tnt-bootstrap out of the Kubernetes readiness rotation (§15.6 of
-        # TNT_CORE_Connexion_Trust_Module.md).
+        # A down yow-trust-event must never take tnt-bootstrap out of the
+        # Kubernetes readiness rotation: trust publishes go through the
+        # yow-event-kernel transactional outbox (broker/gateway outages are
+        # absorbed by the poller's retry/DLQ), and read-path REST calls are
+        # guarded by the trustEventGatewayRead circuit breaker.
         readiness:
           include: readinessState,r2dbc,redis,kafka
   prometheus:
@@ -150,40 +151,59 @@ springdoc:
 
 # ── Resilience4j ───────────────────────────────────────────────────────────
 # tnt-trust-core's gateway toward yow-trust-event (§15.3 of
-# TNT_CORE_Connexion_Trust_Module.md). Two independent circuit breakers:
-#   trustEventGatewayWrite — publish() to yow.trust.events. Kafka decouples
-#     producer from consumer, so this only trips on a broken Kafka broker
-#     itself, not on yow-trust-event being down (see LogisticEventPublisherService).
+# TNT_CORE_Connexion_Trust_Module.md):
 #   trustEventGatewayRead  — verifyProof()/getAuditHistory() REST calls
 #     (TrustEventRestClientAdapter). The only path genuinely coupled to
-#     yow-trust-event's own availability.
+#     yow-trust-event's own availability. The former trustEventGatewayWrite
+#     breaker was removed (Chantier C · Audit n°3 · P5): publishes now go
+#     through the yow-event-kernel transactional outbox, which absorbs broker
+#     outages via the poller's retry/DLQ instead of a circuit breaker.
+#
+# KernelBridgeConfig's three WebClients (Chantier D · Audit n°6 · S4) — auth, roles,
+# organization, third-party/notifications all ultimately call through one of
+# kernelWebClient / kernelOrganizationWebClient / kernelTpWebClient (the single place
+# WebClients targeting the Kernel are built, see KernelBridgeConfig's Javadoc). Same
+# resilience triplet as trust above; retry only re-attempts transport-level failures
+# (connection refused/reset, timeout) — never 4xx/5xx application responses, and never
+# once the breaker itself is open — to avoid amplifying load onto a struggling Kernel.
 resilience4j:
   circuitbreaker:
     instances:
-      trustEventGatewayWrite:
-        register-health-indicator: true
-        sliding-window-size: 20
-        failure-rate-threshold: 50
-        wait-duration-in-open-state: 30s
-        permitted-number-of-calls-in-half-open-state: 5
-        automatic-transition-from-open-to-half-open-enabled: true
       trustEventGatewayRead:
         register-health-indicator: true
         sliding-window-size: 10
         failure-rate-threshold: 40
         wait-duration-in-open-state: 20s
         permitted-number-of-calls-in-half-open-state: 3
+      kernelWebClient: &kernelCircuitBreaker
+        register-health-indicator: true
+        sliding-window-size: 20
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 20s
+        permitted-number-of-calls-in-half-open-state: 5
+        automatic-transition-from-open-to-half-open-enabled: true
+      kernelOrganizationWebClient: *kernelCircuitBreaker
+      kernelTpWebClient: *kernelCircuitBreaker
   timelimiter:
     instances:
-      trustEventGatewayWrite:
-        timeout-duration: 3s
       trustEventGatewayRead:
         timeout-duration: 2s
+      kernelWebClient: &kernelTimeLimiter
+        timeout-duration: 5s
+      kernelOrganizationWebClient: *kernelTimeLimiter
+      kernelTpWebClient: *kernelTimeLimiter
   retry:
     instances:
-      trustEventGatewayWrite:
+      kernelWebClient: &kernelRetry
         max-attempts: 2
-        wait-duration: 500ms
+        wait-duration: 300ms
+        retry-exceptions:
+          - java.io.IOException
+          - java.util.concurrent.TimeoutException
+        ignore-exceptions:
+          - io.github.resilience4j.circuitbreaker.CallNotPermittedException
+      kernelOrganizationWebClient: *kernelRetry
+      kernelTpWebClient: *kernelRetry
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TNT — Module-level properties
@@ -301,10 +321,12 @@ tnt:
     kafka-committed-topic: ${TNT_TRUST_KAFKA_COMMITTED_TOPIC:yow.trust.events.committed}
     fabric-default-channel: ${TNT_TRUST_FABRIC_CHANNEL:yowyob-logistics-channel}
     rest-client-timeout-ms: ${TNT_TRUST_REST_CLIENT_TIMEOUT_MS:10000}
-    # Resilience (§15 of TNT_CORE_Connexion_Trust_Module.md)
-    health-poll-interval-ms: ${TNT_TRUST_HEALTH_POLL_INTERVAL_MS:30000}
-    retry-drain-interval-ms: ${TNT_TRUST_RETRY_DRAIN_INTERVAL_MS:60000}
-    retry-drain-batch-size: ${TNT_TRUST_RETRY_DRAIN_BATCH_SIZE:100}
+    # Publish-path resilience (guard/retry-queue/write circuit breaker) removed:
+    # trust events go through the yow-event-kernel transactional outbox
+    # (Chantier C · Audit n°3 · P5).
+    # ── Trust Core (delivery anchors — called from Agency ERP) ─────────────────
+    #base-url: ${TNT_TRUST_BASE_URL:http://localhost:8090}
+    #timeout: ${TNT_TRUST_TIMEOUT:10s}
 
   # ── Kafka ──────────────────────────────────────────────────────────────────
   kafka:
@@ -317,7 +339,7 @@ tnt:
         core-package-delivered: tnt.delivery.package.delivered
         core-inventory-deposited: tnt.inventory.hub.package.deposited
         core-inventory-pickedup: tnt.inventory.hub.package.pickedup
-        core-actor-kyc: tnt.staff.kyc.validated
+        core-actor-kyc: tnt.actor.kyc.validated
         core-wallet: tnt.billing.wallet.events
       produced:
         domain-events: tnt.agency.events
@@ -340,6 +362,10 @@ tnt:
         enabled: ${TNT_AGENCY_HUB_EXPIRY_JOB_ENABLED:true}
         cron: ${TNT_AGENCY_HUB_EXPIRY_JOB_CRON:0 0 * * * *}
         tenant-id: ${TNT_AGENCY_HUB_EXPIRY_JOB_TENANT_ID:}
+    platform:
+      base-url: ${TNT_AGENCY_PLATFORM_BASE_URL:${tnt.core.base-url:http://localhost:8080}}
+      api-key: ${TNT_AGENCY_PLATFORM_API_KEY:${tnt.core.api-key:}}
+      client-id: ${TNT_AGENCY_PLATFORM_CLIENT_ID:${tnt.core.client-id:agency-back-core}}
 
   # ── Security ───────────────────────────────────────────────────────────────
   security:
@@ -453,6 +479,13 @@ spring:
   config:
     activate:
       on-profile: staging
+  kafka:
+    admin:
+      # Audit n5 P-03/P-12: an undeclared/mistyped topic must fail loudly, not silently
+      # auto-create with the broker's 1-partition default. Every real topic is declared as
+      # a NewTopic bean in TntKafkaTopicsConfig (names sourced from TntTopics) and must be
+      # provisioned there — or by ops tooling — before this profile starts.
+      auto-create: false
 
 server:
   port: 8080
@@ -513,6 +546,13 @@ spring:
   config:
     activate:
       on-profile: prod
+  kafka:
+    admin:
+      # Audit n5 P-03/P-12: an undeclared/mistyped topic must fail loudly, not silently
+      # auto-create with the broker's 1-partition default. Every real topic is declared as
+      # a NewTopic bean in TntKafkaTopicsConfig (names sourced from TntTopics) and must be
+      # provisioned there — or by ops tooling — before this profile starts.
+      auto-create: false
 
 server:
   port: 8080
@@ -533,9 +573,9 @@ management:
 
 springdoc:
   swagger-ui:
-    enabled: true  # We will need to disable Swagger UI in production
+    enabled: false  # Audit n°7 · #10 — full attack-surface reconnaissance via Swagger UI must not be reachable in prod
   api-docs:
-    enabled: true
+    enabled: false  # same rationale — /v3/api-docs also disabled
 
 logging:
   level:
@@ -566,6 +606,9 @@ tnt:
     base-url: ${TNT_KERNEL_BASE_URL:https://kernel-core.yowyob.com/kernel-api}
     api-key: ${TNT_KERNEL_API_KEY:}
     client-id: ${TNT_KERNEL_CLIENT_ID:}
+    # Chantier D · Audit n°6 · S4 — no Kernel call may block indefinitely.
+    connect-timeout-ms: ${TNT_KERNEL_CONNECT_TIMEOUT_MS:2000}
+    response-timeout-ms: ${TNT_KERNEL_RESPONSE_TIMEOUT_MS:5000}
 
   # ── Solution ───────────────────────────────────────────────────────────────
   solution:

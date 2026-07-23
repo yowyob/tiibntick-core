@@ -11,6 +11,7 @@ import com.yowyob.tiibntick.core.gofp.domain.model.enums.AnnouncementStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -27,6 +28,9 @@ public class AnnouncementCoreService implements IAnnouncementUseCase {
     private final IGofpEventPublisher     eventPublisher;
 
     @Override
+    // Chantier C · Audit n°3 · P5: packet/announcement saves and the outbox envelope
+    // written by IGofpEventPublisher must commit atomically.
+    @Transactional
     public Mono<AnnouncementEntity> createAnnouncement(AnnouncementEntity announcement, PacketEntity packet) {
         packet.setId(UUID.randomUUID());
         packet.setCreatedAt(Instant.now());
@@ -57,6 +61,7 @@ public class AnnouncementCoreService implements IAnnouncementUseCase {
     }
 
     @Override
+    @Transactional
     public Mono<AnnouncementEntity> publishAnnouncement(UUID announcementId) {
         return announcementRepository.findById(announcementId)
             .switchIfEmpty(Mono.error(new AnnouncementNotFoundException(announcementId)))

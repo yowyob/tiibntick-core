@@ -33,3 +33,23 @@ databaseChangeLog:
   - include:
       file: db/changelog/011-create-trust-retry-queue.sql
       relativeToChangelogFile: false
+  # v1.4 — Billing policy activation records now persisted locally (P1-B fix)
+  - include:
+      file: db/changelog/012-create-billing-policy-records.sql
+      relativeToChangelogFile: false
+  # v1.5 — Geofencing, DAO Rules, and Proof-of-Location now persisted locally
+  # (read path parity with Delivery/Custody/DID/Badge domains)
+  - include:
+      file: db/changelog/013-create-geofence-crossings.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/014-create-dao-rule-records.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/015-create-pol-verifications.sql
+      relativeToChangelogFile: false
+  # v1.6 — Chantier C · Audit n°3 · P5: trust_retry_queue superseded by the
+  # yow-event-kernel transactional outbox (see 016's header comment)
+  - include:
+      file: db/changelog/016-drop-trust-retry-queue.sql
+      relativeToChangelogFile: false

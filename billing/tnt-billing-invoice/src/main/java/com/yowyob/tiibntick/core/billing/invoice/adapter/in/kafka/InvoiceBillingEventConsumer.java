@@ -1,6 +1,7 @@
 package com.yowyob.tiibntick.core.billing.invoice.adapter.in.kafka;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yowyob.tiibntick.common.kafka.TntTopics;
 import com.yowyob.tiibntick.core.billing.invoice.application.port.in.command.GenerateInvoiceCommand;
 import com.yowyob.tiibntick.core.billing.invoice.application.port.in.command.MarkInvoicePaidCommand;
 import com.yowyob.tiibntick.core.billing.invoice.application.service.InvoiceService;
@@ -51,7 +52,7 @@ public class InvoiceBillingEventConsumer {
      * Generates an invoice for the completed mission.
      */
     @KafkaListener(
-            topics = "${tnt.kafka.topics.delivery-mission-completed:tnt.delivery.mission.completed}",
+            topics = "${tnt.kafka.topics.delivery-mission-completed:" + TntTopics.DELIVERY_MISSION_COMPLETED + "}",
             groupId = "${tnt.kafka.consumer.groups.billing-invoice:tnt-billing-invoice-group}",
             containerFactory = "invoiceKafkaListenerContainerFactory"
     )
@@ -98,7 +99,7 @@ public class InvoiceBillingEventConsumer {
      * Handles PaymentConfirmed events from tnt-billing-wallet.
      */
     @KafkaListener(
-            topics = "${tnt.kafka.topics.payment-confirmed:tnt.billing.wallet.payment.confirmed}",
+            topics = "${tnt.kafka.topics.payment-confirmed:" + TntTopics.BILLING_WALLET_PAYMENT_CONFIRMED + "}",
             groupId = "${tnt.kafka.consumer.groups.billing-invoice:tnt-billing-invoice-group}",
             containerFactory = "invoiceKafkaListenerContainerFactory"
     )

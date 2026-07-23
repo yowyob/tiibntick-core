@@ -1,24 +1,38 @@
 package com.yowyob.tiibntick.core.geo.adapter.out.messaging;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yowyob.kernel.event.application.port.in.PublishEventUseCase;
+import com.yowyob.kernel.event.domain.model.DomainEventEnvelope;
 import com.yowyob.tiibntick.core.geo.application.port.out.IGeoEventPublisher;
 import com.yowyob.tiibntick.core.geo.domain.event.RoadNodeCreatedEvent;
 import com.yowyob.tiibntick.core.geo.domain.event.ServiceZoneUpdatedEvent;
 import com.yowyob.tiibntick.core.geo.domain.event.TrafficConditionChangedEvent;
-import org.apache.kafka.clients.producer.ProducerRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.support.SendResult;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
-import java.util.concurrent.CompletableFuture;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.UUID;
 
 /**
- * Kafka outbound adapter for publishing tnt-geo-core domain events.
+ * Outbox-backed adapter for publishing tnt-geo-core domain events.
  *
- * Topics:
+ * <p>Chantier C · Audit n°3 · P5 (see {@code docs/audits/remediation/chantier-c-p5-inventory.md}):
+ * delegates to {@link PublishEventUseCase} (yow-event-kernel's transactional outbox) instead of
+ * sending to Kafka directly via {@code KafkaTemplate}. Envelopes are persisted in the same DB
+ * transaction as the business write (see the {@code @Transactional} boundaries in
+ * {@code RoadNetworkService}/{@code GeofencingService}/{@code CostFunctionService}), and
+ * {@code OutboxPollerService} relays them to Kafka asynchronously with retry/DLQ.
+ *
+ * <p>The Kafka wire format is unchanged: each event is still serialized as the raw domain event
+ * JSON, with the tenant id as the record key (preserved via {@code kafkaPartitionKey}) — only
+ * the transport changed, so existing consumers require no change.
+ *
+ * <p>Topics:
  *   tnt.geo.traffic.events   — TrafficConditionChangedEvent (consumed by tnt-route-core)
  *   tnt.geo.node.events      — RoadNodeCreatedEvent (consumed by tnt-search)
  *   tnt.geo.zone.events      — ServiceZoneUpdatedEvent (consumed by tnt-actor-core, tnt-delivery-core)
@@ -28,50 +42,64 @@ import java.util.concurrent.CompletableFuture;
 @Component
 public class KafkaGeoEventPublisher implements IGeoEventPublisher {
 
+    private static final Logger log = LoggerFactory.getLogger(KafkaGeoEventPublisher.class);
+
     public static final String TOPIC_TRAFFIC    = "tnt.geo.traffic.events";
     public static final String TOPIC_NODE       = "tnt.geo.node.events";
     public static final String TOPIC_ZONE       = "tnt.geo.zone.events";
 
-    private final KafkaTemplate<String, String> kafkaTemplate;
+    private static final String SOLUTION_CODE = "TNT";
+
+    private final PublishEventUseCase publishEventUseCase;
     private final ObjectMapper objectMapper;
 
     public KafkaGeoEventPublisher(
-            @Qualifier("geoKafkaTemplate") KafkaTemplate<String, String> kafkaTemplate,
+            PublishEventUseCase publishEventUseCase,
             @Qualifier("geoObjectMapper") ObjectMapper objectMapper) {
-        this.kafkaTemplate = kafkaTemplate;
+        this.publishEventUseCase = publishEventUseCase;
         this.objectMapper = objectMapper;
     }
 
     @Override
     public Mono<Void> publishTrafficChanged(TrafficConditionChangedEvent event) {
-        return send(TOPIC_TRAFFIC, event.tenantId().toString(), event);
+        return enqueue(TOPIC_TRAFFIC, event.eventId(), event.tenantId(),
+                event.arcId(), "RoadArc", event.occurredAt(), event);
     }
 
     @Override
     public Mono<Void> publishRoadNodeCreated(RoadNodeCreatedEvent event) {
-        return send(TOPIC_NODE, event.tenantId().toString(), event);
+        return enqueue(TOPIC_NODE, event.eventId(), event.tenantId(),
+                event.nodeId(), "RoadNode", event.occurredAt(), event);
     }
 
     @Override
     public Mono<Void> publishServiceZoneUpdated(ServiceZoneUpdatedEvent event) {
-        return send(TOPIC_ZONE, event.tenantId().toString(), event);
+        return enqueue(TOPIC_ZONE, event.eventId(), event.tenantId(),
+                event.zoneId().toString(), "ServiceZone", event.occurredAt(), event);
     }
 
-    private Mono<Void> send(String topic, String key, Object payload) {
-        try {
-            String json = objectMapper.writeValueAsString(payload);
-            ProducerRecord<String, String> record = new ProducerRecord<>(topic, key, json);
-
-            CompletableFuture<SendResult<String, String>> future = kafkaTemplate.send(record);
-            return Mono.fromFuture(future)
-                    .doOnError(ex -> logPublishError(topic, ex))
-                    .then();
-        } catch (JsonProcessingException ex) {
-            return Mono.error(ex);
-        }
-    }
-
-    private void logPublishError(String topic, Throwable ex) {
-        System.err.println("[KafkaGeoEventPublisher] Failed to publish to topic " + topic + ": " + ex.getMessage());
+    private Mono<Void> enqueue(String topic, UUID eventId, UUID tenantId,
+                               String aggregateId, String aggregateType,
+                               Instant occurredAt, Object event) {
+        return Mono.fromCallable(() -> objectMapper.writeValueAsString(event))
+                .map(payload -> DomainEventEnvelope.wrap()
+                        .correlationId(eventId.toString())
+                        .eventType(event.getClass().getSimpleName())
+                        .aggregateId(aggregateId)
+                        .aggregateType(aggregateType)
+                        .tenantId(tenantId.toString())
+                        .solutionCode(SOLUTION_CODE)
+                        .payload(payload)
+                        .kafkaTopic(topic)
+                        // Pre-migration adapter keyed records by tenantId — preserve that
+                        // partitioning contract for existing consumers.
+                        .kafkaPartitionKey(tenantId.toString())
+                        .occurredAt(LocalDateTime.ofInstant(occurredAt, ZoneOffset.UTC))
+                        .build())
+                .flatMap(publishEventUseCase::publish)
+                .doOnSuccess(v -> log.debug("Enqueued event={} aggregateId={} topic={} to outbox",
+                        event.getClass().getSimpleName(), aggregateId, topic))
+                .doOnError(ex -> log.error("Failed to enqueue event={} to outbox: {}",
+                        event.getClass().getSimpleName(), ex.getMessage()));
     }
 }

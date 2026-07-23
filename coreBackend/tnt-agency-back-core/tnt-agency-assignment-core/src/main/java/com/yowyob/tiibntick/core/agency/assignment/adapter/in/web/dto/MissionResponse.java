@@ -24,6 +24,7 @@ public record MissionResponse(
         String recipientName,
         String recipientPhone,
         Double weightKg,
+        Double distanceKm,
         UUID targetHubId,
         Instant createdAt,
         Instant updatedAt
@@ -36,7 +37,7 @@ public record MissionResponse(
                 m.getQuotedAmount(), m.getQuotedCurrency(),
                 m.getBranchId(), m.getPickupAddress(), m.getDeliveryAddress(),
                 m.getSenderName(), m.getRecipientName(), m.getRecipientPhone(),
-                m.getWeightKg(), m.getTargetHubId(),
+                m.getWeightKg(), m.getDistanceKm(), m.getTargetHubId(),
                 m.getCreatedAt(), m.getUpdatedAt());
     }
 }

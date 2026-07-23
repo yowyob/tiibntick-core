@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audit n°5 — Kafka · Audit TiiBnTick</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --text: #1c2430; --muted: #5b6675;
+  --border: #e3e7ec; --accent: #0f5fa8; --accent-soft: #e8f1fa;
+  --code-bg: #f0f2f5; --sidebar-bg: #101823; --sidebar-text: #c7d0dc;
+  --crit: #c62828; --high: #e65100; --med: #f9a825; --low: #2e7d32;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1319; --panel: #161d27; --text: #dbe2ea; --muted: #8b97a5;
+    --border: #263140; --accent: #5aa2e0; --accent-soft: #17273a;
+    --code-bg: #1d2733; --sidebar-bg: #0a0f15; --sidebar-text: #a9b4c0;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--bg); color: var(--text); line-height: 1.65; }
+.layout { display: flex; min-height: 100vh; }
+nav.sidebar { width: 270px; flex-shrink: 0; background: var(--sidebar-bg);
+  color: var(--sidebar-text); padding: 1.4rem 1rem; position: sticky; top: 0;
+  height: 100vh; overflow-y: auto; }
+nav.sidebar .brand { font-size: 1.05rem; font-weight: 700; color: #fff;
+  margin-bottom: .2rem; }
+nav.sidebar .brand small { display:block; font-weight: 400; color: var(--sidebar-text);
+  font-size: .75rem; margin-top: .2rem; }
+nav.sidebar ul { list-style: none; padding: 0; margin: 1.2rem 0; }
+nav.sidebar li a { display: block; color: var(--sidebar-text); text-decoration: none;
+  padding: .45rem .6rem; border-radius: 6px; font-size: .86rem; }
+nav.sidebar li a:hover { background: rgba(255,255,255,.08); color: #fff; }
+nav.sidebar li a.active { background: var(--accent); color: #fff; }
+nav.sidebar .section-label { text-transform: uppercase; letter-spacing: .08em;
+  font-size: .68rem; color: #6b7683; margin: 1.4rem 0 .4rem .4rem; }
+main { flex: 1; min-width: 0; padding: 2.2rem 3rem 4rem; max-width: 1100px; }
+header.page { border-bottom: 1px solid var(--border); padding-bottom: 1.2rem;
+  margin-bottom: 1.6rem; }
+header.page .kicker { color: var(--accent); font-weight: 600; font-size: .85rem;
+  text-transform: uppercase; letter-spacing: .06em; }
+header.page h1 { margin: .25rem 0 .4rem; font-size: 1.9rem; }
+header.page .meta { color: var(--muted); font-size: .85rem; }
+h2 { margin-top: 2.4rem; padding-bottom: .35rem; border-bottom: 1px solid var(--border);
+  font-size: 1.35rem; }
+h3 { margin-top: 1.8rem; font-size: 1.08rem; }
+h4 { margin-top: 1.4rem; font-size: .98rem; }
+a { color: var(--accent); }
+code { background: var(--code-bg); padding: .12em .38em; border-radius: 4px;
+  font-size: .84em; font-family: "JetBrains Mono", Consolas, monospace; }
+pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem; overflow-x: auto; font-size: .82rem; line-height: 1.5; }
+pre code { background: none; padding: 0; }
+.table-wrap { overflow-x: auto; margin: 1rem 0; border: 1px solid var(--border);
+  border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: .85rem; background: var(--panel); }
+th, td { border-bottom: 1px solid var(--border); padding: .55rem .75rem; text-align: left;
+  vertical-align: top; }
+th { background: var(--accent-soft); color: var(--text); font-weight: 600;
+  white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+blockquote { border-left: 4px solid var(--accent); background: var(--accent-soft);
+  margin: 1rem 0; padding: .7rem 1rem; border-radius: 0 8px 8px 0; }
+blockquote p { margin: .3rem 0; }
+.badge { display: inline-block; padding: .1em .6em; border-radius: 999px;
+  font-size: .74rem; font-weight: 700; color: #fff; white-space: nowrap; }
+.badge.crit { background: var(--crit); } .badge.high { background: var(--high); }
+.badge.med { background: var(--med); color: #333; } .badge.low { background: var(--low); }
+.mermaid { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem; margin: 1rem 0; text-align: center; overflow-x: auto; }
+.toc { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem 1.4rem; margin: 1.4rem 0; font-size: .88rem; }
+.toc > ul { margin: .3rem 0; padding-left: 1.1rem; }
+.toc .toctitle { font-weight: 700; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1rem; margin: 1.4rem 0; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1.1rem 1.2rem; text-decoration: none; color: var(--text); display: block; }
+.card:hover { border-color: var(--accent); }
+.card .icon { font-size: 1.5rem; }
+.card h3 { margin: .4rem 0 .2rem; font-size: 1rem; }
+.card p { margin: 0; color: var(--muted); font-size: .82rem; }
+.stat-row { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1.2rem 0; }
+.stat { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: .8rem 1.2rem; min-width: 130px; }
+.stat .num { font-size: 1.6rem; font-weight: 800; }
+.stat .lbl { font-size: .74rem; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .05em; }
+.stat.crit .num { color: var(--crit); } .stat.high .num { color: var(--high); }
+.stat.med .num { color: var(--med); } .stat.low .num { color: var(--low); }
+footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border);
+  color: var(--muted); font-size: .78rem; }
+.progress-block { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1rem 1.2rem; margin: 1rem 0 1.6rem; }
+.progress-block .progress-label { display: flex; justify-content: space-between; align-items: baseline;
+  font-size: .85rem; margin-bottom: .5rem; }
+.progress-block .progress-label b { font-size: 1rem; }
+.progress-bar-track { background: var(--code-bg); border-radius: 999px; height: .6rem; overflow: hidden; }
+.progress-bar-fill { height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--low), var(--accent)); transition: width .3s ease; }
+.progress-note { font-size: .72rem; color: var(--muted); margin-top: .5rem; }
+li:has(> input.task-checkbox) { list-style: none; margin-left: -1.4rem; padding-left: .3rem;
+  display: list-item; }
+input.task-checkbox { width: 1rem; height: 1rem; margin-right: .5rem; vertical-align: middle;
+  accent-color: var(--accent); }
+li:has(> input.task-checkbox:checked) { color: var(--muted); }
+li:has(> input.task-checkbox:checked) code { opacity: .75; }
+@media (max-width: 900px) {
+  .layout { flex-direction: column; }
+  nav.sidebar { width: 100%; height: auto; position: static; }
+  main { padding: 1.4rem 1.2rem 3rem; }
+}
+@media print { nav.sidebar { display: none; } main { padding: 0; } }
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar"><div class="brand">TiiBnTick Core<small>Audit technique — juillet 2026</small></div>
+<ul><li><a href="index.html">🏠 Accueil</a></li>
+<li><a href="executive-summary.html">📋 Résumé exécutif global</a></li>
+</ul><div class="section-label">Rapports d'audit</div><ul>
+<li><a href="audit-1-architecture.html">🏛️ Audit n°1 — Architecture globale</a></li>
+<li><a href="audit-2-inter-modules.html">🔗 Audit n°2 — Connexions inter-modules</a></li>
+<li><a href="audit-3-yow-event-kernel.html">📨 Audit n°3 — yow-event-kernel</a></li>
+<li><a href="audit-4-yow-i18n-kernel.html">🌍 Audit n°4 — yow-i18n-kernel</a></li>
+<li><a href="audit-5-kafka.html" class="active">🧵 Audit n°5 — Kafka</a></li>
+<li><a href="audit-6-scalabilite.html">📈 Audit n°6 — Scalabilité</a></li>
+<li><a href="audit-7-system-design.html">🧭 Audit n°7 — System Design & Sécurité</a></li>
+</ul><div class="section-label">Plan de remédiation</div><ul>
+<li><a href="remediation/implementation-plan.html">🗂️ Plan — Plan d'implémentation — vue d'ensemble</a></li>
+<li><a href="remediation/phase-0-critical.html">🚨 P0 — Phase 0 — Bloquant production</a></li>
+<li><a href="remediation/phase-1-hardening.html">🛡️ P1 — Phase 1 — Durcissement</a></li>
+<li><a href="remediation/phase-2-target-architecture.html">🚀 P2 — Phase 2 — Architecture cible</a></li>
+<li><a href="remediation/workstream-payment-billing-kernel-delegation.html">💳 Chantier — Délégation paiement/facturation au Kernel</a></li>
+</ul></nav>
+<main>
+<header class="page">
+  <div class="kicker">Audit n°5</div>
+  <h1>🧵 Kafka</h1>
+  <div class="meta">Projet TiiBnTick Core · dépôt <code>tiibntick-core</code> (34 modules Maven, y compris <code>trust/tnt-trust-core</code>) · Audit réalisé le 16 juillet 2026</div>
+</header>
+
+<div class="toc"><div class="toc"><span class="toctitle">Sommaire</span><ul>
+<li><a href="#1-resume-executif">1. Résumé exécutif</a></li>
+<li><a href="#2-etat-actuel-configuration">2. État actuel — Configuration</a><ul>
+<li><a href="#21-broker-docker-compose-dev-local-uniquement">2.1 Broker (docker-compose — dev local uniquement)</a></li>
+<li><a href="#22-spring-tnt-bootstrapsrcmainresourcesapplicationyml40-60">2.2 Spring (tnt-bootstrap/src/main/resources/application.yml:40-60)</a></li>
+<li><a href="#23-configurations-par-module-synthese">2.3 Configurations par module — synthèse</a></li>
+</ul>
+</li>
+<li><a href="#3-cartographie-complete-des-flux">3. Cartographie complète des flux</a><ul>
+<li><a href="#31-tableau-exhaustif-producteurs-consommateurs">3.1 Tableau exhaustif producteurs → consommateurs</a></li>
+<li><a href="#32-diagramme-mermaid-des-flux-reels">3.2 Diagramme Mermaid des flux réels</a></li>
+<li><a href="#33-cas-particulier-corebackend">3.3 Cas particulier coreBackend</a></li>
+</ul>
+</li>
+<li><a href="#4-points-positifs">4. Points positifs</a></li>
+<li><a href="#5-problemes-detectes-tableau-de-synthese">5. Problèmes détectés — tableau de synthèse</a></li>
+<li><a href="#6-details-et-preuves-complementaires">6. Détails et preuves complémentaires</a><ul>
+<li><a href="#61-p-01-la-chaine-metier-livraison-terminee-facture-paiement-comptabilite-est-inerte">6.1 P-01 — la chaîne métier « livraison terminée → facture → paiement → comptabilité » est inerte</a></li>
+<li><a href="#62-p-02-factory-par-defaut-incompatible">6.2 P-02 — factory par défaut incompatible</a></li>
+<li><a href="#63-p-05-pattern-publish-apres-commit-erreurs-avalees">6.3 P-05 — pattern « publish après commit, erreurs avalées »</a></li>
+<li><a href="#64-p-07-gps-hors-ordre">6.4 P-07 — GPS hors ordre</a></li>
+<li><a href="#65-p-09p-10-securite-et-observabilite">6.5 P-09/P-10 — sécurité et observabilité</a></li>
+<li><a href="#66-scalabilite">6.6 Scalabilité</a></li>
+</ul>
+</li>
+<li><a href="#7-recommandations-priorisees">7. Recommandations priorisées</a><ul>
+<li><a href="#p0-reparer-les-flux-casses-jours">P0 — Réparer les flux cassés (jours)</a></li>
+<li><a href="#p1-fiabilite-semaines">P1 — Fiabilité (semaines)</a></li>
+<li><a href="#p2-exploitation-mois">P2 — Exploitation (mois)</a></li>
+</ul>
+</li>
+<li><a href="#8-conclusion">8. Conclusion</a></li>
+</ul>
+</div>
+</div>
+<h1 id="audit-n5-kafka-tiibntick-core">Audit n°5 — Kafka — TiiBnTick Core</h1>
+<p><strong>Auditeur</strong> : Distributed Systems Engineer (spécialiste Kafka)
+<strong>Date</strong> : 2026-07-17
+<strong>Périmètre</strong> : tout le dépôt <code>tiibntick-core</code> (~34 modules Maven, y compris <code>coreBackend/</code> : tnt-agency-back-core, tnt-go-freelancer-point-back-core, tnt-link-back-core, tnt-market-back-core). Basé exclusivement sur le code et la configuration réels du dépôt.</p>
+<hr />
+<h2 id="1-resume-executif">1. Résumé exécutif</h2>
+<p>L'architecture événementielle de TiiBnTick Core est <strong>structurée mais fragmentée et partiellement câblée dans le vide</strong>. Les fondations sont saines : producteurs majoritairement idempotents (<code>acks=all</code>, <code>enable.idempotence=true</code>), auto-commit désactivé partout, un embryon de DLQ dans tnt-sync-core, des topics provisionnés centralement (<code>TntKafkaTopicsConfig</code>), et une enveloppe d'événements riche en headers dans <code>yow-event-kernel</code>.</p>
+<p>Mais l'audit révèle un problème systémique <strong>critique</strong> : <strong>plus de 20 topics consommés n'ont aucun producteur dans le dépôt</strong>, dont une grande partie à cause d'incohérences de nommage tiret/point (<code>tnt.delivery.mission.status-changed</code> produit vs <code>tnt.delivery.mission.status.changed</code> consommé ; <code>tnt.billing.wallet.payment-confirmed</code> produit vs <code>tnt.billing.wallet.payment.confirmed</code> consommé ; <code>tnt.route.eta.events</code> produit vs <code>tnt.route.eta.updated</code> consommé ; <code>tnt.actor.kyc.validated</code> produit vs <code>tnt.staff.kyc.validated</code> consommé). Concrètement : la facturation à la livraison, la comptabilité des paiements, le temps réel des missions, l'onboarding RH de l'Agency ERP et l'escalade litige→remboursement <strong>ne peuvent pas fonctionner de bout en bout</strong> aujourd'hui.</p>
+<p>Second problème critique : <strong>6 consommateurs utilisent la factory Spring Boot par défaut</strong> dont le deserializer de valeur est <code>ByteArrayDeserializer</code> (application.yml), alors que leurs méthodes attendent des <code>String</code> — incompatibilité de type à l'exécution.</p>
+<p>Enfin : une seule DLQ pour tout le système (sync uniquement), aucune transaction/outbox réelle (le topic <code>tnt.outbox.events</code> existe mais aucun code outbox), publication non atomique avec la DB (perte d'événements possible), aucune déduplication consommateur, PLAINTEXT sans ACL, et aucune métrique Kafka Micrometer sur les factories construites manuellement.</p>
+<p><strong>Verdict global : 4/10</strong> — bonne intention architecturale, exécution incohérente entre modules, plusieurs flux métier cassés silencieusement (<code>auto.create.topics.enable=true</code> masque tout : les topics orphelins sont créés à la volée et les consommateurs attendent des messages qui n'arriveront jamais).</p>
+<hr />
+<h2 id="2-etat-actuel-configuration">2. État actuel — Configuration</h2>
+<h3 id="21-broker-docker-compose-dev-local-uniquement">2.1 Broker (docker-compose — dev local uniquement)</h3>
+<p><code>tnt-bootstrap/docker-compose.yml:88-122</code> :</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Paramètre</th>
+<th>Valeur</th>
+<th>Commentaire</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Image</td>
+<td><code>confluentinc/cp-kafka:7.7.0</code> (KRaft, mono-nœud)</td>
+<td>OK pour dev</td>
+</tr>
+<tr>
+<td><code>KAFKA_AUTO_CREATE_TOPICS_ENABLE</code></td>
+<td><code>"true"</code> (l.111)</td>
+<td><strong>Masque les topics orphelins</strong> (créés avec les defaults broker : 1 partition)</td>
+</tr>
+<tr>
+<td><code>KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR</code></td>
+<td>1</td>
+<td>dev only</td>
+</tr>
+<tr>
+<td><code>KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR / MIN_ISR</code></td>
+<td>1 / 1</td>
+<td>inutilisé (aucune transaction dans le code)</td>
+</tr>
+<tr>
+<td>Rétention</td>
+<td>168 h</td>
+<td>uniforme, non différenciée par topic</td>
+</tr>
+<tr>
+<td>Listeners</td>
+<td><code>PLAINTEXT</code> partout (l.98-101)</td>
+<td>aucun SASL/TLS, aucune ACL</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="22-spring-tnt-bootstrapsrcmainresourcesapplicationyml40-60">2.2 Spring (<code>tnt-bootstrap/src/main/resources/application.yml:40-60</code>)</h3>
+<pre><code class="language-yaml">spring.kafka:
+  producer:
+    key-serializer: StringSerializer
+    value-serializer: ByteArraySerializer      # ← incohérent avec tous les usages String
+    acks: all
+    retries: 3
+    properties:
+      enable.idempotence: true
+      max.in.flight.requests.per.connection: 1  # ← inutilement restrictif avec idempotence (≤5 suffit)
+  consumer:
+    group-id: tiibntick-core                    # ← group-id GLOBAL partagé par défaut
+    value-deserializer: ByteArrayDeserializer   # ← source du bug des consommateurs &quot;default factory&quot;
+    auto-offset-reset: earliest
+    enable-auto-commit: false
+    properties:
+      isolation.level: read_committed           # ← sans objet : aucun producteur transactionnel
+  admin:
+    auto-create: true
+tnt.kafka: partitions 3 (dev) / 3 (staging, RF 2) / 6 (prod, RF 3)   # application.yml:314,482,555
+</code></pre>
+<h3 id="23-configurations-par-module-synthese">2.3 Configurations par module — synthèse</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Config</th>
+<th>acks</th>
+<th>idempotence</th>
+<th>compression</th>
+<th>linger/batch</th>
+<th>offset-reset</th>
+<th>auto-commit</th>
+<th>AckMode</th>
+<th>concurrency</th>
+<th>Error handler</th>
+<th>ErrorHandlingDeserializer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TntKafkaConfig</code> (bootstrap, <code>tntKafkaTemplate</code>+<code>tntKafkaSender</code>)</td>
+<td>all</td>
+<td>oui</td>
+<td>lz4 (template) / aucune (sender)</td>
+<td>non</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>DeliveryModuleConfig</code></td>
+<td>all</td>
+<td>oui</td>
+<td>non</td>
+<td>non</td>
+<td>earliest</td>
+<td>non</td>
+<td>défaut (BATCH)</td>
+<td>2</td>
+<td><strong>aucun</strong></td>
+<td>non</td>
+</tr>
+<tr>
+<td><code>IncidentKafkaConfig</code></td>
+<td>all (implicite idempotence)</td>
+<td>oui</td>
+<td>non</td>
+<td>non</td>
+<td>earliest</td>
+<td>non</td>
+<td>défaut</td>
+<td>2</td>
+<td><strong>aucun</strong></td>
+<td>non</td>
+</tr>
+<tr>
+<td><code>KafkaRealtimeConfig</code></td>
+<td>all</td>
+<td>oui</td>
+<td>lz4</td>
+<td>non</td>
+<td>earliest</td>
+<td>non</td>
+<td>MANUAL</td>
+<td>2</td>
+<td>défaut (pas de DLQ)</td>
+<td><strong>oui</strong></td>
+</tr>
+<tr>
+<td><code>SyncKafkaConfig</code></td>
+<td>all</td>
+<td>oui</td>
+<td>lz4</td>
+<td>non</td>
+<td>earliest</td>
+<td>non</td>
+<td>MANUAL</td>
+<td>2</td>
+<td><strong>DefaultErrorHandler + DLQ</strong> (FixedBackOff 1 s ×3)</td>
+<td><strong>oui</strong></td>
+</tr>
+<tr>
+<td><code>DisputeKafkaConfig</code></td>
+<td>all</td>
+<td>oui</td>
+<td>lz4</td>
+<td>non</td>
+<td>earliest</td>
+<td>non</td>
+<td>MANUAL_IMMEDIATE</td>
+<td>?</td>
+<td><strong>aucun</strong></td>
+<td>non</td>
+</tr>
+<tr>
+<td><code>NotifyCoreAutoConfiguration</code></td>
+<td>(producteur = tntKafkaTemplate)</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>earliest</td>
+<td>non</td>
+<td>?</td>
+<td>2</td>
+<td><strong>aucun</strong></td>
+<td>non</td>
+</tr>
+<tr>
+<td><code>GeoCoreConfig</code></td>
+<td><strong>"1"</strong></td>
+<td><strong>false</strong></td>
+<td>non</td>
+<td>non</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>RouteCoreConfig</code></td>
+<td><strong>"1"</strong></td>
+<td>?</td>
+<td>non</td>
+<td>non</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>ActorCoreConfig</code></td>
+<td>all</td>
+<td>oui</td>
+<td>non</td>
+<td>non</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>TntTpKafkaConfig</code></td>
+<td>all</td>
+<td>oui</td>
+<td>non</td>
+<td>non</td>
+<td>earliest</td>
+<td>non</td>
+<td>défaut</td>
+<td>2</td>
+<td><strong>aucun</strong></td>
+<td>non</td>
+</tr>
+<tr>
+<td><code>WalletModuleConfig</code></td>
+<td>all</td>
+<td>oui</td>
+<td>non</td>
+<td>non</td>
+<td>earliest</td>
+<td>non</td>
+<td>défaut</td>
+<td>?</td>
+<td><strong>aucun</strong></td>
+<td>non</td>
+</tr>
+<tr>
+<td><code>TntBillingInvoiceAutoConfiguration</code></td>
+<td>all</td>
+<td>oui</td>
+<td>non</td>
+<td>non</td>
+<td>earliest</td>
+<td>non</td>
+<td>défaut</td>
+<td>2</td>
+<td><strong>aucun</strong></td>
+<td>non</td>
+</tr>
+<tr>
+<td><code>TntBillingReportAutoConfiguration</code></td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>earliest</td>
+<td>non</td>
+<td>défaut</td>
+<td>2</td>
+<td><strong>aucun</strong></td>
+<td>non</td>
+</tr>
+<tr>
+<td><code>KafkaProducerConfig</code> (trust)</td>
+<td>all</td>
+<td>oui</td>
+<td>lz4</td>
+<td><strong>linger 5 ms / batch 16 Ko</strong></td>
+<td>earliest</td>
+<td>non</td>
+<td>MANUAL_IMMEDIATE</td>
+<td>1</td>
+<td><strong>aucun</strong></td>
+<td>non</td>
+</tr>
+<tr>
+<td><code>TntRolesKafkaConfig</code></td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>earliest</td>
+<td>non</td>
+<td>défaut</td>
+<td>1</td>
+<td><strong>aucun</strong></td>
+<td>non</td>
+</tr>
+<tr>
+<td><code>AgencyEventingKafkaProducerConfig</code></td>
+<td>all</td>
+<td>oui</td>
+<td>non</td>
+<td>non</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>Agency*KafkaConfig</code> (4 consumers ERP)</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>earliest</td>
+<td>non</td>
+<td>MANUAL_IMMEDIATE</td>
+<td>?</td>
+<td><strong>aucun</strong></td>
+<td>non</td>
+</tr>
+<tr>
+<td>Factory Boot par défaut (<code>kafkaListenerContainerFactory</code>)</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>earliest</td>
+<td>non</td>
+<td>BATCH</td>
+<td>1</td>
+<td>DefaultErrorHandler (10 essais puis <strong>skip sans DLQ</strong>)</td>
+<td>non</td>
+</tr>
+</tbody>
+</table></div>
+<p>Constat : ~15 factories producteur/consommateur quasi identiques recopiées dans chaque module, avec dérives locales (geo/route en <code>acks=1</code>, seul trust règle linger/batch, seuls sync/realtime ont <code>ErrorHandlingDeserializer</code>, seul sync a une DLQ).</p>
+<hr />
+<h2 id="3-cartographie-complete-des-flux">3. Cartographie complète des flux</h2>
+<h3 id="31-tableau-exhaustif-producteurs-consommateurs">3.1 Tableau exhaustif producteurs → consommateurs</h3>
+<p>Légende clé : la « clé » est la clé de partitionnement réellement passée à <code>send()</code>. <strong>⚠ ORPHELIN</strong> = topic consommé sans producteur trouvé dans le dépôt (ou produit sans consommateur interne). Tous les payloads sont du <strong>JSON sérialisé en String</strong> (sauf mention).</p>
+<h4 id="flux-apparies-fonctionnels">Flux appariés (fonctionnels)</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Topic (source du nom)</th>
+<th>Producteur (module / classe)</th>
+<th>Clé</th>
+<th>Consommateur (module / classe, groupe)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>tnt.incident.escalated.to.dispute</code> (dur)</td>
+<td>tnt-incident-core <code>IncidentKafkaEventPublisher</code></td>
+<td>incidentId</td>
+<td>tnt-dispute-core <code>DisputeEventConsumer</code> (tnt-dispute-core-group) ; tnt-billing-wallet <code>WalletBillingEventConsumer</code> (tnt-billing-wallet-dispute-freeze)</td>
+</tr>
+<tr>
+<td><code>tnt.incident.resolved</code> / <code>tnt.incident.closed</code> (dur)</td>
+<td>tnt-incident-core</td>
+<td>incidentId</td>
+<td>tnt-delivery-core <code>IncidentEventConsumer</code> (<strong>factory par défaut</strong>, groupe <code>tiibntick-core</code>) ; tnt-actor-core <code>IncidentEventConsumer</code> (closed, idem)</td>
+</tr>
+<tr>
+<td><code>tnt.vehicle.assigned_to_mission</code> / <code>tnt.vehicle.released_from_mission</code> (dur)</td>
+<td>tnt-resource-core <code>ResourceKafkaEventPublisher</code> (KafkaSender réactif)</td>
+<td>? (voir code)</td>
+<td>tnt-delivery-core <code>FreelancerVehicleEventConsumer</code> (tnt-delivery-core)</td>
+</tr>
+<tr>
+<td><code>tnt.delivery.freelancer_org.assigned</code> (dur)</td>
+<td>tnt-delivery-core <code>KafkaDeliveryEventPublisher</code></td>
+<td>aggregateId</td>
+<td>tnt-notify-core <code>FreelancerOrgKafkaEventConsumer</code> (tnt-notify-core) ; tnt-accounting-core <code>BillingEventAccountingConsumer</code> (<strong>factory par défaut</strong>, tnt-accounting-core)</td>
+</tr>
+<tr>
+<td><code>tnt.delivery.mission.status-changed</code> (dur, <strong>tiret</strong>)</td>
+<td>tnt-delivery-core (MissionStatusChangedEvent)</td>
+<td>aggregateId (missionId)</td>
+<td>tnt-market-back-core <code>MarketKafkaConsumer</code> (tnt-market-group, <strong>factory par défaut</strong>) — seul consommateur aligné sur le tiret</td>
+</tr>
+<tr>
+<td><code>tnt.realtime.gps.position.updated</code> (dur)</td>
+<td>tnt-realtime-core <code>KafkaRealtimeEventPublisher</code></td>
+<td><strong>eventId (aléatoire !)</strong></td>
+<td>tnt-incident-core <code>IncidentEventConsumer</code> (tnt-incident-core)</td>
+</tr>
+<tr>
+<td><code>tnt.realtime.geofence.triggered</code> (dur)</td>
+<td>tnt-realtime-core</td>
+<td>eventId</td>
+<td>tnt-incident-core ; tnt-sync-core <code>EntityChangedEventConsumer</code> (tnt-sync-core)</td>
+</tr>
+<tr>
+<td><code>tnt.inventory.hub.package.deposited</code> / <code>.pickedup</code> (dur)</td>
+<td>tnt-inventory-core <code>InventoryKafkaEventPublisher</code> (KafkaSender)</td>
+<td>?</td>
+<td>tnt-agency-org-core <code>InventoryHubConsumer</code> (tnt-agency-erp-inventory-consumer, via <code>${tnt.kafka.topics.consumed.*}</code>)</td>
+</tr>
+<tr>
+<td><code>tnt.billing.invoice.events</code> (config <code>tnt.kafka.topics.invoice-events</code>)</td>
+<td>tnt-billing-invoice <code>KafkaInvoiceEventPublisher</code></td>
+<td>invoiceId</td>
+<td>tnt-billing-report <code>InvoiceEventReportConsumer</code> (tnt-billing-report-group)</td>
+</tr>
+<tr>
+<td><code>tnt.billing.wallet.commission-calculated</code> (dur)</td>
+<td>tnt-billing-wallet <code>WalletKafkaPublisher</code></td>
+<td>delivererId</td>
+<td>tnt-billing-wallet <code>WalletBillingEventConsumer</code> (tnt-billing-wallet-commission) — boucle intra-module</td>
+</tr>
+<tr>
+<td><code>tnt.billing.template.applied</code> (dur)</td>
+<td>tnt-billing-templates <code>KafkaTemplateEventPublisher</code></td>
+<td>?</td>
+<td>tnt-notify-core <code>FreelancerOrgKafkaEventConsumer</code></td>
+</tr>
+<tr>
+<td><code>tnt.market.listing.published</code> … <code>tnt.market.merchant.contract.signed</code> (dérivés du nom de classe, préfixe <code>tnt.market.</code>)</td>
+<td>tnt-market-back-core <code>MarketKafkaEventPublisher</code> (tntKafkaTemplate)</td>
+<td>aggregateId</td>
+<td>tnt-sync-core <code>EntityChangedEventConsumer</code> (10 topics market)</td>
+</tr>
+<tr>
+<td><code>yow.trust.events</code> (dur, configurable <code>tnt.trust.kafka-trust-events-topic</code>)</td>
+<td>tnt-trust-core <code>KafkaTrustEventPublisherAdapter</code></td>
+<td>entityId</td>
+<td><strong>externe</strong> : microservice Kernel yow-trust-event</td>
+</tr>
+<tr>
+<td><code>yow.trust.events.committed</code> (dur)</td>
+<td><strong>externe</strong> (yow-trust-event)</td>
+<td>—</td>
+<td>tnt-trust-core <code>TrustCommittedEventConsumer</code> (tnt-trust-committed-listener)</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="topics-produits-sans-consommateur-interne-sorties-fire-and-forget-acceptable-si-contrat-externe-sinon-code-mort">Topics produits sans consommateur interne (sorties « fire and forget » — acceptable si contrat externe, sinon code mort)</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Producteur</th>
+<th>Clé</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>tnt.delivery.events</code> (fourre-tout, enveloppe EventEnvelope)</td>
+<td>tnt-delivery-core</td>
+<td>aggregateId</td>
+</tr>
+<tr>
+<td><code>tnt.incident.created/status.changed/triaged/driver.assigned/handover.completed/cancelled/escalated/interagency.*</code></td>
+<td>tnt-incident-core</td>
+<td>incidentId</td>
+</tr>
+<tr>
+<td><code>tnt.geo.traffic.events</code> / <code>node.events</code> / <code>zone.events</code></td>
+<td>tnt-geo-core (<strong>acks=1, idempotence=false</strong>)</td>
+<td><strong>tenantId</strong></td>
+</tr>
+<tr>
+<td><code>tnt.route.tour.events</code> / <code>eta.events</code> / <code>reroute.events</code> / <code>vrp.events</code></td>
+<td>tnt-route-core (<strong>acks=1</strong>)</td>
+<td>tenantId ou missionId</td>
+</tr>
+<tr>
+<td><code>tnt.realtime.eta.updated</code>, <code>tnt.realtime.actor.connected/disconnected</code></td>
+<td>tnt-realtime-core</td>
+<td>eventId</td>
+</tr>
+<tr>
+<td><code>tnt.sync.entity.version.changed</code>, <code>tnt.sync.conflict.detected</code>, <code>tnt.sync.completed</code></td>
+<td>tnt-sync-core</td>
+<td>eventId</td>
+</tr>
+<tr>
+<td><code>tnt.dispute.opened/status.changed/evidence.submitted/ruled/escalated/compensation.processed/closed</code></td>
+<td>tnt-dispute-core <code>DisputeKafkaEventPublisher</code></td>
+<td>disputeId</td>
+</tr>
+<tr>
+<td><code>tnt.delivery.package.disputed</code> / <code>.dispute.released</code></td>
+<td>tnt-dispute-core <code>DeliveryStatusAdapter</code></td>
+<td>packageId</td>
+</tr>
+<tr>
+<td><code>tnt.billing.compensation.initiated</code></td>
+<td>tnt-dispute-core <code>BillingCompensationAdapter</code></td>
+<td>disputeId</td>
+</tr>
+<tr>
+<td><code>tnt.notify.*</code> (requested/delivered/failed)</td>
+<td>tnt-notify-core <code>KafkaNotificationPublisherAdapter</code></td>
+<td>notificationId</td>
+</tr>
+<tr>
+<td><code>tnt.actor.status.changed/location.updated/badge.earned/kyc.validated/mission.assigned/freelancer.*</code></td>
+<td>tnt-actor-core <code>KafkaActorEventPublisher</code></td>
+<td>actorId</td>
+</tr>
+<tr>
+<td><code>tnt.tp.client.profile/kyc/loyalty/rating/phone.alias/.events</code> (+ <code>tnt.tp.unknown.events</code>)</td>
+<td>tnt-tp-core</td>
+<td>clientId</td>
+</tr>
+<tr>
+<td><code>tnt.administration.events</code></td>
+<td>tnt-administration-core</td>
+<td>tenantId</td>
+</tr>
+<tr>
+<td><code>tnt.product.created</code>, <code>tnt.product.offer.published</code></td>
+<td>tnt-product-core (KafkaSender)</td>
+<td>?</td>
+</tr>
+<tr>
+<td><code>tnt.inventory.stock.low</code></td>
+<td>tnt-inventory-core</td>
+<td>?</td>
+</tr>
+<tr>
+<td><code>tnt.resource.vehicle.*</code>, <code>tnt.resource.freelancer.vehicle.registered</code></td>
+<td>tnt-resource-core</td>
+<td>?</td>
+</tr>
+<tr>
+<td><code>tnt.sales.order.confirmed/dispatched/delivered/cancelled</code></td>
+<td>tnt-sales-core</td>
+<td>?</td>
+</tr>
+<tr>
+<td><code>tnt.accounting.journal-entry.posted</code>, <code>tnt.accounting.period.closed</code></td>
+<td>tnt-accounting-core</td>
+<td>tenantId</td>
+</tr>
+<tr>
+<td><code>tnt.agency.events</code>, <code>tnt.agency.mission.request</code>, <code>tnt.agency.staff.events</code>, <code>tnt.agency.contract.events</code> (config <code>tnt.kafka.topics.produced.*</code>)</td>
+<td>tnt-agency-eventing-core <code>KafkaAgencyEventPublisher</code></td>
+<td><strong>tenantId</strong></td>
+</tr>
+<tr>
+<td><code>tnt.agency.claims.submitted</code> (config)</td>
+<td>tnt-agency-compliance-core <code>ClaimsKafkaPublisher</code></td>
+<td>tenantId</td>
+</tr>
+<tr>
+<td><code>gofp.announcement.published</code>, <code>gofp.delivery.completed</code>, <code>gofp.subscription.suspended</code></td>
+<td>tnt-go-freelancer-point-back-core <code>KafkaGofpEventPublisher</code></td>
+<td>announcement/delivery/subscriptionId</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="topics-consommes-sans-producteur-dans-le-depot-flux-casses-ou-dependant-dun-producteur-externe-non-documente">⚠ Topics consommés SANS producteur dans le dépôt (flux cassés ou dépendant d'un producteur externe non documenté)</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Topic consommé</th>
+<th>Consommateur(s)</th>
+<th>Producteur attendu / cause</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>tnt.delivery.mission.status.changed</code> (<strong>points</strong>)</td>
+<td>tnt-incident-core, tnt-sync-core, tnt-realtime-core <code>MissionStatusEventConsumer</code>, tnt-agency (yml <code>core-mission-status</code>)</td>
+<td>delivery publie <code>…status-changed</code> (<strong>tiret</strong>) — mismatch de nommage</td>
+</tr>
+<tr>
+<td><code>tnt.delivery.mission.completed</code></td>
+<td>tnt-billing-invoice, tnt-tp-core, tnt-sales-core</td>
+<td>jamais publié (les événements delivery partent dans <code>tnt.delivery.events</code>)</td>
+</tr>
+<tr>
+<td><code>tnt.delivery.mission.started</code> / <code>.failed</code></td>
+<td>tnt-sales-core</td>
+<td>jamais publiés</td>
+</tr>
+<tr>
+<td><code>tnt.delivery.mission.created</code></td>
+<td>tnt-agency-assignment (<code>core-mission-created</code>)</td>
+<td>jamais publié (topic déclaré dans TntKafkaTopicsConfig seulement)</td>
+</tr>
+<tr>
+<td><code>tnt.delivery.package.delivered</code></td>
+<td>tnt-agency-assignment</td>
+<td>jamais publié</td>
+</tr>
+<tr>
+<td><code>tnt.delivery.package.updated</code></td>
+<td>tnt-sync-core</td>
+<td>jamais publié</td>
+</tr>
+<tr>
+<td><code>tnt.billing.wallet.payment.confirmed</code> (<strong>points</strong>)</td>
+<td>tnt-billing-invoice</td>
+<td>wallet publie <code>tnt.billing.wallet.payment-confirmed</code> (<strong>tiret</strong>)</td>
+</tr>
+<tr>
+<td><code>tnt.billing.payment.confirmed</code></td>
+<td>tnt-accounting-core, tnt-market-back-core</td>
+<td>personne (ni la variante wallet, ni celle-ci)</td>
+</tr>
+<tr>
+<td><code>tnt.billing.invoice.paid</code></td>
+<td>tnt-accounting-core</td>
+<td>jamais publié (invoice publie sur <code>tnt.billing.invoice.events</code>)</td>
+</tr>
+<tr>
+<td><code>tnt.billing.commission.calculated</code></td>
+<td>tnt-accounting-core</td>
+<td>wallet publie <code>tnt.billing.wallet.commission-calculated</code></td>
+</tr>
+<tr>
+<td><code>tnt.billing.wallet.split_executed</code></td>
+<td>tnt-accounting-core</td>
+<td>jamais publié</td>
+</tr>
+<tr>
+<td><code>tnt.billing.wallet.events</code></td>
+<td>tnt-agency-commission <code>WalletPayoutConsumer</code> (<code>core-wallet</code>)</td>
+<td>jamais publié (wallet publie 6 topics unitaires en tiret)</td>
+</tr>
+<tr>
+<td><code>tnt.billing.compensation.paid</code></td>
+<td>tnt-dispute-core</td>
+<td>jamais publié — la boucle dispute→wallet→dispute est <strong>à moitié câblée</strong> (dispute émet <code>compensation.initiated</code>, personne ne le consomme, personne n'émet <code>compensation.paid</code>)</td>
+</tr>
+<tr>
+<td><code>tnt.route.eta.updated</code></td>
+<td>tnt-realtime-core <code>ETAUpdateEventConsumer</code></td>
+<td>route publie <code>tnt.route.eta.events</code></td>
+</tr>
+<tr>
+<td><code>tnt.staff.kyc.validated</code></td>
+<td>tnt-agency-workforce <code>ActorKycConsumer</code> (<code>core-actor-kyc</code>)</td>
+<td>actor publie <code>tnt.actor.kyc.validated</code></td>
+</tr>
+<tr>
+<td><code>tnt.actor.profile.updated</code>, <code>tnt.organization.hub.updated</code>, <code>tnt.geo.alert.created</code></td>
+<td>tnt-sync-core</td>
+<td>jamais publiés</td>
+</tr>
+<tr>
+<td><code>tnt.freelancer_org.created/.sub_deliverer.associated/.revoked/.verified</code></td>
+<td>tnt-actor-core <code>FreelancerOrgEventConsumer</code></td>
+<td>jamais publiés</td>
+</tr>
+<tr>
+<td><code>tnt.admin.freelancer_org.kyc_approved/kyc_rejected/suspended/unsuspended</code></td>
+<td>tnt-notify-core</td>
+<td>jamais publiés (déclarés dans TntKafkaTopicsConfig uniquement)</td>
+</tr>
+<tr>
+<td><code>tnt.roles.permission-changed</code></td>
+<td>tnt-roles-core <code>PermissionCacheInvalidationListener</code></td>
+<td>jamais publié (invalidation de cache jamais déclenchée)</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="32-diagramme-mermaid-des-flux-reels">3.2 Diagramme Mermaid des flux réels</h3>
+<pre class="mermaid">flowchart LR
+  subgraph L3["Logistics"]
+    DEL[tnt-delivery-core]
+    INC[tnt-incident-core]
+    RT[tnt-realtime-core]
+    RTE[tnt-route-core]
+    GEO[tnt-geo-core]
+    SYNC[tnt-sync-core]
+    DISP[tnt-dispute-core]
+    NOT[tnt-notify-core]
+  end
+  subgraph L2["Identity"]
+    ACT[tnt-actor-core]
+    TP[tnt-tp-core]
+  end
+  subgraph L4["Business"]
+    RES[tnt-resource-core]
+    INV[tnt-inventory-core]
+    SAL[tnt-sales-core]
+    ACC[tnt-accounting-core]
+  end
+  subgraph L5["Billing"]
+    BINV[tnt-billing-invoice]
+    BWAL[tnt-billing-wallet]
+    BREP[tnt-billing-report]
+    BTPL[tnt-billing-templates]
+  end
+  subgraph BACK["coreBackend"]
+    AGY[tnt-agency-back-core]
+    MKT[tnt-market-back-core]
+    GOFP[tnt-gofp-back-core]
+    LNK[tnt-link-back-core]
+  end
+  TRUST[tnt-trust-core]
+  KTRUST[(Kernel yow-trust-event)]
+
+  %% Flux fonctionnels
+  INC -- "tnt.incident.escalated.to.dispute" --> DISP
+  INC -- "tnt.incident.escalated.to.dispute" --> BWAL
+  INC -- "tnt.incident.resolved / closed" --> DEL
+  INC -- "tnt.incident.closed" --> ACT
+  RES -- "tnt.vehicle.assigned_to_mission / released" --> DEL
+  DEL -- "tnt.delivery.freelancer_org.assigned" --> NOT
+  DEL -- "tnt.delivery.freelancer_org.assigned" --> ACC
+  DEL -- "tnt.delivery.mission.status-changed" --> MKT
+  RT -- "tnt.realtime.gps.position.updated" --> INC
+  RT -- "tnt.realtime.geofence.triggered" --> INC
+  RT -- "tnt.realtime.geofence.triggered" --> SYNC
+  INV -- "tnt.inventory.hub.package.*" --> AGY
+  BINV -- "tnt.billing.invoice.events" --> BREP
+  BWAL -- "tnt.billing.wallet.commission-calculated" --> BWAL
+  BTPL -- "tnt.billing.template.applied" --> NOT
+  MKT -- "tnt.market.*" --> SYNC
+  TRUST -- "yow.trust.events" --> KTRUST
+  KTRUST -- "yow.trust.events.committed" --> TRUST
+
+  %% Flux cassés (mismatch / producteur absent)
+  DEL -. "✗ status.changed (points) jamais produit" .-> INC
+  DEL -. "✗ idem" .-> SYNC
+  DEL -. "✗ idem" .-> RT
+  DEL -. "✗ mission.completed jamais produit" .-> BINV
+  DEL -. "✗ mission.completed/started/failed" .-> SAL
+  DEL -. "✗ mission.completed" .-> TP
+  DEL -. "✗ mission.created / package.delivered" .-> AGY
+  BWAL -. "✗ payment-confirmed (tiret) ≠ payment.confirmed" .-> BINV
+  BWAL -. "✗ wallet.events jamais produit" .-> AGY
+  BWAL -. "✗ compensation.paid jamais produit" .-> DISP
+  DISP -. "✗ compensation.initiated : aucun consommateur" .-> BWAL
+  RTE -. "✗ eta.events ≠ eta.updated" .-> RT
+  ACT -. "✗ actor.kyc.validated ≠ staff.kyc.validated" .-> AGY
+  ACT -. "✗ actor.profile.updated jamais produit" .-> SYNC
+  AGY -- "tnt.agency.mission.request (aucun consommateur core)" --> AGY
+  GOFP -- "gofp.* (aucun consommateur)" --> GOFP
+  LNK -. "aucun flux Kafka — tracking par appel direct DeliveryQueryUseCase" .-> DEL
+</pre>
+<h3 id="33-cas-particulier-corebackend">3.3 Cas particulier coreBackend</h3>
+<ul>
+<li><strong>tnt-agency-back-core</strong> : le seul sous-système avec des topics <strong>configurables</strong> (<code>tnt.kafka.topics.consumed/produced.*</code>, application.yml:316-334) et des groupes dédiés par domaine (delivery/inventory/billing/actor). Le flux « mission create » annoncé par l'historique git est le topic <strong>produit</strong> <code>tnt.agency.mission.request</code> (<code>KafkaAgencyEventPublisher.java:51,78</code>, clé = tenantId) — <strong>aucun consommateur côté Core</strong> : la création de mission passe en réalité par le gateway HTTP (<code>tnt.agency.platform.base-url</code> + X-Client-Id/X-Api-Key). Sur les 7 topics consommés par l'ERP, <strong>5 sont orphelins</strong> (seuls les 2 topics inventory fonctionnent).</li>
+<li><strong>tnt-market-back-core</strong> : bien intégré (publie <code>tnt.market.*</code> clé=aggregateId consommés par tnt-sync-core ; consomme le statut mission au bon nom en tiret) — mais consomme <code>tnt.billing.payment.confirmed</code> orphelin, et ses 2 listeners utilisent la factory Boot par défaut (bug ByteArray, cf. P-02).</li>
+<li><strong>tnt-go-freelancer-point-back-core</strong> : 3 topics produits <code>gofp.*</code> — <strong>hors convention <code>tnt.*</code></strong>, aucun consommateur, pas de <code>NewTopic</code> (créés par auto-create avec 1 partition).</li>
+<li><strong>tnt-link-back-core</strong> : <strong>zéro usage Kafka</strong> (aucun fichier ne référence KafkaTemplate/@KafkaListener). Le tracking colis (<code>TrackParcelApplicationService.java:22-26</code>) appelle <strong>directement en synchrone</strong> <code>DeliveryQueryUseCase.findByTrackingCode()</code> de tnt-delivery-core. Pour des cartes temps réel à grande échelle, il manque tout le chaînage : consommation de <code>tnt.realtime.gps.position.updated</code> (ou un topic compacté <code>tnt.tracking.position.latest</code> clé=missionId), fan-out SSE/WebSocket, et cache Redis des dernières positions. Aujourd'hui c'est du pull DB à chaque requête → non scalable pour de l'affichage live.</li>
+</ul>
+<hr />
+<h2 id="4-points-positifs">4. Points positifs</h2>
+<ol>
+<li><strong>Producteurs durables par défaut</strong> : <code>acks=all</code> + <code>enable.idempotence=true</code> + retries=3 dans 12 des 14 configs producteur (ex. <code>TntKafkaConfig.java:48-51</code>, <code>SyncKafkaConfig.java:45-48</code>, trust <code>KafkaProducerConfig.java:62-68</code>).</li>
+<li><strong>Auto-commit désactivé partout</strong> (<code>enable-auto-commit=false</code> dans le yml et toutes les factories) — pas de perte d'offset silencieuse par commit prématuré ; plusieurs modules en ack manuel (sync, realtime, dispute, trust, agency ERP).</li>
+<li><strong>Une vraie DLQ existe</strong> : tnt-sync-core (<code>SyncKafkaConfig.java:81-85</code>) avec <code>DeadLetterPublishingRecoverer</code> + <code>FixedBackOff(1 s, 3)</code> + <code>ErrorHandlingDeserializer</code> — le seul module protégé des poison pills de bout en bout.</li>
+<li><strong>Provisionnement centralisé des topics</strong> : <code>TntKafkaTopicsConfig</code> (~50 <code>NewTopic</code>, partitions/RF paramétrés par profil : 3/1 dev, 3/2 staging, 6/3 prod) ; dimensionnement différencié pour les topics véhicules (6 partitions, <code>TntKafkaTopicsConfig.java:141-157</code>).</li>
+<li><strong>yow-event-kernel</strong> : enveloppe avec 9 headers standard (<code>X-Yow-Envelope-Id</code>, <code>X-Yow-Correlation-Id</code>, <code>X-Yow-Event-Type</code>, <code>X-Yow-Tenant-Id</code>, <code>X-Yow-Schema-Version</code>, <code>X-Yow-Replay</code>…) — base saine pour le versioning et le routage sans désérialisation (<code>KafkaEventPublisher.java:47-57</code>).</li>
+<li><strong>Clés de partitionnement métier majoritaires</strong> : aggregateId/incidentId/disputeId/walletId — l'ordre par agrégat est garanti pour la plupart des flux ; le commentaire de <code>MarketKafkaEventPublisher.java:38-41</code> montre une réflexion consciente clé↔consommateur.</li>
+<li><strong>Sérialisation String/JSON sans <code>JsonDeserializer</code> typé</strong> : pas de risque <code>spring.json.trusted.packages=*</code> (aucune désérialisation polymorphe pilotée par header de type dans le dépôt).</li>
+<li><strong>Trust en mode dégradé maîtrisé</strong> : file de retry DB drainée périodiquement (<code>tnt.trust.retry-drain-*</code>, application.yml:305-307), le health check Kafka trust est volontairement exclu de la readiness (application.yml:116-121).</li>
+<li><strong>Kill-switch consommateurs Agency</strong> (<code>tnt.agency.kafka.consumers.enabled</code>) et readiness incluant <code>kafka</code> (application.yml:121).</li>
+</ol>
+<hr />
+<h2 id="5-problemes-detectes-tableau-de-synthese">5. Problèmes détectés — tableau de synthèse</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>Problème</th>
+<th>Localisation (preuve)</th>
+<th>Criticité</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>P-01</td>
+<td>~20 topics consommés sans producteur : nommage tiret/point incohérent + événements jamais émis → facturation, comptabilité, temps réel mission, ERP agency, boucle litige-remboursement <strong>inertes</strong></td>
+<td>§3.1 tableau orphelins (ex. <code>KafkaDeliveryEventPublisher.java:33</code> vs <code>IncidentEventConsumer.java:35</code> ; <code>WalletKafkaPublisher.java:26</code> vs <code>InvoiceBillingEventConsumer.java:101</code> ; <code>KafkaRouteEventPublisher.java:17</code> vs <code>ETAUpdateEventConsumer.java:52</code> ; <code>KafkaActorEventPublisher.java:47</code> vs application.yml:323)</td>
+<td><span class="badge crit">Critique</span></td>
+</tr>
+<tr>
+<td>P-02</td>
+<td>6+ listeners sur la factory Boot par défaut dont le value-deserializer est <code>ByteArrayDeserializer</code> alors qu'ils attendent <code>String</code> → échec de conversion à l'exécution</td>
+<td>application.yml:54 ; <code>BillingEventAccountingConsumer.java:44,73,102,143,188</code>, <code>DeliveryEventSalesConsumer.java:37,48,59</code>, <code>MarketKafkaConsumer.java:33,53</code>, delivery/actor <code>IncidentEventConsumer</code> (<code>containerFactory="kafkaListenerContainerFactory"</code>)</td>
+<td><span class="badge crit">Critique</span></td>
+</tr>
+<tr>
+<td>P-03</td>
+<td><code>auto.create.topics.enable=true</code> + <code>spring.kafka.admin.auto-create</code> masquent P-01 : les topics orphelins sont créés à la volée (1 partition côté broker) et personne ne détecte rien</td>
+<td>docker-compose.yml:111 ; application.yml:59-60</td>
+<td><span class="badge high">Élevé</span></td>
+</tr>
+<tr>
+<td>P-04</td>
+<td>Une seule DLQ (sync). Tous les autres consommateurs : soit skip+ack du poison pill (perte définitive, ex. <code>DisputeEventConsumer.java:104-107</code> « ack to avoid blocking the partition »), soit DefaultErrorHandler par défaut (10 tentatives puis skip loggé)</td>
+<td><code>SyncKafkaConfig.java:31</code> (seule DLQ) ; <code>tnt.dlq</code> déclaré (<code>TntKafkaTopicsConfig.java:225</code>) mais <strong>jamais utilisé par aucun code</strong></td>
+<td><span class="badge high">Élevé</span></td>
+</tr>
+<tr>
+<td>P-05</td>
+<td>Aucune publication atomique avec la DB : pas d'outbox (le topic <code>tnt.outbox.events</code> existe, <code>TntKafkaTopicsConfig.java:228-234</code>, mais aucun writer/reader), pas de transactions Kafka (aucun <code>transactional.id</code> dans le dépôt) ; pire, plusieurs publishers avalent les erreurs (<code>onErrorComplete()</code> <code>KafkaDeliveryEventPublisher.java:66</code> ; fire-and-forget sans callback <code>IncidentKafkaEventPublisher.java:137</code>, <code>KafkaInvoiceEventPublisher.java:46</code>, <code>MarketKafkaEventPublisher.java:41</code>, <code>KafkaGofpEventPublisher.java:32-59</code>) → événements perdus si le send échoue après commit DB</td>
+<td>fichiers cités</td>
+<td><span class="badge high">Élevé</span></td>
+</tr>
+<tr>
+<td>P-06</td>
+<td>Aucune idempotence/déduplication consommateur : aucun listener ne vérifie un eventId déjà traité ; avec at-least-once + rebalances, doublons garantis (paiements wallet, écritures comptables, compensations litige)</td>
+<td>tous les listeners ; ex. <code>WalletBillingEventConsumer</code>, <code>BillingEventAccountingConsumer</code></td>
+<td><span class="badge high">Élevé</span></td>
+</tr>
+<tr>
+<td>P-07</td>
+<td>Ordre non garanti sur les flux temps réel : clé = <code>eventId</code> aléatoire pour GPS/geofence/ETA (<code>KafkaRealtimeEventPublisher.java:43</code>) et sync (<code>KafkaSyncEventPublisher.java:34</code>) → les positions d'une même mission arrivent dans le désordre chez tnt-incident-core (détection d'anomalies de trajectoire faussée)</td>
+<td>fichiers cités</td>
+<td><span class="badge high">Élevé</span></td>
+</tr>
+<tr>
+<td>P-08</td>
+<td><code>acks=1</code>, <code>enable.idempotence=false</code> dans tnt-geo-core (<code>GeoCoreConfig.java:52-54</code>) et <code>acks=1</code> dans tnt-route-core (<code>RouteCoreConfig.java:43</code>) — perte possible d'événements trafic/reroutage en cas de bascule broker ; incohérent avec le reste</td>
+<td>fichiers cités</td>
+<td><span class="badge med">Moyen</span></td>
+</tr>
+<tr>
+<td>P-09</td>
+<td>Sécurité : PLAINTEXT sans SASL/TLS ni ACL (aucune propriété <code>security.protocol</code>/<code>sasl.*</code> dans tout le dépôt) ; acceptable en dev, mais aucune ébauche staging/prod (les profils staging/prod ne touchent que partitions/RF)</td>
+<td>docker-compose.yml:98-101 ; application.yml profils</td>
+<td><strong>Élevé</strong> (prod) / Faible (dev)</td>
+</tr>
+<tr>
+<td>P-10</td>
+<td>Monitoring : aucune factory manuelle n'enregistre <code>MicrometerProducerListener</code>/<code>MicrometerConsumerListener</code> (grep vide) → pas de métriques client Kafka ni de lag consommateur dans Prometheus pour ~90 % des flux ; seuls des compteurs métier trust (<code>tnt.trust.event.published</code>…) existent</td>
+<td>absence dans tous les <code>*KafkaConfig</code></td>
+<td><span class="badge med">Moyen</span></td>
+</tr>
+<tr>
+<td>P-11</td>
+<td>group-id par défaut global <code>tiibntick-core</code> partagé par des listeners de modules différents (roles, delivery-incident, actor) → en cas de scale-out du monolithe, rebalances croisés inutiles et offsets entremêlés dans un même groupe pour des topics sans rapport</td>
+<td>application.yml:52 ; <code>IncidentEventConsumer.java:68</code> (delivery), <code>FreelancerOrgEventConsumer.java:71</code> (actor), <code>PermissionCacheInvalidationListener.java:46</code></td>
+<td><span class="badge med">Moyen</span></td>
+</tr>
+<tr>
+<td>P-12</td>
+<td>Nommage anarchique : 4 conventions coexistent (<code>tnt.x.y.z</code> points, <code>tnt.x.y-z</code> tirets, <code>tnt.x.y_z</code> underscores, <code>gofp.*</code> hors préfixe) ; <code>MarketKafkaEventPublisher</code> dérive même les topics du nom de classe par regex (<code>MarketKafkaEventPublisher.java:50-59</code>) — fragile au renommage de classe</td>
+<td>§3.1 ; fichiers cités</td>
+<td><span class="badge med">Moyen</span></td>
+</tr>
+<tr>
+<td>P-13</td>
+<td><code>max.in.flight.requests.per.connection=1</code> (application.yml:50) : dégrade le débit sans bénéfice (l'idempotence garantit l'ordre jusqu'à 5) ; par ailleurs aucun <code>linger.ms</code>/<code>batch.size</code> réglé hors trust → micro-batches</td>
+<td>application.yml:50 ; configs §2.3</td>
+<td><span class="badge low">Faible</span></td>
+</tr>
+<tr>
+<td>P-14</td>
+<td><code>isolation.level=read_committed</code> (application.yml:58) sans aucun producteur transactionnel : lettre morte (et uniquement sur la factory Boot, pas sur les factories manuelles)</td>
+<td>application.yml:58</td>
+<td><span class="badge low">Faible</span></td>
+</tr>
+<tr>
+<td>P-15</td>
+<td>Concurrency 2 pour 3 partitions (sync, realtime, delivery, incident, tp, invoice, report, notify) : 1 thread traite 2 partitions ; en prod (6 partitions) le déséquilibre s'accentue (2 threads × 3 partitions) — et le monolithe étant unique, aucune montée en charge horizontale des consommateurs</td>
+<td>configs §2.3 ; application.yml:555</td>
+<td><span class="badge low">Faible</span></td>
+</tr>
+<tr>
+<td>P-16</td>
+<td>Hot partitions : clé = tenantId pour tous les événements agency (<code>KafkaAgencyEventPublisher.java:78</code>), geo traffic, claims — un gros tenant concentre tout son trafic sur 1 partition</td>
+<td>fichiers cités</td>
+<td><span class="badge med">Moyen</span></td>
+</tr>
+<tr>
+<td>P-17</td>
+<td>tnt-link-back-core (tracking/cartes) : aucun flux Kafka ; lecture synchrone directe de delivery-core à chaque requête de tracking → pas de diffusion temps réel scalable des positions</td>
+<td><code>TrackParcelApplicationService.java:22-26</code></td>
+<td><span class="badge med">Moyen</span></td>
+</tr>
+<tr>
+<td>P-18</td>
+<td><code>DisputeEventConsumer</code> fait <code>.block()</code> dans le thread listener et n'acquitte pas en cas d'erreur de traitement tout en continuant le poll (offset non commité + traitement suivant) → à la reprise, re-traitement de messages déjà « passés », sans dédup (cf. P-06)</td>
+<td><code>DisputeEventConsumer.java:96-107</code></td>
+<td><span class="badge med">Moyen</span></td>
+</tr>
+<tr>
+<td>P-19</td>
+<td>Poison pills : seuls sync et realtime ont <code>ErrorHandlingDeserializer</code> ; ailleurs inutile (String) mais les erreurs de parse JSON sont gérées à la main de façon divergente (ack+skip, log-only, throw)</td>
+<td><code>KafkaRealtimeConfig.java:105-108</code> vs autres</td>
+<td><span class="badge low">Faible</span></td>
+</tr>
+<tr>
+<td>P-20</td>
+<td>Événements qui devraient transiter par Kafka mais ne le font pas : (a) fin de mission → facturation (P-01), (b) invalidation de cache permissions jamais émise (<code>tnt.roles.permission-changed</code> sans producteur → cache RBAC potentiellement obsolète jusqu'au TTL 300 s), (c) tracking Link (P-17), (d) création de mission Agency→Core en HTTP synchrone via le platform gateway alors que <code>tnt.agency.mission.request</code> existe déjà côté producteur</td>
+<td>fichiers cités</td>
+<td><span class="badge med">Moyen</span></td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="6-details-et-preuves-complementaires">6. Détails et preuves complémentaires</h2>
+<h3 id="61-p-01-la-chaine-metier-livraison-terminee-facture-paiement-comptabilite-est-inerte">6.1 P-01 — la chaîne métier « livraison terminée → facture → paiement → comptabilité » est inerte</h3>
+<ol>
+<li><code>tnt-billing-invoice/adapter/in/kafka/InvoiceBillingEventConsumer.java:54</code> écoute <code>tnt.delivery.mission.completed</code>. Le seul publisher delivery (<code>KafkaDeliveryEventPublisher.java:50-58</code>) route tout événement autre que <code>MissionStatusChangedEvent</code>/<code>FreelancerOrgAssignedEvent</code> vers le fourre-tout <code>tnt.delivery.events</code>. Aucun <code>send("tnt.delivery.mission.completed", …)</code> n'existe dans le dépôt.</li>
+<li>Si une facture était créée (via REST), <code>KafkaInvoiceEventPublisher</code> publie sur <code>tnt.billing.invoice.events</code> — mais <code>BillingEventAccountingConsumer.java:44</code> attend <code>tnt.billing.invoice.paid</code> : la comptabilité ne verra jamais rien.</li>
+<li><code>WalletKafkaPublisher.java:26</code> publie <code>tnt.billing.wallet.payment-confirmed</code> (tiret) ; l'invoice attend <code>tnt.billing.wallet.payment.confirmed</code> (point, <code>InvoiceBillingEventConsumer.java:101</code>) ; accounting et market attendent <code>tnt.billing.payment.confirmed</code> (sans <code>wallet</code>). <strong>Trois variantes, zéro correspondance.</strong></li>
+<li>Boucle litige : incident → dispute fonctionne, mais dispute émet <code>tnt.billing.compensation.initiated</code> (<code>BillingCompensationAdapter.java:22,48</code>) que personne ne consomme, et attend <code>tnt.billing.compensation.paid</code> (<code>DisputeEventConsumer.java:76</code>) que personne n'émet. Un litige ne sera jamais <code>COMPENSATED</code>.</li>
+<li>Temps réel : <code>MissionStatusEventConsumer</code> (realtime) et <code>IncidentEventConsumer</code> (incident) écoutent la variante à points du statut mission ; seul market-back écoute la bonne variante à tiret. L'auto-détection d'incident sur changement de statut ne se déclenche donc jamais.</li>
+</ol>
+<h3 id="62-p-02-factory-par-defaut-incompatible">6.2 P-02 — factory par défaut incompatible</h3>
+<p><code>application.yml:54</code> fixe <code>value-deserializer: ByteArrayDeserializer</code> pour le consumer Boot. Aucun module ni le bootstrap ne définit de bean <code>kafkaListenerContainerFactory</code> (grep exhaustif) : c'est donc <code>KafkaAutoConfiguration</code> qui la crée avec ces propriétés. Or les listeners suivants la référencent (explicitement ou par défaut) avec des signatures <code>ConsumerRecord&lt;String,String&gt;</code>/<code>String</code> : delivery <code>IncidentEventConsumer.java:69,86</code>, actor <code>IncidentEventConsumer.java:69</code> et <code>FreelancerOrgEventConsumer.java:72,116,164,208</code>, accounting (5 listeners), sales (3), market (2). La valeur réelle sera un <code>byte[]</code> → <code>ClassCastException</code> ou conversion parasite selon le converter. Ces flux ne peuvent pas fonctionner tels quels, indépendamment de P-01.</p>
+<h3 id="63-p-05-pattern-publish-apres-commit-erreurs-avalees">6.3 P-05 — pattern « publish après commit, erreurs avalées »</h3>
+<p>Exemple type (<code>KafkaDeliveryEventPublisher.java:60-67</code>) : le send est enchaîné après la persistence R2DBC, et <code>onErrorComplete()</code> transforme tout échec Kafka en succès silencieux. <code>IncidentKafkaEventPublisher.send()</code> (l.135-140) appelle <code>kafkaTemplate.send()</code> sans même attendre le future (le <code>Mono</code> complète avant l'accusé broker). Aucun outbox transactionnel : le topic <code>tnt.outbox.events</code> (partition unique, <code>TntKafkaTopicsConfig.java:228-234</code>) est décoratif — aucun composant ne l'écrit ni ne le lit.</p>
+<h3 id="64-p-07-gps-hors-ordre">6.4 P-07 — GPS hors ordre</h3>
+<p><code>GpsPositionUpdatedEvent.kafkaTopic()</code> → <code>tnt.realtime.gps.position.updated</code> ; publication <code>kafkaTemplate.send(event.kafkaTopic(), event.getEventId(), json)</code> (<code>KafkaRealtimeEventPublisher.java:43</code>). <code>eventId</code> est un identifiant d'événement (unique) : deux positions successives du même livreur atterrissent sur des partitions différentes ; <code>IncidentEventConsumer</code> (concurrency 2) peut traiter la position t+1 avant t. Pour la détection « prolonged stop »/« trajectory anomaly » (champs du même événement), l'ordre par acteur/mission est indispensable → la clé devrait être <code>actorId</code> ou <code>missionId</code>.</p>
+<h3 id="65-p-09p-10-securite-et-observabilite">6.5 P-09/P-10 — sécurité et observabilité</h3>
+<ul>
+<li>Grep exhaustif : aucune occurrence de <code>security.protocol</code>, <code>sasl.*</code>, SSL Kafka dans le code ou les yml. Les profils <code>staging</code>/<code>prod</code> (application.yml:480-483, 553-556) ne surchargent que partitions/replication-factor.</li>
+<li>Grep exhaustif : aucune occurrence de <code>MicrometerProducerListener</code>/<code>MicrometerConsumerListener</code>. Les <code>DefaultKafkaProducerFactory</code>/<code>DefaultKafkaConsumerFactory</code> créés à la main (≈15) n'exposent donc ni <code>kafka.producer.*</code> ni <code>kafka.consumer.*</code> (dont <code>records-lag-max</code>) dans <code>/actuator/prometheus</code>. Aucun exporter de lag (burrow/kafka-exporter) dans docker-compose.</li>
+</ul>
+<h3 id="66-scalabilite">6.6 Scalabilité</h3>
+<ul>
+<li>Groupes distincts et bien nommés côté billing/agency (<code>tnt-billing-invoice-group</code>, <code>tnt-agency-erp-*-consumer</code>) ; mais 3 modules partagent le groupe fourre-tout <code>tiibntick-core</code> (P-11).</li>
+<li>Partitions : 3 partout (6 en prod), sauf <code>tnt.vehicle.*</code> (6) et <code>tnt.outbox.events</code> (1). Les topics auto-créés (tous les orphelins + <code>gofp.*</code>) auront <strong>1 partition</strong> (défaut broker), invisible dans <code>TntKafkaTopicsConfig</code>.</li>
+<li>Hot partitions : clés tenantId (agency: <code>KafkaAgencyEventPublisher.java:78</code>, geo, claims, administration) — avec 1 à 5 tenants plateformes, la quasi-totalité du trafic tombe sur 1-2 partitions.</li>
+<li>Monolithe : une seule instance consomme tout ; la « concurrency » des containers est la seule parallélisation. OK aujourd'hui, bloquant si un module devient un service séparé (les configs agency, déjà configurables par yml, sont les mieux préparées).</li>
+</ul>
+<hr />
+<h2 id="7-recommandations-priorisees">7. Recommandations priorisées</h2>
+<h3 id="p0-reparer-les-flux-casses-jours">P0 — Réparer les flux cassés (jours)</h3>
+<ol>
+<li><strong>Geler un référentiel unique de topics</strong> dans <code>tnt-common-core</code> (classe <code>TntTopics</code> de constantes, convention unique <code>tnt.&lt;module&gt;.&lt;entité&gt;.&lt;action&gt;</code> en points) et remplacer chaque littéral. Corriger les 4 mismatches tiret/point (<code>mission.status-changed</code>, <code>wallet.payment-confirmed</code>, <code>route.eta</code>, <code>staff/actor.kyc</code>) en faisant converger producteur ET consommateur.</li>
+<li><strong>Émettre les événements manquants</strong> : <code>MissionCompletedEvent</code> → topic dédié (invoice/tp/sales), <code>invoice.paid</code>, <code>compensation.paid</code> (wallet, en réponse à <code>compensation.initiated</code>), <code>wallet.events</code> agrégé ou re-cibler l'ERP sur les topics unitaires.</li>
+<li><strong>Corriger la factory par défaut</strong> : aligner <code>spring.kafka.consumer.value-deserializer</code> sur <code>StringDeserializer</code> (ou doter chaque listener d'une factory explicite) ; faire de même côté producteur (<code>ByteArraySerializer</code> → <code>StringSerializer</code>) pour éviter la même surprise.</li>
+<li><strong>Désactiver <code>auto.create.topics.enable</code></strong> en staging/prod et ajouter un test d'intégration « chaque topic consommé a un producteur ou est documenté externe » (simple assertion sur le référentiel de l'étape 1).</li>
+</ol>
+<h3 id="p1-fiabilite-semaines">P1 — Fiabilité (semaines)</h3>
+<ol>
+<li><strong>Généraliser le pattern sync-core</strong> : une auto-configuration Kafka commune (factory producteur + factory listener avec <code>ErrorHandlingDeserializer</code>, <code>DefaultErrorHandler(DeadLetterPublishingRecoverer → tnt.dlq.&lt;module&gt;, ExponentialBackOff)</code>) au lieu de 15 copies divergentes. Supprimer les <code>ack+skip</code> manuels de poison pills.</li>
+<li><strong>Outbox réel</strong> : table outbox R2DBC écrite dans la même transaction que l'agrégat + relayeur (Debezium ou poller) vers Kafka ; supprimer <code>onErrorComplete()</code>/fire-and-forget des publishers. À défaut, a minima : attendre le <code>SendResult</code> et journaliser en table de reprise (le mécanisme retry-queue de trust est un bon modèle à généraliser).</li>
+<li><strong>Idempotence consommateur</strong> : table <code>processed_events(event_id, consumer_group)</code> ou clé Redis SETNX, alimentée par le header <code>X-Yow-Envelope-Id</code> (déjà prévu par yow-event-kernel) — prioritaire sur wallet/accounting/dispute.</li>
+<li><strong>Clés d'ordre</strong> : realtime → <code>actorId</code>/<code>missionId</code> au lieu d'<code>eventId</code> ; sync → <code>aggregateId</code> ; geo/route → aligner <code>acks=all</code>+idempotence.</li>
+</ol>
+<h3 id="p2-exploitation-mois">P2 — Exploitation (mois)</h3>
+<ol>
+<li><strong>Observabilité</strong> : enregistrer <code>MicrometerProducerListener</code>/<code>MicrometerConsumerListener</code> dans la factory commune ; ajouter kafka-exporter (lag) à docker-compose + dashboard Grafana ; alerte sur lag et sur taux DLQ.</li>
+<li><strong>Sécurité staging/prod</strong> : SASL/SCRAM ou mTLS + ACLs par principal (un principal par plateforme backend, cohérent avec le modèle platform-client existant) ; profils yml <code>spring.kafka.security.*</code> préparés dès maintenant.</li>
+<li><strong>Groupes et partitions</strong> : group-id explicite par module (supprimer le défaut global <code>tiibntick-core</code>), concurrency = nombre de partitions, revoir les clés tenantId (ajouter un suffixe entité : <code>tenantId:aggregateId</code>).</li>
+<li><strong>Link temps réel</strong> : consommer <code>tnt.realtime.gps.position.updated</code> (clé corrigée), matérialiser la dernière position en Redis, diffuser en SSE/WebSocket ; prévoir un topic compacté <code>tnt.tracking.position.latest</code>.</li>
+<li><strong>Versioning des événements</strong> : exploiter <code>X-Yow-Schema-Version</code> partout (aujourd'hui seul yow-event-kernel le pose) ; documenter chaque topic (payload, clé, producteur, consommateurs) dans <code>docs/kafka-topics.md</code> généré depuis le référentiel.</li>
+</ol>
+<hr />
+<h2 id="8-conclusion">8. Conclusion</h2>
+<p>Le socle Kafka de TiiBnTick Core est <strong>au stade « squelette prometteur »</strong> : les réglages producteur sont majoritairement corrects, la topologie voulue (chorégraphie événementielle inter-modules, ERP Agency découplé, ancrage blockchain asynchrone) est lisible, et tnt-sync-core démontre que l'équipe sait faire une chaîne de consommation robuste (ErrorHandlingDeserializer + retries + DLQ + ack manuel).</p>
+<p>Mais en l'état, <strong>le système événementiel est largement décoratif</strong> : la majorité des chaînes métier inter-modules (facturation, comptabilité, compensation de litiges, ERP Agency, temps réel mission) sont interrompues par des topics orphelins issus d'un nommage non gouverné, et six consommateurs sont techniquement incapables de désérialiser leurs messages. L'auto-création de topics et l'absence totale de métriques de lag font que ces pannes sont invisibles : rien ne crashe, rien n'alerte, les événements s'accumulent ou ne partent jamais.</p>
+<p>La correction est peu coûteuse (référentiel de topics + alignement des noms + factory commune) et doit précéder toute mise en production : sans elle, les garanties <code>acks=all</code>/idempotence ne protègent que des messages qui, souvent, n'ont pas le bon destinataire. Les chantiers structurants (outbox, dédup consommateur, DLQ généralisée, SASL/ACL, lag monitoring) constituent la feuille de route P1/P2 naturelle une fois les flux re-câblés.</p>
+<footer>Audit technique TiiBnTick — généré à partir de l'analyse du code source réel. Chaque constat référence les fichiers et lignes concernés.</footer>
+</main>
+</div>
+
+<script type="module">
+  try {
+    const m = await import("https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs");
+    const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    m.default.initialize({ startOnLoad: true, theme: dark ? "dark" : "neutral", securityLevel: "loose" });
+  } catch (e) {
+    document.querySelectorAll(".mermaid").forEach(el => {
+      el.style.textAlign = "left";
+      el.innerHTML = "<div style='color:var(--muted);font-size:.75rem;margin-bottom:.5rem'>⚠ Diagramme Mermaid (connexion internet requise pour le rendu) — source :</div><pre>" + el.textContent.replace(/&/g,"&amp;").replace(/</g,"&lt;") + "</pre>";
+    });
+  }
+</script>
+
+</body>
+</html>

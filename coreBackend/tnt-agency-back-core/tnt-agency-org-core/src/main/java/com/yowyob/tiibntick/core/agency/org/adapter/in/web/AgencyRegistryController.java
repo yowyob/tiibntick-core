@@ -3,6 +3,7 @@ package com.yowyob.tiibntick.core.agency.org.adapter.in.web;
 import com.yowyob.tiibntick.common.api.ApiResponse;
 import com.yowyob.tiibntick.core.agency.org.adapter.in.web.dto.AgencyRegistryResponse;
 import com.yowyob.tiibntick.core.agency.org.adapter.in.web.dto.AgencySettingsResponse;
+import com.yowyob.tiibntick.core.agency.org.application.mapper.AgencyOrgMapper;
 import com.yowyob.tiibntick.core.agency.org.application.service.AgencyRegistryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,6 +26,7 @@ import reactor.core.publisher.Mono;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * Agency ERP registry — legal entities and settings in schema {@code agency_org}.
@@ -43,6 +45,7 @@ public class AgencyRegistryController {
     @Operation(summary = "List agencies for tenant")
     public Mono<ApiResponse<List<AgencyRegistryResponse>>> list(@PathVariable UUID tenantId) {
         return registryService.listByTenant(tenantId)
+                .map(AgencyOrgMapper::toAgencyResponse)
                 .collectList()
                 .map(ApiResponse::success);
     }
@@ -52,10 +55,13 @@ public class AgencyRegistryController {
     public Mono<ApiResponse<AgencyRegistryResponse>> getById(
             @PathVariable UUID tenantId,
             @PathVariable UUID agencyId) {
-        return registryService.getById(tenantId, agencyId).map(ApiResponse::success);
+        return registryService.getById(tenantId, agencyId)
+                .map(AgencyOrgMapper::toAgencyResponse)
+                .map(ApiResponse::success);
     }
 
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Register a new agency")
     public Mono<ApiResponse<AgencyRegistryResponse>> register(
@@ -73,35 +79,45 @@ public class AgencyRegistryController {
                 req.address() != null ? req.address().lat() : null,
                 req.address() != null ? req.address().lon() : null,
                 req.contactEmail(), req.contactPhone(), req.logoUrl(), req.website()
-        )).map(ApiResponse::success);
+        )).map(AgencyOrgMapper::toAgencyResponse).map(ApiResponse::success);
     }
 
     @PostMapping("/{agencyId}/sync-platform-core")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Register agency on platform organization core")
     public Mono<ApiResponse<AgencyRegistryResponse>> syncPlatformCore(
             @PathVariable UUID tenantId,
             @PathVariable UUID agencyId) {
-        return registryService.syncPlatformCore(tenantId, agencyId).map(ApiResponse::success);
+        return registryService.syncPlatformCore(tenantId, agencyId)
+                .map(AgencyOrgMapper::toAgencyResponse)
+                .map(ApiResponse::success);
     }
 
     @PatchMapping("/{agencyId}/activate")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Activate agency")
     public Mono<ApiResponse<AgencyRegistryResponse>> activate(
             @PathVariable UUID tenantId,
             @PathVariable UUID agencyId) {
-        return registryService.activate(tenantId, agencyId).map(ApiResponse::success);
+        return registryService.activate(tenantId, agencyId)
+                .map(AgencyOrgMapper::toAgencyResponse)
+                .map(ApiResponse::success);
     }
 
     @PatchMapping("/{agencyId}/suspend")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Suspend agency")
     public Mono<ApiResponse<AgencyRegistryResponse>> suspend(
             @PathVariable UUID tenantId,
             @PathVariable UUID agencyId,
             @RequestParam String reason) {
-        return registryService.suspend(tenantId, agencyId, reason).map(ApiResponse::success);
+        return registryService.suspend(tenantId, agencyId, reason)
+                .map(AgencyOrgMapper::toAgencyResponse)
+                .map(ApiResponse::success);
     }
 
     @PatchMapping("/{agencyId}/profile")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Update agency profile")
     public Mono<ApiResponse<AgencyRegistryResponse>> updateProfile(
             @PathVariable UUID tenantId,
@@ -119,7 +135,7 @@ public class AgencyRegistryController {
                 req.address() != null ? req.address().lat() : null,
                 req.address() != null ? req.address().lon() : null,
                 req.email(), req.phone(), req.logoUrl(), req.website()
-        )).map(ApiResponse::success);
+        )).map(AgencyOrgMapper::toAgencyResponse).map(ApiResponse::success);
     }
 
     @GetMapping("/{agencyId}/settings")
@@ -127,10 +143,13 @@ public class AgencyRegistryController {
     public Mono<ApiResponse<AgencySettingsResponse>> getSettings(
             @PathVariable UUID tenantId,
             @PathVariable UUID agencyId) {
-        return registryService.getSettings(tenantId, agencyId).map(ApiResponse::success);
+        return registryService.getSettings(tenantId, agencyId)
+                .map(AgencyOrgMapper::toSettingsResponse)
+                .map(ApiResponse::success);
     }
 
     @PatchMapping("/{agencyId}/settings")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Update agency settings")
     public Mono<ApiResponse<AgencySettingsResponse>> updateSettings(
             @PathVariable UUID tenantId,
@@ -141,7 +160,7 @@ public class AgencyRegistryController {
                 req.autoAssignMissions(), req.allowFreelancerAssociation(),
                 req.hubRetentionDelayHours(), req.defaultCommissionRate(),
                 req.maxActiveBranches(), req.timezone()
-        )).map(ApiResponse::success);
+        )).map(AgencyOrgMapper::toSettingsResponse).map(ApiResponse::success);
     }
 
     public record RegisterAgencyRequest(

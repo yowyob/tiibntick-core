@@ -24,6 +24,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * Generic Market API for promotional campaigns — admin-managed promo codes,
@@ -42,6 +43,7 @@ public class MarketCampaignController {
 
     @Operation(summary = "Create a promotional campaign")
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<MarketCampaignResponse> create(@Valid @RequestBody CreateCampaignCommand command) {
         return campaignUseCase.createCampaign(command);
@@ -49,6 +51,7 @@ public class MarketCampaignController {
 
     @Operation(summary = "Activate a campaign")
     @PostMapping("/{id}/activate")
+    @PreAuthorize("isAuthenticated()")
     public Mono<MarketCampaignResponse> activate(
             @PathVariable UUID id,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
@@ -57,6 +60,7 @@ public class MarketCampaignController {
 
     @Operation(summary = "Pause a campaign")
     @PostMapping("/{id}/pause")
+    @PreAuthorize("isAuthenticated()")
     public Mono<MarketCampaignResponse> pause(
             @PathVariable UUID id,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
@@ -65,6 +69,7 @@ public class MarketCampaignController {
 
     @Operation(summary = "Terminate a campaign")
     @PostMapping("/{id}/end")
+    @PreAuthorize("isAuthenticated()")
     public Mono<MarketCampaignResponse> end(
             @PathVariable UUID id,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
@@ -73,6 +78,7 @@ public class MarketCampaignController {
 
     @Operation(summary = "Validate a promo code against an order")
     @PostMapping("/promo-code/{code}/validate")
+    @PreAuthorize("isAuthenticated()")
     public Mono<MarketCampaignResponse> validatePromoCode(
             @PathVariable String code,
             @RequestParam UUID orderId,

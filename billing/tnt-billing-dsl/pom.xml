@@ -50,6 +50,25 @@
             <artifactId>yow-i18n-kernel</artifactId>
         </dependency>
 
+        <!-- ── tnt-auth-core (Foundation L1 ─ security context, @CurrentUser) ── -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-auth-core</artifactId>
+        </dependency>
+
+        <!-- ── tnt-roles-core (Foundation L1 ─ RBAC / @RequirePermission) ── -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-roles-core</artifactId>
+        </dependency>
+
+        <!-- ── Spring AOP (required for @RequirePermission aspect) ── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+            <version>4.0.0-M2</version>
+        </dependency>
+
         <!-- ═══ SPRING BOOT (non-runnable — no spring-boot-maven-plugin) ═ -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

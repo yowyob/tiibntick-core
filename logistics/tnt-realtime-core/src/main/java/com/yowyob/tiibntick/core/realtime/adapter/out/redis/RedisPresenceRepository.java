@@ -101,6 +101,10 @@ public class RedisPresenceRepository implements IPresenceRepository {
         //LocalDateTime threshold = LocalDateTime.now().minus(staleDuration);
 
         return redisTemplate.keys(KEY_PREFIX + "*")
+                // KEY_PREFIX also matches INDEX_PREFIX keys (tnt:presence:idx:{tenantId}),
+                // which are Redis Sets, not Strings — reading them via opsForValue() throws
+                // WRONGTYPE. Exclude them so only actual presence value keys are scanned.
+                .filter(key -> !key.startsWith(INDEX_PREFIX))
                 .flatMap(key -> redisTemplate.opsForValue().get(key))
                 .flatMap(json -> {
                     try {

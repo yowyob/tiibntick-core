@@ -26,7 +26,7 @@ import java.time.LocalDateTime;
  * CREATE INDEX idx_outbox_status ON event_bus.outbox_entries (status, scheduled_at);
  * }</pre>
  */
-@Table("event_bus.outbox_entries")
+@Table(name = "outbox_entries", schema = "event_bus")
 public class OutboxEntryEntity {
 
     @Id

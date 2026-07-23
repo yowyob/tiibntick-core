@@ -16,6 +16,7 @@ import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Application service for {@link TntClientProfile} lifecycle management.
@@ -69,6 +70,7 @@ public class TntClientProfileService implements RegisterTntClientProfileUseCase 
      */
     @Override
     @RequirePermission(resource = "actor", action = "write")
+    @Transactional
     public Mono<TntClientProfile> register(RegisterTntClientProfileCommand command) {
         // Step 1: validate that the Kernel ThirdParty exists and is active
         return kernelThirdPartyPort.existsAndActive(command.thirdPartyId())
