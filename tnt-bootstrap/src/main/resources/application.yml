@@ -533,8 +533,11 @@ iwm:
 # not a dedicated server). Before first deploy, make sure these env vars are set —
 # see tnt-bootstrap/.env.prod.example:
 #   DB_HOST / DB_PORT / DB_NAME / DB_USER / DB_PASSWORD — TiiBnTick's own database
-#     on the shared instance, provisioned by the Yowyob DBA team (this app has no
-#     CREATEDB/CREATEROLE rights there — see docker/postgres/init.sql for context).
+#     on the shared instance. DB_USER is granted CREATEDB there (not superuser) —
+#     LiquibaseConfig.ensureDatabaseExists() creates DB_NAME itself at startup if
+#     it doesn't exist yet, so it no longer needs to be pre-created by the DBA
+#     team (see docker/postgres/init.sql for the full rationale, and
+#     DB_AUTO_CREATE_DATABASE / DB_MAINTENANCE_DATABASE below to control this).
 #   DB_SSL_MODE — set to require/verify-full; the shared instance enforces TLS.
 #   DB_POOL_* — bounded pool sizes; 8 ConnectionFactory beans share the same
 #     instance in monolith mode, so size against the DBA-granted max_connections.

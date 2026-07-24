@@ -13,6 +13,13 @@ databaseChangeLog:
   # ══════════════════════════════════════════════════════════════════════════════
 
   # ── L0 — Cross-cutting bootstrap-owned tables ──────────────────────────────
+  # Required PostgreSQL extensions (postgis, uuid-ossp, pg_trgm...) — must run
+  # before any module changelog, so every module can rely on them existing
+  # regardless of include order below.
+  - include:
+      file: db/changelog/changes/000-create-required-extensions.sql
+      relativeToChangelogFile: false
+
   # shedlock: shared by every module's @Scheduled job (Chantier D · Audit n°6 · S2) —
   # owned here, not by any single domain module, since it's genuinely cross-cutting.
   - include:

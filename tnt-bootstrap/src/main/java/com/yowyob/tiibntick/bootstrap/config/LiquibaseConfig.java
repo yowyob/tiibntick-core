@@ -12,6 +12,14 @@ import org.springframework.context.annotation.Configuration;
 import javax.sql.DataSource;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.regex.Pattern;
+
 /**
  * Liquibase migration configuration for TiiBnTick Core.
  * <p>
@@ -28,6 +36,8 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 @Configuration
 public class LiquibaseConfig {
 
+    private static final Pattern SAFE_IDENTIFIER = Pattern.compile("^[A-Za-z_][A-Za-z0-9_]*$");
+
     @Value("${spring.liquibase.url:jdbc:postgresql://localhost:5432/tiibntick_core}")
     private String jdbcUrl;
 
@@ -39,6 +49,30 @@ public class LiquibaseConfig {
 
     @Value("${spring.liquibase.enabled:true}")
     private boolean liquibaseEnabled;
+
+    // ── Auto-create the target database ─────────────────────────────────────
+    // DB_USER is granted CREATEDB on the shared Yowyob PostgreSQL instance, so
+    // the app can provision its own database instead of waiting on manual DBA
+    // provisioning. CREATE DATABASE cannot run inside a transaction block and
+    // can't target the database it's currently connected to, so this opens a
+    // separate autocommit connection to a maintenance database first.
+    @Value("${DB_HOST:localhost}")
+    private String dbHost;
+
+    @Value("${DB_PORT:5433}")
+    private int dbPort;
+
+    @Value("${DB_NAME:tiibntick_core_prod}")
+    private String dbName;
+
+    @Value("${DB_SSL_MODE:disable}")
+    private String dbSslMode;
+
+    @Value("${DB_MAINTENANCE_DATABASE:postgres}")
+    private String maintenanceDatabase;
+
+    @Value("${DB_AUTO_CREATE_DATABASE:true}")
+    private boolean autoCreateDatabase;
 
     /**
      * Primary Liquibase bean — runs the master changelog that includes all module migrations.
@@ -53,12 +87,58 @@ public class LiquibaseConfig {
             return liquibase;
         }
 
+        if (autoCreateDatabase) {
+            ensureDatabaseExists();
+        }
+
         log.info("Running TiiBnTick Core Liquibase migrations → {}", jdbcUrl);
         SpringLiquibase liquibase = new SpringLiquibase();
         liquibase.setDataSource(buildDataSource());
         liquibase.setChangeLog("classpath:db/changelog/tnt-core-master.yaml");
         liquibase.setShouldRun(true);
         return liquibase;
+    }
+
+    /**
+     * Creates {@link #dbName} on {@link #dbHost}:{@link #dbPort} if it doesn't exist yet.
+     * Idempotent — safe to run against an already-provisioned database (no-ops).
+     */
+    private void ensureDatabaseExists() {
+        if (!SAFE_IDENTIFIER.matcher(dbName).matches()) {
+            throw new IllegalStateException(
+                    "DB_NAME '" + dbName + "' is not a safe SQL identifier — refusing to auto-create it");
+        }
+
+        String maintenanceUrl = String.format("jdbc:postgresql://%s:%d/%s?sslmode=%s",
+                dbHost, dbPort, maintenanceDatabase, dbSslMode);
+
+        try (Connection connection = DriverManager.getConnection(maintenanceUrl, jdbcUser, jdbcPassword)) {
+            connection.setAutoCommit(true);
+
+            try (PreparedStatement check = connection.prepareStatement(
+                    "SELECT 1 FROM pg_database WHERE datname = ?")) {
+                check.setString(1, dbName);
+                try (ResultSet rs = check.executeQuery()) {
+                    if (rs.next()) {
+                        log.debug("Database '{}' already exists — nothing to create", dbName);
+                        return;
+                    }
+                }
+            }
+
+            log.warn("Database '{}' does not exist on {}:{} — creating it now (DB_AUTO_CREATE_DATABASE=true)",
+                    dbName, dbHost, dbPort);
+            try (Statement create = connection.createStatement()) {
+                create.executeUpdate("CREATE DATABASE \"" + dbName + "\"");
+            }
+            log.info("Database '{}' created successfully", dbName);
+        } catch (SQLException e) {
+            throw new IllegalStateException(
+                    "Failed to auto-create database '" + dbName + "' via maintenance database '"
+                            + maintenanceDatabase + "' on " + dbHost + ":" + dbPort
+                            + " — DB_USER needs CREATEDB privilege there. Set DB_AUTO_CREATE_DATABASE=false "
+                            + "to disable this and fall back to manual DBA provisioning instead.", e);
+        }
     }
 
     private DataSource buildDataSource() {

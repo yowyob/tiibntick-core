@@ -5,16 +5,20 @@
 -- LOCAL DEV ONLY. This runs against the disposable docker-compose Postgres
 -- container (which grants superuser), never against Yowyob's shared PostgreSQL
 -- instance used in staging/prod. On the shared instance:
---   - TiiBnTick does NOT own the server and has no CREATEDB/CREATEROLE rights.
---   - The Yowyob DBA team provisions, once, out-of-band: a dedicated database
---     for TiiBnTick (name coordinated to avoid collision with other Yowyob
---     products on the same instance) and an application role scoped to it only
---     (equivalent of tiibntick/tiibntick_pass below, but with a strong secret
---     injected via DB_PASSWORD — see tnt-bootstrap/.env.prod.example).
+--   - TiiBnTick does NOT own the server and is not superuser there, but its
+--     application role IS granted CREATEDB (scoped so it can only create/own
+--     its own database) — LiquibaseConfig.ensureDatabaseExists() creates
+--     DB_NAME itself at startup if missing (idempotent; set
+--     DB_AUTO_CREATE_DATABASE=false to fall back to manual provisioning).
+--     The Yowyob DBA team still provisions, once, out-of-band: the role itself
+--     with its CREATEDB grant and a strong secret injected via DB_PASSWORD
+--     (see tnt-bootstrap/.env.prod.example).
 --   - The DBA team also installs postgis / postgis_topology / uuid-ossp / pg_trgm
---     on that database once (extension creation itself needs superuser); the app's
---     own Liquibase changelogs (e.g. tnt-geo-core's `CREATE EXTENSION IF NOT EXISTS
---     postgis`) then no-op safely since the extension already exists.
+--     on that database once (extension creation needs superuser or a "trusted
+--     extension" grant — separate from CREATEDB, the app's role may still lack
+--     it); the app's own Liquibase changelogs (e.g. tnt-geo-core's `CREATE
+--     EXTENSION IF NOT EXISTS postgis`) then no-op safely since the extension
+--     already exists.
 --   - RT-comops (Kernel) has its own database on the shared instance — do not
 --     assume KERNEL_DB_NAME/KERNEL_DB_HOST default to TiiBnTick's own DB in prod;
 --     set them explicitly (see TntDataSourceConfig and the "prod" profile notes
