@@ -1,6 +1,8 @@
 package com.yowyob.tiibntick.core.platformgateway.adapter.out.persistence.entity;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.domain.Persistable;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
@@ -14,11 +16,14 @@ import java.time.Instant;
  * @author MANFOUO Braun
  */
 @Table("tnt_platform_clients")
-public class PlatformClientEntity {
+public class PlatformClientEntity implements Persistable<String>, TntPersistableEntity {
 
     @Id
     @Column("id")
     private String id;
+
+    @Transient
+    private boolean isNew = true;
 
     @Column("client_id")
     private String clientId;
@@ -53,8 +58,15 @@ public class PlatformClientEntity {
     @Column("updated_by")
     private String updatedBy;
 
+    @Override
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
+
+    @Override
+    public boolean isNew() { return isNew; }
+
+    @Override
+    public void markNotNew() { this.isNew = false; }
 
     public String getClientId() { return clientId; }
     public void setClientId(String clientId) { this.clientId = clientId; }
