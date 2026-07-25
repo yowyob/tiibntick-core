@@ -2,6 +2,7 @@ package com.yowyob.tiibntick.core.realtime.adapter.out.websocket;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yowyob.tiibntick.core.realtime.adapter.in.kafka.MissionStatusEventConsumer;
 import com.yowyob.tiibntick.core.realtime.application.port.out.IWebSocketBroadcaster;
 import com.yowyob.tiibntick.core.realtime.domain.model.BroadcastTopic;
 import io.micrometer.core.instrument.Counter;
@@ -10,7 +11,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
+import org.springframework.data.redis.listener.ChannelTopic;
+import org.springframework.data.redis.listener.ReactiveRedisMessageListenerContainer;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 
@@ -38,15 +42,18 @@ public class RedisBackedWebSocketBroadcaster implements IWebSocketBroadcaster {
 
     private final WebSocketSessionRegistry sessionRegistry;
     private final ReactiveStringRedisTemplate redisTemplate;
+    private final ReactiveRedisMessageListenerContainer listenerContainer;
     private final ObjectMapper objectMapper;
     private final Counter broadcastCounter;
 
     public RedisBackedWebSocketBroadcaster(WebSocketSessionRegistry sessionRegistry,
                                            @Qualifier("realtimeRedisTemplate") ReactiveStringRedisTemplate redisTemplate,
+                                           @Qualifier("realtimeRedisListenerContainer") ReactiveRedisMessageListenerContainer listenerContainer,
                                            ObjectMapper objectMapper,
                                            MeterRegistry meterRegistry) {
         this.sessionRegistry = sessionRegistry;
         this.redisTemplate = redisTemplate;
+        this.listenerContainer = listenerContainer;
         this.objectMapper = objectMapper;
 
         this.broadcastCounter = Counter.builder("tnt.realtime.broadcasts.total")
@@ -88,6 +95,17 @@ public class RedisBackedWebSocketBroadcaster implements IWebSocketBroadcaster {
      * Internal method to broadcast a pre-serialized JSON string to a topic path (String form).
      * This variant accepts the topic path as a String and converts it to Redis channel format.
      *
+     * <p>Fixed as part of Chantier G: this used to build the Redis channel as the literal
+     * {@code "tnt:rt:topic:" + topicPath} (slashes left un-replaced), which does NOT match the
+     * {@link BroadcastTopic#toRedisChannel()} scheme {@link #broadcastRaw}/{@link #subscribeToTopic}
+     * use. Local-instance delivery ({@link #pushToLocalSessions}, keyed by the raw {@code topicPath})
+     * was never affected and masked the bug — but {@link RedisTopicMessageListener}, decoding the
+     * topic path back out of the Redis channel name on the *receiving* instance, reconstructed the
+     * wrong path ({@code "/topic//topic/..."} — a doubled segment) for any cross-instance relay, so
+     * a session connected to a different app instance than the publisher never received these
+     * messages. {@link MissionStatusEventConsumer} and {@link com.yowyob.tiibntick.core.realtime.application.service.GpsPingApplicationService}
+     * (fleet topic) both go through this path via {@code broadcastToTopic}.
+     *
      * @param topicPath the STOMP topic path string (e.g., /topic/fleet/FRL-ORG-001)
      * @param json the pre-serialized JSON string
      * @return Mono completing when broadcast is dispatched
@@ -99,8 +117,8 @@ public class RedisBackedWebSocketBroadcaster implements IWebSocketBroadcaster {
         // Phase 1: local push to this instance's subscribed sessions
         pushToLocalSessions(topicPath, wireMessage);
 
-        // Phase 2: publish to Redis for other instances
-        String redisChannel = "tnt:rt:topic:" + topicPath;
+        // Phase 2: publish to Redis for other instances — same channel scheme as broadcastRaw()
+        String redisChannel = new BroadcastTopic(topicPath).toRedisChannel();
         return redisTemplate.convertAndSend(redisChannel, wireMessage)
                 .doOnNext(count -> log.trace("Published to Redis channel {} — {} subscribers", redisChannel, count))
                 .doOnError(ex -> log.warn("Redis publish failed for topic {}: {}", topicPath, ex.getMessage()))
@@ -119,6 +137,25 @@ public class RedisBackedWebSocketBroadcaster implements IWebSocketBroadcaster {
             log.error("Failed to serialize broadcast payload for topic {}: {}", topicPath, e.getMessage());
             return Mono.error(e);
         }
+    }
+
+    @Override
+    public Flux<Object> subscribeToTopic(String topicPath) {
+        // Chantier G: this default-implementation gap (interface fallback was Flux.empty()) meant
+        // WatchSubDeliverersApplicationService/SseController's fleet stream never actually emitted
+        // anything. Channel computed via BroadcastTopic.toRedisChannel() — the same scheme every
+        // publish path (broadcastRaw/broadcastRawToTopic) and RedisTopicMessageListener now share.
+        String channel = new BroadcastTopic(topicPath).toRedisChannel();
+        return listenerContainer.receive(ChannelTopic.of(channel))
+                .mapNotNull(message -> {
+                    String wireMessage = message.getMessage();
+                    int separatorIdx = wireMessage.indexOf('|');
+                    if (separatorIdx < 0) {
+                        log.warn("Malformed wire message on channel {}: no separator", channel);
+                        return null;
+                    }
+                    return (Object) wireMessage.substring(separatorIdx + 1);
+                });
     }
 
     /**

@@ -60,7 +60,7 @@ If `tnt-bootstrap` already declares these, Maven deduplication handles it — no
 # application-dev.yml
 tnt:
   auth:
-    service-code: TNT_AGENCY
+    service-code: TNT_CORE
     token-cache-ttl: PT14M
     actor-resolution-enabled: true
     allow-anonymous-context: false
@@ -72,7 +72,7 @@ tnt:
 # application-prod.yml
 tnt:
   auth:
-    service-code: TNT_AGENCY           # Matches the client_id registered in YowAuth0
+    service-code: TNT_CORE           # Matches the client_id registered in YowAuth0
     token-cache-ttl: PT14M             # Should be < JWT expires_in (typically 15min)
     actor-resolution-enabled: true     # Enriches context with actor profile from tnt-actor-core
     allow-anonymous-context: false     # All /api/** endpoints require authentication

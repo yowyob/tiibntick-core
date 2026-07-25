@@ -1,6 +1,9 @@
 package com.yowyob.tiibntick.core.trust.adapter.out.persistence;
 
+import com.yowyob.tiibntick.common.persistence.TntPersistableEntity;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.domain.Persistable;
 import org.springframework.data.r2dbc.repository.Modifying;
 import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.relational.core.mapping.Column;
@@ -26,7 +29,18 @@ import java.time.LocalDateTime;
  * @author MANFOUO Braun
  */
 @Table(schema = "tnt_trust", name = "did_documents")
-class DIDDocumentEntity {
+class DIDDocumentEntity implements Persistable<String>, TntPersistableEntity {
+
+    @Transient private boolean isNew = true;
+
+    @Override
+    public boolean isNew() { return isNew; }
+
+    @Override
+    public void markNotNew() { this.isNew = false; }
+
+    @Override
+    public String getId() { return did; }
 
     @Id @Column("did") private String did;
     @Column("actor_id") private String actorId;

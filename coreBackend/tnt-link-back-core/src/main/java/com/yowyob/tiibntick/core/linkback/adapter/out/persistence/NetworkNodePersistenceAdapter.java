@@ -13,6 +13,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -43,6 +44,11 @@ public class NetworkNodePersistenceAdapter implements NetworkNodeRepository {
     @Override
     public Mono<NetworkNode> findByRefId(UUID tenantId, UUID refId) {
         return r2dbcRepository.findByTenantIdAndRefId(tenantId, refId).map(this::toDomain);
+    }
+
+    @Override
+    public Flux<NetworkNode> findByRefIds(UUID tenantId, Collection<UUID> refIds) {
+        return r2dbcRepository.findByTenantIdAndRefIdIn(tenantId, refIds).map(this::toDomain);
     }
 
     @Override

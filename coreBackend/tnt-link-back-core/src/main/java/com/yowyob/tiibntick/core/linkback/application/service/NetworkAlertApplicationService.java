@@ -7,6 +7,7 @@ import com.yowyob.tiibntick.core.linkback.application.port.in.QueryNetworkAlerts
 import com.yowyob.tiibntick.core.linkback.application.port.in.ReportNetworkAlertUseCase;
 import com.yowyob.tiibntick.core.linkback.application.port.in.ResolveNetworkAlertUseCase;
 import com.yowyob.tiibntick.core.linkback.application.port.in.command.ReportNetworkAlertCommand;
+import com.yowyob.tiibntick.core.linkback.application.port.out.ILinkTileEventPublisher;
 import com.yowyob.tiibntick.core.linkback.application.port.out.NetworkAlertRepository;
 import com.yowyob.tiibntick.core.linkback.domain.exception.NetworkAlertDomainException;
 import com.yowyob.tiibntick.core.linkback.domain.model.NetworkAlert;
@@ -32,13 +33,15 @@ public class NetworkAlertApplicationService implements
 
     private final NetworkAlertRepository repository;
     private final AwardNodeReputationUseCase reputationUseCase;
+    private final ILinkTileEventPublisher tilePublisher;
 
     @Override
     public Mono<NetworkAlert> report(ReportNetworkAlertCommand command) {
         NetworkAlert alert = NetworkAlert.report(
                 command.tenantId(), command.reporterId(), command.type(),
                 command.description(), command.location(), command.severity());
-        return repository.save(alert);
+        return repository.save(alert)
+                .flatMap(saved -> tilePublisher.publishAlertReported(saved).thenReturn(saved));
     }
 
     @Override
@@ -61,7 +64,8 @@ public class NetworkAlertApplicationService implements
                 .flatMap(alert -> {
                     alert.resolve();
                     return repository.save(alert);
-                });
+                })
+                .flatMap(saved -> tilePublisher.publishAlertResolved(saved).thenReturn(saved));
     }
 
     @Override

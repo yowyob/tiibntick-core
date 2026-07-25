@@ -338,6 +338,17 @@ public final class TntTopics {
     public static final String MARKET_QUOTE_REQUEST_CREATED = "tnt.market.quote.request.created";
     public static final String MARKET_QUOTE_RESPONSE_SUBMITTED = "tnt.market.quote.response.submitted";
 
+    // ── Link (tnt-link-back-core, coreBackend) ───────────────────────────────────
+
+    /** Compacted (cleanup.policy=compact), keyed by nodeId — last-known-position snapshot for
+     *  the Link live map (Chantier G, Audit n5 P-17 / Audit n6 S26). First compacted topic in
+     *  this codebase. Named with the {@code tnt.link.*} module prefix (Audit n5 P-12 convention)
+     *  rather than the audit doc's original {@code tnt.tracking.position.latest} suggestion,
+     *  which had no module prefix. Consumed by tnt-link-back-core's own materialization path
+     *  (read model, not this topic itself — see {@code LinkPositionRedisRepository}); published
+     *  by {@code NetworkNodeApplicationService.updateLocation} via the shared outbox. */
+    public static final String LINK_TRACKING_POSITION_LATEST = "tnt.link.tracking.position.latest";
+
     // ── Go-Freelancer-Point (tnt-go-freelancer-point-back-core, coreBackend) ────
     // Deliberately out of the "tnt.*" convention — flagged in Audit n5 P-12, no consumer,
     // kept as-is pending a decision on whether GOFP should adopt the tnt.* prefix.

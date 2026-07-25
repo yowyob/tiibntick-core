@@ -3,13 +3,14 @@ package com.yowyob.tiibntick.core.linkback.adapter.in.web.response;
 import com.yowyob.tiibntick.core.delivery.domain.model.aggregate.Delivery;
 import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.DeliveryAddress;
 import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.GeoCoordinates;
+import com.yowyob.tiibntick.core.linkback.domain.model.LinkPosition;
 
 public final class ParcelTrackingResponseMapper {
 
     private ParcelTrackingResponseMapper() {
     }
 
-    public static ParcelTrackingResponse toResponse(String trackingCode, Delivery delivery) {
+    public static ParcelTrackingResponse toResponse(String trackingCode, Delivery delivery, LinkPosition currentPosition) {
         GeoCoordinates pickupCoords = coordinatesOf(delivery.getPickupAddress());
         GeoCoordinates deliveryCoords = coordinatesOf(delivery.getDeliveryAddress());
         return new ParcelTrackingResponse(
@@ -29,7 +30,10 @@ public final class ParcelTrackingResponseMapper {
                 delivery.getEstimatedDeliveryTime(),
                 delivery.getActualDeliveryTime(),
                 delivery.getCreatedAt(),
-                delivery.getUpdatedAt()
+                delivery.getUpdatedAt(),
+                currentPosition != null ? currentPosition.latitude() : null,
+                currentPosition != null ? currentPosition.longitude() : null,
+                currentPosition != null ? currentPosition.occurredAt() : null
         );
     }
 

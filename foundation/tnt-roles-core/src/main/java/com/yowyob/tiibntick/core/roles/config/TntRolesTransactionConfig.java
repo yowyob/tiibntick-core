@@ -4,6 +4,7 @@ import io.r2dbc.spi.ConnectionFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.r2dbc.connection.R2dbcTransactionManager;
 import org.springframework.transaction.ReactiveTransactionManager;
 import org.springframework.transaction.reactive.TransactionalOperator;
@@ -36,7 +37,16 @@ import org.springframework.transaction.reactive.TransactionalOperator;
 @Configuration
 public class TntRolesTransactionConfig {
 
+    // @Primary: several modules (agency-back-core, go-freelancer-point-back-core,
+    // notify-core...) use bare @Transactional with no manager qualifier. Both this bean
+    // and tnt-dispute-core's disputeTransactionManager wrap the same tntCoreConnectionFactory
+    // (functionally interchangeable for any generic @Transactional caller), but with two
+    // unqualified ReactiveTransactionManager beans in the context Spring can't resolve which
+    // one to use and throws NoUniqueBeanDefinitionException. Marking this one @Primary breaks
+    // the tie without affecting tnt-dispute-core's own explicit @Transactional("disputeTransactionManager")
+    // usages, if any.
     @Bean
+    @Primary
     public ReactiveTransactionManager tntRolesTransactionManager(
             @Qualifier("tntCoreConnectionFactory") ConnectionFactory connectionFactory) {
         return new R2dbcTransactionManager(connectionFactory);

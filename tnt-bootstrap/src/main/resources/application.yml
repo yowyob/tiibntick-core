@@ -215,7 +215,7 @@ tnt:
   # All cryptographic operations remain in RT-comops-kernel-core / YowAuth0.
   auth:
     # Client service code registered in YowAuth0 — identifies this application
-    service-code: ${TNT_AUTH_SERVICE_CODE:TNT_AGENCY}
+    service-code: ${TNT_AUTH_SERVICE_CODE:TNT_CORE}
     # Token context cache TTL — must be strictly less than JWT expires_in (typically 15 min)
     token-cache-ttl: ${TNT_AUTH_TOKEN_CACHE_TTL:PT14M}
     # When true, tnt-actor-core's IYowAuthTntAdapter enriches TntSecurityContext with actor profile
@@ -508,7 +508,7 @@ tnt:
     partitions: 3
     replication-factor: 2
   auth:
-    service-code: TNT_AGENCY
+    service-code: TNT_CORE
     token-cache-ttl: PT14M
     actor-resolution-enabled: true
     allow-anonymous-context: false
@@ -593,7 +593,7 @@ tnt:
 
   auth:
     # Matches the client_id registered in YowAuth0 production instance
-    service-code: ${TNT_AUTH_SERVICE_CODE:TNT_AGENCY}
+    service-code: ${TNT_AUTH_SERVICE_CODE:TNT_CORE}
     token-cache-ttl: PT14M
     actor-resolution-enabled: true
     allow-anonymous-context: false

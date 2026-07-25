@@ -3,6 +3,8 @@ package com.yowyob.tiibntick.core.linkback.adapter.in.web;
 import com.yowyob.tiibntick.core.linkback.adapter.in.web.response.ParcelTrackingResponse;
 import com.yowyob.tiibntick.core.linkback.adapter.in.web.response.ParcelTrackingResponseMapper;
 import com.yowyob.tiibntick.core.linkback.application.port.in.TrackParcelUseCase;
+import com.yowyob.tiibntick.core.linkback.application.port.out.ILinkPositionCache;
+import com.yowyob.tiibntick.core.linkback.domain.model.LinkPosition;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -29,11 +31,14 @@ import reactor.core.publisher.Mono;
 public class ParcelTrackingController {
 
     private final TrackParcelUseCase trackParcelUseCase;
+    private final ILinkPositionCache positionCache;
 
     @Operation(summary = "Track a Link parcel by tracking code (public endpoint)")
     @GetMapping("/track/{trackingCode}")
     public Mono<ParcelTrackingResponse> track(@PathVariable String trackingCode) {
         return trackParcelUseCase.trackByCode(trackingCode)
-                .map(delivery -> ParcelTrackingResponseMapper.toResponse(trackingCode, delivery));
+                .flatMap(delivery -> positionCache.findLatest(delivery.getTenantId(), delivery.getId().toString())
+                        .map(position -> ParcelTrackingResponseMapper.toResponse(trackingCode, delivery, position))
+                        .defaultIfEmpty(ParcelTrackingResponseMapper.toResponse(trackingCode, delivery, (LinkPosition) null)));
     }
 }

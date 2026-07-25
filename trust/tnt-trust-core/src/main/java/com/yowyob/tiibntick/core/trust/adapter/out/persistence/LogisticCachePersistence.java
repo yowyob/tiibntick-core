@@ -1,6 +1,9 @@
 package com.yowyob.tiibntick.core.trust.adapter.out.persistence;
 
+import com.yowyob.tiibntick.common.persistence.TntPersistableEntity;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.domain.Persistable;
 import org.springframework.data.r2dbc.repository.Modifying;
 import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.relational.core.mapping.Column;
@@ -23,7 +26,18 @@ import java.time.LocalDateTime;
 // ============================================================
 
 @Table(schema = "tnt_trust", name = "delivery_proofs")
-class DeliveryProofEntity {
+class DeliveryProofEntity implements Persistable<String>, TntPersistableEntity {
+
+    @Transient private boolean isNew = true;
+
+    @Override
+    public boolean isNew() { return isNew; }
+
+    @Override
+    public void markNotNew() { this.isNew = false; }
+
+    @Override
+    public String getId() { return proofId; }
 
     @Id @Column("proof_id") private String proofId;
     @Column("mission_id") private String missionId;
@@ -130,7 +144,18 @@ class DeliveryProofCacheRepositoryAdapter implements DeliveryProofCacheRepositor
 // ============================================================
 
 @Table(schema = "tnt_trust", name = "custody_transfers")
-class CustodyTransferEntity {
+class CustodyTransferEntity implements Persistable<String>, TntPersistableEntity {
+
+    @Transient private boolean isNew = true;
+
+    @Override
+    public boolean isNew() { return isNew; }
+
+    @Override
+    public void markNotNew() { this.isNew = false; }
+
+    @Override
+    public String getId() { return transferId; }
 
     @Id @Column("transfer_id") private String transferId;
     @Column("package_id") private String packageId;

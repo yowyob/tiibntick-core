@@ -10,7 +10,9 @@ import com.yowyob.tiibntick.core.linkback.application.port.in.RegisterNetworkNod
 import com.yowyob.tiibntick.core.linkback.application.port.in.UpdateNodeLocationUseCase;
 import com.yowyob.tiibntick.core.linkback.application.port.in.UpdateNodeStatusUseCase;
 import com.yowyob.tiibntick.core.linkback.application.port.in.command.RegisterNetworkNodeCommand;
+import com.yowyob.tiibntick.core.linkback.application.port.out.ILinkTileEventPublisher;
 import com.yowyob.tiibntick.core.linkback.application.port.out.NetworkNodeRepository;
+import com.yowyob.tiibntick.common.util.TntGeohashUtil;
 import com.yowyob.tiibntick.core.linkback.domain.exception.NetworkNodeDomainException;
 import com.yowyob.tiibntick.core.linkback.domain.model.NetworkNode;
 import com.yowyob.tiibntick.core.linkback.domain.model.NodeStatus;
@@ -39,6 +41,7 @@ public class NetworkNodeApplicationService implements
 
     private final NetworkNodeRepository repository;
     private final QueryDaoZonesUseCase queryDaoZonesUseCase;
+    private final ILinkTileEventPublisher tilePublisher;
 
     @Override
     public Mono<NetworkNode> register(RegisterNetworkNodeCommand command) {
@@ -61,6 +64,7 @@ public class NetworkNodeApplicationService implements
     public Mono<NetworkNode> updateLocation(UUID tenantId, UUID nodeId, GeoPoint location, Double heading, int polPeerCount) {
         return findOrError(tenantId, nodeId)
                 .flatMap(node -> {
+                    GeoPoint previousLocation = node.getLastKnownLocation();
                     node.updateLocation(location, heading);
                     node.recordProofOfLocation(polPeerCount);
                     // .next() + .map() yields an empty Mono when no zone contains the point —
@@ -72,8 +76,26 @@ public class NetworkNodeApplicationService implements
                             .then(Mono.defer(() -> {
                                 node.refreshBadges();
                                 return repository.save(node);
-                            }));
+                            }))
+                            .flatMap(saved -> publishIfTileChanged(saved, previousLocation).thenReturn(saved));
                 });
+    }
+
+    /**
+     * Chantier G tile fan-out: only publish when the node actually entered a different
+     * geohash tile (or this is its first fix) — an in-tile GPS jitter doesn't need to
+     * reach subscribers, keeping fan-out volume proportional to real movement (Audit n6
+     * S23 / n7 P1 bis: "n'émettre que les entités entrées/sorties/déplacées de la tuile").
+     */
+    private Mono<Void> publishIfTileChanged(NetworkNode saved, GeoPoint previousLocation) {
+        GeoPoint current = saved.getLastKnownLocation();
+        if (current == null) {
+            return Mono.empty();
+        }
+        String newTile = TntGeohashUtil.encode(current.latitude(), current.longitude());
+        boolean tileChanged = previousLocation == null
+                || !newTile.equals(TntGeohashUtil.encode(previousLocation.latitude(), previousLocation.longitude()));
+        return tileChanged ? tilePublisher.publishNodeMoved(saved) : Mono.empty();
     }
 
     @Override
@@ -84,6 +106,11 @@ public class NetworkNodeApplicationService implements
     @Override
     public Mono<NetworkNode> findByRefId(UUID tenantId, UUID refId) {
         return repository.findByRefId(tenantId, refId);
+    }
+
+    @Override
+    public Flux<NetworkNode> findByRefIds(UUID tenantId, java.util.Collection<UUID> refIds) {
+        return repository.findByRefIds(tenantId, refIds);
     }
 
     @Override

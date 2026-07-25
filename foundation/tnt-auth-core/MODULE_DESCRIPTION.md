@@ -120,7 +120,7 @@ Configuration bound from `tnt.auth.*`:
 ```yaml
 tnt:
   auth:
-    service-code: TNT_AGENCY
+    service-code: TNT_CORE
     token-cache-ttl: PT14M
     actor-resolution-enabled: true
     allow-anonymous-context: false

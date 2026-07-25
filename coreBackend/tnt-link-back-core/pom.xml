@@ -52,11 +52,6 @@
             <groupId>com.yowyob.tiibntick.core</groupId>
             <artifactId>tnt-actor-core</artifactId>
         </dependency>
-        <dependency>
-            <groupId>com.yowyob.tiibntick.core</groupId>
-            <artifactId>tnt-organization-core</artifactId>
-        </dependency>
-
         <!-- ── L3 Logistics — reused, never duplicated ── -->
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>
@@ -64,23 +59,11 @@
         </dependency>
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>
-            <artifactId>tnt-route-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.yowyob.tiibntick.core</groupId>
             <artifactId>tnt-delivery-core</artifactId>
         </dependency>
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>
-            <artifactId>tnt-incident-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.yowyob.tiibntick.core</groupId>
             <artifactId>tnt-realtime-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.yowyob.tiibntick.core</groupId>
-            <artifactId>tnt-sync-core</artifactId>
         </dependency>
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>

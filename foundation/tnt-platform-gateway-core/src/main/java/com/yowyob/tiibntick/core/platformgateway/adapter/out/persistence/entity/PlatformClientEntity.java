@@ -1,4 +1,6 @@
 package com.yowyob.tiibntick.core.platformgateway.adapter.out.persistence.entity;
+import com.yowyob.tiibntick.common.persistence.TntPersistableEntity;
+
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.Transient;

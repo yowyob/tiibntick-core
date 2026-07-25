@@ -140,4 +140,25 @@ public record BroadcastTopic(String path) {
         return new BroadcastTopic("/topic/fleet/" + freelancerOrgId + "/sub/" + subDelivererId);
     }
 
+    // ── Chantier G: Link geohash-tile fan-out ──────────────────────────────
+
+    /**
+     * Topic for a single geohash tile on the Link live map (Chantier G — Link BFF +
+     * temps réel par tuiles geohash, precision 5-6 ≈ 1-5km cells, see
+     * {@code com.yowyob.tiibntick.common.util.TntGeohashUtil}).
+     *
+     * <p>Subscribers: any client whose current map viewport covers this tile. The client
+     * (or the BFF on its behalf) subscribes/unsubscribes dynamically as the viewport
+     * pans/zooms, so fan-out stays bounded to what's actually on screen instead of
+     * broadcasting every network-node/alert update tenant-wide.
+     *
+     * <p>Topic format: {@code /topic/link/tile/{geohash}}
+     *
+     * @param geohash the geohash tile code (see {@code TntGeohashUtil.encode})
+     */
+    public static BroadcastTopic forTile(String geohash) {
+        Objects.requireNonNull(geohash, "geohash must not be null");
+        return new BroadcastTopic("/topic/link/tile/" + geohash);
+    }
+
 }

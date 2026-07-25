@@ -6,16 +6,17 @@ import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.Collection;
 import java.util.UUID;
 
 public interface NetworkNodeR2dbcRepository extends ReactiveCrudRepository<NetworkNodeEntity, UUID> {
 
     /**
-     * Phase 0 stop-gap (audit n6 S25, Chantier G — see docs/audits/remediation/phase-0-critical.md):
-     * {@code /nearby} had no result cap, so a wide/borderless bounding box could return the
-     * entire tenant's node table in one call. Bounding the {@code SELECT} itself with {@code LIMIT}
-     * (not an in-memory filter after the fact) closes the scraping/DoS-lite exposure until the
-     * Phase 1 geohash-tile + BFF redesign replaces this endpoint shape entirely.
+     * Hard cap on {@code /nearby} results (Audit n6 S25, Chantier G). Since 007-add-spatial-gist-indexes,
+     * {@link #findWithinBoundingBox} is served by the GIST index on {@code ST_MakePoint(longitude,
+     * latitude)::geography} (see {@code 007-add-spatial-gist-indexes.sql} and tnt-geo-core's
+     * {@code road_nodes} for the same pattern) rather than a sequential bbox scan — this LIMIT is now
+     * a sane result-size cap, not the scalability mechanism itself.
      */
     int MAX_NEARBY_RESULTS = 100;
 
@@ -23,9 +24,14 @@ public interface NetworkNodeR2dbcRepository extends ReactiveCrudRepository<Netwo
 
     Mono<NetworkNodeEntity> findByTenantIdAndRefId(UUID tenantId, UUID refId);
 
+    /** Single {@code IN (...)} round trip for {@code /by-ref/batch} (Audit n6 S27) — replaces
+     *  the N+1 {@code flatMap} over {@link #findByTenantIdAndRefId} per requested id. */
+    Flux<NetworkNodeEntity> findByTenantIdAndRefIdIn(UUID tenantId, Collection<UUID> refIds);
+
     @Query("SELECT * FROM tnt_link.network_nodes WHERE tenant_id = :tenantId "
-            + "AND latitude BETWEEN :minLat AND :maxLat "
-            + "AND longitude BETWEEN :minLng AND :maxLng "
+            + "AND ST_Intersects("
+            + "ST_MakePoint(longitude, latitude)::geography, "
+            + "ST_MakeEnvelope(:minLng, :minLat, :maxLng, :maxLat, 4326)::geography) "
             + "LIMIT " + MAX_NEARBY_RESULTS)
     Flux<NetworkNodeEntity> findWithinBoundingBox(UUID tenantId, double minLat, double maxLat, double minLng, double maxLng);
 

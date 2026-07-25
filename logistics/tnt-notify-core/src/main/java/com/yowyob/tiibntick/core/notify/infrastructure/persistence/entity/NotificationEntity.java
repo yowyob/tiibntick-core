@@ -1,10 +1,13 @@
 package com.yowyob.tiibntick.core.notify.infrastructure.persistence.entity;
 
+import com.yowyob.tiibntick.common.persistence.TntPersistableEntity;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.domain.Persistable;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
@@ -21,7 +24,15 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 @Table("tnt_notifications")
-public class NotificationEntity {
+public class NotificationEntity implements Persistable<String>, TntPersistableEntity {
+
+    @Transient @Builder.Default private boolean isNew = true;
+
+    @Override
+    public boolean isNew() { return isNew; }
+
+    @Override
+    public void markNotNew() { this.isNew = false; }
 
     @Id
     private String id;

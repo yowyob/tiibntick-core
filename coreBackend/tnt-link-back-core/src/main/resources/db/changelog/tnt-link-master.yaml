@@ -17,3 +17,6 @@ databaseChangeLog:
   - include:
       file: db/changelog/006-extend-network-nodes.sql
       relativeToChangelogFile: false
+  - include:
+      file: db/changelog/007-add-spatial-gist-indexes.sql
+      relativeToChangelogFile: false

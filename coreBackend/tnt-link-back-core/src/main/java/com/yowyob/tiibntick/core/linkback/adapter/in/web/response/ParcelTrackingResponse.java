@@ -24,6 +24,12 @@ public record ParcelTrackingResponse(
         Instant estimatedDeliveryTime,
         Instant actualDeliveryTime,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        /** Live deliverer position materialized from GPS pings (Chantier G, Audit n5 P-17) —
+         *  {@code null} when no GPS ping has been received for this mission yet, distinct from
+         *  the fixed {@code pickup}/{@code delivery} coordinates above. */
+        Double currentLatitude,
+        Double currentLongitude,
+        Instant currentPositionUpdatedAt
 ) {
 }

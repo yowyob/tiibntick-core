@@ -14,12 +14,13 @@ public interface DaoZoneR2dbcRepository extends ReactiveCrudRepository<DaoZoneEn
 
     Flux<DaoZoneEntity> findByTenantIdAndStatus(UUID tenantId, String status);
 
-    // Bounding box computed per-row from each zone's own center/radius — a cheap DB-side
-    // pre-filter (superset of the exact circle); the caller still applies the precise
-    // haversine containment check on the narrowed candidate set.
+    // Exact geodesic circle containment via the GIST index on center_longitude/center_latitude
+    // (007-add-spatial-gist-indexes.sql) — ST_DWithin replaces the old lat/lng-box approximation,
+    // which was both slower (sequential scan) and imprecise (rectangle superset of the real circle).
     @Query("SELECT * FROM tnt_link.dao_zones WHERE tenant_id = :tenantId AND status = :status "
-            + "AND :lat BETWEEN (center_latitude - radius_km / 111.0) AND (center_latitude + radius_km / 111.0) "
-            + "AND :lng BETWEEN (center_longitude - radius_km / (111.0 * COS(RADIANS(center_latitude)))) "
-            + "AND (center_longitude + radius_km / (111.0 * COS(RADIANS(center_latitude))))")
+            + "AND ST_DWithin("
+            + "ST_MakePoint(center_longitude, center_latitude)::geography, "
+            + "ST_MakePoint(:lng, :lat)::geography, "
+            + "radius_km * 1000)")
     Flux<DaoZoneEntity> findByTenantIdAndStatusContainingPoint(UUID tenantId, String status, double lat, double lng);
 }

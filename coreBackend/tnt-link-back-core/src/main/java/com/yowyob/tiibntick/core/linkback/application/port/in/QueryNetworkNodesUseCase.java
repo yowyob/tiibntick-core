@@ -4,6 +4,7 @@ import com.yowyob.tiibntick.core.linkback.domain.model.NetworkNode;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.Collection;
 import java.util.UUID;
 
 public interface QueryNetworkNodesUseCase {
@@ -12,6 +13,9 @@ public interface QueryNetworkNodesUseCase {
 
     /** The caller's own registered node, if any (looked up by the actor/org id it extends). */
     Mono<NetworkNode> findByRefId(UUID tenantId, UUID refId);
+
+    /** Batch lookup — single query for {@code /by-ref/batch} (Audit n6 S27). */
+    Flux<NetworkNode> findByRefIds(UUID tenantId, Collection<UUID> refIds);
 
     /** Nodes located within the given bounding box, mirroring the Link frontend's getNearby(bbox) call. */
     Flux<NetworkNode> findWithinBoundingBox(UUID tenantId, double minLat, double minLng, double maxLat, double maxLng);

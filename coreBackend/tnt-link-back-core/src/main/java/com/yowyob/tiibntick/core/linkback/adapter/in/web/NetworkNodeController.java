@@ -116,8 +116,7 @@ public class NetworkNodeController {
     public Flux<NetworkNodeResponse> getByRefIds(
             @RequestBody List<UUID> refIds,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
-        return Flux.fromIterable(refIds)
-                .flatMap(refId -> queryUseCase.findByRefId(currentUser.tenantId(), refId))
+        return queryUseCase.findByRefIds(currentUser.tenantId(), refIds)
                 .map(NetworkNodeResponseMapper::toResponse);
     }
 

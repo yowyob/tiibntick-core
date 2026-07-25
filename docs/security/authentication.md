@@ -33,7 +33,7 @@ Built by `TntSecurityContextService.buildContext(Authentication)`, reading the K
 ## Config (`tnt.auth.*`)
 | Property | Default | Purpose |
 |---|---|---|
-| `tnt.auth.service-code` | `TNT_AGENCY` | Client ID registered in YowAuth0 |
+| `tnt.auth.service-code` | `TNT_CORE` | Client ID registered in YowAuth0 |
 | `tnt.auth.token-cache-ttl` | `PT14M` | Must be strictly less than JWT `expires_in` (typically 15min) |
 | `tnt.auth.actor-resolution-enabled` | `true` | Enriches `TntSecurityContext` with actor profile (deliverer/freelancer) via `IYowAuthTntAdapter` |
 | `tnt.auth.allow-anonymous-context` | `false` (`true` in test profile only) | When true, unauthenticated requests get an anonymous context instead of 401 |

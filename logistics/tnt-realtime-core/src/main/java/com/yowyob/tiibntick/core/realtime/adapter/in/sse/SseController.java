@@ -1,6 +1,8 @@
 package com.yowyob.tiibntick.core.realtime.adapter.in.sse;
 
 import com.yowyob.tiibntick.core.realtime.application.port.in.IWatchSubDeliverersUseCase;
+import com.yowyob.tiibntick.core.realtime.application.port.out.IWebSocketBroadcaster;
+import com.yowyob.tiibntick.core.realtime.domain.model.BroadcastTopic;
 import com.yowyob.tiibntick.core.realtime.domain.service.SseDomainService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,11 +38,14 @@ public class SseController {
 
     private final SseDomainService sseDomainService;
     private final IWatchSubDeliverersUseCase watchSubDeliverersUseCase;
+    private final IWebSocketBroadcaster broadcaster;
 
     public SseController(SseDomainService sseDomainService,
-                         IWatchSubDeliverersUseCase watchSubDeliverersUseCase) {
+                         IWatchSubDeliverersUseCase watchSubDeliverersUseCase,
+                         IWebSocketBroadcaster broadcaster) {
         this.sseDomainService = sseDomainService;
         this.watchSubDeliverersUseCase = watchSubDeliverersUseCase;
+        this.broadcaster = broadcaster;
     }
 
     /**
@@ -146,6 +151,32 @@ public class SseController {
                         .id(gpsEntry.delivererId() + ":" + gpsEntry.timestamp())
                         .build())
                 .doOnCancel(() -> log.debug("SSE fleet stream closed for FreelancerOrg={}", freelancerOrgId));
+    }
+
+    // ── Chantier G: Link geohash-tile fan-out ──────────────────────────────
+
+    /**
+     * Server-Sent Events stream of all updates broadcast on a single Link geohash tile
+     * (network node moves, alerts reported/resolved — see {@code BroadcastTopic.forTile}).
+     *
+     * <p>Designed for service-to-service consumption (the Link BFF relays this to its own
+     * browser/mobile WebSocket clients per their viewport) rather than direct browser use —
+     * SSE over WebClient avoids needing a STOMP client in the consuming service.
+     *
+     * <p>Endpoint: {@code GET /api/v1/realtime/sse/tile/{geohash}}
+     *
+     * @param geohash the geohash tile code (precision 5-6, see {@code TntGeohashUtil})
+     */
+    @GetMapping(value = "/tile/{geohash}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<ServerSentEvent<Object>> streamTile(@PathVariable String geohash) {
+        log.debug("SSE tile stream opened for geohash={}", geohash);
+        String topicPath = BroadcastTopic.forTile(geohash).path();
+        return broadcaster.subscribeToTopic(topicPath)
+                .map(payload -> ServerSentEvent.builder()
+                        .event("tile-update")
+                        .data(payload)
+                        .build())
+                .doOnCancel(() -> log.debug("SSE tile stream closed for geohash={}", geohash));
     }
 
 }

@@ -18,7 +18,7 @@ tnt:
   # TntCurrentUserArgumentResolver reads tenantId/userId from JWT claims.
   # No additional configuration needed here — inherited from tnt-bootstrap application.yml.
   auth:
-    service-code: ${TNT_AUTH_SERVICE_CODE:TNT_AGENCY}
+    service-code: ${TNT_AUTH_SERVICE_CODE:TNT_CORE}
 
   # ── tnt-roles-core integration (L1 Foundation) ────────────────────────────────
   # TntRoleInitializationService.provisionForTenant() is called during tenant onboarding.

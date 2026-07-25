@@ -3,6 +3,7 @@ package com.yowyob.tiibntick.bootstrap.config;
 import com.yowyob.tiibntick.common.kafka.TntTopics;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.common.config.TopicConfig;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -223,6 +224,24 @@ public class TntKafkaTopicsConfig {
     /** Wallet payment split executed (platform + org + sub-deliverer distribution). */
     @Bean public NewTopic tntBillingWalletSplitExecuted() {
         return topic(TntTopics.BILLING_WALLET_SPLIT_EXECUTED);
+    }
+
+    // ── Link Topics (tnt-link-back-core, coreBackend) ─────────────────────────
+
+    /**
+     * Compacted topic — Kafka keeps only the latest record per key (nodeId), so it acts as a
+     * durable, replayable "last known position" log rather than an event stream (Chantier G,
+     * Audit n5 P-17). First compacted topic in this codebase — no existing bean to copy, so
+     * {@code cleanup.policy=compact} is set explicitly instead of via the shared {@link #topic}
+     * helper (which always builds a delete-policy topic).
+     */
+    @Bean
+    public NewTopic tntLinkTrackingPositionLatest() {
+        return TopicBuilder.name(TntTopics.LINK_TRACKING_POSITION_LATEST)
+                .partitions(partitions)
+                .replicas(replicationFactor)
+                .config(TopicConfig.CLEANUP_POLICY_CONFIG, TopicConfig.CLEANUP_POLICY_COMPACT)
+                .build();
     }
 
     // ── Sync Topics ───────────────────────────────────────────────────────────

@@ -1,7 +1,10 @@
 package com.yowyob.tiibntick.core.agency.inbox.adapter.out.persistence.entity;
 
+import com.yowyob.tiibntick.common.persistence.TntPersistableEntity;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.domain.Persistable;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
@@ -10,7 +13,15 @@ import java.util.UUID;
 
 @Data
 @Table(schema = "agency_inbox", name = "notifications")
-public class NotificationEntity {
+public class NotificationEntity implements Persistable<UUID>, TntPersistableEntity {
+
+    @Transient private boolean isNew = true;
+
+    @Override
+    public boolean isNew() { return isNew; }
+
+    @Override
+    public void markNotNew() { this.isNew = false; }
 
     @Id
     private UUID id;
