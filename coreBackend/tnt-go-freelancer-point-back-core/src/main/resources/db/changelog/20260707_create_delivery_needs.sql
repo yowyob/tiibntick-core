@@ -1,0 +1,23 @@
+CREATE TABLE delivery_needs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    client_id UUID NOT NULL,
+    packet_id UUID,
+    pickup_address_id UUID NOT NULL,
+    delivery_address_id UUID NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    status VARCHAR(50) NOT NULL,
+    duration INTEGER,
+    signature_url VARCHAR(255),
+    payment_method VARCHAR(50),
+    transport_method VARCHAR(50),
+    distance DOUBLE PRECISION,
+    delivery_id UUID,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+    FOREIGN KEY (packet_id) REFERENCES packets(id) ON DELETE SET NULL,
+    FOREIGN KEY (pickup_address_id) REFERENCES addresses(id) ON DELETE RESTRICT,
+    FOREIGN KEY (delivery_address_id) REFERENCES addresses(id) ON DELETE RESTRICT,
+    FOREIGN KEY (delivery_id) REFERENCES deliveries(id) ON DELETE SET NULL
+);

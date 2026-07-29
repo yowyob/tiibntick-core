@@ -122,7 +122,7 @@ public class IntakeService {
                                     intake.getPickupAddress(), intake.getDeliveryAddress(),
                                     intake.getSenderName(), intake.getRecipientName(),
                                     intake.getRecipientPhone(), intake.getWeightKg(),
-                                    intake.getPackagesCount(), hubId))
+                                    intake.getPackagesCount(), hubId, intake.getId()))
                             .flatMap(created -> assignIfNeeded(created, input))
                             .flatMap(pair -> depositIfHub(pair.mission(), pair.trackingCode(),
                                     intake, mode, hubId))

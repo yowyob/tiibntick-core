@@ -52,7 +52,7 @@ class IncidentFreelancerOrgTest {
                     UUID.randomUUID(), IncidentCategory.SLA_TIME,
                     IncidentType.SLA_BREACH_TRAFFIC_DELAY,
                     "Freelancer incident", UUID.randomUUID(), ActorRole.SYSTEM,
-                    List.of(), orgId, "FREELANCER_ORG");
+                    List.of(), orgId, "FREELANCER_ORG", "TNT-20260725-A1B2C3D4");
 
             assertThat(incident.getResponsibleOrgId()).isEqualTo(orgId);
             assertThat(incident.getResponsibleOrgType()).isEqualTo("FREELANCER_ORG");
@@ -68,7 +68,7 @@ class IncidentFreelancerOrgTest {
                     UUID.randomUUID(), IncidentCategory.SLA_TIME,
                     IncidentType.SLA_BREACH_TRAFFIC_DELAY,
                     "Agency incident", UUID.randomUUID(), ActorRole.SYSTEM,
-                    List.of(), agencyId.toString(), "AGENCY");
+                    List.of(), agencyId.toString(), "AGENCY", null);
 
             assertThat(incident.getResponsibleOrgType()).isEqualTo("AGENCY");
         }

@@ -25,6 +25,8 @@
 #   - prometheus      : Metrics scraping (port 9090)
 #   - grafana         : Dashboards (port 3000)
 #   - zipkin          : Distributed tracing (port 9411)
+#   - tileserver      : Self-hosted OSM map tiles, Central Africa (port 8090) — see
+#                       docker/maptiles/build-tiles.sh, run once before `up`
 # ══════════════════════════════════════════════════════════════════════════════
 
 name: tiibntick-core-dev
@@ -41,6 +43,7 @@ volumes:
   elasticsearch-data:
   grafana-data:
   prometheus-data:
+  djl-model-cache:   # DJL model cache — persists ~400 MB BERT model across container restarts
 
 services:
 
@@ -227,6 +230,30 @@ services:
     networks:
       - tiibntick-net
 
+  # ── Self-hosted map tiles (Central Africa) ─────────────────────────────────
+  # Serves the .mbtiles built by ./docker/maptiles/build-tiles.sh — replaces direct calls
+  # from TiiBnTick-Link-Frontend's LeafletMapContainer.tsx to tile.openstreetmap.org /
+  # basemaps.cartocdn.com, whose usage policies prohibit this platform's traffic volume.
+  # Run build-tiles.sh at least once before starting this service — it serves whatever
+  # .mbtiles it finds in ./docker/maptiles/output, and has nothing to serve otherwise.
+  # Not wired into TntProdSecretsGuard (a standalone container, like grafana/zipkin above) —
+  # LOCAL DEV ONLY, see file header; a production deployment needs its own image/hosting plan.
+  tileserver:
+    image: maptiler/tileserver-gl:latest
+    container_name: tnt-tileserver
+    restart: unless-stopped
+    ports:
+      - "${TILESERVER_PORT:-8090}:8080"
+    volumes:
+      - ./docker/maptiles/output:/data:ro
+    networks:
+      - tiibntick-net
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1" ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
   # ── TiiBnTick Core Application ─────────────────────────────────────────────
   tiibntick-core:
     build:
@@ -286,6 +313,12 @@ services:
       ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
       SWAGGER_SERVER_URL: ${SWAGGER_SERVER_URL:-http://localhost:8080}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
+      # Sentiment analysis (DJL — nlptown/bert-base-multilingual-uncased-sentiment)
+      TNT_SENTIMENT_ENABLED: ${TNT_SENTIMENT_ENABLED:-true}
+      TNT_SENTIMENT_MODEL_NAME: ${TNT_SENTIMENT_MODEL_NAME:-nlptown/bert-base-multilingual-uncased-sentiment}
+      TNT_SENTIMENT_CACHE_DIR: /app/.djl.ai
+    volumes:
+      - djl-model-cache:/app/.djl.ai   # persists BERT model (~400 MB) across restarts
     depends_on:
       postgres:
         condition: service_healthy

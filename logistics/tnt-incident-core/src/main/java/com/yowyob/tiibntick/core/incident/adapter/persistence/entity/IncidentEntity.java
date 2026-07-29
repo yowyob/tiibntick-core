@@ -162,6 +162,9 @@ public class IncidentEntity implements Persistable<UUID> {
     @Column("responsible_org_type")
     private String responsibleOrgType;
 
+    @Column("tracking_code")
+    private String trackingCode;
+
     @Version
     private long version;
 

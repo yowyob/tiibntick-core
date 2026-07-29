@@ -4,9 +4,7 @@ package com.yowyob.tiibntick.core.agency.assignment.application.service;
 
 import com.yowyob.tiibntick.common.exception.TntNotFoundException;
 
-import com.yowyob.tiibntick.common.exception.TntValidationException;
-
-import com.yowyob.tiibntick.core.agency.assignment.adapter.out.clients.DeliveryMissionPort;
+import com.yowyob.tiibntick.core.agency.assignment.adapter.out.clients.DeliveryCorePort;
 
 import com.yowyob.tiibntick.core.agency.assignment.adapter.out.persistence.AgencyMissionR2dbcRepository;
 
@@ -79,13 +77,21 @@ public class MissionService {
 
     private static final BigDecimal DEFAULT_COMMISSION = BigDecimal.valueOf(5000);
 
+    /**
+     * Agency intake requests only carry a free-text address (no city/district
+     * breakdown) — tnt-delivery-core requires a non-blank city. Same hardcoded
+     * fallback the old sales-order integration used; a real fix needs
+     * ClientIntakeRequest to capture a structured/geocoded address.
+     */
+    private static final String DEFAULT_INTAKE_CITY = "Douala";
+
 
 
     private final AgencyMissionR2dbcRepository missionRepo;
 
     private final AgencyRegistryService agencyRegistry;
 
-    private final DeliveryMissionPort deliveryMission;
+    private final DeliveryCorePort deliveryCore;
 
     private final MissionDeliveryOrchestrator deliveryOrchestrator;
 
@@ -115,7 +121,15 @@ public class MissionService {
 
             String senderName, String recipientName, String recipientPhone,
 
-            Double weightKg, int packagesCount, UUID targetHubId) {}
+            Double weightKg, int packagesCount, UUID targetHubId,
+
+            /**
+             * The originating {@code ClientIntakeRequest.id}. Walk-in/mobile clients have
+             * no registered actor UUID (only senderName/senderPhone strings), so this is
+             * used as a traceable placeholder {@code Delivery.senderId} — see
+             * {@link MissionService#createFromIntake}.
+             */
+            UUID intakeRequestId) {}
 
 
 
@@ -177,7 +191,7 @@ public class MissionService {
 
                 input.weightKg(), input.packagesCount() != null ? input.packagesCount() : 1,
 
-                input.targetHubId()
+                input.targetHubId(), null
 
         )).map(CreatedMissionResult::mission);
 
@@ -193,33 +207,53 @@ public class MissionService {
 
         UUID agencyMissionId = UUID.randomUUID();
 
-        String trackingCode = TrackingCodeGenerator.generate();
-
-
+        // Walk-in/mobile intake has no registered actor UUID for the client — the intake
+        // request's own id is the closest traceable stand-in for Delivery.senderId.
+        UUID senderId = input.intakeRequestId() != null ? input.intakeRequestId() : UUID.randomUUID();
 
         return agencyRegistry.getById(input.tenantId(), input.agencyId())
 
-                .flatMap(agency -> {
+                .flatMap(agency -> deliveryCore.createDelivery(new DeliveryCorePort.CreateDeliveryRequest(
 
-                    if (agency.getCoreAgencyId() == null || agency.getKernelOrganizationId() == null) {
+                        input.tenantId(),
 
-                        return Mono.error(new TntValidationException(
+                        senderId,
 
-                                "Agence non synchronisée avec le Core (coreAgencyId / kernelOrganizationId)."));
+                        input.agencyId(),
 
-                    }
+                        input.pickupAddress(),
 
-                    return deliveryMission.createMission(new DeliveryMissionPort.CreateMissionRequest(
+                        null,
 
-                            input.tenantId(),
+                        DEFAULT_INTAKE_CITY,
 
-                            agency.getKernelOrganizationId(),
+                        input.deliveryAddress(),
 
-                            input.agencyId(),
+                        null,
 
-                            agency.getCoreAgencyId(),
+                        DEFAULT_INTAKE_CITY,
 
-                            agencyMissionId,
+                        input.recipientName(),
+
+                        input.recipientPhone(),
+
+                        input.weightKg(),
+
+                        now
+
+                )))
+
+                .map(created -> {
+
+                    AgencyMission mission = AgencyMission.create(
+
+                            agencyMissionId, input.tenantId(), input.agencyId(),
+
+                            created.id(), now, now);
+
+                    mission.applyCreationSnapshot(
+
+                            input.branchId(),
 
                             input.pickupAddress(),
 
@@ -233,55 +267,27 @@ public class MissionService {
 
                             input.weightKg(),
 
-                            now
+                            DEFAULT_DISTANCE_KM,
 
-                    )).map(core -> {
+                            input.packagesCount(),
 
-                        AgencyMission mission = AgencyMission.create(
+                            "NORMAL",
 
-                                agencyMissionId, input.tenantId(), input.agencyId(),
+                            input.targetHubId(),
 
-                                core.coreMissionId(), now, now);
+                            now);
 
-                        mission.applyCreationSnapshot(
-
-                                input.branchId(),
-
-                                input.pickupAddress(),
-
-                                input.deliveryAddress(),
-
-                                input.senderName(),
-
-                                input.recipientName(),
-
-                                input.recipientPhone(),
-
-                                input.weightKg(),
-
-                                DEFAULT_DISTANCE_KM,
-
-                                input.packagesCount(),
-
-                                "NORMAL",
-
-                                input.targetHubId(),
-
-                                now);
-
-                        return mission;
-
-                    });
+                    return new CreatedMissionResult(mission, created.trackingCode());
 
                 })
 
-                .flatMap(mission -> missionRepo.save(MissionMapper.toEntity(mission))
+                .flatMap(result -> missionRepo.save(MissionMapper.toEntity(result.mission()))
 
                         .map(MissionMapper::toDomain)
 
                         .flatMap(this::publishCreated)
 
-                        .map(saved -> new CreatedMissionResult(saved, trackingCode)));
+                        .map(saved -> new CreatedMissionResult(saved, result.trackingCode())));
 
     }
 
@@ -419,7 +425,7 @@ public class MissionService {
 
                 .flatMap(saved -> trust.recordDelivery(new TrustPort.DeliveryTransaction(
 
-                        saved.getId(),
+                        saved.getCoreMissionId() != null ? saved.getCoreMissionId() : saved.getId(),
 
                         delivererId,
 
@@ -489,9 +495,13 @@ public class MissionService {
 
                             missionId, anomalyType, delivererId, description);
 
+                    UUID coreMissionId = mission.getCoreMissionId() != null
+
+                            ? mission.getCoreMissionId() : mission.getId();
+
                     return complianceOrchestrator.reportIncident(
 
-                                    tenantId, mission.getAgencyId(), missionId,
+                                    tenantId, mission.getAgencyId(), coreMissionId,
 
                                     delivererId, anomalyType, description)
 

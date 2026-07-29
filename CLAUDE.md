@@ -59,14 +59,19 @@ L1  foundation/tnt-common-core, tnt-auth-core, tnt-roles-core, tnt-platform-gate
 L2  identity/   tnt-actor-core, tnt-organization-core, tnt-tp-core, tnt-administration-core
 L3  logistics/  tnt-geo-core, tnt-route-core, tnt-delivery-core, tnt-dispute-core, tnt-incident-core,
                 tnt-realtime-core, tnt-sync-core, tnt-notify-core, tnt-media-core
-L4  business/   tnt-resource-core, tnt-product-core, tnt-inventory-core, tnt-sales-core, tnt-accounting-core
+L4  business/   tnt-resource-core, tnt-product-core, tnt-inventory-core, tnt-sales-core, tnt-accounting-core,
+                tnt-hrm-core, tnt-legacy-documents-core
 L5  billing/    tnt-billing-dsl, tnt-billing-pricing, tnt-billing-cost, tnt-billing-invoice,
                 tnt-billing-wallet, tnt-billing-report, tnt-billing-templates
-L6  trust/      tnt-trust-core   — cross-cutting blockchain anchoring (Kernel yow-trust-event)
-L7  tnt-bootstrap   — the only runnable module; wires everything together
+L6      trust/      tnt-trust-core   — cross-cutting blockchain anchoring (Kernel yow-trust-event)
+L6-Bis  coreBackend/  tnt-go-freelancer-point-back-core, tnt-agency-back-core (14 sub-modules),
+                      tnt-link-back-core, tnt-market-back-core   — official per-product business backends
+L7      tnt-bootstrap   — the only runnable module; wires everything together
 ```
 
 `tnt-trust-core` sits above L5 billing, not among the L3 logistics modules — it is consumed by (potentially) every layer from L2 up through L5, but no module ever depends back on it (each calling module owns its own outbound port; `tnt-trust-core` depends *down* into that module to implement the adapter). That makes it structurally a cross-cutting layer, not L3 logistics: a module that legitimately depends on L2–L5 modules cannot itself be L3 without violating the "never depend on a higher layer" rule below.
+
+`coreBackend/` is **L6-Bis**, not L8 — it sits beside `tnt-trust-core` (L6) rather than above it, and is consumed only by `tnt-bootstrap` (L7). Each module here is the *official business backend* for one TiiBnTick product — `tnt-go-freelancer-point-back-core` (Market's Go Freelancer Point, TOPSIS/AHP matching), `tnt-link-back-core` (network nodes, bulletin board, DAO zones, gamification), `tnt-market-back-core` (provider discovery, quotes, market orders), and `tnt-agency-back-core` (an aggregator POM of its own, with 14 further sub-modules — `tnt-agency-eventing-core`, `-org-core`, `-staff-core`, `-workforce-core`, `-assignment-core`, `-commission-core`, `-billing-core`, `-onboarding-core`, `-intake-core`, `-inbox-core`, `-fleet-local-core`, `-compliance-core`, `-analytics-core`, `-sync-core` — the Agency ERP layer migrated from the old `tnt-agency` monolith). Each orchestrates L2–L5 modules (identity/logistics/business/billing) behind generic business APIs and contains no screen- or frontend-specific logic — that belongs exclusively to each product's own BFF repo (e.g. `tiibntick-link-backend`, `tiibntick-market-backend`, agency's `backend/tnt-agency`), which calls these modules' endpoints only once exposed by `tnt-bootstrap`. As of 2026-07-27, Spring wiring into `tnt-bootstrap`'s `@Import` is incomplete/in progress for some of these (only `GoFreelancerPointCoreConfig` is actually imported in `TntCoreConfig`) even though all four are already declared as Maven dependencies and registered in root `<dependencyManagement>` — check current wiring state before assuming a given back-core module's beans are live.
 
 Each module's `groupId:artifactId` is pinned in the root `<dependencyManagement>` at `${project.version}` — when adding a new module, register it both in `<modules>` and in `<dependencyManagement>`.
 

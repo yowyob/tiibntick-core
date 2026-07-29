@@ -26,6 +26,32 @@ public class DeliveryCoreClient implements DeliveryCorePort {
     }
 
     @Override
+    public Mono<DeliveryView> createDelivery(CreateDeliveryRequest request) {
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("senderId", request.senderId());
+        body.put("agencyId", request.agencyId());
+        body.put("pickupLandmark", request.pickupLandmark());
+        body.put("pickupDistrict", request.pickupDistrict());
+        body.put("pickupCity", request.pickupCity());
+        body.put("deliveryLandmark", request.deliveryLandmark());
+        body.put("deliveryDistrict", request.deliveryDistrict());
+        body.put("deliveryCity", request.deliveryCity());
+        body.put("recipientName", request.recipientName());
+        body.put("recipientPhone", request.recipientPhone());
+        body.put("weightKg", request.weightKg());
+        body.put("scheduledPickupTime", request.scheduledPickupTime());
+
+        return webClient.post()
+                .uri(BASE, request.tenantId())
+                .bodyValue(body)
+                .retrieve()
+                .bodyToMono(JsonNode.class)
+                .map(this::toView)
+                .doOnError(e -> log.warn("[DeliveryCore] createDelivery failed tenantId={}: {}",
+                        request.tenantId(), e.getMessage()));
+    }
+
+    @Override
     public Mono<DeliveryView> getById(UUID tenantId, UUID deliveryId) {
         return webClient.get()
                 .uri(BASE + "/{deliveryId}", tenantId, deliveryId)
@@ -125,6 +151,7 @@ public class DeliveryCoreClient implements DeliveryCorePort {
         return new DeliveryView(
                 uuid(data, "id"),
                 text(data, "status"),
+                text(data, "trackingCode"),
                 instant(data, "actualPickupTime"),
                 instant(data, "actualDeliveryTime"),
                 uuid(data, "deliveryPersonId"));

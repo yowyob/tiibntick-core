@@ -72,7 +72,7 @@ class GpsPingProcessorTest {
     @Test
     @DisplayName("process() with valid ping → calls locationUpdater, Kalman, geofence, eventPublisher")
     void processValidPingCallsAllPipelineSteps() {
-        when(kalmanEtaUpdater.update(anyString(), anyString(), anyString(), any(), any(double.class), any(double.class)))
+        when(kalmanEtaUpdater.update(anyString(), anyString(), anyString(), any(), any(double.class), any(double.class), any(double.class)))
                 .thenReturn(Mono.just(stubEtaUpdate("M1")));
         when(locationUpdater.updateLocation(anyString(), anyString(), any())).thenReturn(Mono.empty());
         when(geofenceMonitorService.checkGeofences(any())).thenReturn(Mono.empty());
@@ -85,7 +85,7 @@ class GpsPingProcessorTest {
                 .verifyComplete();
 
         verify(locationUpdater).updateLocation("d1", "tenant-A", YAOUNDE);
-        verify(kalmanEtaUpdater).update("d1", "M1", "tenant-A", YAOUNDE, 30.0, 90.0);
+        verify(kalmanEtaUpdater).update("d1", "M1", "tenant-A", YAOUNDE, 30.0, 90.0, 15.0);
         verify(geofenceMonitorService).checkGeofences(ping);
         verify(eventPublisher).publish(any());
     }
@@ -104,13 +104,13 @@ class GpsPingProcessorTest {
                 .verifyComplete();
 
         verify(locationUpdater, never()).updateLocation(any(), any(), any());
-        verify(kalmanEtaUpdater, never()).update(any(), any(), any(), any(), any(double.class), any(double.class));
+        verify(kalmanEtaUpdater, never()).update(any(), any(), any(), any(), any(double.class), any(double.class), any(double.class));
     }
 
     @Test
     @DisplayName("process() with outlier GPS jump → discards the ping")
     void processOutlierPingDiscards() {
-        when(kalmanEtaUpdater.update(any(), any(), any(), any(), any(double.class), any(double.class)))
+        when(kalmanEtaUpdater.update(any(), any(), any(), any(), any(double.class), any(double.class), any(double.class)))
                 .thenReturn(Mono.just(stubEtaUpdate("M1")));
         when(locationUpdater.updateLocation(any(), any(), any())).thenReturn(Mono.empty());
         when(geofenceMonitorService.checkGeofences(any())).thenReturn(Mono.empty());
@@ -130,7 +130,7 @@ class GpsPingProcessorTest {
         StepVerifier.create(processor.process(outlier))
                 .verifyComplete();
 
-        verify(kalmanEtaUpdater, times(1)).update(any(), any(), any(), any(), any(double.class), any(double.class));
+        verify(kalmanEtaUpdater, times(1)).update(any(), any(), any(), any(), any(double.class), any(double.class), any(double.class));
     }
 
     @Test
@@ -146,14 +146,14 @@ class GpsPingProcessorTest {
                 .verifyComplete();
 
         verify(locationUpdater).updateLocation("d1", "tenant-A", YAOUNDE);
-        verify(kalmanEtaUpdater, never()).update(any(), any(), any(), any(), any(double.class), any(double.class));
+        verify(kalmanEtaUpdater, never()).update(any(), any(), any(), any(), any(double.class), any(double.class), any(double.class));
         verify(geofenceMonitorService).checkGeofences(ping);
     }
 
     @Test
     @DisplayName("process() 10 consecutive valid pings — all processed independently")
     void processConsecutivePings() {
-        when(kalmanEtaUpdater.update(any(), any(), any(), any(), any(double.class), any(double.class)))
+        when(kalmanEtaUpdater.update(any(), any(), any(), any(), any(double.class), any(double.class), any(double.class)))
                 .thenReturn(Mono.just(stubEtaUpdate("M1")));
         when(locationUpdater.updateLocation(any(), any(), any())).thenReturn(Mono.empty());
         when(geofenceMonitorService.checkGeofences(any())).thenReturn(Mono.empty());
@@ -172,14 +172,14 @@ class GpsPingProcessorTest {
         }
 
         verify(locationUpdater, times(10)).updateLocation(any(), any(), any());
-        verify(kalmanEtaUpdater, times(10)).update(any(), any(), any(), any(), any(double.class), any(double.class));
+        verify(kalmanEtaUpdater, times(10)).update(any(), any(), any(), any(), any(double.class), any(double.class), any(double.class));
         verify(geofenceMonitorService, times(10)).checkGeofences(any());
     }
 
     @Test
     @DisplayName("clearLastPosition() resets outlier detection state for a deliverer")
     void clearLastPositionResetsState() {
-        when(kalmanEtaUpdater.update(any(), any(), any(), any(), any(double.class), any(double.class)))
+        when(kalmanEtaUpdater.update(any(), any(), any(), any(), any(double.class), any(double.class), any(double.class)))
                 .thenReturn(Mono.just(stubEtaUpdate("M1")));
         when(locationUpdater.updateLocation(any(), any(), any())).thenReturn(Mono.empty());
         when(geofenceMonitorService.checkGeofences(any())).thenReturn(Mono.empty());

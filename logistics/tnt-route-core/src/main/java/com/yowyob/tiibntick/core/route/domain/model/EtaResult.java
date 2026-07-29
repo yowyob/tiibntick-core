@@ -9,13 +9,17 @@ public record EtaResult(
         Instant lowerBound,
         Instant upperBound,
         double confidenceLevel,
-        Instant computedAt
+        Instant computedAt,
+        double remainingDistanceKm
 ) {
     public EtaResult {
         Objects.requireNonNull(expected);
         Objects.requireNonNull(lowerBound);
         Objects.requireNonNull(upperBound);
         Objects.requireNonNull(computedAt);
+        if (remainingDistanceKm < 0) {
+            throw new IllegalArgumentException("remainingDistanceKm must be >= 0");
+        }
     }
 
     public Duration range() {

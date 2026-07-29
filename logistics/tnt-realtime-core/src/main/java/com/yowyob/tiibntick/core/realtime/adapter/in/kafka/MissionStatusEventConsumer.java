@@ -3,6 +3,7 @@ package com.yowyob.tiibntick.core.realtime.adapter.in.kafka;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yowyob.tiibntick.core.realtime.application.port.in.IBroadcastNotificationUseCase;
 import com.yowyob.tiibntick.core.realtime.domain.model.BroadcastTopic;
+import com.yowyob.tiibntick.core.realtime.domain.service.MissionTrackingCodeCache;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,11 +34,14 @@ public class MissionStatusEventConsumer {
 
     private final IBroadcastNotificationUseCase broadcastNotification;
     private final ObjectMapper objectMapper;
+    private final MissionTrackingCodeCache trackingCodeCache;
 
     public MissionStatusEventConsumer(IBroadcastNotificationUseCase broadcastNotification,
-                                      ObjectMapper objectMapper) {
+                                      ObjectMapper objectMapper,
+                                      MissionTrackingCodeCache trackingCodeCache) {
         this.broadcastNotification = broadcastNotification;
         this.objectMapper = objectMapper;
+        this.trackingCodeCache = trackingCodeCache;
     }
 
     /**
@@ -56,6 +60,7 @@ public class MissionStatusEventConsumer {
 
         try {
             MissionStatusPayload payload = objectMapper.readValue(record.value(), MissionStatusPayload.class);
+            trackingCodeCache.put(payload.missionId(), payload.trackingCode());
 
             String deliveryTopic = BroadcastTopic.forDelivery(payload.missionId()).path();
             String trackingTopic = payload.trackingCode() != null
@@ -89,7 +94,7 @@ public class MissionStatusEventConsumer {
             String previousStatus,
             String newStatus,
             String agencyId,
-            String delivererId,
+            String deliveryPersonId,
             String occurredAt
     ) {}
 }

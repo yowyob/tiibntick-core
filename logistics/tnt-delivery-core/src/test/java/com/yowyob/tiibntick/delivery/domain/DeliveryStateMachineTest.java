@@ -52,6 +52,26 @@ class DeliveryStateMachineTest {
     }
 
     @Test
+    @DisplayName("create() assigns a valid tracking code")
+    void createAssignsValidTrackingCode() {
+        assertThat(delivery.getTrackingCode()).matches("TNT-\\d{8}-[A-Z0-9]{8}");
+    }
+
+    @Test
+    @DisplayName("Mission status transitions carry the delivery's tracking code")
+    void missionStatusEventCarriesTrackingCode() {
+        delivery.confirmPickup();
+
+        MissionStatusChangedEvent event = delivery.getDomainEvents().stream()
+                .filter(MissionStatusChangedEvent.class::isInstance)
+                .map(MissionStatusChangedEvent.class::cast)
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(event.trackingCode()).isEqualTo(delivery.getTrackingCode());
+    }
+
+    @Test
     @DisplayName("CREATED → PICKED_UP should succeed")
     void shouldTransitionCreatedToPickedUp() {
         delivery.confirmPickup();

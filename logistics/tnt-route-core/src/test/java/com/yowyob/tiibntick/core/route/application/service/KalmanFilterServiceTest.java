@@ -83,7 +83,7 @@ class KalmanFilterServiceTest {
                 GeoPoint.of(3.85, 11.51), 45.0, 90.0, 10.0,
                 Instant.now().plusSeconds(10));
 
-        StepVerifier.create(service.updateEta("M1", gps))
+        StepVerifier.create(service.updateEta("M1", "TNT-20260725-A1B2C3D4", gps))
                 .assertNext(eta -> {
                     assertThat(eta.expected()).isNotNull();
                     assertThat(eta.confidenceLevel()).isEqualTo(0.80);

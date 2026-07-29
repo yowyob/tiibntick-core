@@ -1,14 +1,15 @@
 package com.yowyob.tiibntick.bootstrap.config;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
-import tools.jackson.databind.SerializationFeature;
-import tools.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.annotation.PropertyAccessor;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.codec.ServerCodecConfigurer;
-import org.springframework.http.codec.json.JacksonJsonDecoder;
-import org.springframework.http.codec.json.JacksonJsonEncoder;
+import org.springframework.http.codec.json.Jackson2JsonDecoder;
+import org.springframework.http.codec.json.Jackson2JsonEncoder;
 import org.springframework.web.reactive.config.EnableWebFlux;
 import org.springframework.web.reactive.config.WebFluxConfigurer;
 import org.springframework.web.server.WebFilter;
@@ -30,8 +31,9 @@ public class TntWebFluxConfig implements WebFluxConfigurer {
     @Override
     public void configureHttpMessageCodecs(ServerCodecConfigurer configurer) {
         JsonMapper mapper = tntJsonMapper();
-        configurer.defaultCodecs().jacksonJsonEncoder(new JacksonJsonEncoder(mapper));
-        configurer.defaultCodecs().jacksonJsonDecoder(new JacksonJsonDecoder(mapper));
+        // Jackson 2 codecs — application DTOs/proxies use com.fasterxml JsonNode, not tools.jackson.
+        configurer.defaultCodecs().jackson2JsonEncoder(new Jackson2JsonEncoder(mapper));
+        configurer.defaultCodecs().jackson2JsonDecoder(new Jackson2JsonDecoder(mapper));
         configurer.defaultCodecs().maxInMemorySize(10 * 1024 * 1024);
     }
 
@@ -47,10 +49,9 @@ public class TntWebFluxConfig implements WebFluxConfigurer {
         return JsonMapper.builder()
                 .findAndAddModules()
                 .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
-                .changeDefaultVisibility(vc -> vc
-                        .withFieldVisibility(Visibility.ANY)
-                        .withGetterVisibility(Visibility.NONE)
-                        .withIsGetterVisibility(Visibility.NONE))
+                .visibility(PropertyAccessor.FIELD, Visibility.ANY)
+                .visibility(PropertyAccessor.GETTER, Visibility.NONE)
+                .visibility(PropertyAccessor.IS_GETTER, Visibility.NONE)
                 .build();
     }
 

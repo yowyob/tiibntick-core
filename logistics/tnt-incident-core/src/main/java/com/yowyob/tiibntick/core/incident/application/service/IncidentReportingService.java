@@ -65,7 +65,8 @@ public class IncidentReportingService implements IReportIncidentUseCase, IReport
                 command.getMissionId(), category, type,
                 command.getDescription(), command.getReportedByActorId(),
                 command.getReportedByRole(), command.getAffectedParcelIds(),
-                command.getResponsibleOrgId(), command.getResponsibleOrgType()
+                command.getResponsibleOrgId(), command.getResponsibleOrgType(),
+                command.getTrackingCode()
         );
 
         return incidentRepository.save(incident)

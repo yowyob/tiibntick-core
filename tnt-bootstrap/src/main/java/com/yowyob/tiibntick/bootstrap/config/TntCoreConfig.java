@@ -4,12 +4,16 @@ import com.yowyob.kernel.event.config.YowEventKernelAutoConfiguration;
 import com.yowyob.tiibntick.bootstrap.registry.TntExtensionRegistry;
 import com.yowyob.tiibntick.bootstrap.registry.TntRoleRegistrar;
 import com.yowyob.tiibntick.bootstrap.registry.TntSettingsRegistrar;
-import com.yowyob.tiibntick.core.gofp.config.GoFreelancerPointCoreConfig;
+import com.yowyob.tiibntick.core.gofreelancer.config.GoFreelancerPointCoreConfig;
 import com.yowyob.tiibntick.core.marketback.config.MarketBackCoreConfig;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.codec.json.Jackson2JsonDecoder;
+import org.springframework.http.codec.json.Jackson2JsonEncoder;
+import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
@@ -73,8 +77,14 @@ public class TntCoreConfig {
     }*/
 
     @Bean
-    public WebClient.Builder webClientBuilder() {
-        return WebClient.builder();
+    public WebClient.Builder webClientBuilder(JsonMapper tntJsonMapper) {
+        ExchangeStrategies strategies = ExchangeStrategies.builder()
+                .codecs(configurer -> {
+                    configurer.defaultCodecs().jackson2JsonEncoder(new Jackson2JsonEncoder(tntJsonMapper));
+                    configurer.defaultCodecs().jackson2JsonDecoder(new Jackson2JsonDecoder(tntJsonMapper));
+                })
+                .build();
+        return WebClient.builder().exchangeStrategies(strategies);
     }
 
     @Bean

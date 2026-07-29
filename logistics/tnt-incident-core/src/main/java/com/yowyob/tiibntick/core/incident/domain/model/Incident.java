@@ -92,13 +92,22 @@ public class Incident {
      */
     private String responsibleOrgType;
 
+    /**
+     * Public-facing tracking code of the delivery this incident is blocking (format
+     * {@code TNT-YYYYMMDD-XXXXXXXX}). Threaded from {@code tnt-delivery-core}'s
+     * {@code MissionStatusChangedEvent} so it can be re-exposed to {@code tnt-dispute-core}
+     * when an incident escalates into an automated dispute. Null for incidents reported
+     * before this field existed or where the source mission has no tracking code.
+     */
+    private String trackingCode;
+
     public static Incident create(
             UUID tenantId, UUID agencyId, PlatformType platform,
             UUID missionId, IncidentCategory category, IncidentType type,
             String description, UUID reportedBy, ActorRole reportedByRole,
             List<UUID> affectedParcelIds) {
         return createWithFreelancerOrg(tenantId, agencyId, platform, missionId, category, type,
-                description, reportedBy, reportedByRole, affectedParcelIds, null, null);
+                description, reportedBy, reportedByRole, affectedParcelIds, null, null, null);
     }
 
     /**
@@ -106,12 +115,14 @@ public class Incident {
      *
      * @param responsibleOrgId   UUID of the FreelancerOrg responsible, or null for Agency
      * @param responsibleOrgType "FREELANCER_ORG" or "AGENCY", or null
+     * @param trackingCode       tracking code of the blocked delivery, or null if unavailable
      */
     public static Incident createWithFreelancerOrg(
             UUID tenantId, UUID agencyId, PlatformType platform,
             UUID missionId, IncidentCategory category, IncidentType type,
             String description, UUID reportedBy, ActorRole reportedByRole,
-            List<UUID> affectedParcelIds, String responsibleOrgId, String responsibleOrgType) {
+            List<UUID> affectedParcelIds, String responsibleOrgId, String responsibleOrgType,
+            String trackingCode) {
 
         UUID id = UUID.randomUUID();
         Instant now = Instant.now();
@@ -139,6 +150,7 @@ public class Incident {
                 .version(0L)
                 .responsibleOrgId(responsibleOrgId)
                 .responsibleOrgType(responsibleOrgType)
+                .trackingCode(trackingCode)
                 .build();
     }
 
@@ -361,6 +373,8 @@ public class Incident {
                 .autoResolutionAttempts(autoResolutionAttempts)
                 .interAgencyInvolved(interAgencyInvolved)
                 .geoSnapshot(geoSnapshot).slaImpact(slaImpact).riskScore(riskScore)
-                .compensationImpact(compensationImpact).version(version);
+                .compensationImpact(compensationImpact).version(version)
+                .responsibleOrgId(responsibleOrgId).responsibleOrgType(responsibleOrgType)
+                .trackingCode(trackingCode);
     }
 }

@@ -12,6 +12,7 @@ import com.yowyob.tiibntick.core.delivery.domain.model.aggregate.Delivery;
 import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.EtaEstimate;
 import com.yowyob.tiibntick.core.delivery.domain.policy.DeliveryCostPolicy;
 import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
+import com.yowyob.tiibntick.core.route.application.port.in.IUpdateEtaUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -35,11 +36,15 @@ import reactor.core.publisher.Mono;
 @RequiredArgsConstructor
 public class DeliveryLifecycleService implements DeliveryLifecycleUseCase {
 
+    /** Average speed (km/h) assumed when seeding tnt-route-core's Kalman filter at transit start. */
+    private static final double INITIAL_KALMAN_SPEED_KMH = 25.0;
+
     private final DeliveryRepository deliveryRepository;
     private final DeliveryPersonRepository deliveryPersonRepository;
     private final EtaComputationPort etaComputationPort;
     private final DeliveryEventPublisher eventPublisher;
     private final DeliveryProofAnchorPort deliveryProofAnchorPort;
+    private final IUpdateEtaUseCase updateEtaUseCase;
 
     @Override
     @Transactional
@@ -74,8 +79,25 @@ public class DeliveryLifecycleService implements DeliveryLifecycleUseCase {
                                     .flatMap(eta -> {
                                         delivery.startTransit(eta);
                                         return saveAndPublish(delivery);
-                                    });
+                                    })
+                                    .flatMap(saved -> bootstrapKalmanState(saved.getId(), distKm)
+                                            .thenReturn(saved));
                         }));
+    }
+
+    /**
+     * Seeds tnt-route-core's Kalman filter state for this mission so that subsequent GPS
+     * pings (routed through tnt-realtime-core's {@code GpsPingProcessor}) can refine the
+     * live ETA. Best-effort: a failure here must never block the transit-start transaction —
+     * it only degrades the live-tracking broadcast, not delivery business correctness.
+     */
+    private Mono<Void> bootstrapKalmanState(java.util.UUID deliveryId, double totalDistanceKm) {
+        return updateEtaUseCase.computeInitialEta(deliveryId.toString(), totalDistanceKm, INITIAL_KALMAN_SPEED_KMH)
+                .then()
+                .onErrorResume(ex -> {
+                    log.warn("Failed to seed Kalman ETA state for delivery={}: {}", deliveryId, ex.getMessage());
+                    return Mono.empty();
+                });
     }
 
     @Override

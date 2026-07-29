@@ -206,6 +206,8 @@ public final class IncidentDomainEvents {
         UUID agencyId;
         List<UUID> affectedParcelIds;
         String fraudReason;
+        /** Tracking code of the blocked delivery (format TNT-YYYYMMDD-XXXXXXXX), null if unavailable. */
+        String trackingCode;
         Instant occurredAt;
     }
 

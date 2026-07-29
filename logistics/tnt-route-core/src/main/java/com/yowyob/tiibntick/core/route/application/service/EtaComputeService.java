@@ -16,6 +16,7 @@ public class EtaComputeService {
     public EtaResult computeInitial(RoutePath path, Instant departureTime) {
         double expectedHours = 0;
         double varianceHours = 0;
+        double totalDistanceKm = 0;
 
         for (RouteSegment seg : path.segments()) {
             double travelTimeH = seg.distanceKm() / Math.max(seg.partialCost(), 0.01);
@@ -23,10 +24,11 @@ public class EtaComputeService {
             double sigma2 = DEFAULT_SIGMA_RATIO * DEFAULT_SIGMA_RATIO;
             expectedHours += Math.exp(mu + sigma2 / 2.0);
             varianceHours += (Math.exp(sigma2) - 1.0) * Math.exp(2 * mu + sigma2);
+            totalDistanceKm += seg.distanceKm();
         }
 
         if (path.segments().isEmpty()) {
-            return new EtaResult(departureTime, departureTime, departureTime, 1.0, Instant.now());
+            return new EtaResult(departureTime, departureTime, departureTime, 1.0, Instant.now(), 0.0);
         }
 
         double sdHours = Math.sqrt(varianceHours);
@@ -37,7 +39,7 @@ public class EtaComputeService {
         Instant lower = departureTime.plusMillis(Math.max(expectedMs - marginMs, 0));
         Instant upper = departureTime.plusMillis(expectedMs + marginMs);
 
-        return new EtaResult(expected, lower, upper, 0.88, Instant.now());
+        return new EtaResult(expected, lower, upper, 0.88, Instant.now(), totalDistanceKm);
     }
 
     public EtaResult computeFromDistanceAndSpeed(double remainingKm, double avgSpeedKmh,
@@ -53,7 +55,8 @@ public class EtaComputeService {
                 now.plusMillis(Math.max(expectedMs - marginMs, 0)),
                 now.plusMillis(expectedMs + marginMs),
                 0.80,
-                now
+                now,
+                remainingKm
         );
     }
 }

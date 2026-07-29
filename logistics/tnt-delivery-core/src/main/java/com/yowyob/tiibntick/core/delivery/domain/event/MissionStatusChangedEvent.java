@@ -64,6 +64,14 @@ public record MissionStatusChangedEvent(
          */
         String freelancerRole,
 
+        /**
+         * Public-facing tracking code for this delivery (format {@code TNT-YYYYMMDD-XXXXXXXX}).
+         * Propagated so downstream consumers (e.g. {@code tnt-realtime-core}'s ETA/status
+         * broadcast, {@code tnt-dispute-core}'s auto-filed disputes) can key their own
+         * tracking-by-code lookups without a synchronous call back into delivery-core.
+         */
+        String trackingCode,
+
         Instant occurredAt
 ) implements DeliveryDomainEvent {
 
@@ -72,12 +80,14 @@ public record MissionStatusChangedEvent(
                                       String newStatus, String previousStatus,
                                       UUID deliveryPersonId, UUID agencyId,
                                       String platform, UUID parcelId,
+                                      String trackingCode,
                                       Instant occurredAt) {
         this(UUID.randomUUID(), deliveryId, tenantId,
                 newStatus, previousStatus, deliveryPersonId, agencyId,
                 deliveryId, platform,
                 parcelId != null ? List.of(parcelId) : List.of(),
                 null, null,  // no freelancer context
+                trackingCode,
                 occurredAt);
     }
 
@@ -87,12 +97,14 @@ public record MissionStatusChangedEvent(
                                       UUID deliveryPersonId, UUID agencyId,
                                       String platform, UUID parcelId,
                                       String freelancerOrgId, String freelancerRole,
+                                      String trackingCode,
                                       Instant occurredAt) {
         this(UUID.randomUUID(), deliveryId, tenantId,
                 newStatus, previousStatus, deliveryPersonId, agencyId,
                 deliveryId, platform,
                 parcelId != null ? List.of(parcelId) : List.of(),
                 freelancerOrgId, freelancerRole,
+                trackingCode,
                 occurredAt);
     }
 }

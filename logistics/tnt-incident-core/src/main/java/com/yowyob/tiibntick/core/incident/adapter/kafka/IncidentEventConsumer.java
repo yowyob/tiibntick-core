@@ -52,6 +52,7 @@ public class IncidentEventConsumer {
                 UUID tenantId = UUID.fromString(payload.path("tenantId").asText());
                 UUID agencyId = UUID.fromString(payload.path("agencyId").asText());
                 String platformStr = payload.path("platform").asText("AGENCY");
+                String trackingCode = payload.path("trackingCode").asText(null);
 
                 // : Extract FreelancerOrg context from the event payload
                 String freelancerOrgId = null;
@@ -75,6 +76,7 @@ public class IncidentEventConsumer {
                                 .reportedByRole(ActorRole.SYSTEM)
                                 .responsibleOrgId(freelancerOrgId)
                                 .responsibleOrgType(freelancerOrgId != null ? responsibleOrgType : null)
+                                .trackingCode(trackingCode)
                                 .build()
                 ).subscribe(
                         inc -> log.info("Auto-created SLA incident {} for mission {}", inc.getReferenceCode(), missionId),

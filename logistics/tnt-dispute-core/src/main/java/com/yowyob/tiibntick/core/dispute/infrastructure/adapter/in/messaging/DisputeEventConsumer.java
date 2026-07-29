@@ -166,6 +166,8 @@ public class DisputeEventConsumer {
      *   "parcelIds":    ["uuid", ...],   (nullable)
      *   "fraudReason":  "human-readable cause string",
      *   "incidentType": "DRIVER_FRAUD | VEHICLE | PARCEL_CARGO | ..."
+     *   "trackingCode": "TNT-YYYYMMDD-XXXXXXXX"  (nullable — absent for incidents reported
+     *                                              before tnt-incident-core carried it)
      * }
      * </pre>
      *
@@ -179,6 +181,7 @@ public class DisputeEventConsumer {
         String agencyId    = payload.path("agencyId").asText(null);
         String fraudReason = payload.path("fraudReason").asText("Incident escalated to dispute");
         String incidentType = payload.path("incidentType").asText("");
+        String trackingCode = payload.path("trackingCode").asText(null);
 
         if (tenantId == null || tenantId.isBlank()) {
             log.warn("IncidentEscalatedToDispute event missing tenantId — skipping auto-dispute creation");
@@ -218,7 +221,7 @@ public class DisputeEventConsumer {
                 priority,
                 missionId,
                 null,              // packageId: not available at this level; linked via missionId
-                null,              // trackingCode
+                trackingCode,
                 description,
                 (respondentType == RespondentType.AGENCY) ? agencyId : null, // respondentOrgId
                 null,              // impliedSubDelivererId

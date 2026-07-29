@@ -37,6 +37,7 @@ public final class DeliveryPersistenceMapper {
                 .parcelId(parcel != null ? parcel.getId() : null)
                 .senderId(delivery.getSenderId())
                 .deliveryPersonId(delivery.getDeliveryPersonId())
+                .trackingCode(delivery.getTrackingCode())
                 .status(delivery.getStatus().name())
                 .urgency(delivery.getUrgency().name())
                 // Pickup
@@ -139,6 +140,7 @@ public final class DeliveryPersistenceMapper {
                 .parcel(parcel)
                 .senderId(e.getSenderId())
                 .deliveryPersonId(e.getDeliveryPersonId())
+                .trackingCode(e.getTrackingCode())
                 .pickupAddress(pickup)
                 .deliveryAddress(dest)
                 .recipient(recip)

@@ -141,6 +141,7 @@ public class IncidentEscalationService implements IEscalateIncidentUseCase,
                             .agencyId(saved.getAgencyId())
                             .affectedParcelIds(saved.getAffectedParcelIds())
                             .fraudReason(cmd.getFraudEvidence())
+                            .trackingCode(saved.getTrackingCode())
                             .occurredAt(Instant.now())
                             .build();
                     return eventPublisher.publish(event).thenReturn(saved);

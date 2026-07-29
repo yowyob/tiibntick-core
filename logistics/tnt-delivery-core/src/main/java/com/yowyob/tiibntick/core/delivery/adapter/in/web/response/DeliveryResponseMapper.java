@@ -22,6 +22,7 @@ public final class DeliveryResponseMapper {
                 d.getAnnouncementId(),
                 d.getSenderId(),
                 d.getDeliveryPersonId(),
+                d.getTrackingCode(),
                 d.getStatus(),
                 d.getUrgency(),
                 d.getPickupAddress() != null ? d.getPickupAddress().toDisplayString() : "",

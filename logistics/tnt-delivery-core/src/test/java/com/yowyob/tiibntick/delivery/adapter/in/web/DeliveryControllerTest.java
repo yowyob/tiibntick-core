@@ -3,6 +3,7 @@ package com.yowyob.tiibntick.delivery.adapter.in.web;
 import com.yowyob.tiibntick.core.auth.domain.model.TntUserIdentity;
 import com.yowyob.tiibntick.core.delivery.adapter.in.web.DeliveryController;
 import com.yowyob.tiibntick.core.delivery.adapter.in.web.DeliveryExceptionHandler;
+import com.yowyob.tiibntick.core.delivery.application.port.in.CreateDirectDeliveryUseCase;
 import com.yowyob.tiibntick.core.delivery.application.port.in.DeliveryLifecycleUseCase;
 import com.yowyob.tiibntick.core.delivery.application.port.in.DeliveryQueryUseCase;
 import com.yowyob.tiibntick.core.delivery.domain.exception.DeliveryNotFoundException;
@@ -39,6 +40,7 @@ class DeliveryControllerTest {
 
     @Mock DeliveryLifecycleUseCase lifecycleUseCase;
     @Mock DeliveryQueryUseCase queryUseCase;
+    @Mock CreateDirectDeliveryUseCase createDirectDeliveryUseCase;
 
     @InjectMocks DeliveryController controller;
 

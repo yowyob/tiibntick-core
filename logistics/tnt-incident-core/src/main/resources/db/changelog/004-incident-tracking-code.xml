@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- Author: MANFOUO Braun | tnt-incident-core — delivery tracking code context -->
+
+    <changeSet id="004-add-tracking-code-to-incidents" author="MANFOUO Braun">
+        <comment>
+            Adds the blocked delivery's tracking code to tnt_incidents, threaded from
+            tnt-delivery-core's MissionStatusChangedEvent so it can be re-exposed to
+            tnt-dispute-core when an incident escalates into an automated dispute.
+        </comment>
+
+        <addColumn tableName="tnt_incidents">
+            <column name="tracking_code" type="VARCHAR(30)">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+
+        <sql>
+            COMMENT ON COLUMN tnt_incidents.tracking_code IS
+            'Public-facing tracking code (TNT-YYYYMMDD-XXXXXXXX) of the delivery this incident blocks. '
+            'Null for incidents reported before this field existed.';
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

@@ -1,7 +1,9 @@
 package com.yowyob.tiibntick.core.delivery.application.service;
 
+import com.yowyob.tiibntick.core.delivery.application.port.in.CreateDirectDeliveryUseCase;
 import com.yowyob.tiibntick.core.delivery.application.port.in.DeliveryAnnouncementUseCase;
 import com.yowyob.tiibntick.core.delivery.application.port.in.command.CreateDeliveryAnnouncementCommand;
+import com.yowyob.tiibntick.core.delivery.application.port.in.command.CreateDirectDeliveryCommand;
 import com.yowyob.tiibntick.core.delivery.application.port.in.command.RespondToAnnouncementCommand;
 import com.yowyob.tiibntick.core.delivery.application.port.in.command.SelectAnnouncementResponseCommand;
 import com.yowyob.tiibntick.core.delivery.application.port.out.*;
@@ -35,7 +37,7 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class DeliveryAnnouncementService implements DeliveryAnnouncementUseCase {
+public class DeliveryAnnouncementService implements DeliveryAnnouncementUseCase, CreateDirectDeliveryUseCase {
 
     private final DeliveryAnnouncementRepository announcementRepository;
     private final DeliveryRepository deliveryRepository;
@@ -124,6 +126,38 @@ public class DeliveryAnnouncementService implements DeliveryAnnouncementUseCase 
                                                 }));
                             });
                 });
+    }
+
+    @Override
+    @Transactional
+    @RequirePermission(resource = "delivery", action = "create-direct")
+    public Mono<Delivery> createDirect(CreateDirectDeliveryCommand cmd) {
+        log.info("Creating direct delivery for tenant={} sender={} agency={}",
+                cmd.tenantId(), cmd.senderId(), cmd.agencyId());
+
+        Parcel parcel = Parcel.create(cmd.packageSpecification());
+        Delivery delivery = Delivery.create(
+                cmd.tenantId(),
+                null,
+                cmd.senderId(),
+                parcel,
+                cmd.pickupAddress(),
+                cmd.deliveryAddress(),
+                cmd.recipient(),
+                cmd.urgency(),
+                cmd.scheduledPickupTime(),
+                cmd.notes());
+
+        if (cmd.agencyId() != null) {
+            delivery.setAgencyContext(cmd.agencyId(), "AGENCY");
+        }
+
+        return deliveryRepository.save(delivery)
+                .flatMap(saved -> eventPublisher.publishAll(saved.getDomainEvents())
+                        .doOnSuccess(v -> saved.clearDomainEvents())
+                        .thenReturn(saved))
+                .doOnSuccess(d -> log.info("Direct delivery {} created, trackingCode={}",
+                        d.getId(), d.getTrackingCode()));
     }
 
     @Override

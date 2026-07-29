@@ -165,7 +165,7 @@ public class GpsPingProcessor {
 
         return kalmanEtaUpdater
                 .update(entry.delivererId(), entry.missionId(), entry.tenantId(),
-                        entry.coordinates(), entry.speedKmh(), entry.bearing())
+                        entry.coordinates(), entry.speedKmh(), entry.bearing(), entry.accuracy())
                 .flatMap(this::broadcastEtaUpdate)
                 .onErrorResume(ex -> {
                     log.warn("Kalman ETA update failed for mission={}: {}",

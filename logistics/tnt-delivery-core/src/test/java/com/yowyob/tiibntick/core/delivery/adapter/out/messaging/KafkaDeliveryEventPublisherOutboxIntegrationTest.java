@@ -152,6 +152,7 @@ class KafkaDeliveryEventPublisherOutboxIntegrationTest {
                 "IN_TRANSIT", "ASSIGNED",
                 UUID.randomUUID(), null,
                 "GO", parcelId,
+                "TNT-20260725-A1B2C3D4",
                 Instant.now());
 
         publisher.publish(event).block(Duration.ofSeconds(10));

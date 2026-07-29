@@ -1,30 +1,37 @@
 package com.yowyob.tiibntick.core.realtime.adapter.out.route;
 
+import com.yowyob.tiibntick.core.geo.domain.model.GeoPoint;
 import com.yowyob.tiibntick.core.realtime.application.port.out.IKalmanEtaUpdater;
 import com.yowyob.tiibntick.core.realtime.domain.model.ETAInterval;
 import com.yowyob.tiibntick.core.realtime.domain.model.GeoCoordinates;
 import com.yowyob.tiibntick.core.realtime.domain.model.LiveETAUpdate;
+import com.yowyob.tiibntick.core.realtime.domain.service.MissionTrackingCodeCache;
+import com.yowyob.tiibntick.core.route.application.port.in.IUpdateEtaUseCase;
+import com.yowyob.tiibntick.core.route.domain.model.EtaResult;
+import com.yowyob.tiibntick.core.route.domain.model.GPSMeasurement;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 /**
  * Outbound adapter implementing {@link IKalmanEtaUpdater}.
  *
- * <p>Delegates the Kalman filter ETA recomputation to tnt-route-core.
- * In the monolithic modular deployment, tnt-route-core's Kalman service bean
- * is resolved directly via Spring context injection (configured in RealtimeCoreConfig).</p>
+ * <p>Delegates the Kalman filter ETA recomputation to tnt-route-core's
+ * {@link IUpdateEtaUseCase}, resolved directly via Spring context injection in
+ * this monolithic modular deployment (both modules are component-scanned into
+ * the same {@code tnt-bootstrap} application context).</p>
  *
- * <p>The Kalman filter in tnt-route-core uses an Extended Kalman Filter (EKF) with
- * state vector [position, speed, measurement_bias]. This adapter converts the
- * realtime-core GPS data types to the route-core's input types and maps
- * the result back to {@link LiveETAUpdate}.</p>
- *
- * <p>In a future microservices migration, this adapter calls the tnt-route-core
- * gRPC/REST Kalman endpoint instead of direct Java invocation.</p>
+ * <p>Requires that Kalman state already exists for the mission (seeded by
+ * {@code IUpdateEtaUseCase.computeInitialEta()} when transit starts — see
+ * {@code DeliveryLifecycleService.startTransit()}). If no state exists yet
+ * (mission not yet bootstrapped, or already completed), {@code updateEta()}
+ * errors and the caller ({@code GpsPingProcessor}) skips broadcasting for that
+ * ping rather than failing the whole GPS ingestion pipeline.</p>
  *
  * @author MANFOUO Braun
  */
@@ -33,72 +40,43 @@ public class KalmanEtaUpdaterAdapter implements IKalmanEtaUpdater {
 
     private static final Logger log = LoggerFactory.getLogger(KalmanEtaUpdaterAdapter.class);
 
-    /**
-     * The tnt-route-core Kalman update service is injected at runtime by
-     * {@code RealtimeCoreConfig.kalmanEtaUpdater()} using Spring's optional
-     * bean resolution. If tnt-route-core beans are not present, a default
-     * passthrough implementation is used.
-     */
-    public KalmanEtaUpdaterAdapter() {
-        // Actual route-core service injected via RealtimeCoreConfig
+    private final IUpdateEtaUseCase updateEtaUseCase;
+    private final MissionTrackingCodeCache trackingCodeCache;
+
+    public KalmanEtaUpdaterAdapter(IUpdateEtaUseCase updateEtaUseCase,
+                                    MissionTrackingCodeCache trackingCodeCache) {
+        this.updateEtaUseCase = updateEtaUseCase;
+        this.trackingCodeCache = trackingCodeCache;
     }
 
     @Override
     public Mono<LiveETAUpdate> update(String delivererId, String missionId, String tenantId,
-                                      GeoCoordinates coordinates, double speedKmh, double bearing) {
+                                      GeoCoordinates coordinates, double speedKmh, double bearing,
+                                      double accuracyMetres) {
         log.debug("Triggering Kalman ETA update for mission {} — deliverer {} at {}",
                 missionId, delivererId, coordinates);
 
-        // In the current monolithic modular architecture, this call is replaced
-        // by direct injection of tnt-route-core's KalmanStateUpdateService.
-        // The stub below demonstrates the contract and return type.
-        // RealtimeCoreConfig.kalmanEtaUpdater() replaces this bean with the real implementation.
-        return Mono.defer(() -> {
-            // Stub: returns a conservative ETA estimate
-            // Real implementation: calls tnt-route-core's KalmanStateUpdateService
-            LocalDateTime estimatedArrival = LocalDateTime.now().plusMinutes(30);
-            ETAInterval interval = ETAInterval.of(
-                    estimatedArrival.minusMinutes(5),
-                    estimatedArrival.plusMinutes(5),
-                    0.90
-            );
+        String trackingCode = trackingCodeCache.get(missionId);
+        GPSMeasurement measurement = new GPSMeasurement(
+                GeoPoint.of(coordinates.latitude(), coordinates.longitude()),
+                speedKmh, bearing, accuracyMetres, Instant.now());
 
-            LiveETAUpdate etaUpdate = LiveETAUpdate.of(
-                    missionId, delivererId, tenantId, null,
-                    coordinates, interval,
-                    15.0, 30, 0.90
-            );
-
-            log.trace("Kalman ETA stub result for mission {}: ETA={}", missionId, etaUpdate.bestEta());
-            return Mono.just(etaUpdate);
-        });
+        return updateEtaUseCase.updateEta(missionId, trackingCode, measurement)
+                .map(eta -> toLiveETAUpdate(eta, delivererId, missionId, tenantId, trackingCode, coordinates));
     }
 
-    /**
-     * Internal DTO for Kalman update request to tnt-route-core.
-     */
-    record KalmanUpdateRequest(
-            String delivererId,
-            String missionId,
-            String tenantId,
-            double latitude,
-            double longitude,
-            double speedKmh,
-            double bearing,
-            long observationTimestampMs
-    ) {}
+    private LiveETAUpdate toLiveETAUpdate(EtaResult eta, String delivererId, String missionId,
+                                          String tenantId, String trackingCode, GeoCoordinates coordinates) {
+        ETAInterval interval = ETAInterval.of(
+                LocalDateTime.ofInstant(eta.lowerBound(), ZoneOffset.UTC),
+                LocalDateTime.ofInstant(eta.upperBound(), ZoneOffset.UTC),
+                eta.confidenceLevel());
 
-    /**
-     * Internal DTO for Kalman update response from tnt-route-core.
-     */
-    record KalmanUpdateResponse(
-            String missionId,
-            String trackingCode,
-            double etaLowerBoundEpochSeconds,
-            double etaMidpointEpochSeconds,
-            double etaUpperBoundEpochSeconds,
-            double kalmanConfidence,
-            double remainingDistanceKm,
-            int remainingTimeMin
-    ) {}
+        return LiveETAUpdate.of(
+                missionId, delivererId, tenantId, trackingCode,
+                coordinates, interval,
+                eta.remainingDistanceKm(),
+                (int) Math.max(eta.remainingMinutes(Instant.now()), 0),
+                eta.confidenceLevel());
+    }
 }

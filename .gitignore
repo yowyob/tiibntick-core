@@ -140,6 +140,11 @@ config/dev/
 docker-data/
 volumes/
 
+# Self-hosted map tiles build artifacts (OSM extracts, generated .mbtiles — large binaries,
+# regenerate via tnt-bootstrap/docker/maptiles/build-tiles.sh, never commit)
+tnt-bootstrap/docker/maptiles/work/
+tnt-bootstrap/docker/maptiles/output/
+
 # ===============================================================
 # DATABASES / LOCAL STORAGE
 # ===============================================================

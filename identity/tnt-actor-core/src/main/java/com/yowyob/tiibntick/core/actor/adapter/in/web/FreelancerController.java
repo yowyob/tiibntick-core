@@ -19,6 +19,7 @@ import com.yowyob.tiibntick.core.actor.application.port.in.IFindFreelancerByOrgU
 import com.yowyob.tiibntick.core.actor.application.port.in.IFindFreelancerUseCase;
 import com.yowyob.tiibntick.core.actor.application.port.in.ILinkFreelancerOrgUseCase;
 import com.yowyob.tiibntick.core.actor.application.port.in.IRateActorUseCase;
+import com.yowyob.tiibntick.core.actor.application.port.in.IResolveActorIdentityUseCase;
 import com.yowyob.tiibntick.core.actor.application.port.in.IUpdateActorLocationUseCase;
 import com.yowyob.tiibntick.core.actor.domain.model.ActorType;
 import com.yowyob.tiibntick.core.actor.domain.model.AvailabilitySlot;
@@ -81,6 +82,7 @@ public class FreelancerController {
     private final IRateActorUseCase rateActorUseCase;
     private final ILinkFreelancerOrgUseCase linkOrgUseCase;
     private final IFindFreelancerByOrgUseCase findByOrgUseCase;
+    private final IResolveActorIdentityUseCase identityUseCase;
 
     public FreelancerController(ICreateFreelancerProfileUseCase createUseCase,
                                  IFindFreelancerUseCase findUseCase,
@@ -89,7 +91,8 @@ public class FreelancerController {
                                  IUpdateActorLocationUseCase updateLocationUseCase,
                                  IRateActorUseCase rateActorUseCase,
                                  ILinkFreelancerOrgUseCase linkOrgUseCase,
-                                 IFindFreelancerByOrgUseCase findByOrgUseCase) {
+                                 IFindFreelancerByOrgUseCase findByOrgUseCase,
+                                 IResolveActorIdentityUseCase identityUseCase) {
         this.createUseCase = createUseCase;
         this.findUseCase = findUseCase;
         this.associateUseCase = associateUseCase;
@@ -98,6 +101,7 @@ public class FreelancerController {
         this.rateActorUseCase = rateActorUseCase;
         this.linkOrgUseCase = linkOrgUseCase;
         this.findByOrgUseCase = findByOrgUseCase;
+        this.identityUseCase = identityUseCase;
     }
 
     // ── Existing endpoints (unchanged) ─────────────────────────────────────────
@@ -120,7 +124,9 @@ public class FreelancerController {
                     zones, slots,
                     req.pricingPolicyId()));
         })
-        .map(FreelancerProfileResponse::from)
+        .flatMap(profile -> identityUseCase.resolve(profile.actorId())
+                .map(identity -> FreelancerProfileResponse.from(profile, identity))
+                .defaultIfEmpty(FreelancerProfileResponse.from(profile)))
         .map(r -> ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(r)));
     }
@@ -131,7 +137,9 @@ public class FreelancerController {
     public Mono<ResponseEntity<ApiResponse<FreelancerProfileResponse>>> getMyProfile(
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
         return findUseCase.findByActorId(currentUser.tenantId(), currentUser.userId())
-                .map(FreelancerProfileResponse::from)
+                .flatMap(profile -> identityUseCase.resolve(profile.actorId())
+                        .map(identity -> FreelancerProfileResponse.from(profile, identity))
+                        .defaultIfEmpty(FreelancerProfileResponse.from(profile)))
                 .map(r -> ResponseEntity.ok(ApiResponse.success(r)));
     }
 
@@ -291,7 +299,9 @@ public class FreelancerController {
     public Mono<ResponseEntity<ApiResponse<FreelancerProfileResponse>>> getOrgOwner(
             @PathVariable UUID orgId) {
         return findByOrgUseCase.findOwnerByOrg(orgId)
-                .map(FreelancerProfileResponse::from)
+                .flatMap(profile -> identityUseCase.resolve(profile.actorId())
+                        .map(identity -> FreelancerProfileResponse.from(profile, identity))
+                        .defaultIfEmpty(FreelancerProfileResponse.from(profile)))
                 .map(r -> ResponseEntity.ok(
                         ApiResponse.success(r)));
     }

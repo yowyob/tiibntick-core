@@ -59,7 +59,7 @@ class RouteModelsTest {
     void etaResult_remainingMinutes_calculatedCorrectly() {
         Instant now = Instant.now();
         EtaResult eta = new EtaResult(now.plusSeconds(1800), now.plusSeconds(1200),
-                now.plusSeconds(2400), 0.80, now);
+                now.plusSeconds(2400), 0.80, now, 10.0);
         assertThat(eta.remainingMinutes(now)).isEqualTo(30);
         assertThat(eta.isExpired(now)).isFalse();
     }

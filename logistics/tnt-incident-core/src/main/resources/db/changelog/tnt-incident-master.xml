@@ -12,4 +12,6 @@
 
     <include file="db/changelog/003-incident-freelancer-org.xml" relativeToChangelogFile="false"/>
 
+    <include file="db/changelog/004-incident-tracking-code.xml" relativeToChangelogFile="false"/>
+
 </databaseChangeLog>

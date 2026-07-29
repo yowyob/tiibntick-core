@@ -42,4 +42,10 @@ public class ReportIncidentCommand {
      * Null when responsibleOrgId is null.
      */
     String responsibleOrgType;
+
+    /**
+     * Tracking code of the delivery this incident blocks (format TNT-YYYYMMDD-XXXXXXXX).
+     * Extracted from tnt-delivery-core's MissionStatusChangedEvent. Null if unavailable.
+     */
+    String trackingCode;
 }

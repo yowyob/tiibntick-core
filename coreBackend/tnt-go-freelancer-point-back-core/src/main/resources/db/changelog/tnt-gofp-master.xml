@@ -2,34 +2,388 @@
 <databaseChangeLog
         xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
-        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+        xsi:schemaLocation="
+           http://www.liquibase.org/xml/ns/dbchangelog
+           http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.23.xsd">
 
-    <!-- ── Schéma ── -->
-    <include file="db/changelog/changes/001_create_schema.sql"           relativeToChangelogFile="false"/>
+    <changeSet id="001-init-extensions" author="TiiBnPickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile
+                path="db/changelog/init-extensions.sql"
+                relativeToChangelogFile="false"/>
+    </changeSet>
 
-    <!-- ── Tables principales ── -->
-    <include file="db/changelog/changes/002_create_packets.sql"                        relativeToChangelogFile="false"/>
-    <include file="db/changelog/changes/003_create_announcements.sql"                  relativeToChangelogFile="false"/>
-    <include file="db/changelog/changes/004_create_deliveries.sql"                     relativeToChangelogFile="false"/>
-    <include file="db/changelog/changes/005_create_announcement_subscriptions.sql"     relativeToChangelogFile="false"/>
-    <include file="db/changelog/changes/006_create_subscriptions.sql"                  relativeToChangelogFile="false"/>
-    <include file="db/changelog/changes/007_create_payments.sql"                       relativeToChangelogFile="false"/>
-    <include file="db/changelog/changes/008_create_delivery_needs.sql"                 relativeToChangelogFile="false"/>
-    <include file="db/changelog/changes/009_create_relay_deposits.sql"                 relativeToChangelogFile="false"/>
-    <include file="db/changelog/changes/010_create_evaluations.sql"                    relativeToChangelogFile="false"/>
-    <include file="db/changelog/changes/011_create_delivery_person_pricing.sql"        relativeToChangelogFile="false"/>
-    <include file="db/changelog/changes/012_create_logistics_pricing.sql"              relativeToChangelogFile="false"/>
-    <include file="db/changelog/changes/013_create_delivery_person_availability.sql"   relativeToChangelogFile="false"/>
+    <changeSet id="002-create-person" author="TiiBnPickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile
+                path="db/changelog/create-person.sql"
+                relativeToChangelogFile="false"/>
+    </changeSet>
 
-    <!-- ── Tables d'extension (propriétés Market absent des modules Core) ── -->
-    <include file="db/changelog/changes/014_create_freelancer_extensions.sql"          relativeToChangelogFile="false"/>
-    <include file="db/changelog/changes/015_create_relay_hub_extensions.sql"           relativeToChangelogFile="false"/>
+    <changeSet id="003-create-client" author="TiiBnPickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile
+                path="db/changelog/create-client.sql"
+                relativeToChangelogFile="false"/>
+    </changeSet>
 
-    <!-- ── Index ── -->
-    <include file="db/changelog/changes/016_create_indexes.sql"                        relativeToChangelogFile="false"/>
+    <changeSet id="004-create-deliveryPerson" author="TiiBnPickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile
+                path="db/changelog/create-deliveryPerson.sql"
+                relativeToChangelogFile="false"/>
+    </changeSet>
 
-    <!-- ── Abonnements Points Relais ── -->
-    <include file="db/changelog/changes/017_create_relay_hub_subscriptions.sql"        relativeToChangelogFile="false"/>
+    <changeSet id="005-create-address" author="TiiBnPickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile
+                path="db/changelog/create-address.sql"
+                relativeToChangelogFile="false"/>
+    </changeSet>
+
+    <changeSet id="007-create-packet" author="TiiBnPickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile
+                path="db/changelog/create-packet.sql"
+                relativeToChangelogFile="false"/>
+    </changeSet>
+
+    <changeSet id="006-create-announcement" author="TiiBnPickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile
+                path="db/changelog/create-announcement.sql"
+                relativeToChangelogFile="false"/>
+    </changeSet>
+
+    <changeSet id="008-create-delivery" author="TiiBnPickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile
+                path="db/changelog/create-delivery.sql"
+                relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="009-create-payment" author="TiiBnPickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile
+                path="db/changelog/create-payment.sql"
+                relativeToChangelogFile="false"/>
+    </changeSet>
+
+    <changeSet id="010-create-logistics" author="TiiBnPickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile
+                path="db/changelog/create-logistics.sql"
+                relativeToChangelogFile="false"/>
+    </changeSet>
+
+    <changeSet id="011-create-response" author="TiiBnPickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile
+                path="db/changelog/create-response.sql"
+                relativeToChangelogFile="false"/>
+    </changeSet>
+
+
+
+    <changeSet id="012-create-subscription" author="TiiBnPickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile
+                path="db/changelog/create-subscription.sql"
+                relativeToChangelogFile="false"/>
+    </changeSet>
+
+    <changeSet id="013-create-notification" author="TiiBnPickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile
+                path="db/changelog/create-notification.sql"
+                relativeToChangelogFile="false"/>
+    </changeSet>
+
+
+    <changeSet id="014-create-comment" author="TiiBnPickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile
+                path="db/changelog/create-comment.sql"
+                relativeToChangelogFile="false"/>
+    </changeSet>
+
+    <changeSet id="015-create-person-address" author="TiiBnPickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile
+                path="db/changelog/create-person-address.sql"
+                relativeToChangelogFile="false"/>
+    </changeSet>
+
+    <changeSet id="016-update-packet-announcement" author="TiiBnPickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile
+                path="db/changelog/update-packet-announcement.sql"
+                relativeToChangelogFile="false"/>
+    </changeSet>
+    <changeSet id="017-add-duration" author="Tchoungs">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/update-schema-duration.sql" relativeToChangelogFile="false"/>
+    </changeSet>
+    <changeSet id="018-add-address-coordinates" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/update-address-coordinates.sql" relativeToChangelogFile="false"/>
+    </changeSet>
+
+    <changeSet id="019-create-announcement-subscription" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/create-announcement-subscription.sql" relativeToChangelogFile="false"/>
+    </changeSet>
+    <changeSet id="020-update-logistic-packet-announcement" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/update-schema-logistic-packet-announcement.sql" relativeToChangelogFile="false"/>
+    </changeSet>
+    <changeSet id="021-add-cni-photos-to-person" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260207_add_cni_photos_to_person.sql" relativeToChangelogFile="false"/>
+    </changeSet>
+
+    <changeSet id="022-update-logistics-dimensions" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260207_update_logistics_dimensions.sql" relativeToChangelogFile="false"/>
+    </changeSet>
+
+    <changeSet id="023-add-nui-is-active-to-person" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260208_add_nui_is_active_to_person.sql" relativeToChangelogFile="false"/>
+    </changeSet>
+    <changeSet id="024-fix-delivery-person-and-logistics-schema" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260208_fix_delivery_person_and_logistics_schema.sql" relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+    <changeSet id="025-fix-packets-and-announcements-schema" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260208_fix_packets_and_announcements_schema.sql" relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+    <changeSet id="026-add-distance-to-announcements" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260209_add_distance_to_announcements.sql" relativeToChangelogFile="false"/>
+    </changeSet>
+    <changeSet id="027-separate-shipper-names" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260209_separate_shipper_names.sql" relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+    <changeSet id="028-separate-recipient-names-and-mandatory-emails" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260209_separate_recipient_names_and_mandatory_emails.sql" relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+    <changeSet id="029-add-missing-announcement-columns" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260209_add_missing_announcement_columns.sql" relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+    <changeSet id="030-add-weight-to-packets" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260210_add_weight_to_packets.sql" relativeToChangelogFile="false"/>
+    </changeSet>
+    <changeSet id="031-ensure-all-announcement-columns" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260210_ensure_all_announcement_columns.sql" relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="032-drop-recipient-number" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260216_drop_recipient_number.sql" relativeToChangelogFile="false"/>
+    </changeSet>
+    <changeSet id="033-insert-guest-client" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260216_insert_guest_client.sql" relativeToChangelogFile="false"/>
+    </changeSet>
+    <changeSet id="034-fix-packet-circular-dependency" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260216_fix_packet_circular_dependency.sql" relativeToChangelogFile="false"/>
+    </changeSet>
+
+    <changeSet id="035-add-role-to-person" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/add-role-to-person.sql" relativeToChangelogFile="false"/>
+    </changeSet>
+
+    <changeSet id="036-updatePerson" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/updatePerson.sql" relativeToChangelogFile="false"/>
+    </changeSet>
+
+    <changeSet id="037-fix-type-mismatches" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/fix-type-mismatches.sql" relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="038-insert-admin-user" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260216_insert_admin_user.sql" relativeToChangelogFile="false"/>
+    </changeSet>
+    <include file="db/changelog/changes/002-add-brand-model-to-logistics.xml"/>
+    <include file="db/changelog/changes/003-add-nui-photo-to-persons.xml"/>
+
+    <changeSet id="039-add-height-to-packets" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260218_add_height_to_packets.sql" relativeToChangelogFile="false"/>
+    </changeSet>
+
+    <changeSet id="039-add-status-to-clients" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260219_add_status_to_clients.sql" relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="040-seed-test-data" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260219_seed_test_data.sql" relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="041-fix-logistics-class-economy" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260219_fix_logistics_class.sql" relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="042-remove-duplicate-admin" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260219_remove_duplicate_admin.sql" relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="043-add-unique-constraint-subscriptions" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/043-add-unique-constraint-subscriptions.sql" relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="044-add-assigned-delivery-person" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/044-add-assigned-delivery-person.sql" relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="045-add-contacts" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260707_add_contacts.sql" relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="046-add-duration-to-deliveries" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260707_add_duration_to_deliveries.sql" relativeToChangelogFile="false"/>
+    </changeSet>
+
+    <changeSet id="047-create-evaluations" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260707_create_evaluations.sql" relativeToChangelogFile="false"/>
+    </changeSet>
+
+    <changeSet id="048-add-profile-photo-to-person" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260707_add_profile_photo_to_person.sql" relativeToChangelogFile="false"/>
+    </changeSet>
+
+    <changeSet id="049-add-delivery-person-availability" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260707_add_delivery_person_availability.sql" relativeToChangelogFile="false"/>
+    </changeSet>
+
+    <changeSet id="050-create-pricing-policies" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260707_create_pricing_policies.sql" relativeToChangelogFile="false"/>
+    </changeSet>
+
+    <changeSet id="051-create-delivery-needs" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260707_create_delivery_needs.sql" relativeToChangelogFile="false"/>
+    </changeSet>
+
+    <changeSet id="052-create-users-table" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260707_create_users_table.sql" relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="053-update-deliveries-for-needs" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260707_update_deliveries_for_needs.sql" relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="054-update-announcements-point-relais" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260707_update_announcements_point_relais.sql" relativeToChangelogFile="false"/>
+    </changeSet>
+
+    <changeSet id="055-create-relay-deposits-table" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260707_create_relay_deposits_table.sql" relativeToChangelogFile="false"/>
+    </changeSet>
+
+    <changeSet id="056-update-relay-deposits-penalty" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260707_update_relay_deposits_penalty.sql" relativeToChangelogFile="false"/>
+    </changeSet>
+
+    <changeSet id="057-add-commission-and-quota-to-subscription" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260708_add_commission_and_quota_to_subscription.sql"
+                 relativeToChangelogFile="false"
+                 splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="058-add-address-and-shop-photo" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260708_add_address_and_shop_photo.sql"
+                 relativeToChangelogFile="false"
+                 splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="059-add-required-vehicle-type-to-announcements" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260708_add_required_vehicle_type_to_announcements.sql"
+                 relativeToChangelogFile="false"/>
+    </changeSet>
+    <changeSet id="060-create-visuals-and-docs" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260723_create_gofreelancer_visuals_and_docs.sql"
+                 relativeToChangelogFile="false"/>
+    </changeSet>
+
+    <changeSet id="061-add-missing-delivery-columns" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260724_add_missing_delivery_columns.sql"
+                 relativeToChangelogFile="false"
+                 splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="062-add-otp-fields-to-deliveries" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260726_add_otp_fields_to_deliveries.sql"
+                 relativeToChangelogFile="false"/>
+    </changeSet>
+
+    <changeSet id="063-create-gofp-actor-tables" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260726_create_gofp_actor_tables.sql"
+                 relativeToChangelogFile="false"
+                 splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="064-add-missing-announcement-columns" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260726_add_missing_announcement_columns.sql"
+                 relativeToChangelogFile="false"
+                 splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="065-add-contacts-to-announcements" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260727_add_contacts_to_announcements.sql"
+                 relativeToChangelogFile="false"
+                 splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="066-replace-client-id-with-user-id-in-contacts" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260727_replace_client_id_with_user_id_in_contacts.sql"
+                 relativeToChangelogFile="false"
+                 splitStatements="false"/>
+    </changeSet>
+    <changeSet id="067-add-currency-columns" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260727_add_currency_columns.sql"
+                 relativeToChangelogFile="false"
+                 splitStatements="false"/>
+    </changeSet>
 
 </databaseChangeLog>

@@ -39,7 +39,7 @@ public class KalmanFilterService implements IUpdateEtaUseCase {
     }
 
     @Override
-    public Mono<EtaResult> updateEta(String missionId, GPSMeasurement measurement) {
+    public Mono<EtaResult> updateEta(String missionId, String trackingCode, GPSMeasurement measurement) {
         return stateRepository.findByMissionId(missionId)
                 .switchIfEmpty(Mono.error(new IllegalStateException(
                         "No Kalman state for mission: " + missionId)))
@@ -61,9 +61,9 @@ public class KalmanFilterService implements IUpdateEtaUseCase {
 
                     return stateRepository.save(state)
                             .then(eventPublisher.publishEtaUpdated(
-                                    EtaUpdatedEvent.of(null, missionId,
+                                    EtaUpdatedEvent.of(null, missionId, trackingCode,
                                             eta.expected(), eta.lowerBound(), eta.upperBound(),
-                                            eta.confidenceLevel())))
+                                            eta.confidenceLevel(), eta.remainingDistanceKm())))
                             .thenReturn(eta);
                 });
     }
@@ -110,7 +110,8 @@ public class KalmanFilterService implements IUpdateEtaUseCase {
                 now.plusMillis(etaMinMs),
                 now.plusMillis(etaMaxMs),
                 0.88,
-                now
+                now,
+                totalDistanceKm
         );
 
         KalmanState state = KalmanState.initialize(missionId, totalDistanceKm);

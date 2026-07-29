@@ -6,6 +6,7 @@ import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.DeliveryAddre
 import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.DeliveryCost;
 import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.EtaEstimate;
 import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.RecipientInfo;
+import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.TrackingCode;
 import com.yowyob.tiibntick.core.delivery.domain.exception.InvalidDeliveryStateTransitionException;
 import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryStatus;
 import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryUrgency;
@@ -59,6 +60,14 @@ public class Delivery {
     private final UUID id;
     private final UUID tenantId;
     private final UUID announcementId;
+
+    /**
+     * Public-facing tracking code (format {@code TNT-YYYYMMDD-XXXXXXXX}), assigned once at
+     * creation time via {@link TrackingCode#generate()}. Powers the public
+     * {@code GET /track/{trackingCode}} lookup and is propagated into
+     * {@link MissionStatusChangedEvent} for downstream real-time tracking consumers.
+     */
+    private String trackingCode;
 
     // Parcel
     private final Parcel parcel;
@@ -219,6 +228,7 @@ public class Delivery {
                 .recipient(recipient)
                 .urgency(urgency)
                 .status(DeliveryStatus.CREATED)
+                .trackingCode(TrackingCode.generate().value())
                 .platform("AGENCY")
                 .scheduledPickupTime(scheduledPickupTime)
                 .notes(notes)
@@ -552,13 +562,14 @@ public class Delivery {
                     parcelId,
                     assignedFreelancerOrgId,
                     assignedFreelancerRole != null ? assignedFreelancerRole.name() : null,
+                    trackingCode,
                     updatedAt));
         } else {
             domainEvents.add(new MissionStatusChangedEvent(
                     id, tenantId, newSt, prevSt,
                     deliveryPersonId, agencyId,
                     platform != null ? platform : "AGENCY",
-                    parcelId, updatedAt));
+                    parcelId, trackingCode, updatedAt));
         }
     }
 }

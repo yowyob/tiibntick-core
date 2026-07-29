@@ -1,8 +1,10 @@
 package com.yowyob.tiibntick.core.actor.adapter.in.web;
 
 import com.yowyob.tiibntick.core.actor.domain.exception.ActorNotAvailableException;
+import com.yowyob.tiibntick.core.actor.domain.exception.ClientNotFoundException;
 import com.yowyob.tiibntick.core.actor.domain.exception.DelivererNotFoundException;
 import com.yowyob.tiibntick.core.actor.domain.exception.FreelancerNotFoundException;
+import com.yowyob.tiibntick.core.actor.domain.exception.RelayOperatorNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -43,6 +45,26 @@ public class ActorExceptionHandler {
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
         pd.setType(URI.create("urn:tiibntick:actor:freelancer-not-found"));
         pd.setTitle("Freelancer Not Found");
+        pd.setProperty("timestamp", Instant.now());
+        return Mono.just(pd);
+    }
+
+    @ExceptionHandler(ClientNotFoundException.class)
+    public Mono<ProblemDetail> handleClientNotFound(ClientNotFoundException ex) {
+        log.warn("Client not found: {}", ex.getMessage());
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        pd.setType(URI.create("urn:tiibntick:actor:client-not-found"));
+        pd.setTitle("Client Not Found");
+        pd.setProperty("timestamp", Instant.now());
+        return Mono.just(pd);
+    }
+
+    @ExceptionHandler(RelayOperatorNotFoundException.class)
+    public Mono<ProblemDetail> handleRelayOperatorNotFound(RelayOperatorNotFoundException ex) {
+        log.warn("Relay operator not found: {}", ex.getMessage());
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        pd.setType(URI.create("urn:tiibntick:actor:relay-operator-not-found"));
+        pd.setTitle("Relay Operator Not Found");
         pd.setProperty("timestamp", Instant.now());
         return Mono.just(pd);
     }

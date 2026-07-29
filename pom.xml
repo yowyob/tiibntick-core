@@ -227,6 +227,12 @@
         <!-- ── Blockchain (Trust Base — MANFOUO, en attente de migration vers RT-comops) ── -->
         <hyperledger-fabric-gateway.version>1.4.0</hyperledger-fabric-gateway.version>
 
+        <!-- ── Deep Java Library (DJL) — sentiment analysis ── -->
+        <djl.version>0.32.0</djl.version>
+        <djl.pytorch.native.version>2.5.1</djl.pytorch.native.version>
+        <!-- pytorch-native-cpu classifier: linux-x86_64 (prod Docker), osx-aarch64, win-x86_64 -->
+        <djl.platform>linux-x86_64</djl.platform>
+
         <!-- ── JWT (validation tokens émis par comops-auth-core) ── -->
         <nimbus-jose-jwt.version>9.40</nimbus-jose-jwt.version>
 

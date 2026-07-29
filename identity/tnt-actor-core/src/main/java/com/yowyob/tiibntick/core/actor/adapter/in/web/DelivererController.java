@@ -15,6 +15,7 @@ import com.yowyob.tiibntick.core.actor.application.port.in.IFindDelivererUseCase
 import com.yowyob.tiibntick.core.actor.application.port.in.IGetAvailableDeliverersNearUseCase;
 import com.yowyob.tiibntick.core.actor.application.port.in.IRateActorUseCase;
 import com.yowyob.tiibntick.core.actor.application.port.in.IReleaseMissionFromDelivererUseCase;
+import com.yowyob.tiibntick.core.actor.application.port.in.IResolveActorIdentityUseCase;
 import com.yowyob.tiibntick.core.actor.application.port.in.IUpdateActorLocationUseCase;
 import com.yowyob.tiibntick.core.actor.domain.model.ActorType;
 import com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser;
@@ -68,6 +69,7 @@ public class DelivererController {
     private final IUpdateActorLocationUseCase updateLocationUseCase;
     private final IRateActorUseCase rateActorUseCase;
     private final IGetAvailableDeliverersNearUseCase availableNearUseCase;
+    private final IResolveActorIdentityUseCase identityUseCase;
 
     public DelivererController(ICreateDelivererProfileUseCase createUseCase,
                                 IFindDelivererUseCase findUseCase,
@@ -75,7 +77,8 @@ public class DelivererController {
                                 IReleaseMissionFromDelivererUseCase releaseMissionUseCase,
                                 IUpdateActorLocationUseCase updateLocationUseCase,
                                 IRateActorUseCase rateActorUseCase,
-                                IGetAvailableDeliverersNearUseCase availableNearUseCase) {
+                                IGetAvailableDeliverersNearUseCase availableNearUseCase,
+                                IResolveActorIdentityUseCase identityUseCase) {
         this.createUseCase = createUseCase;
         this.findUseCase = findUseCase;
         this.assignMissionUseCase = assignMissionUseCase;
@@ -83,6 +86,7 @@ public class DelivererController {
         this.updateLocationUseCase = updateLocationUseCase;
         this.rateActorUseCase = rateActorUseCase;
         this.availableNearUseCase = availableNearUseCase;
+        this.identityUseCase = identityUseCase;
     }
 
     @PostMapping
@@ -100,7 +104,9 @@ public class DelivererController {
                         req.capacityKg(),
                         req.delivererType(),
                         req.contractId())))
-                .map(DelivererProfileResponse::from)
+                .flatMap(profile -> identityUseCase.resolve(profile.actorId())
+                        .map(identity -> DelivererProfileResponse.from(profile, identity))
+                        .defaultIfEmpty(DelivererProfileResponse.from(profile)))
                 .map(r -> ResponseEntity.status(HttpStatus.CREATED)
                         .body(ApiResponse.success(r)));
     }
@@ -111,7 +117,9 @@ public class DelivererController {
     public Mono<ResponseEntity<ApiResponse<DelivererProfileResponse>>> getMyProfile(
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
         return findUseCase.findByActorId(currentUser.tenantId(), currentUser.userId())
-                .map(DelivererProfileResponse::from)
+                .flatMap(profile -> identityUseCase.resolve(profile.actorId())
+                        .map(identity -> DelivererProfileResponse.from(profile, identity))
+                        .defaultIfEmpty(DelivererProfileResponse.from(profile)))
                 .map(r -> ResponseEntity.ok(ApiResponse.success(r)));
     }
 

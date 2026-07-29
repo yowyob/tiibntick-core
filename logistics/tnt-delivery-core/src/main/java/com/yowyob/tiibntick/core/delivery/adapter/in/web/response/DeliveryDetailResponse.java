@@ -18,6 +18,7 @@ public record DeliveryDetailResponse(
         UUID announcementId,
         UUID senderId,
         UUID deliveryPersonId,
+        String trackingCode,
         DeliveryStatus status,
         DeliveryUrgency urgency,
         String pickupDisplay,

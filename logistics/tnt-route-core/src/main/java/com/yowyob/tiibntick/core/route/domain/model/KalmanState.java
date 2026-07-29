@@ -103,7 +103,7 @@ public final class KalmanState {
         Instant lower = now.plusMillis(Math.max(expectedMs - marginMs, 0));
         Instant upper = now.plusMillis(expectedMs + marginMs);
 
-        return new EtaResult(expected, lower, upper, 0.80, now);
+        return new EtaResult(expected, lower, upper, 0.80, now, remaining);
     }
 
     public String missionId()         { return missionId; }

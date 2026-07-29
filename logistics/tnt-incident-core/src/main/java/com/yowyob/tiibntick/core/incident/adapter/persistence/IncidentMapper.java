@@ -62,6 +62,7 @@ public class IncidentMapper {
                 //  FreelancerOrg context
                 .responsibleOrgId(d.getResponsibleOrgId())
                 .responsibleOrgType(d.getResponsibleOrgType())
+                .trackingCode(d.getTrackingCode())
                 .build();
 
         if (d.getGeoSnapshot() != null) {
@@ -149,6 +150,7 @@ public class IncidentMapper {
                 //  FreelancerOrg context
                 .responsibleOrgId(e.getResponsibleOrgId())
                 .responsibleOrgType(e.getResponsibleOrgType())
+                .trackingCode(e.getTrackingCode())
                 .build();
     }
 

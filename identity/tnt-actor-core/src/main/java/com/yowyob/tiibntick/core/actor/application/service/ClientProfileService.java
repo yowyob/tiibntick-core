@@ -6,10 +6,12 @@ import com.yowyob.tiibntick.core.actor.application.port.out.IActorEventPublisher
 import com.yowyob.tiibntick.core.actor.application.port.out.IClientProfileRepository;
 import com.yowyob.tiibntick.core.actor.application.port.out.IKernelActorPort;
 import com.yowyob.tiibntick.core.actor.domain.event.ActorProfileUpdatedEvent;
+import com.yowyob.tiibntick.core.actor.domain.event.ActorStatusChangedEvent;
 import com.yowyob.tiibntick.core.actor.domain.model.ClientProfile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Mono;
 
 import java.util.Objects;
@@ -33,6 +35,7 @@ public class ClientProfileService implements ICreateClientProfileUseCase {
     }
 
     @Override
+    @Transactional
     public Mono<ClientProfile> createClientProfile(CreateClientProfileCommand command) {
         Objects.requireNonNull(command, "command must not be null");
         return clientProfileRepository.existsByActorId(command.tenantId(), command.actorId())
@@ -49,7 +52,11 @@ public class ClientProfileService implements ICreateClientProfileUseCase {
                             })
                             .then(Mono.defer(() -> {
                                 ClientProfile profile = ClientProfile.create(command.tenantId(), command.actorId());
-                                return clientProfileRepository.save(profile);
+                                return clientProfileRepository.save(profile)
+                                        .flatMap(saved -> eventPublisher.publishActorStatusChanged(
+                                                ActorStatusChangedEvent.of(saved.actorId(), saved.tenantId(),
+                                                        null, saved.actorStatus().name(), "client_profile_created"))
+                                                .thenReturn(saved));
                             }));
                 });
     }

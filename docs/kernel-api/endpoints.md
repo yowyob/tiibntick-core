@@ -4,7 +4,7 @@ Auto-generated from `IWM Backend API` v0.1.0-SNAPSHOT OpenAPI spec (`openapi.jso
 
 **Do not edit by hand** — regenerate with `scripts/fetch-kernel-openapi.sh` (fetches spec) then `python3 scripts/gen_kernel_api_docs.py` (rebuilds this file + `schemas.md`).
 
-1785 operations across 1372 paths, 193 tags, 1190 schemas.
+1872 operations across 1440 paths, 198 tags, 1237 schemas.
 
 ## Tags (controllers)
 
@@ -31,11 +31,11 @@ Auto-generated from `IWM Backend API` v0.1.0-SNAPSHOT OpenAPI spec (`openapi.jso
 - [accounting-report-controller](#accounting-report-controller) (6 ops)
 - [accounting-workflow-controller](#accounting-workflow-controller) (1 ops)
 - [actor-address-book-controller](#actor-address-book-controller) (6 ops)
-- [actor-controller](#actor-controller) (6 ops)
+- [actor-controller](#actor-controller) (7 ops)
 - [actor-financial-profile-controller](#actor-financial-profile-controller) (1 ops)
 - [address-controller](#address-controller) (3 ops)
-- [admin-redacteur-controller](#admin-redacteur-controller) (7 ops)
-- [administration-controller](#administration-controller) (27 ops)
+- [admin-redacteur-controller](#admin-redacteur-controller) (8 ops)
+- [administration-controller](#administration-controller) (29 ops)
 - [advanced-asset-management-controller](#advanced-asset-management-controller) (5 ops)
 - [agency-controller](#agency-controller) (6 ops)
 - [agency-schedule-controller](#agency-schedule-controller) (5 ops)
@@ -43,7 +43,7 @@ Auto-generated from `IWM Backend API` v0.1.0-SNAPSHOT OpenAPI spec (`openapi.jso
 - [artwork-controller](#artwork-controller) (19 ops)
 - [asset-portfolio-controller](#asset-portfolio-controller) (3 ops)
 - [audit-log-controller](#audit-log-controller) (2 ops)
-- [auth-controller](#auth-controller) (27 ops)
+- [auth-controller](#auth-controller) (31 ops)
 - [auth-oidc-controller](#auth-oidc-controller) (6 ops)
 - [bank-account-check-controller](#bank-account-check-controller) (4 ops)
 - [bank-category-controller](#bank-category-controller) (8 ops)
@@ -52,6 +52,7 @@ Auto-generated from `IWM Backend API` v0.1.0-SNAPSHOT OpenAPI spec (`openapi.jso
 - [bank-transaction-controller](#bank-transaction-controller) (7 ops)
 - [billing-legacy-documents-controller](#billing-legacy-documents-controller) (64 ops)
 - [billing-legacy-payments-controller](#billing-legacy-payments-controller) (7 ops)
+- [billing-sales-core](#billing-sales-core) (57 ops)
 - [blockchain-controller](#blockchain-controller) (11 ops)
 - [blog-controller](#blog-controller) (17 ops)
 - [budget-controller](#budget-controller) (7 ops)
@@ -73,20 +74,20 @@ Auto-generated from `IWM Backend API` v0.1.0-SNAPSHOT OpenAPI spec (`openapi.jso
 - [customer-controller](#customer-controller) (27 ops)
 - [declaration-controller](#declaration-controller) (2 ops)
 - [department-controller](#department-controller) (7 ops)
-- [discussion-group-controller](#discussion-group-controller) (14 ops)
-- [document-governance-controller](#document-governance-controller) (5 ops)
-- [document-hub-controller](#document-hub-controller) (4 ops)
+- [discussion-group-controller](#discussion-group-controller) (15 ops)
+- [document-governance-controller](#document-governance-controller) (6 ops)
+- [document-hub-controller](#document-hub-controller) (5 ops)
 - [domain-controller](#domain-controller) (1 ops)
 - [editor-application-controller](#editor-application-controller) (4 ops)
 - [email-controller](#email-controller) (1 ops)
 - [email-verification-page-controller](#email-verification-page-controller) (1 ops)
-- [employee-controller](#employee-controller) (32 ops)
+- [employee-controller](#employee-controller) (34 ops)
 - [employee-self-service-controller](#employee-self-service-controller) (4 ops)
 - [exchange-rate-controller](#exchange-rate-controller) (1 ops)
 - [expense-controller](#expense-controller) (9 ops)
 - [favorite-controller](#favorite-controller) (4 ops)
 - [feed-controller](#feed-controller) (3 ops)
-- [file-controller](#file-controller) (5 ops)
+- [file-controller](#file-controller) (7 ops)
 - [final-settlement-controller](#final-settlement-controller) (4 ops)
 - [fiscal-year-controller](#fiscal-year-controller) (4 ops)
 - [fixed-asset-controller](#fixed-asset-controller) (7 ops)
@@ -112,12 +113,13 @@ Auto-generated from `IWM Backend API` v0.1.0-SNAPSHOT OpenAPI spec (`openapi.jso
 - [loan-advance-controller](#loan-advance-controller) (10 ops)
 - [lookup-table-admin-controller](#lookup-table-admin-controller) (5 ops)
 - [material-request-controller](#material-request-controller) (7 ops)
+- [media-controller](#media-controller) (4 ops)
 - [medical-controller](#medical-controller) (15 ops)
 - [medical-self-service-controller](#medical-self-service-controller) (1 ops)
 - [mission-order-controller](#mission-order-controller) (12 ops)
 - [newsletter-abonnement-controller](#newsletter-abonnement-controller) (3 ops)
 - [newsletter-categorie-controller](#newsletter-categorie-controller) (6 ops)
-- [newsletter-content-controller](#newsletter-content-controller) (11 ops)
+- [newsletter-content-controller](#newsletter-content-controller) (14 ops)
 - [newsletter-entity-controller](#newsletter-entity-controller) (9 ops)
 - [newsletter-subscription-controller](#newsletter-subscription-controller) (4 ops)
 - [notification-controller](#notification-controller) (10 ops)
@@ -131,6 +133,7 @@ Auto-generated from `IWM Backend API` v0.1.0-SNAPSHOT OpenAPI spec (`openapi.jso
 - [org-content-controller](#org-content-controller) (1 ops)
 - [organization-address-book-controller](#organization-address-book-controller) (12 ops)
 - [organization-controller](#organization-controller) (12 ops)
+- [organization-delegation-controller](#organization-delegation-controller) (5 ops)
 - [organization-service-controller](#organization-service-controller) (11 ops)
 - [organization-structure-controller](#organization-structure-controller) (12 ops)
 - [pay-element-admin-controller](#pay-element-admin-controller) (5 ops)
@@ -155,6 +158,8 @@ Auto-generated from `IWM Backend API` v0.1.0-SNAPSHOT OpenAPI spec (`openapi.jso
 - [product-structure-controller](#product-structure-controller) (15 ops)
 - [product-transformation-controller](#product-transformation-controller) (3 ops)
 - [prospect-controller](#prospect-controller) (26 ops)
+- [public-file-controller](#public-file-controller) (1 ops)
+- [public-newsletter-subscription-controller](#public-newsletter-subscription-controller) (2 ops)
 - [public-newsletter-tracking-controller](#public-newsletter-tracking-controller) (1 ops)
 - [public-organization-branding-controller](#public-organization-branding-controller) (1 ops)
 - [purchase-order-controller](#purchase-order-controller) (5 ops)
@@ -259,6 +264,9 @@ Modifier une action (statut, date, note…)
 ### GET `/api/v1/ratings/comments`
 Récupérer tous les commentaires
 
+**Parameters:**
+- `scope` (query, string, optional)
+
 **Responses:** 200 → `Comment[]`; 500 → `Comment[]`
 
 
@@ -275,6 +283,7 @@ Récupérer les commentaires d'une entité
 
 **Parameters:**
 - `entityId` (query, string(uuid), required)
+- `scope` (query, string, optional)
 
 **Responses:** 200 → `Comment[]`; 404 → `Comment[]`; 500 → `Comment[]`
 
@@ -3048,6 +3057,12 @@ Se désabonner d'un contenu
 **Responses:** 200 → `ApiResponseBusinessActorResponse`
 
 
+### PUT `/api/actors/me/identity`
+**Request body:** `application/json` → `UpdateActorRequest` (required)
+
+**Responses:** 200 → `ApiResponseActorResponse`
+
+
 ### POST `/api/actors/me/reactivate`
 **Responses:** 200 → `ApiResponseBusinessActorResponse`
 
@@ -3137,6 +3152,13 @@ Se désabonner d'un contenu
 **Responses:** 200 → `RedacteurRequestResponse`
 
 
+### POST `/api/v1/newsletter/admin/redacteurs/requests/{id}/activate`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `RedacteurRequestResponse`
+
+
 ### POST `/api/v1/newsletter/admin/redacteurs/requests/{id}/approve`
 **Parameters:**
 - `id` (path, string(uuid), required)
@@ -3203,6 +3225,23 @@ Se désabonner d'un contenu
 **Request body:** `application/json` → `GovernanceActionRequest` (required)
 
 **Responses:** 200 → `ApiResponseBusinessActorResponse`
+
+
+### POST `/api/administration/governance/business-actors/{primaryBusinessActorId}/merge/{duplicateBusinessActorId}`
+**Parameters:**
+- `primaryBusinessActorId` (path, string(uuid), required)
+- `duplicateBusinessActorId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseBusinessActorResponse`
+
+
+### POST `/api/administration/governance/identity-onboarding/{userId}`
+**Parameters:**
+- `userId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `GovernanceActionRequest` (required)
+
+**Responses:** 200 → `ApiResponseIdentityOnboardingGovernanceResponse`
 
 
 ### GET `/api/administration/governance/organizations`
@@ -3777,6 +3816,18 @@ Se désabonner d'un contenu
 **Responses:** 200 → `ApiResponseIdentifyAccountResponse`
 
 
+### POST `/api/auth/identity-migration/challenge`
+**Request body:** `application/json` → `UsernameMigrationChallengeRequest` (required)
+
+**Responses:** 200 → `ApiResponseOtpChallengeResponse`
+
+
+### POST `/api/auth/identity-migration/confirm`
+**Request body:** `application/json` → `UsernameMigrationConfirmRequest` (required)
+
+**Responses:** 200 → `ApiResponseUserAccountResponse`
+
+
 ### POST `/api/auth/login`
 **Request body:** `application/json` → `LoginRequest` (required)
 
@@ -3795,6 +3846,22 @@ Se désabonner d'un contenu
 
 ### POST `/api/auth/me/spaces`
 **Responses:** 200 → `ApiResponseObject`
+
+
+### DELETE `/api/auth/me/spaces/{tenantId}`
+**Parameters:**
+- `tenantId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `DeleteOwnedSpaceRequest` (required)
+
+**Responses:** 200 → `ApiResponseVoid`
+
+
+### POST `/api/auth/me/spaces/{tenantId}/deletion-challenge`
+**Parameters:**
+- `tenantId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseOtpChallengeResponse`
 
 
 ### POST `/api/auth/mfa/confirm`
@@ -4747,6 +4814,523 @@ Se désabonner d'un contenu
 **Request body:** `application/json` → `UpdatePaymentRequest` (required)
 
 **Responses:** 200 → `PaymentView`
+
+
+
+## billing-sales-core
+
+### GET `/api/factures`
+Récupérer toutes les factures
+
+**Responses:** 200 → `FactureResponse[]`
+
+
+### POST `/api/factures`
+Créer une facture client
+
+**Request body:** `application/json` → `CreateFactureRequest` (required)
+
+**Responses:** 201 → `FactureResponse`
+
+
+### GET `/api/factures-fournisseur`
+Récupérer toutes les factures fournisseur
+
+**Responses:** 200 → `FactureFournisseurResponse[]`
+
+
+### POST `/api/factures-fournisseur`
+Créer une facture fournisseur
+
+**Request body:** `application/json` → `CreateFactureFournisseurRequest` (required)
+
+**Responses:** 201 → `FactureFournisseurResponse`
+
+
+### GET `/api/factures-fournisseur/agence/{agencyId}`
+Récupérer les factures fournisseur par agence
+
+**Parameters:**
+- `agencyId` (path, string(uuid), required)
+
+**Responses:** 200 → `FactureFournisseurResponse[]`
+
+
+### GET `/api/factures-fournisseur/organisation/{organizationId}`
+Récupérer les factures fournisseur par organisation
+
+**Parameters:**
+- `organizationId` (path, string(uuid), required)
+
+**Responses:** 200 → `FactureFournisseurResponse[]`
+
+
+### DELETE `/api/factures-fournisseur/{id}`
+Supprimer une facture fournisseur
+
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 204
+
+
+### GET `/api/factures-fournisseur/{id}`
+Récupérer une facture fournisseur par ID
+
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `FactureFournisseurResponse`
+
+
+### PUT `/api/factures-fournisseur/{id}`
+Mettre à jour une facture fournisseur
+
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `application/json` → `CreateFactureFournisseurRequest` (required)
+
+**Responses:** 200 → `FactureFournisseurResponse`
+
+
+### GET `/api/factures/agence/{agencyId}`
+Récupérer les factures par agence
+
+**Parameters:**
+- `agencyId` (path, string(uuid), required)
+
+**Responses:** 200 → `FactureResponse[]`
+
+
+### GET `/api/factures/client/{clientId}`
+Récupérer les factures d'un client
+
+**Parameters:**
+- `clientId` (path, string(uuid), required)
+
+**Responses:** 200 → `FactureResponse[]`
+
+
+### GET `/api/factures/en-retard`
+Récupérer les factures en retard
+
+**Responses:** 200 → `FactureResponse[]`
+
+
+### GET `/api/factures/etat/{etat}`
+Récupérer les factures par état
+
+**Parameters:**
+- `etat` (path, string, required)
+
+**Responses:** 200 → `FactureResponse[]`
+
+
+### GET `/api/factures/non-payees`
+Récupérer les factures non payées
+
+**Responses:** 200 → `FactureResponse[]`
+
+
+### GET `/api/factures/numero/{numero}`
+Récupérer une facture par numéro
+
+**Parameters:**
+- `numero` (path, string, required)
+
+**Responses:** 200 → `FactureResponse`
+
+
+### GET `/api/factures/organisation/{organizationId}`
+Récupérer les factures par organisation
+
+**Parameters:**
+- `organizationId` (path, string(uuid), required)
+
+**Responses:** 200 → `FactureResponse[]`
+
+
+### PUT `/api/factures/purchases/accounted/{factureId}`
+Mark a supplier invoice as accounted (callback from the accounting backend)
+
+**Parameters:**
+- `factureId` (path, string(uuid), required)
+
+**Responses:** 200
+
+
+### GET `/api/factures/purchases/{factureId}`
+Get a supplier invoice by id (proxied from account)
+
+**Parameters:**
+- `factureId` (path, string(uuid), required)
+
+**Responses:** 200 → `object`
+
+
+### PUT `/api/factures/sales/accounted/{factureId}`
+Mark a client invoice as accounted (callback from the accounting backend)
+
+**Parameters:**
+- `factureId` (path, string(uuid), required)
+
+**Responses:** 200
+
+
+### GET `/api/factures/sales/{factureId}`
+Get a client invoice by id (proxied from account)
+
+**Parameters:**
+- `factureId` (path, string(uuid), required)
+
+**Responses:** 200 → `object`
+
+
+### GET `/api/factures/vendeur/{sellerId}`
+Récupérer les factures créées par un vendeur
+
+**Parameters:**
+- `sellerId` (path, string(uuid), required)
+
+**Responses:** 200 → `FactureResponse[]`
+
+
+### DELETE `/api/factures/{id}`
+Supprimer une facture
+
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 204
+
+
+### GET `/api/factures/{id}`
+Récupérer une facture par ID
+
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `FactureResponse`
+
+
+### PUT `/api/factures/{id}`
+Mettre à jour une facture
+
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `application/json` → `CreateFactureRequest` (required)
+
+**Responses:** 200 → `FactureResponse`
+
+
+### PUT `/api/factures/{id}/paiement`
+Enregistrer un paiement partiel ou total
+
+**Parameters:**
+- `id` (path, string(uuid), required)
+- `montant` (query, number, required)
+
+**Responses:** 200 → `FactureResponse`
+
+
+### PUT `/api/factures/{id}/paye`
+Marquer une facture comme payée intégralement
+
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `FactureResponse`
+
+
+### GET `/api/fournisseurs`
+List suppliers
+
+**Responses:** 200 → `UpdatedClientResponse[]`
+
+
+### GET `/api/fournisseurs/{id}`
+Get a supplier by id
+
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `UpdatedClientResponse`
+
+
+### GET `/api/organizations/{organizationId}/branding`
+Get an organization's branding
+
+**Parameters:**
+- `organizationId` (path, string(uuid), required)
+
+**Responses:** 200 → `OrganizationBrandingResponse`
+
+
+### GET `/api/pos-sessions`
+List sessions
+
+**Parameters:**
+- `salesPointId` (query, string(uuid), optional)
+- `sellerId` (query, string(uuid), optional)
+- `organizationId` (query, string(uuid), optional)
+- `agencyId` (query, string(uuid), optional)
+
+**Responses:** 200 → `SessionResponse[]`
+
+
+### POST `/api/pos-sessions`
+Open a new session
+
+**Request body:** `application/json` → `CreateSessionRequest` (required)
+
+**Responses:** 201 → `SessionResponse`
+
+
+### POST `/api/pos-sessions/schedule`
+Schedule a future session
+
+**Request body:** `application/json` → `CreateSessionRequest` (required)
+
+**Responses:** 201 → `SessionResponse`
+
+
+### DELETE `/api/pos-sessions/{id}`
+Delete a session
+
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 204
+
+
+### GET `/api/pos-sessions/{id}`
+Get a session by id
+
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `SessionResponse`
+
+
+### PUT `/api/pos-sessions/{id}`
+Update a session
+
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `application/json` → `UpdateSessionRequest` (required)
+
+**Responses:** 200 → `SessionResponse`
+
+
+### POST `/api/pos-sessions/{id}/cancel`
+Cancel a session
+
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `SessionResponse`
+
+
+### POST `/api/pos-sessions/{id}/close`
+Close a session
+
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `application/json` → `CloseSessionRequest` (required)
+
+**Responses:** 200 → `SessionResponse`
+
+
+### POST `/api/pos-sessions/{id}/reopen`
+Reopen a closed session
+
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `SessionResponse`
+
+
+### POST `/api/pos-sessions/{id}/resume`
+Resume a suspended session
+
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `SessionResponse`
+
+
+### POST `/api/pos-sessions/{id}/start`
+Start a scheduled session
+
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `SessionResponse`
+
+
+### POST `/api/pos-sessions/{id}/suspend`
+Suspend a session
+
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `SessionResponse`
+
+
+### GET `/api/sales-points`
+List sales points
+
+**Parameters:**
+- `organizationId` (query, string(uuid), optional)
+- `agencyId` (query, string(uuid), optional)
+
+**Responses:** 200 → `SalesPointResponse[]`
+
+
+### POST `/api/sales-points`
+Create a sales point
+
+**Request body:** `application/json` → `CreateSalesPointRequest` (required)
+
+**Responses:** 201 → `SalesPointResponse`
+
+
+### DELETE `/api/sales-points/{id}`
+Delete a sales point
+
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 204
+
+
+### GET `/api/sales-points/{id}`
+Get a sales point by id
+
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `SalesPointResponse`
+
+
+### PUT `/api/sales-points/{id}`
+Update a sales point
+
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `application/json` → `UpdateSalesPointRequest` (required)
+
+**Responses:** 200 → `SalesPointResponse`
+
+
+### GET `/api/sellers`
+List cashiers for the current organization
+
+**Responses:** 200 → `KernelCashierResponse[]`
+
+
+### POST `/api/sellers`
+Create a seller account
+
+**Request body:** `application/json` → `CreateSellerRequest` (required)
+
+**Responses:** 201 → `CreateSellerResponse`
+
+
+### GET `/api/sellers/local`
+List local seller accounts for an organization
+
+**Parameters:**
+- `organizationId` (query, string(uuid), required)
+
+**Responses:** 200 → `SellerListItemResponse[]`
+
+
+### DELETE `/api/sellers/{sellerId}`
+Delete a seller account
+
+**Parameters:**
+- `sellerId` (path, string(uuid), required)
+
+**Responses:** 204
+
+
+### POST `/api/sellers/{sellerId}/agency`
+Assign a seller to an agency
+
+**Parameters:**
+- `sellerId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `AssignAgencyRequest` (required)
+
+**Responses:** 200 → `AssignAgencyResponse`
+
+
+### PUT `/api/sellers/{sellerId}/permissions`
+Update a seller's permissions
+
+**Parameters:**
+- `sellerId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `UpdateSellerPermissionsRequest` (required)
+
+**Responses:** 200 → `SellerListItemResponse`
+
+
+### PUT `/api/sellers/{sellerId}/photo`
+Update a seller's photo
+
+**Parameters:**
+- `sellerId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `UpdateSellerPhotoRequest` (required)
+
+**Responses:** 200 → `SellerListItemResponse`
+
+
+### GET `/api/sellers/{sellerId}/ui-permissions`
+Get a seller's UI permissions
+
+**Parameters:**
+- `sellerId` (path, string(uuid), required)
+
+**Responses:** 200 → `UIPermissionsResponse`
+
+
+### POST `/api/sellers/{sellerId}/ui-permissions`
+Set a seller's UI permissions
+
+**Parameters:**
+- `sellerId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `UIPermissionsRequest` (required)
+
+**Responses:** 200 → `UIPermissionsResponse`
+
+
+### GET `/api/third-parties/{thirdPartyId}/sale-config`
+Get a third party's sale configuration
+
+**Parameters:**
+- `thirdPartyId` (path, string(uuid), required)
+
+**Responses:** 200 → `SaleConfigResponse`
+
+
+### POST `/api/third-parties/{thirdPartyId}/sale-config`
+Set a third party's sale configuration
+
+**Parameters:**
+- `thirdPartyId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `SetSaleConfigRequest` (required)
+
+**Responses:** 200 → `SaleConfigResponse`
 
 
 
@@ -6042,6 +6626,7 @@ Mettre à jour une catégorie
 ### GET `/api/v1/forum/commentaires/post/{postId}`
 **Parameters:**
 - `postId` (path, string(uuid), required)
+- `scope` (query, string, optional)
 
 **Responses:** 200 → `Commentaire[]`
 
@@ -6764,17 +7349,24 @@ Soumettre un brouillon de cours pour validation par l'admin
 
 
 ### GET `/api/v1/forum/groups/all`
+**Parameters:**
+- `scope` (query, string, optional)
+
 **Responses:** 200 → `DiscussionGroup[]`
 
 
 ### GET `/api/v1/forum/groups/mine`
 **Parameters:**
 - `userId` (query, string(uuid), required)
+- `scope` (query, string, optional)
 
 **Responses:** 200 → `DiscussionGroup[]`
 
 
 ### GET `/api/v1/forum/groups/public`
+**Parameters:**
+- `scope` (query, string, optional)
+
 **Responses:** 200 → `DiscussionGroup[]`
 
 
@@ -6792,6 +7384,14 @@ Soumettre un brouillon de cours pour validation par l'admin
 - `adminId` (query, string(uuid), required)
 
 **Responses:** 200 → `object`
+
+
+### GET `/api/v1/forum/groups/{communityId}/forums`
+**Parameters:**
+- `communityId` (path, string(uuid), required)
+- `scope` (query, string, optional)
+
+**Responses:** 200 → `DiscussionGroup[]`
 
 
 ### DELETE `/api/v1/forum/groups/{groupId}`
@@ -6878,6 +7478,15 @@ Soumettre un brouillon de cours pour validation par l'admin
 **Responses:** 200 → `ApiResponsePolicyResponse`
 
 
+### GET `/api/document-governance/organizations/{organizationId}/checklist/{targetType}/{targetId}`
+**Parameters:**
+- `organizationId` (path, string(uuid), required)
+- `targetType` (path, string, required)
+- `targetId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseDocumentChecklist`
+
+
 ### GET `/api/document-governance/organizations/{organizationId}/overview`
 **Parameters:**
 - `organizationId` (path, string(uuid), required)
@@ -6906,6 +7515,13 @@ Soumettre un brouillon de cours pour validation par l'admin
 
 
 ## document-hub-controller
+
+### GET `/api/document-hub/accounts/{userId}`
+**Parameters:**
+- `userId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListDocumentLinkView`
+
 
 ### POST `/api/document-hub/links`
 **Request body:** `application/json` → `AttachDocumentRequest` (required)
@@ -7008,6 +7624,12 @@ Changer le statut d'une candidature (admin)
 **Responses:** 200 → `ApiResponseListEmployeeMembershipResponse`
 
 
+### POST `/api/employees/invitations/accept`
+**Request body:** `application/json` → `AcceptInvitationRequest` (required)
+
+**Responses:** 200 → `ApiResponseEmployeeMembershipResponse`
+
+
 ### POST `/api/employees/invite`
 **Parameters:**
 - `organizationId` (query, string(uuid), required)
@@ -7033,6 +7655,13 @@ Changer le statut d'une candidature (admin)
 - `membershipId` (path, string(uuid), required)
 
 **Request body:** `application/json` → `UpdateEmployeeMembershipRequest` (required)
+
+**Responses:** 200 → `ApiResponseEmployeeMembershipResponse`
+
+
+### POST `/api/employees/{membershipId}/resend-invitation`
+**Parameters:**
+- `membershipId` (path, string(uuid), required)
 
 **Responses:** 200 → `ApiResponseEmployeeMembershipResponse`
 
@@ -7444,6 +8073,7 @@ Fil d'actualité des podcasts (personnalisé si abonnements)
 ### POST `/api/files`
 **Parameters:**
 - `documentType` (query, string, optional)
+- `public` (query, string, optional)
 
 **Request body:** `multipart/form-data` → `object` (optional)
 
@@ -7471,11 +8101,25 @@ Fil d'actualité des podcasts (personnalisé si abonnements)
 **Responses:** 200 → `ApiResponseStoredFileResponse`
 
 
+### POST `/api/files/{fileId}/reanalyze`
+**Parameters:**
+- `fileId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseStoredFileResponse`
+
+
 ### GET `/api/files/{fileId}/review`
 **Parameters:**
 - `fileId` (path, string(uuid), required)
 
 **Responses:** 200 → `string(binary)`
+
+
+### GET `/api/files/{fileId}/signed-url`
+**Parameters:**
+- `fileId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseSignedUrlResponse`
 
 
 
@@ -7598,12 +8242,16 @@ Fil d'actualité des podcasts (personnalisé si abonnements)
 ## forum-categorie-controller
 
 ### GET `/api/v1/forum/categories/all`
+**Parameters:**
+- `scope` (query, string, optional)
+
 **Responses:** 200 → `Categorie[]`
 
 
 ### GET `/api/v1/forum/categories/groupe/{groupeId}`
 **Parameters:**
 - `groupeId` (path, string(uuid), required)
+- `scope` (query, string, optional)
 
 **Responses:** 200 → `Categorie[]`
 
@@ -7618,6 +8266,7 @@ Fil d'actualité des podcasts (personnalisé si abonnements)
 ### GET `/api/v1/forum/categories/{categorieId}`
 **Parameters:**
 - `categorieId` (path, string(uuid), required)
+- `scope` (query, string, optional)
 
 **Responses:** 200 → `Categorie`
 
@@ -8600,6 +9249,44 @@ Fil d'actualité des podcasts (personnalisé si abonnements)
 
 
 
+## media-controller
+
+### GET `/api/public/education/media/{ressourceId}`
+Servir une image de contenu (public)
+
+**Parameters:**
+- `ressourceId` (path, string(uuid), required)
+
+**Responses:** 200 → `string(binary)`
+
+
+### GET `/api/public/newsletter/media/{tenantId}/{fileId}`
+Servir une image / un fichier de contenu de newsletter (public)
+
+**Parameters:**
+- `tenantId` (path, string(uuid), required)
+- `fileId` (path, string(uuid), required)
+
+**Responses:** 200 → `string(binary)`
+
+
+### POST `/api/v1/education/media`
+Téléverser une image à insérer dans le corps d'un contenu
+
+**Request body:** `multipart/form-data` → `object` (optional)
+
+**Responses:** 200 → `EditorMediaResponse`
+
+
+### POST `/api/v1/newsletter/media`
+Téléverser une image ou un fichier à inclure dans un contenu de newsletter
+
+**Request body:** `multipart/form-data` → `object` (optional)
+
+**Responses:** 200 → `MediaResponse`
+
+
+
 ## medical-controller
 
 ### GET `/api/v1/hrm/medical/activity-report`
@@ -8885,11 +9572,25 @@ Fil d'actualité des podcasts (personnalisé si abonnements)
 **Responses:** 200 → `NewsletterContentResponse[]`
 
 
+### GET `/api/v1/newsletter/contents/mine`
+**Parameters:**
+- `userId` (query, string(uuid), required)
+
+**Responses:** 200 → `NewsletterContentResponse[]`
+
+
 ### DELETE `/api/v1/newsletter/contents/{id}`
 **Parameters:**
 - `id` (path, string(uuid), required)
 
 **Responses:** 204
+
+
+### GET `/api/v1/newsletter/contents/{id}`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `NewsletterContentResponse`
 
 
 ### PUT `/api/v1/newsletter/contents/{id}`
@@ -8926,6 +9627,14 @@ Fil d'actualité des podcasts (personnalisé si abonnements)
 
 
 ### POST `/api/v1/newsletter/contents/{id}/publish`
+**Parameters:**
+- `id` (path, string(uuid), required)
+- `userId` (query, string(uuid), required)
+
+**Responses:** 200 → `NewsletterContentResponse`
+
+
+### POST `/api/v1/newsletter/contents/{id}/reject`
 **Parameters:**
 - `id` (path, string(uuid), required)
 - `userId` (query, string(uuid), required)
@@ -8971,6 +9680,7 @@ Fil d'actualité des podcasts (personnalisé si abonnements)
 ### GET `/api/v1/newsletter/admin/newsletters`
 **Parameters:**
 - `status` (query, string, optional)
+- `scope` (query, string, optional)
 
 **Responses:** 200 → `NewsletterResponse[]`
 
@@ -9008,6 +9718,7 @@ Fil d'actualité des podcasts (personnalisé si abonnements)
 ### GET `/api/v1/newsletter/newsletters/mine`
 **Parameters:**
 - `userId` (query, string(uuid), required)
+- `scope` (query, string, optional)
 
 **Responses:** 200 → `NewsletterResponse[]`
 
@@ -9015,6 +9726,7 @@ Fil d'actualité des podcasts (personnalisé si abonnements)
 ### GET `/api/v1/newsletter/newsletters/{id}`
 **Parameters:**
 - `id` (path, string(uuid), required)
+- `scope` (query, string, optional)
 
 **Responses:** 200 → `NewsletterResponse`
 
@@ -9633,6 +10345,51 @@ Lister les contenus d'éducation de mon organisation active
 - `newOwnerId` (path, string(uuid), required)
 
 **Responses:** 200 → `ApiResponseOrganizationResponse`
+
+
+
+## organization-delegation-controller
+
+### GET `/api/organizations/{organizationId}/delegation/change-requests`
+**Parameters:**
+- `organizationId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListChangeRequestResponse`
+
+
+### POST `/api/organizations/{organizationId}/delegation/change-requests`
+**Parameters:**
+- `organizationId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `SubmitChangeRequest` (required)
+
+**Responses:** 200 → `ApiResponseChangeRequestResponse`
+
+
+### POST `/api/organizations/{organizationId}/delegation/change-requests/{requestId}/decision`
+**Parameters:**
+- `organizationId` (path, string(uuid), required)
+- `requestId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `DecisionRequest` (required)
+
+**Responses:** 200 → `ApiResponseChangeRequestResponse`
+
+
+### DELETE `/api/organizations/{organizationId}/delegation/manager`
+**Parameters:**
+- `organizationId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseVoid`
+
+
+### POST `/api/organizations/{organizationId}/delegation/manager`
+**Parameters:**
+- `organizationId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `AssignManagerRequest` (required)
+
+**Responses:** 200 → `ApiResponseManagerResponse`
 
 
 
@@ -10619,6 +11376,7 @@ Soumettre un brouillon de podcast pour validation par l'admin
 **Parameters:**
 - `auteurId` (path, string(uuid), required)
 - `memberId` (query, string(uuid), required)
+- `scope` (query, string, optional)
 
 **Responses:** 200 → `Post[]`
 
@@ -10627,6 +11385,7 @@ Soumettre un brouillon de podcast pour validation par l'admin
 **Parameters:**
 - `categorieId` (path, string(uuid), required)
 - `memberId` (query, string(uuid), required)
+- `scope` (query, string, optional)
 
 **Responses:** 200 → `Post[]`
 
@@ -10634,6 +11393,7 @@ Soumettre un brouillon de podcast pour validation par l'admin
 ### GET `/api/v1/forum/posts/groupe/{groupeId}`
 **Parameters:**
 - `groupeId` (path, string(uuid), required)
+- `scope` (query, string, optional)
 
 **Responses:** 200 → `Post[]`
 
@@ -10650,6 +11410,7 @@ Soumettre un brouillon de podcast pour validation par l'admin
 **Parameters:**
 - `postId` (path, string(uuid), required)
 - `memberId` (query, string(uuid), required)
+- `scope` (query, string, optional)
 
 **Responses:** 200 → `Post`
 
@@ -11142,6 +11903,38 @@ Soumettre un brouillon de podcast pour validation par l'admin
 - `thirdPartyId` (path, string(uuid), required)
 
 **Responses:** 200 → `ApiResponseThirdPartyResponse`
+
+
+
+## public-file-controller
+
+### GET `/api/public/files/{tenantId}/{fileId}`
+**Parameters:**
+- `tenantId` (path, string(uuid), required)
+- `fileId` (path, string(uuid), required)
+- `exp` (query, integer(int64), required)
+- `sig` (query, string, required)
+
+**Responses:** 200 → `string(binary)`
+
+
+
+## public-newsletter-subscription-controller
+
+### GET `/api/public/newsletter/subscribe/{token}`
+**Parameters:**
+- `token` (path, string(uuid), required)
+
+**Responses:** 200 → `PublicNewsletterResponse`
+
+
+### POST `/api/public/newsletter/subscribe/{token}`
+**Parameters:**
+- `token` (path, string(uuid), required)
+
+**Request body:** `application/json` → `SubscribeRequest` (required)
+
+**Responses:** 204
 
 
 
@@ -13555,6 +14348,9 @@ Mettre à jour un tag existant
 
 ### GET `/api/v1/ratings`
 Obtenir toutes les évaluations
+
+**Parameters:**
+- `scope` (query, string, optional)
 
 **Responses:** 200 → `Ratings[]`
 

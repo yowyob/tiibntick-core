@@ -2,10 +2,12 @@ package com.yowyob.tiibntick.core.delivery.adapter.in.web;
 
 import com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser;
 import com.yowyob.tiibntick.core.auth.domain.model.TntUserIdentity;
+import com.yowyob.tiibntick.core.delivery.adapter.in.web.request.CreateDirectDeliveryRequest;
 import com.yowyob.tiibntick.core.delivery.adapter.in.web.request.UpdateLocationRequest;
 import com.yowyob.tiibntick.core.delivery.adapter.in.web.response.DeliveryDetailResponse;
 import com.yowyob.tiibntick.core.delivery.adapter.in.web.response.DeliveryResponseMapper;
 import com.yowyob.tiibntick.core.delivery.adapter.in.web.response.EtaResponse;
+import com.yowyob.tiibntick.core.delivery.application.port.in.CreateDirectDeliveryUseCase;
 import com.yowyob.tiibntick.core.delivery.application.port.in.DeliveryLifecycleUseCase;
 import com.yowyob.tiibntick.core.delivery.application.port.in.DeliveryQueryUseCase;
 import com.yowyob.tiibntick.core.delivery.application.port.in.command.*;
@@ -48,6 +50,19 @@ public class DeliveryController {
 
     private final DeliveryLifecycleUseCase lifecycleUseCase;
     private final DeliveryQueryUseCase queryUseCase;
+    private final CreateDirectDeliveryUseCase createDirectDeliveryUseCase;
+
+    @Operation(summary = "Create a delivery directly, bypassing the announcement/marketplace flow",
+               description = "For callers that already know sender/recipient/parcel and don't need a "
+                           + "bidding step (e.g. an agency dispatching from a client intake).")
+    @PostMapping
+    @PreAuthorize("hasAnyRole('AGENCY_MANAGER','BRANCH_MANAGER','TNT_ADMIN')")
+    public Mono<DeliveryDetailResponse> createDirect(
+            @PathVariable UUID tenantId,
+            @Valid @RequestBody CreateDirectDeliveryRequest req) {
+        return createDirectDeliveryUseCase.createDirect(req.toCommand(tenantId))
+                .map(DeliveryResponseMapper::toDetail);
+    }
 
     @Operation(summary = "Get delivery by ID")
     @GetMapping("/{deliveryId}")
