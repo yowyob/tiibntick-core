@@ -13,7 +13,7 @@ import java.util.UUID;
 
 /**
  * Bootstrap configuration to ensure the admin user exists with the correct
- * credentials provided in the application.properties (or environment variables).
+ * credentials provided in tnt-bootstrap/application.yml (or environment variables).
  * 
  * If no variables are provided, it falls back to admin@test.com / admin123.
  */
@@ -24,10 +24,10 @@ public class AdminBootstrapConfig implements ApplicationRunner {
     private final DatabaseClient databaseClient;
     private final PasswordEncoder passwordEncoder;
 
-    @Value("${admin.email:admin@test.com}")
+    @Value("${tnt.gofp.admin.email:admin@test.com}")
     private String adminEmail;
 
-    @Value("${admin.password:admin123}")
+    @Value("${tnt.gofp.admin.password:admin123}")
     private String adminPassword;
 
     public AdminBootstrapConfig(DatabaseClient databaseClient) {

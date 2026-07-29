@@ -151,9 +151,10 @@ public class TntOpenApiConfig {
     public GroupedOpenApi deliveryCoreApi() {
         return GroupedOpenApi.builder()
                 .group("03-delivery-core")
-                .displayName("L3 — Delivery Core (Mission, Package, Hub Deposit)")
-                .pathsToMatch("/api/v1/missions/**", "/api/v1/packages/**",
-                              "/api/v1/hub-deposits/**", "/api/v1/tracking/**")
+                .displayName("L3 — Delivery Core (Deliveries, Announcements, Delivery Persons)")
+                .pathsToMatch("/api/v1/tenants/*/deliveries/**",
+                              "/api/v1/tenants/*/delivery-announcements/**",
+                              "/api/v1/tenants/*/delivery-persons/**")
                 .build();
     }
 
@@ -242,6 +243,58 @@ public class TntOpenApiConfig {
                 .displayName("L5 — Billing Engine (Pricing, Invoice, Wallet, Reports)")
                 .pathsToMatch("/api/v1/billing/**", "/api/v1/invoices/**",
                               "/api/v1/wallets/**", "/api/v1/pricing/**")
+                .build();
+    }
+
+    /**
+     * Go Freelancer Point back-core (L6): product API under {@code /api/v1/gofp/**}
+     * (announcements, deliveries, matching, relay deposits, subscriptions, pricing).
+     */
+    @Bean
+    public GroupedOpenApi goFreelancerPointBackCoreApi() {
+        return GroupedOpenApi.builder()
+                .group("06-go-freelancer-point")
+                .displayName("L6 — Go Freelancer Point (Announcements, Deliveries, Matching, Relay)")
+                .pathsToMatch("/api/v1/gofp/**")
+                .build();
+    }
+
+    /**
+     * Agency ERP back-core (L6): tenant-scoped agency registry — org, workforce, missions,
+     * fleet, billing, onboarding, intake, sync, compliance, analytics.
+     */
+    @Bean
+    public GroupedOpenApi agencyBackCoreApi() {
+        return GroupedOpenApi.builder()
+                .group("06-agency-back-core")
+                .displayName("L6 — Agency ERP (Registry, Missions, Fleet, Billing, Onboarding)")
+                .pathsToMatch("/api/v1/tenants/*/agency-registry/**", "/api/v1/agency-registry/**")
+                .build();
+    }
+
+    /**
+     * TiiBnTick Link back-core (L6): network nodes, bulletin board, DAO zones, parcel tracking,
+     * gamification leaderboard.
+     */
+    @Bean
+    public GroupedOpenApi linkBackCoreApi() {
+        return GroupedOpenApi.builder()
+                .group("06-link-back-core")
+                .displayName("L6 — Link (Network Nodes, Board, DAO, Parcels, Leaderboard)")
+                .pathsToMatch("/api/v1/platform/link/**")
+                .build();
+    }
+
+    /**
+     * TiiBnTick Market back-core (L6): provider listings, service offers, quotes, orders,
+     * campaigns, contracts, search.
+     */
+    @Bean
+    public GroupedOpenApi marketBackCoreApi() {
+        return GroupedOpenApi.builder()
+                .group("06-market-back-core")
+                .displayName("L6 — Market (Listings, Offers, Quotes, Orders, Campaigns)")
+                .pathsToMatch("/api/v1/platform/market/**")
                 .build();
     }
 

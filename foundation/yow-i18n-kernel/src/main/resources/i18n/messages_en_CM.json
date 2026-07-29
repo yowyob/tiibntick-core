@@ -57,5 +57,15 @@
   "ORDER_COMPLETED": "Your order {{orderId}} has been completed.",
   "REVIEW_PUBLISHED": "New review {{reviewId}} published: {{rating}}/5.",
   "LISTING_APPROVED": "Your listing {{listingId}} has been approved.",
-  "LISTING_REJECTED": "Your listing {{listingId}} was rejected. Reason: {{reason}}."
+  "LISTING_REJECTED": "Your listing {{listingId}} was rejected. Reason: {{reason}}.",
+
+  "notify.gofp.message": "{{title}}\n\n{{body}}",
+  "notify.gofp.registration_received": "Hello,\n\nYour registration request as a delivery person has been received.\n\nYour account is pending validation by our admin team.\nYou will be notified once your request has been reviewed.\n\nBest regards,\nThe TiiBnTick team",
+  "notify.gofp.account_approved": "Hello,\n\nCongratulations! Your account has been approved.\n\nYou can now sign in to the application.\n\n{{loginUrl}}\n\nBest regards,\nThe TiiBnTick team",
+  "notify.gofp.account_rejected": "Hello,\n\nWe regret to inform you that your registration request was not approved.\n{{reason}}\n\nIf you believe this is an error, please contact us.\n\n{{loginUrl}}\n\nBest regards,\nThe TiiBnTick team",
+  "notify.gofp.account_suspended": "Hello,\n\nYour account has been temporarily suspended.\n\nDuring this period, you will not be able to access application features.\n\n{{loginUrl}}\n\nBest regards,\nThe TiiBnTick team",
+  "notify.gofp.account_revoked": "Hello,\n\nYour account has been permanently revoked.\n\nThis decision is final and you will no longer be able to access the application.\n\n{{loginUrl}}\n\nBest regards,\nThe TiiBnTick team",
+  "notify.gofp.delivery_assigned": "Hello,\n\nCongratulations! You have been selected for the following delivery:\n\n\"{{announcementTitle}}\"\n\nPlease sign in to the application for details.\n\nBest regards,\nThe TiiBnTick team",
+  "notify.gofp.new_announcement": "New delivery available! Check the app for details.",
+  "notify.gofp.evaluation_request": "Please leave a rating for your latest delivery."
 }

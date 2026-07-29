@@ -41,17 +41,17 @@
                 relativeToChangelogFile="false"/>
     </changeSet>
 
-    <changeSet id="007-create-packet" author="TiiBnPickTeam">
-        <validCheckSum>ANY</validCheckSum>
-        <sqlFile
-                path="db/changelog/create-packet.sql"
-                relativeToChangelogFile="false"/>
-    </changeSet>
-
     <changeSet id="006-create-announcement" author="TiiBnPickTeam">
         <validCheckSum>ANY</validCheckSum>
         <sqlFile
                 path="db/changelog/create-announcement.sql"
+                relativeToChangelogFile="false"/>
+    </changeSet>
+
+    <changeSet id="007-create-packet" author="TiiBnPickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile
+                path="db/changelog/create-packet.sql"
                 relativeToChangelogFile="false"/>
     </changeSet>
 
@@ -379,6 +379,20 @@
                  relativeToChangelogFile="false"
                  splitStatements="false"/>
     </changeSet>
+
+    <changeSet id="066a-create-relay-point-subscriptions" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260712_create_relay_point_subscriptions.sql"
+                 relativeToChangelogFile="false"
+                 splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="066b-add-pickup-deadline-to-delivery-needs" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260712_add_pickup_deadline_to_delivery_needs.sql"
+                 relativeToChangelogFile="false"/>
+    </changeSet>
+
     <changeSet id="067-add-currency-columns" author="TiiBnTickTeam">
         <validCheckSum>ANY</validCheckSum>
         <sqlFile path="db/changelog/20260727_add_currency_columns.sql"

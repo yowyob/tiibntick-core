@@ -13,10 +13,12 @@ import com.yowyob.tiibntick.core.platformgateway.domain.model.ClientStatus;
 import com.yowyob.tiibntick.core.platformgateway.domain.model.PlatformClient;
 import com.yowyob.tiibntick.core.platformgateway.domain.model.PlatformClientApplication;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -103,17 +105,36 @@ public class PlatformClientAuthenticationService {
         if (cached.client.status() != ClientStatus.ACTIVE) {
             return Mono.empty();
         }
+        return Mono.fromCallable(() -> findMatchingKey(cached, rawApiKey))
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(matchedKey -> {
+                    if (matchedKey == null) {
+                        return Mono.empty();
+                    }
+                    markLastUsedAsync(matchedKey.id(), Instant.now());
+                    return Mono.just(new PlatformClientApplication(
+                            cached.client.id(), cached.client.clientId(), cached.client.platformCode(),
+                            cached.client.environment(), cached.scopes));
+                });
+    }
+
+    /** BCrypt comparison is CPU-bound — must not run on Netty/R2DBC event-loop threads. */
+    private ApiKey findMatchingKey(CachedClient cached, String rawApiKey) {
         Instant now = Instant.now();
         for (ApiKey key : cached.validKeys) {
             boolean notExpired = key.expiresAt() == null || key.expiresAt().isAfter(now);
             if (notExpired && hashingService.matches(rawApiKey, key.keyHash())) {
-                apiKeyRepository.markLastUsed(key.id(), now).subscribe();
-                return Mono.just(new PlatformClientApplication(
-                        cached.client.id(), cached.client.clientId(), cached.client.platformCode(),
-                        cached.client.environment(), cached.scopes));
+                return key;
             }
         }
-        return Mono.empty();
+        return null;
+    }
+
+    /** Fire-and-forget — must not add latency or failure modes to the auth response path. */
+    private void markLastUsedAsync(UUID keyId, Instant lastUsedAt) {
+        Mono.defer(() -> apiKeyRepository.markLastUsed(keyId, lastUsedAt))
+                .subscribeOn(Schedulers.boundedElastic())
+                .subscribe(v -> { }, error -> { /* last-used updates must never surface to the caller */ });
     }
 
     private record CachedClient(PlatformClient client, List<ApiKey> validKeys, Set<String> scopes) {

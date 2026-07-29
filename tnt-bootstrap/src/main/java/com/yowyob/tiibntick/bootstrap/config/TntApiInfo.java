@@ -22,6 +22,9 @@ public final class TntApiInfo {
             Hexagonal Architecture / DDD Modular Monolith.
             Authentication: OAuth2 Bearer JWT (YowAuth0).
             Multi-tenancy: X-Tenant-Id header required.
+            L6 product backends: Go Freelancer Point (/api/v1/gofp/**), Agency ERP
+            (/api/v1/tenants/{tenantId}/agency-registry/**), Link (/api/v1/platform/link/**),
+            Market (/api/v1/platform/market/**).
             Author: MANFOUO Braun — ENSP Yaoundé 2026.
             """;
 

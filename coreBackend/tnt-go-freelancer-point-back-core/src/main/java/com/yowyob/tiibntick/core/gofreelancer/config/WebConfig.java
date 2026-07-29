@@ -12,7 +12,7 @@ import java.nio.file.Paths;
 @Configuration
 public class WebConfig implements WebFluxConfigurer {
 
-    @Value("${kyc.verify.url}")
+    @Value("${tnt.gofp.kyc.verify-url:http://localhost:8080/api/v1/kyc/verify}")
     private String kycVerifyUrl;
 
     @Override

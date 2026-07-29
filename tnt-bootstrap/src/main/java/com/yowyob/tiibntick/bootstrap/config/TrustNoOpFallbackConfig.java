@@ -9,6 +9,9 @@ import com.yowyob.tiibntick.bootstrap.config.trustnoop.NoOpDeliveryProofAnchorPo
 import com.yowyob.tiibntick.bootstrap.config.trustnoop.NoOpFreelancerOrgDidAnchorPort;
 import com.yowyob.tiibntick.bootstrap.config.trustnoop.NoOpGeofenceAnchorPort;
 import com.yowyob.tiibntick.bootstrap.config.trustnoop.NoOpPaymentAnchorPort;
+import com.yowyob.tiibntick.bootstrap.config.trustnoop.NoOpRecordCustodyTransferUseCase;
+import com.yowyob.tiibntick.bootstrap.config.trustnoop.NoOpRecordMissionUseCase;
+import com.yowyob.tiibntick.bootstrap.config.trustnoop.NoOpRecordPaymentUseCase;
 import com.yowyob.tiibntick.core.actor.application.port.out.IActorDidAnchorPort;
 import com.yowyob.tiibntick.core.actor.application.port.out.IBadgeAnchorPort;
 import com.yowyob.tiibntick.core.billing.pricing.domain.port.out.BillingPolicyAnchorPort;
@@ -18,6 +21,9 @@ import com.yowyob.tiibntick.core.dispute.application.port.outbound.IBlockchainPr
 import com.yowyob.tiibntick.core.incident.port.outbound.IBlockchainAuditPort;
 import com.yowyob.tiibntick.core.organization.application.port.out.FreelancerOrgDidAnchorPort;
 import com.yowyob.tiibntick.core.realtime.application.port.out.IGeofenceAnchorPort;
+import com.yowyob.tiibntick.core.trust.application.port.in.RecordCustodyTransferUseCase;
+import com.yowyob.tiibntick.core.trust.application.port.in.RecordMissionUseCase;
+import com.yowyob.tiibntick.core.trust.application.port.in.RecordPaymentUseCase;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -31,10 +37,11 @@ import org.springframework.context.annotation.Configuration;
  * <p>{@code tnt-trust-core}'s {@code TntTrustAutoConfiguration} is entirely
  * switched off by {@code tnt.trust.enabled=false} (§15.1 of
  * {@code TNT_CORE_Connexion_Trust_Module.md}), so none of its port adapters
- * (e.g. {@code DeliveryProofAnchorAdapter}) exist. The 8 calling modules below
- * inject their outbound trust port as a required constructor dependency —
- * without a fallback, disabling trust makes {@code tnt-bootstrap} fail to
- * start with {@code UnsatisfiedDependencyException} instead of degrading
+ * (e.g. {@code DeliveryProofAnchorAdapter}) or inbound use cases
+ * (e.g. {@code RecordCustodyTransferUseCase}) exist. Calling modules inject
+ * their outbound trust ports and/or inbound use cases as required constructor
+ * dependencies — without a fallback, disabling trust makes {@code tnt-bootstrap}
+ * fail to start with {@code UnsatisfiedDependencyException} instead of degrading
  * gracefully as the design doc promises.
  *
  * <p>Each {@code @Bean} is {@link ConditionalOnMissingBean} so a real
@@ -110,5 +117,23 @@ public class TrustNoOpFallbackConfig {
     @ConditionalOnMissingBean
     public IBadgeAnchorPort badgeAnchorPort() {
         return new NoOpBadgeAnchorPort();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public RecordCustodyTransferUseCase recordCustodyTransferUseCase() {
+        return new NoOpRecordCustodyTransferUseCase();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public RecordMissionUseCase recordMissionUseCase() {
+        return new NoOpRecordMissionUseCase();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public RecordPaymentUseCase recordPaymentUseCase() {
+        return new NoOpRecordPaymentUseCase();
     }
 }

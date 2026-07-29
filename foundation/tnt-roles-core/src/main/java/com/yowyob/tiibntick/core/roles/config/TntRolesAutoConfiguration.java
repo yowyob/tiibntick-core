@@ -363,7 +363,7 @@ public class TntRolesAutoConfiguration {
             TntRoleDefinitionRegistry registry,
             RoleRepository roleRepository,
             RoleSyncOutboxRepository outboxRepository,
-            TransactionalOperator transactionalOperator,
+            @Qualifier("tntRolesTransactionalOperator") TransactionalOperator transactionalOperator,
             ObjectMapper objectMapper,
             TntRolesProperties properties) {
         return new TntRoleInitializationService(registry, roleRepository, outboxRepository,

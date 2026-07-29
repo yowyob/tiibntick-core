@@ -1,6 +1,7 @@
 package com.yowyob.tiibntick.core.dispute.infrastructure.config;
 
 import io.r2dbc.spi.ConnectionFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.r2dbc.config.EnableR2dbcAuditing;
@@ -34,7 +35,8 @@ public class DisputeR2dbcConfig {
      * @return the reactive transaction manager
      */
     @Bean
-    public ReactiveTransactionManager disputeTransactionManager(ConnectionFactory connectionFactory) {
+    public ReactiveTransactionManager disputeTransactionManager(
+            @Qualifier("tntCoreConnectionFactory") ConnectionFactory connectionFactory) {
         return new R2dbcTransactionManager(connectionFactory);
     }
 }

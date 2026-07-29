@@ -29,7 +29,7 @@ import java.util.UUID;
  * @author François-Charles ATANGA
  */
 @Slf4j
-@Service
+@Service("gofpKafkaEventPublisher")
 public class KafkaEventPublisher implements EventPublisher {
 
     private static final String AGGREGATE_TYPE_FREELANCER    = "Freelancer";

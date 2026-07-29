@@ -72,6 +72,11 @@ spring:
           max-idle: 10
           min-idle: 2
 
+  # ── Elasticsearch (Go Freelancer search — disabled by default) ─────────────
+  elasticsearch:
+    enabled: ${ELASTICSEARCH_ENABLED:false}
+    uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
+
   # ── Security (JWT resource server — validates Kernel-issued JWTs) ─────────────
   # Only jwk-set-uri is set (no issuer-uri) so Spring Security validates signature
   # + expiry but NOT the iss claim — required because the Kernel issues iss:"kernel-core"
@@ -351,6 +356,18 @@ tnt:
         agency-erp-inventory: tnt-agency-erp-inventory-consumer
         agency-erp-billing: tnt-agency-erp-billing-consumer
         agency-erp-actor: tnt-agency-erp-actor-consumer
+
+  # ── Go Freelancer Point (Layer 6 back-core) ────────────────────────────────
+  gofp:
+    admin:
+      email: ${TNT_GOFP_ADMIN_EMAIL:admin@test.com}
+      password: ${TNT_GOFP_ADMIN_PASSWORD:admin123}
+    kyc:
+      verify-url: ${KYC_VERIFY_URL:http://localhost:8080/api/v1/kyc/verify}
+    sentiment:
+      enabled: ${TNT_SENTIMENT_ENABLED:true}
+      model-name: ${TNT_SENTIMENT_MODEL_NAME:nlptown/bert-base-multilingual-uncased-sentiment}
+      cache-dir: ${TNT_SENTIMENT_CACHE_DIR:/app/.djl.ai}
 
   # ── Agency ERP (Layer 6 back-core) ─────────────────────────────────────────
   agency:

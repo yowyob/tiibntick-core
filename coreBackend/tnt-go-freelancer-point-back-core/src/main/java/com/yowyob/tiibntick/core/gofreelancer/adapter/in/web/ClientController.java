@@ -17,7 +17,7 @@ import java.util.UUID;
  * Inbound REST adapter for client management.
  * Delegates to the ClientUseCase inbound port.
  */
-@RestController
+@RestController("gofpLegacyClientController")
 @RequestMapping("/api/clients")
 @RequiredArgsConstructor
 public class ClientController {

@@ -53,7 +53,8 @@ public class TntRolesTransactionConfig {
     }
 
     @Bean
-    public TransactionalOperator tntRolesTransactionalOperator(ReactiveTransactionManager tntRolesTransactionManager) {
+    public TransactionalOperator tntRolesTransactionalOperator(
+            @Qualifier("tntRolesTransactionManager") ReactiveTransactionManager tntRolesTransactionManager) {
         return TransactionalOperator.create(tntRolesTransactionManager);
     }
 }

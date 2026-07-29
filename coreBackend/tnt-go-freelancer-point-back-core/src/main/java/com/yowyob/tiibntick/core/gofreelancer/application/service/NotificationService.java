@@ -8,6 +8,8 @@ import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.notification.No
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.persistence.repository.NotificationRepository;
 
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.kafka.event.MatchingNotificationEvent;
+import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.EmailPort;
+import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.PushNotificationPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -19,23 +21,19 @@ import java.util.List;
 
 /**
  * Service responsible for managing and sending notifications.
- * Orchestrates Email, Push, and DB persistence.
+ * Orchestrates tnt-notify-core (email/push) and DB persistence.
  *
  * @author François-Charles ATANGA
  * @date 03/02/2026
  */
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class NotificationService {
 
-    private static final Logger log = LoggerFactory.getLogger(NotificationService.class);
-
     private final NotificationRepository notificationRepository;
-    private final EmailService emailService;
-    private final PushNotificationService pushNotificationService;
+    private final EmailPort emailPort;
+    private final PushNotificationPort pushNotificationPort;
     private final KafkaEventPublisher kafkaEventPublisher;
 
     /**
@@ -45,7 +43,7 @@ public class NotificationService {
      * @param announcement    The matched announcement.
      * @return A Flux of saved Notifications.
      */
-    @Transactional("connectionFactoryTransactionManager")
+    @Transactional
     public Flux<Notification> notifyEligibleFreelancers(List<FreelancerDocument> freelancers,
             AnnouncementDocument announcement) {
         log.info("Notifying {} delivery persons for Announcement {}", freelancers.size(), announcement.getId());
@@ -70,7 +68,7 @@ public class NotificationService {
         return notificationRepository.save(notification)
                 .flatMap(savedNotification -> {
                     // 3. Send Email
-                    Mono<Void> emailMono = emailService.sendSimpleMessageReactive(
+                    Mono<Void> emailMono = emailPort.sendSimpleMessageReactive(
                             dp.getEmail(),
                             title,
                             message + "\n\nAnnonce ID: " + announcement.getId()).onErrorResume(e -> {
@@ -79,7 +77,7 @@ public class NotificationService {
                             });
 
                     // 4. Send Push Notification
-                    Mono<Void> pushMono = pushNotificationService.sendPushNotification(
+                    Mono<Void> pushMono = pushNotificationPort.sendPushNotification(
                             dp.getId(),
                             title,
                             message).onErrorResume(e -> {
@@ -117,10 +115,10 @@ public class NotificationService {
 
         return notificationRepository.save(notification)
                 .flatMap(saved -> {
-                    Mono<Void> emailMono = emailService.sendSimpleMessageReactive(
+                    Mono<Void> emailMono = emailPort.sendSimpleMessageReactive(
                             personEmail, title, message + "\n\nDelivery ID: " + deliveryId)
                             .onErrorResume(e -> Mono.empty());
-                    Mono<Void> pushMono = pushNotificationService.sendPushNotification(personId, title, message)
+                    Mono<Void> pushMono = pushNotificationPort.sendPushNotification(personId, title, message)
                             .onErrorResume(e -> Mono.empty());
                     return Mono.when(emailMono, pushMono);
                 });

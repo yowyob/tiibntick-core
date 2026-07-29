@@ -7,19 +7,19 @@ import org.springframework.context.annotation.Configuration;
 /**
  * Configuration properties for the DJL sentiment analysis model.
  *
- * <p>Bound to the {@code tnt.sentiment.*} namespace in {@code application.properties}.
+ * <p>Bound to the {@code tnt.gofp.sentiment.*} namespace in {@code tnt-bootstrap/application.yml}.
  *
  * <pre>
- * tnt.sentiment.model-name=nlptown/bert-base-multilingual-uncased-sentiment
- * tnt.sentiment.cache-dir=/app/.djl.ai
- * tnt.sentiment.enabled=true
+ * tnt.gofp.sentiment.model-name=nlptown/bert-base-multilingual-uncased-sentiment
+ * tnt.gofp.sentiment.cache-dir=/app/.djl.ai
+ * tnt.gofp.sentiment.enabled=true
  * </pre>
  *
  * @author François-Charles ATANGA
  */
 @Data
 @Configuration
-@ConfigurationProperties(prefix = "tnt.sentiment")
+@ConfigurationProperties(prefix = "tnt.gofp.sentiment")
 public class SentimentModelConfig {
 
     /**

@@ -57,5 +57,15 @@
   "ORDER_COMPLETED": "Your order {{orderId}} don finish.",
   "REVIEW_PUBLISHED": "New review {{reviewId}} don publish: {{rating}}/5.",
   "LISTING_APPROVED": "Dem don approve your listing {{listingId}}.",
-  "LISTING_REJECTED": "Dem reject your listing {{listingId}}. Reason na {{reason}}."
+  "LISTING_REJECTED": "Dem reject your listing {{listingId}}. Reason na {{reason}}.",
+
+  "notify.gofp.message": "{{title}}\n\n{{body}}",
+  "notify.gofp.registration_received": "How far,\n\nWe don receive your registration as delivery person.\n\nYour account dey wait make admin check am.\nWe go notify you when dem finish.\n\nTiiBnTick team",
+  "notify.gofp.account_approved": "How far,\n\nCongrats! Dem don approve your account.\n\nYou fit login now.\n\n{{loginUrl}}\n\nTiiBnTick team",
+  "notify.gofp.account_rejected": "How far,\n\nSorry, dem no approve your registration.\n{{reason}}\n\nIf e be mistake, contact us.\n\n{{loginUrl}}\n\nTiiBnTick team",
+  "notify.gofp.account_suspended": "How far,\n\nDem suspend your account for now.\n\nYou no fit use the app until dem lift am.\n\n{{loginUrl}}\n\nTiiBnTick team",
+  "notify.gofp.account_revoked": "How far,\n\nDem revoke your account permanently.\n\nYou no fit access the app again.\n\n{{loginUrl}}\n\nTiiBnTick team",
+  "notify.gofp.delivery_assigned": "How far,\n\nDem select you for this delivery:\n\n\"{{announcementTitle}}\"\n\nOpen the app for details.\n\nTiiBnTick team",
+  "notify.gofp.new_announcement": "New delivery don land! Check the app.",
+  "notify.gofp.evaluation_request": "Abeg rate your last delivery."
 }

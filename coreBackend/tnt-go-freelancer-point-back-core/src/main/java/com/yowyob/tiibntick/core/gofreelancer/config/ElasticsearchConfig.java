@@ -16,7 +16,7 @@ import org.springframework.data.elasticsearch.repository.config.EnableReactiveEl
  */
 @Configuration
 @EnableReactiveElasticsearchRepositories(basePackages = "com.yowyob.tiibntick.core.gofreelancer.adapter.out.search")
-@ConditionalOnProperty(name = "spring.elasticsearch.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "spring.elasticsearch.enabled", havingValue = "true", matchIfMissing = false)
 public class ElasticsearchConfig extends ReactiveElasticsearchConfiguration {
 
     @Value("${spring.elasticsearch.uris:localhost:9200}")

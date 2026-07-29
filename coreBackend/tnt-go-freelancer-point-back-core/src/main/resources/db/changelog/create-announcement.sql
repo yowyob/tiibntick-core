@@ -1,4 +1,4 @@
-CREATE TABLE announcements (
+CREATE TABLE IF NOT EXISTS announcements (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     duration INTEGER,
     distance DOUBLE PRECISION,

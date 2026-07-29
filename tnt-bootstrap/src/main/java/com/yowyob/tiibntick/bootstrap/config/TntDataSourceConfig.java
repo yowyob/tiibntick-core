@@ -63,6 +63,7 @@ public class TntDataSourceConfig {
     @Value("${DB_POOL_INITIAL_SIZE:2}")       private int poolInitialSize;
     @Value("${DB_POOL_MAX_SIZE:10}")          private int poolMaxSize;
     @Value("${DB_POOL_MAX_IDLE_MINUTES:30}")  private long poolMaxIdleMinutes;
+    @Value("${DB_POOL_MAX_ACQUIRE_SECONDS:5}") private long poolMaxAcquireSeconds;
 
     // Kernel DB (may differ in production when RT-comops has its own DB)
     @Value("${KERNEL_DB_HOST:${DB_HOST:localhost}}") private String kernelDbHost;
@@ -182,6 +183,7 @@ public class TntDataSourceConfig {
                 .initialSize(poolInitialSize)
                 .maxSize(poolMaxSize)
                 .maxIdleTime(Duration.ofMinutes(poolMaxIdleMinutes))
+                .maxAcquireTime(Duration.ofSeconds(poolMaxAcquireSeconds))
                 .validationQuery("SELECT 1")
                 .build();
         return new ConnectionPool(poolConfiguration);

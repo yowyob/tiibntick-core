@@ -57,5 +57,15 @@
   "ORDER_COMPLETED": "Votre commande {{orderId}} a été finalisée.",
   "REVIEW_PUBLISHED": "Nouvel avis {{reviewId}} publié : {{rating}}/5.",
   "LISTING_APPROVED": "Votre annonce {{listingId}} a été approuvée.",
-  "LISTING_REJECTED": "Votre annonce {{listingId}} a été rejetée. Motif : {{reason}}."
+  "LISTING_REJECTED": "Votre annonce {{listingId}} a été rejetée. Motif : {{reason}}.",
+
+  "notify.gofp.message": "{{title}}\n\n{{body}}",
+  "notify.gofp.registration_received": "Bonjour,\n\nVotre demande d'inscription en tant que livreur a bien été reçue.\n\nVotre compte est en attente de validation par notre équipe administrative.\nUn email vous sera envoyé lorsque votre demande aura été examinée.\n\nCordialement,\nL'équipe TiiBnTick",
+  "notify.gofp.account_approved": "Bonjour,\n\nFélicitations ! Votre compte a été approuvé.\n\nVous pouvez maintenant vous connecter à l'application.\n\n{{loginUrl}}\n\nCordialement,\nL'équipe TiiBnTick",
+  "notify.gofp.account_rejected": "Bonjour,\n\nNous avons le regret de vous informer que votre demande d'inscription n'a pas été approuvée.\n{{reason}}\n\nSi vous pensez qu'il s'agit d'une erreur, veuillez nous contacter.\n\n{{loginUrl}}\n\nCordialement,\nL'équipe TiiBnTick",
+  "notify.gofp.account_suspended": "Bonjour,\n\nNous vous informons que votre compte a été temporairement suspendu.\n\nDurant cette période, vous ne pourrez pas accéder aux fonctionnalités de l'application.\n\n{{loginUrl}}\n\nCordialement,\nL'équipe TiiBnTick",
+  "notify.gofp.account_revoked": "Bonjour,\n\nNous vous informons que votre compte a été définitivement révoqué.\n\nCette décision est irrévocable et vous ne pourrez plus accéder aux fonctionnalités de l'application.\n\n{{loginUrl}}\n\nCordialement,\nL'équipe TiiBnTick",
+  "notify.gofp.delivery_assigned": "Bonjour,\n\nFélicitations ! Vous avez été sélectionné(e) pour effectuer la livraison suivante :\n\n\"{{announcementTitle}}\"\n\nVeuillez vous connecter à l'application pour consulter les détails.\n\nCordialement,\nL'équipe TiiBnTick",
+  "notify.gofp.new_announcement": "Nouvelle course disponible ! Consultez l'application pour les détails.",
+  "notify.gofp.evaluation_request": "Merci de laisser une évaluation pour votre dernière livraison."
 }
