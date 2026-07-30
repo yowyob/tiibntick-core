@@ -242,7 +242,7 @@ public class OnboardingService {
                 .flatMap(agency -> staffMemberService.register(new StaffMemberService.RegisterInput(
                         tenantId, agencyId, null,
                         app.getOwnerName(), app.getOwnerPhone(), app.getOwnerEmail(),
-                        StaffRole.AGENCY_MANAGER)).thenReturn(agency));
+                        StaffRole.AGENCY_MANAGER, false)).thenReturn(agency));
     }
 
     private Mono<Void> provisionAdminViaCoreIfNeeded(

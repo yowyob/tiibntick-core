@@ -18,6 +18,9 @@ public class HubParcelRecord {
     private ParcelStatus status;
     private boolean identityVerified;
     private String withdrawnBy;
+    private UUID depositedByActorId;
+    private String depositedByLabel;
+    private UUID withdrawnByActorId;
     private UUID coreHubPackageEntryId;
     private final Instant createdAt;
     private Instant updatedAt;
@@ -26,6 +29,7 @@ public class HubParcelRecord {
     public HubParcelRecord(UUID id, UUID tenantId, UUID hubId, UUID packageId, UUID missionId,
                            String trackingCode, Instant depositedAt, Instant withdrawalDeadline,
                            ParcelStatus status, boolean identityVerified, String withdrawnBy,
+                           UUID depositedByActorId, String depositedByLabel, UUID withdrawnByActorId,
                            UUID coreHubPackageEntryId,
                            Instant createdAt, Instant updatedAt, long version) {
         this.id = id;
@@ -39,6 +43,9 @@ public class HubParcelRecord {
         this.status = status;
         this.identityVerified = identityVerified;
         this.withdrawnBy = withdrawnBy;
+        this.depositedByActorId = depositedByActorId;
+        this.depositedByLabel = depositedByLabel;
+        this.withdrawnByActorId = withdrawnByActorId;
         this.coreHubPackageEntryId = coreHubPackageEntryId;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
@@ -47,18 +54,26 @@ public class HubParcelRecord {
 
     public static HubParcelRecord deposit(UUID id, UUID tenantId, UUID hubId,
                                           UUID packageId, UUID missionId,
-                                          String trackingCode, int retentionHours, Instant now) {
+                                          String trackingCode, int retentionHours, Instant now,
+                                          UUID depositedByActorId, String depositedByLabel) {
         Instant deadline = now.plusSeconds((long) retentionHours * 3600L);
         return new HubParcelRecord(id, tenantId, hubId, packageId, missionId, trackingCode,
-                now, deadline, ParcelStatus.DEPOSITED, false, null, null, now, now, 0L);
+                now, deadline, ParcelStatus.DEPOSITED, false, null,
+                depositedByActorId, depositedByLabel, null,
+                null, now, now, 0L);
     }
 
     public void withdraw(String withdrawnBy, boolean identityVerified, Instant now) {
+        withdraw(withdrawnBy, identityVerified, null, now);
+    }
+
+    public void withdraw(String withdrawnBy, boolean identityVerified, UUID withdrawnByActorId, Instant now) {
         if (status != ParcelStatus.DEPOSITED) {
             throw new IllegalStateException("Only a DEPOSITED parcel can be withdrawn");
         }
         this.status = ParcelStatus.WITHDRAWN;
         this.withdrawnBy = withdrawnBy;
+        this.withdrawnByActorId = withdrawnByActorId;
         this.identityVerified = identityVerified;
         this.updatedAt = now;
     }
@@ -93,6 +108,9 @@ public class HubParcelRecord {
     public ParcelStatus getStatus() { return status; }
     public boolean isIdentityVerified() { return identityVerified; }
     public String getWithdrawnBy() { return withdrawnBy; }
+    public UUID getDepositedByActorId() { return depositedByActorId; }
+    public String getDepositedByLabel() { return depositedByLabel; }
+    public UUID getWithdrawnByActorId() { return withdrawnByActorId; }
     public UUID getCoreHubPackageEntryId() { return coreHubPackageEntryId; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }

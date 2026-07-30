@@ -34,7 +34,13 @@ public class HubParcelService {
     private final TrustPort trust;
 
     public record DepositInput(
-            UUID tenantId, UUID hubId, UUID missionId, String trackingCode, UUID packageId) {}
+            UUID tenantId, UUID hubId, UUID missionId, String trackingCode, UUID packageId,
+            UUID depositedByActorId, String depositedByLabel) {
+
+        public DepositInput(UUID tenantId, UUID hubId, UUID missionId, String trackingCode, UUID packageId) {
+            this(tenantId, hubId, missionId, trackingCode, packageId, null, null);
+        }
+    }
 
     public record WithdrawInput(
             UUID tenantId, String trackingCode, String withdrawnBy, boolean identityVerified,
@@ -60,10 +66,11 @@ public class HubParcelService {
                             UUID.randomUUID(), input.tenantId(), input.hubId(),
                             packageId, input.missionId(), trackingCode,
                             hub.getRetentionDelayHours() != null ? hub.getRetentionDelayHours() : 72,
-                            now);
+                            now,
+                            input.depositedByActorId(), input.depositedByLabel());
                     return inventoryCore.depositPackage(new InventoryCorePort.DepositPackageRequest(
                                     input.tenantId(), hub.getCoreHubId(), packageId,
-                                    trackingCode, null, null, null))
+                                    trackingCode, null, input.depositedByActorId(), null))
                             .doOnNext(view -> record.linkCoreEntry(view.id(), now))
                             .then(parcelRepo.save(HubParcelMapper.toEntity(record)))
                             .map(HubParcelMapper::toDomain)
@@ -97,7 +104,8 @@ public class HubParcelService {
                                 new InventoryCorePort.PickupPackageRequest(
                                         input.trackingCode(), input.pickedUpByActorId()))
                         .then(Mono.defer(() -> {
-                            record.withdraw(input.withdrawnBy(), input.identityVerified(), now);
+                            record.withdraw(input.withdrawnBy(), input.identityVerified(),
+                                    input.pickedUpByActorId(), now);
                             return parcelRepo.save(HubParcelMapper.toEntity(record));
                         }))
                         .map(HubParcelMapper::toDomain)

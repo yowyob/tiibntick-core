@@ -12,6 +12,8 @@ import com.yowyob.tiibntick.core.agency.workforce.domain.vo.DelivererStatus;
 import com.yowyob.tiibntick.core.agency.workforce.domain.vo.RemunerationModel;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import jakarta.validation.Valid;
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
@@ -47,13 +50,13 @@ public class WorkforceController {
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/agencies/{agencyId}/deliverers")
     @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Register a deliverer (links existing Core actor)")
+    @Operation(summary = "Register a deliverer (provisions Kernel login when actorId omitted)")
     public Mono<ApiResponse<DelivererResponse>> registerDeliverer(
             @PathVariable UUID tenantId,
             @PathVariable UUID agencyId,
-            @RequestBody RegisterDelivererRequest body) {
+            @RequestBody @Valid RegisterDelivererRequest body) {
         return delivererService.register(new AgencyDelivererService.RegisterInput(
-                tenantId, agencyId, body.actorId(), body.phone()
+                tenantId, agencyId, body.actorId(), body.phone(), body.fullName(), body.email()
         )).map(ApiResponse::success);
     }
 
@@ -90,6 +93,19 @@ public class WorkforceController {
         return delivererService.updateAvailability(
                 tenantId, delivererId, DelivererStatus.valueOf(body.status())
         ).map(ApiResponse::success);
+    }
+
+    @PatchMapping("/api/v1/tenants/{tenantId}/agency-registry/deliverers/{delivererId}/location")
+    @PreAuthorize("isAuthenticated()")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Update deliverer last known GPS (UC-52)")
+    public Mono<Void> updateLocation(
+            @PathVariable UUID tenantId,
+            @PathVariable UUID delivererId,
+            @RequestBody LocationRequest body) {
+        return delivererService.updateLocation(
+                tenantId, delivererId, body.latitude(), body.longitude(),
+                body.accuracyMeters(), body.missionId());
     }
 
     @GetMapping("/api/v1/tenants/{tenantId}/agency-registry/deliverers/{delivererId}")
@@ -208,9 +224,15 @@ public class WorkforceController {
         return freelancerService.listByAgency(tenantId, agencyId).collectList().map(ApiResponse::success);
     }
 
-    public record RegisterDelivererRequest(UUID actorId, String fullName, String email, String phone) {}
+    public record RegisterDelivererRequest(
+            UUID actorId,
+            String fullName,
+            @Email String email,
+            @NotBlank String phone) {}
     public record AttachBranchRequest(UUID branchId) {}
     public record AvailabilityRequest(String status) {}
+    public record LocationRequest(
+            double latitude, double longitude, Double accuracyMeters, UUID missionId) {}
     public record SignContractRequest(
             UUID agencyId, ContractType contractType, LocalDate startDate, LocalDate endDate,
             RemunerationModel remunerationModel, BigDecimal baseSalary, BigDecimal commissionRate) {}

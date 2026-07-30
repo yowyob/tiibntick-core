@@ -43,7 +43,6 @@ public class IntakeController {
     }
 
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/intake-requests")
-    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Submit a client shipment request (mobile)")
     public Mono<ApiResponse<IntakeResponse>> submit(

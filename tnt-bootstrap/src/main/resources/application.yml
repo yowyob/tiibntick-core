@@ -371,6 +371,8 @@ tnt:
 
   # ── Agency ERP (Layer 6 back-core) ─────────────────────────────────────────
   agency:
+    portal:
+      login-url: ${TNT_AGENCY_PORTAL_LOGIN_URL:}
     kafka:
       consumers:
         enabled: ${TNT_AGENCY_KAFKA_CONSUMERS_ENABLED:true}

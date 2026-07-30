@@ -42,6 +42,7 @@ public class TntRoleDefinitionRegistry {
             TntRole.BRANCH_MANAGER,
             TntRole.SUPPORT_AGENT,
             TntRole.PERMANENT_DELIVERER,
+            TntRole.AGENCY_HUB_OPERATOR,
             TntRole.RELAY_OPERATOR,
             TntRole.FREELANCER,
             TntRole.CLIENT

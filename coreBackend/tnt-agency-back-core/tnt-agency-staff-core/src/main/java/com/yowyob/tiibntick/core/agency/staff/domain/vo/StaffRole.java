@@ -6,5 +6,6 @@ public enum StaffRole {
     BRANCH_MANAGER,
     OPERATIONS_MANAGER,
     ACCOUNTANT,
-    DISPATCHER
+    DISPATCHER,
+    HUB_OPERATOR
 }

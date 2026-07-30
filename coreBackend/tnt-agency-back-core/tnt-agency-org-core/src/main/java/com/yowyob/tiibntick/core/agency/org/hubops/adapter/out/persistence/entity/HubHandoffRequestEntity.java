@@ -13,8 +13,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Data
-@Table(schema = "agency_org", name = "hub_parcel_records")
-public class HubParcelRecordEntity implements Persistable<UUID>, TntPersistableEntity {
+@Table(schema = "agency_org", name = "hub_handoff_requests")
+public class HubHandoffRequestEntity implements Persistable<UUID>, TntPersistableEntity {
 
     @Transient private boolean isNew = true;
 
@@ -26,20 +26,23 @@ public class HubParcelRecordEntity implements Persistable<UUID>, TntPersistableE
 
     @Id @Column("id") private UUID id;
     @Column("tenant_id") private UUID tenantId;
+    @Column("agency_id") private UUID agencyId;
     @Column("hub_id") private UUID hubId;
-    @Column("package_id") private UUID packageId;
-    @Column("mission_id") private UUID missionId;
-    @Column("tracking_code") private String trackingCode;
-    @Column("deposited_at") private Instant depositedAt;
-    @Column("withdrawal_deadline") private Instant withdrawalDeadline;
+    @Column("handoff_type") private String handoffType;
     @Column("status") private String status;
-    @Column("identity_verified") private Boolean identityVerified;
-    @Column("withdrawn_by") private String withdrawnBy;
-    @Column("deposited_by_actor_id") private UUID depositedByActorId;
-    @Column("deposited_by_label") private String depositedByLabel;
-    @Column("withdrawn_by_actor_id") private UUID withdrawnByActorId;
-    @Column("core_hub_package_entry_id") private UUID coreHubPackageEntryId;
+    @Column("mission_id") private UUID missionId;
+    @Column("package_id") private UUID packageId;
+    @Column("tracking_code") private String trackingCode;
+    @Column("requester_actor_id") private UUID requesterActorId;
+    @Column("requester_role") private String requesterRole;
+    @Column("requester_label") private String requesterLabel;
+    @Column("withdraw_party") private String withdrawParty;
+    @Column("validated_by_actor_id") private UUID validatedByActorId;
+    @Column("validated_by_label") private String validatedByLabel;
+    @Column("notes") private String notes;
     @Column("created_at") private Instant createdAt;
     @Column("updated_at") private Instant updatedAt;
+    @Column("validated_at") private Instant validatedAt;
+    @Column("completed_at") private Instant completedAt;
     @Version @Column("version") private Long version;
 }

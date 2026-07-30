@@ -67,5 +67,7 @@
   "notify.gofp.account_revoked": "Hello,\n\nYour account has been permanently revoked.\n\nThis decision is final and you will no longer be able to access the application.\n\n{{loginUrl}}\n\nBest regards,\nThe TiiBnTick team",
   "notify.gofp.delivery_assigned": "Hello,\n\nCongratulations! You have been selected for the following delivery:\n\n\"{{announcementTitle}}\"\n\nPlease sign in to the application for details.\n\nBest regards,\nThe TiiBnTick team",
   "notify.gofp.new_announcement": "New delivery available! Check the app for details.",
-  "notify.gofp.evaluation_request": "Please leave a rating for your latest delivery."
+  "notify.gofp.evaluation_request": "Please leave a rating for your latest delivery.",
+
+  "notify.agency.access_credentials": "Hello {{fullName}},\n\nA TiiBnTick Agency account has been created for you ({{roleLabel}}).\n\nLogin: {{email}}\nTemporary password: {{password}}\n\nSign in: {{loginUrl}}\n\nPlease change your password after the first login.\n\nBest regards,\nThe TiiBnTick team"
 }

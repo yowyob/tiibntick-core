@@ -33,6 +33,11 @@ public class DelivererEntity implements Persistable<UUID>, TntPersistableEntity 
     @Column("status")              private String status;
     @Column("joined_at")           private Instant joinedAt;
     @Column("suspended_at")        private Instant suspendedAt;
+    @Column("last_latitude")       private Double lastLatitude;
+    @Column("last_longitude")      private Double lastLongitude;
+    @Column("last_accuracy_meters") private Double lastAccuracyMeters;
+    @Column("last_location_at")    private Instant lastLocationAt;
+    @Column("last_mission_id")     private UUID lastMissionId;
     @Column("created_at")          private Instant createdAt;
     @Column("updated_at")          private Instant updatedAt;
     @Version @Column("version")    private Long version;

@@ -93,6 +93,17 @@ public class AgencyRegistryController {
                 .map(ApiResponse::success);
     }
 
+    @PostMapping("/{agencyId}/ensure-kernel-organization")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Ensure Kernel org link (+ platform coreAgencyId) before sensitive ops")
+    public Mono<ApiResponse<AgencyRegistryResponse>> ensureKernelOrganization(
+            @PathVariable UUID tenantId,
+            @PathVariable UUID agencyId) {
+        return registryService.ensureKernelOrganization(tenantId, agencyId)
+                .map(AgencyOrgMapper::toAgencyResponse)
+                .map(ApiResponse::success);
+    }
+
     @PatchMapping("/{agencyId}/activate")
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Activate agency")

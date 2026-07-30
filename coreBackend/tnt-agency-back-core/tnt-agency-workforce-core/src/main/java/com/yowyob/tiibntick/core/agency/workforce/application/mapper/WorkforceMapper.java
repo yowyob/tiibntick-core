@@ -22,7 +22,9 @@ public final class WorkforceMapper {
     public static DelivererResponse toDelivererResponse(Deliverer d) {
         return new DelivererResponse(
                 d.getId(), d.getTenantId(), d.getAgencyId(), d.getBranchId(), d.getActorId(),
-                d.getPhone(), d.getStatus().name(), d.getJoinedAt(), d.getSuspendedAt());
+                d.getPhone(), d.getStatus().name(), d.getJoinedAt(), d.getSuspendedAt(),
+                d.getLastLatitude(), d.getLastLongitude(), d.getLastAccuracyMeters(),
+                d.getLastLocationAt(), d.getLastMissionId());
     }
 
     public static ContractResponse toContractResponse(Contract c) {
@@ -51,6 +53,11 @@ public final class WorkforceMapper {
         e.setStatus(d.getStatus().name());
         e.setJoinedAt(d.getJoinedAt());
         e.setSuspendedAt(d.getSuspendedAt());
+        e.setLastLatitude(d.getLastLatitude());
+        e.setLastLongitude(d.getLastLongitude());
+        e.setLastAccuracyMeters(d.getLastAccuracyMeters());
+        e.setLastLocationAt(d.getLastLocationAt());
+        e.setLastMissionId(d.getLastMissionId());
         e.setCreatedAt(d.getCreatedAt());
         e.setUpdatedAt(d.getUpdatedAt());
         e.setVersion(d.getVersion());
@@ -62,6 +69,8 @@ public final class WorkforceMapper {
                 e.getId(), e.getTenantId(), e.getAgencyId(), e.getBranchId(), e.getActorId(), e.getPhone(),
                 DelivererStatus.valueOf(e.getStatus()),
                 e.getJoinedAt(), e.getSuspendedAt(),
+                e.getLastLatitude(), e.getLastLongitude(), e.getLastAccuracyMeters(),
+                e.getLastLocationAt(), e.getLastMissionId(),
                 e.getCreatedAt(), e.getUpdatedAt(), e.getVersion() != null ? e.getVersion() : 0L);
     }
 

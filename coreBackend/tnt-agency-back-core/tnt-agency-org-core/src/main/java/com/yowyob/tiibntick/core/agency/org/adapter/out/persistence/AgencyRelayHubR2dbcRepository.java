@@ -15,5 +15,7 @@ public interface AgencyRelayHubR2dbcRepository extends ReactiveCrudRepository<Ag
 
     Mono<AgencyRelayHubEntity> findByCoreHubIdAndTenantId(UUID coreHubId, UUID tenantId);
 
+    Mono<AgencyRelayHubEntity> findByOperatorUserIdAndTenantId(UUID operatorUserId, UUID tenantId);
+
     Mono<Boolean> existsByCode(String code);
 }

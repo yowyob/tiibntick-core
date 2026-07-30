@@ -156,6 +156,27 @@ public enum TntRole {
     ),
 
     /**
+     * Manages an agency-owned relay hub: validates deposit/withdraw, stock, QR handoffs.
+     * Scope: per-agency (linked to a specific AgencyRelayHub).
+     */
+    AGENCY_HUB_OPERATOR(
+            "AGENCY_HUB_OPERATOR",
+            "Agency Hub Operator",
+            RoleScopeType.AGENCY,
+            true,
+            Set.of(
+                    DELIVERY_READ, DELIVERY_TRACK, DELIVERY_CONFIRM, DELIVERY_PROOF,
+                    RELAY_READ, RELAY_WRITE, RELAY_OPERATE,
+                    MISSION_READ,
+                    TRUST_READ, TRUST_VERIFY, TRUST_ANCHOR,
+                    MEDIA_READ, MEDIA_UPLOAD,
+                    GEO_READ,
+                    DISPUTE_CREATE,
+                    ACTOR_READ
+            )
+    ),
+
+    /**
      * End client: creates delivery announcements, tracks parcels, processes payments.
      * Scope: tenant (cross-agency — a client can use multiple agencies).
      */

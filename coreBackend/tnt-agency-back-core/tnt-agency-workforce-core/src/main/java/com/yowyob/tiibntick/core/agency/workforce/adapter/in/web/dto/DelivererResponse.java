@@ -6,4 +6,6 @@ import java.util.UUID;
 
 public record DelivererResponse(
         UUID id, UUID tenantId, UUID agencyId, UUID branchId, UUID actorId,
-        String phone, String status, Instant joinedAt, Instant suspendedAt) {}
+        String phone, String status, Instant joinedAt, Instant suspendedAt,
+        Double lastLatitude, Double lastLongitude, Double lastAccuracyMeters,
+        Instant lastLocationAt, UUID lastMissionId) {}

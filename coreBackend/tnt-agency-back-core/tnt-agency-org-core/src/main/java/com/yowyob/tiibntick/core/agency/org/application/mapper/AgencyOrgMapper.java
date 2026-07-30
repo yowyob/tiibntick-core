@@ -53,6 +53,8 @@ public final class AgencyOrgMapper {
                 capacity, occupancy, Math.max(0, capacity - occupancy),
                 e.getRetentionDelayHours(), e.getOpeningHours(), e.getCoreHubId(),
                 e.getAddrCity(), e.getAddrCountry(), e.getAddrStreet(), e.getAddrQuarter(),
-                e.getLatitude(), e.getLongitude(), e.getCreatedAt());
+                e.getLatitude(), e.getLongitude(),
+                e.getOperatorUserId(), e.getOperatorEmail(), e.getOperatorName(),
+                e.getCreatedAt());
     }
 }

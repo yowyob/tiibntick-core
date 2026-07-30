@@ -131,7 +131,7 @@ public class InventoryHubConsumer {
                             UUID.randomUUID(), tenantId, agencyHub.getId(),
                             packageId != null ? packageId : UUID.randomUUID(),
                             uuidVal(payload.get("missionId")),
-                            trackingCode, retention, now);
+                            trackingCode, retention, now, null, null);
                     if (coreEntryId != null) {
                         record.linkCoreEntry(coreEntryId, now);
                     }

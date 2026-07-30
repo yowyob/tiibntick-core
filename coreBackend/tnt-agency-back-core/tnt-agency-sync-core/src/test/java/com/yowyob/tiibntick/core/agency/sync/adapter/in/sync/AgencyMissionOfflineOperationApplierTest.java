@@ -95,8 +95,7 @@ class AgencyMissionOfflineOperationApplierTest {
     @DisplayName("rejects deliverer not assigned to mission")
     void rejectsForeignDeliverer() {
         UUID otherDeliverer = UUID.randomUUID();
-        when(delivererService.getById(tenantId, delivererId)).thenReturn(Mono.just(
-                new DelivererResponse(delivererId, tenantId, agencyId, null, null, null, "AVAILABLE", Instant.now(), null)));
+        when(delivererService.getById(tenantId, delivererId)).thenReturn(Mono.just(sampleDeliverer()));
         AgencyMission foreignMission = AgencyMission.create(
                 missionId, tenantId, agencyId, UUID.randomUUID(), Instant.now(), Instant.now());
         foreignMission.assign(otherDeliverer, null, Instant.now());
@@ -112,12 +111,18 @@ class AgencyMissionOfflineOperationApplierTest {
     }
 
     private void stubAuthorization(UUID assignedDelivererId) {
-        when(delivererService.getById(tenantId, delivererId)).thenReturn(Mono.just(
-                new DelivererResponse(delivererId, tenantId, agencyId, null, null, null, "AVAILABLE", Instant.now(), null)));
+        when(delivererService.getById(tenantId, delivererId)).thenReturn(Mono.just(sampleDeliverer()));
         AgencyMission mission = AgencyMission.create(
                 missionId, tenantId, agencyId, UUID.randomUUID(), Instant.now(), Instant.now());
         mission.assign(assignedDelivererId, null, Instant.now());
         when(missionService.getById(tenantId, missionId)).thenReturn(Mono.just(mission));
+    }
+
+    private DelivererResponse sampleDeliverer() {
+        return new DelivererResponse(
+                delivererId, tenantId, agencyId,
+                null, null, null, "AVAILABLE", Instant.now(), null,
+                null, null, null, null, null);
     }
 
     private OfflineOperation operation(OfflineOpType type, String payload) {

@@ -84,6 +84,15 @@ public class AgencyRelayHubEntity implements Persistable<UUID>, TntPersistableEn
     private Double latitude;
     private Double longitude;
 
+    @Column("operator_user_id")
+    private UUID operatorUserId;
+
+    @Column("operator_email")
+    private String operatorEmail;
+
+    @Column("operator_name")
+    private String operatorName;
+
     @Column("created_at")
     private Instant createdAt;
 

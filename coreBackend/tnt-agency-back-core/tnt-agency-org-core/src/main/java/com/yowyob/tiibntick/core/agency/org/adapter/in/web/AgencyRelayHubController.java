@@ -103,6 +103,27 @@ public class AgencyRelayHubController {
         return hubService.close(tenantId, hubId).map(ApiResponse::success);
     }
 
+    @PatchMapping("/api/v1/tenants/{tenantId}/agency-registry/hubs/{hubId}/operator")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Assign hub operator (gérant)")
+    public Mono<ApiResponse<AgencyRelayHubResponse>> assignOperator(
+            @PathVariable UUID tenantId,
+            @PathVariable UUID hubId,
+            @RequestBody AssignOperatorRequest req) {
+        return hubService.assignOperator(
+                tenantId, hubId, req.operatorUserId(), req.operatorEmail(), req.operatorName()
+        ).map(ApiResponse::success);
+    }
+
+    @GetMapping("/api/v1/tenants/{tenantId}/agency-registry/hub-operators/{operatorUserId}/hub")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Resolve hub for an operator user")
+    public Mono<ApiResponse<AgencyRelayHubResponse>> hubForOperator(
+            @PathVariable UUID tenantId,
+            @PathVariable UUID operatorUserId) {
+        return hubService.findByOperatorUserId(tenantId, operatorUserId).map(ApiResponse::success);
+    }
+
     public record CreateHubRequest(
             UUID branchId,
             @NotBlank String name,
@@ -123,4 +144,6 @@ public class AgencyRelayHubController {
     public record AttachBranchRequest(UUID branchId) {}
 
     public record ChangeStatusRequest(String status) {}
+
+    public record AssignOperatorRequest(UUID operatorUserId, String operatorEmail, String operatorName) {}
 }

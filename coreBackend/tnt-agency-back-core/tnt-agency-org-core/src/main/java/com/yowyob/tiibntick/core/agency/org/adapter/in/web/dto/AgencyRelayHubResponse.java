@@ -23,4 +23,7 @@ public record AgencyRelayHubResponse(
         String addrQuarter,
         Double latitude,
         Double longitude,
+        UUID operatorUserId,
+        String operatorEmail,
+        String operatorName,
         Instant createdAt) {}

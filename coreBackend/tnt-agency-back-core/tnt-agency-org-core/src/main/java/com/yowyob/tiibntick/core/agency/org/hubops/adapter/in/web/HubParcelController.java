@@ -39,7 +39,6 @@ public class HubParcelController {
     }
 
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/hubs/{hubId}/parcels/deposit")
-    @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Deposit parcel at hub (orchestrates inventory-core)")
     public Mono<ApiResponse<HubParcelResponse>> deposit(
@@ -47,7 +46,8 @@ public class HubParcelController {
             @PathVariable UUID hubId,
             @RequestBody DepositParcelRequest body) {
         return hubParcelService.deposit(new HubParcelService.DepositInput(
-                tenantId, hubId, body.missionId(), body.trackingCode(), body.packageId()
+                tenantId, hubId, body.missionId(), body.trackingCode(), body.packageId(),
+                body.depositedByActorId(), body.depositedByLabel()
         )).map(ApiResponse::success);
     }
 
@@ -80,9 +80,18 @@ public class HubParcelController {
                 .map(ApiResponse::success);
     }
 
-    public record ExpiredProcessResult(int processedCount) {}
+    public record ExpiredProcessResult(int processedCount, int processed, String message) {
+        public ExpiredProcessResult(int count) {
+            this(count, count, count + " colis expiré(s) traité(s).");
+        }
+    }
 
-    public record DepositParcelRequest(UUID missionId, String trackingCode, UUID packageId) {}
+    public record DepositParcelRequest(
+            UUID missionId,
+            String trackingCode,
+            UUID packageId,
+            UUID depositedByActorId,
+            String depositedByLabel) {}
 
     public record WithdrawParcelRequest(
             String withdrawnBy, boolean identityVerified, UUID pickedUpByActorId) {}

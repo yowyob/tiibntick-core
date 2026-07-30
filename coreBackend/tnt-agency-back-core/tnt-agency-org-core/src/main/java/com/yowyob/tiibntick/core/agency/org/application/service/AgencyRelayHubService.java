@@ -115,6 +115,34 @@ public class AgencyRelayHubService {
         return setStatus(tenantId, hubId, STATUS_CLOSED);
     }
 
+    @Transactional
+    public Mono<AgencyRelayHubResponse> assignOperator(UUID tenantId, UUID hubId,
+                                                       UUID operatorUserId,
+                                                       String operatorEmail,
+                                                       String operatorName) {
+        if (operatorUserId == null) {
+            return Mono.error(new com.yowyob.tiibntick.common.exception.TntValidationException(
+                    "operatorUserId is required"));
+        }
+        return requireHub(hubId, tenantId)
+                .flatMap(hub -> {
+                    hub.setOperatorUserId(operatorUserId);
+                    hub.setOperatorEmail(operatorEmail);
+                    hub.setOperatorName(operatorName);
+                    hub.setUpdatedAt(Instant.now());
+                    return hubRepo.save(hub);
+                })
+                .map(AgencyOrgMapper::toHubResponse);
+    }
+
+    public Mono<AgencyRelayHubResponse> findByOperatorUserId(UUID tenantId, UUID operatorUserId) {
+        return hubRepo.findByOperatorUserIdAndTenantId(operatorUserId, tenantId)
+                .map(AgencyOrgMapper::toHubResponse)
+                .switchIfEmpty(Mono.error(new TntNotFoundException(
+                        "HUB_OPERATOR_NOT_FOUND",
+                        "Aucun hub associé à ce compte gérant.")));
+    }
+
     private Mono<AgencyRelayHubResponse> setStatus(UUID tenantId, UUID hubId, String status) {
         return requireHub(hubId, tenantId)
                 .flatMap(hub -> {

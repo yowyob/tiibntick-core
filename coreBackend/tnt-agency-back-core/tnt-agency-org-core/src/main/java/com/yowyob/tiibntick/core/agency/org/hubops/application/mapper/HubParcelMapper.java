@@ -14,7 +14,9 @@ public final class HubParcelMapper {
                 e.getTrackingCode(), e.getDepositedAt(), e.getWithdrawalDeadline(),
                 ParcelStatus.valueOf(e.getStatus()),
                 Boolean.TRUE.equals(e.getIdentityVerified()),
-                e.getWithdrawnBy(), e.getCoreHubPackageEntryId(),
+                e.getWithdrawnBy(),
+                e.getDepositedByActorId(), e.getDepositedByLabel(), e.getWithdrawnByActorId(),
+                e.getCoreHubPackageEntryId(),
                 e.getCreatedAt(), e.getUpdatedAt(),
                 e.getVersion() != null ? e.getVersion() : 0L);
     }
@@ -32,6 +34,9 @@ public final class HubParcelMapper {
         e.setStatus(r.getStatus().name());
         e.setIdentityVerified(r.isIdentityVerified());
         e.setWithdrawnBy(r.getWithdrawnBy());
+        e.setDepositedByActorId(r.getDepositedByActorId());
+        e.setDepositedByLabel(r.getDepositedByLabel());
+        e.setWithdrawnByActorId(r.getWithdrawnByActorId());
         e.setCoreHubPackageEntryId(r.getCoreHubPackageEntryId());
         e.setCreatedAt(r.getCreatedAt());
         e.setUpdatedAt(r.getUpdatedAt());

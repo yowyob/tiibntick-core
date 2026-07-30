@@ -67,5 +67,7 @@
   "notify.gofp.account_revoked": "How far,\n\nDem revoke your account permanently.\n\nYou no fit access the app again.\n\n{{loginUrl}}\n\nTiiBnTick team",
   "notify.gofp.delivery_assigned": "How far,\n\nDem select you for this delivery:\n\n\"{{announcementTitle}}\"\n\nOpen the app for details.\n\nTiiBnTick team",
   "notify.gofp.new_announcement": "New delivery don land! Check the app.",
-  "notify.gofp.evaluation_request": "Abeg rate your last delivery."
+  "notify.gofp.evaluation_request": "Abeg rate your last delivery.",
+
+  "notify.agency.access_credentials": "How far {{fullName}},\n\nDem don create TiiBnTick Agency account for you ({{roleLabel}}).\n\nLogin: {{email}}\nTemporary password: {{password}}\n\nSign in: {{loginUrl}}\n\nChange your password after first login.\n\nTiiBnTick team"
 }

@@ -175,6 +175,29 @@ public class AgencyRegistryService {
                 });
     }
 
+    /**
+     * Gate before sensitive ops (credentials, hub Core sync, deposits that need platform IDs).
+     * Ensures {@code kernelOrganizationId} is present and {@code coreAgencyId} is linked when possible.
+     */
+    @Transactional
+    public Mono<AgencyRegistryEntity> ensureKernelOrganization(UUID tenantId, UUID agencyId) {
+        return requireAgency(agencyId, tenantId)
+                .flatMap(agency -> {
+                    if (agency.getKernelOrganizationId() == null) {
+                        return Mono.error(new TntValidationException(
+                                "KERNEL_ORGANIZATION_REQUIRED",
+                                "L'agence n'est pas liée à une organisation Kernel. "
+                                        + "Relancez l'approbation onboarding ou liez kernelOrganizationId "
+                                        + "via linkKernelIdentity avant cette action.",
+                                null));
+                    }
+                    if (agency.getCoreAgencyId() != null) {
+                        return Mono.just(agency);
+                    }
+                    return syncPlatformCore(tenantId, agencyId);
+                });
+    }
+
     @Transactional
     public Mono<AgencyRegistryEntity> linkKernelBusinessActor(
             UUID tenantId, UUID agencyId, UUID kernelBusinessActorId) {

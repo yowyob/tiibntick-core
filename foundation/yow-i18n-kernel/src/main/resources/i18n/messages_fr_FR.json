@@ -67,5 +67,7 @@
   "notify.gofp.account_revoked": "Bonjour,\n\nNous vous informons que votre compte a été définitivement révoqué.\n\nCette décision est irrévocable et vous ne pourrez plus accéder aux fonctionnalités de l'application.\n\n{{loginUrl}}\n\nCordialement,\nL'équipe TiiBnTick",
   "notify.gofp.delivery_assigned": "Bonjour,\n\nFélicitations ! Vous avez été sélectionné(e) pour effectuer la livraison suivante :\n\n\"{{announcementTitle}}\"\n\nVeuillez vous connecter à l'application pour consulter les détails.\n\nCordialement,\nL'équipe TiiBnTick",
   "notify.gofp.new_announcement": "Nouvelle course disponible ! Consultez l'application pour les détails.",
-  "notify.gofp.evaluation_request": "Merci de laisser une évaluation pour votre dernière livraison."
+  "notify.gofp.evaluation_request": "Merci de laisser une évaluation pour votre dernière livraison.",
+
+  "notify.agency.access_credentials": "Bonjour {{fullName}},\n\nUn compte TiiBnTick Agency a été créé pour vous ({{roleLabel}}).\n\nIdentifiant : {{email}}\nMot de passe temporaire : {{password}}\n\nConnectez-vous : {{loginUrl}}\n\nChangez votre mot de passe après la première connexion.\n\nCordialement,\nL'équipe TiiBnTick"
 }

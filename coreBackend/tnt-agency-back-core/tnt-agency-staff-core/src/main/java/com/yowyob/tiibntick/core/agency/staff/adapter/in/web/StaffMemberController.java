@@ -6,7 +6,9 @@ import com.yowyob.tiibntick.core.agency.staff.application.service.StaffMemberSer
 import com.yowyob.tiibntick.core.agency.staff.domain.vo.StaffRole;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,6 +18,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import jakarta.validation.Valid;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -45,14 +48,14 @@ public class StaffMemberController {
     @PostMapping("/api/v1/tenants/{tenantId}/agency-registry/agencies/{agencyId}/staff")
     @PreAuthorize("isAuthenticated()")
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Register an administrative staff member")
+    @Operation(summary = "Register an administrative staff member (provisions Kernel login + emails credentials)")
     public Mono<ApiResponse<StaffMemberResponse>> register(
             @PathVariable UUID tenantId,
             @PathVariable UUID agencyId,
-            @RequestBody RegisterStaffRequest body) {
+            @RequestBody @Valid RegisterStaffRequest body) {
         return staffService.register(new StaffMemberService.RegisterInput(
                 tenantId, agencyId, body.branchId(),
-                body.fullName(), body.phone(), body.email(), body.role()
+                body.fullName(), body.phone(), body.email(), body.role(), true
         )).map(ApiResponse::success);
     }
 
@@ -89,8 +92,8 @@ public class StaffMemberController {
     public record RegisterStaffRequest(
             @NotBlank String fullName,
             @NotBlank String phone,
-            String email,
-            StaffRole role,
+            @NotBlank @Email String email,
+            @NotNull StaffRole role,
             UUID branchId) {}
 
     public record UpdateStaffRequest(
