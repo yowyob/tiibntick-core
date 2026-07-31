@@ -29,7 +29,7 @@ class TntRoleDefinitionRegistryTest {
         assertThat(all).extracting(TntRoleDefinition::code)
                 .containsExactlyInAnyOrder(
                         "AGENCY_MANAGER", "BRANCH_MANAGER", "PERMANENT_DELIVERER",
-                        "FREELANCER", "RELAY_OPERATOR", "CLIENT",
+                        "FREELANCER", "RELAY_OPERATOR", "AGENCY_HUB_OPERATOR", "CLIENT",
                         "SUPPORT_AGENT", "ORG_ADMIN", "TNT_ADMIN"
                 );
     }

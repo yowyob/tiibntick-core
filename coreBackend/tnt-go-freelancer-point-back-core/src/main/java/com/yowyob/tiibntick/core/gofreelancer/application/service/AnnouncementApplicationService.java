@@ -11,6 +11,11 @@ import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.Announcemen
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.PacketDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.RespondAnnouncementRequestDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.SubscriptionResponseDTO;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.AnnouncementUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.AnnouncementSubscriptionRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpFreelancerRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpUserRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IAnnouncementRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryAnnouncementPort;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.INegotiationChatPort;
@@ -19,9 +24,11 @@ import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.Announcem
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.PublishAnnouncementPortCommand;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.RespondToAnnouncementPortCommand;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Announcement;
+import com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery;
+import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpFreelancer;
+import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpUser;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.announcement.AnnouncementStatus;
-import com.yowyob.tiibntick.core.gofreelancer.application.port.in.AnnouncementUseCase;
-import com.yowyob.tiibntick.core.gofreelancer.application.port.out.AnnouncementSubscriptionRepository;
+import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryStatus;
 import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +38,7 @@ import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 /**
@@ -56,6 +64,10 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
     private final INegotiationChatPort negotiationChatPort;
     private final IAnnouncementRepository announcementRepository;
     private final AnnouncementSubscriptionRepository subscriptionRepository;
+    private final GofpFreelancerRepository gofpFreelancerRepository;
+    private final GofpUserRepository gofpUserRepository;
+    private final DeliveryRepository deliveryRepository;
+    private final DeliveryOtpService deliveryOtpService;
 
     @Override
     @RequirePermission(resource = "announcement", action = "create")
@@ -67,7 +79,8 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
                             .flatMap(published -> escrowOnPublishIfFixed(published)
                                     .thenReturn(published))
                             .flatMap(published -> softMirrorLocal(published, request)
-                                    .thenReturn(toDTO(published)));
+                                    .thenReturn(toDTO(published)))
+                            .flatMap(this::enrichFromLocalMirror);
                 });
     }
 
@@ -75,7 +88,8 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
     public Flux<AnnouncementResponseDTO> getAllAnnouncements() {
         return tenantContextHolder.currentTenantId()
                 .flatMapMany(deliveryAnnouncementPort::findOpenAnnouncements)
-                .map(this::toDTO);
+                .map(this::toDTO)
+                .flatMap(this::enrichFromLocalMirror);
     }
 
     @Override
@@ -83,7 +97,9 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
         return tenantContextHolder.currentTenantId()
                 .flatMap(tenantId -> deliveryAnnouncementPort.findById(tenantId, id))
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("Announcement not found: " + id)))
-                .map(this::toDTO);
+                .map(this::toDTO)
+                .flatMap(this::enrichFromLocalMirror)
+                .flatMap(this::enrichAssignedFreelancerProfile);
     }
 
     @Override
@@ -91,14 +107,16 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
         return tenantContextHolder.currentTenantId()
                 .flatMap(tenantId -> deliveryAnnouncementPort.findById(tenantId, id))
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("Announcement not found: " + id)))
-                .map(a -> toCandidateDTO(a, viewerFreelancerId));
+                .map(a -> toCandidateDTO(a, viewerFreelancerId))
+                .flatMap(this::enrichFromLocalMirror);
     }
 
     @Override
     public Flux<AnnouncementResponseDTO> getAnnouncementsByClientId(UUID clientId) {
         return tenantContextHolder.currentTenantId()
                 .flatMapMany(tenantId -> deliveryAnnouncementPort.findByClient(tenantId, clientId))
-                .map(this::toDTO);
+                .map(this::toDTO)
+                .flatMap(this::enrichFromLocalMirror);
     }
 
     @Override
@@ -116,6 +134,11 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
                     if (request.getRequiredVehicleType() != null) a.setRequiredVehicleType(request.getRequiredVehicleType());
                     if (request.getAmount() != null) a.setAmount(request.getAmount());
                     if (request.getCurrency() != null) a.setCurrency(request.getCurrency());
+                    if (request.getSignatureUrl() != null) a.setSignatureUrl(request.getSignatureUrl());
+                    if (request.getShipperFirstName() != null) a.setShipperFirstName(request.getShipperFirstName());
+                    if (request.getShipperLastName() != null) a.setShipperLastName(request.getShipperLastName());
+                    if (request.getShipperEmail() != null) a.setShipperEmail(request.getShipperEmail());
+                    if (request.getShipperPhone() != null) a.setShipperPhone(request.getShipperPhone());
                     return announcementRepository.save(a);
                 })
                 .map(this::localToDTO);
@@ -132,7 +155,7 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
     @Override
     @RequirePermission(resource = "announcement", action = "create")
     public Mono<AnnouncementResponseDTO> publishAnnouncement(UUID id) {
-        // createAnnouncement already publishes via delivery-core; this endpoint is idempotent read.
+        // createAnnouncement already publishes via delivery-core; this endpoint is an idempotent read.
         return getAnnouncement(id);
     }
 
@@ -164,7 +187,8 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
                             .flatMap(saved -> negotiationChatPort
                                     .openNegotiationThread(announcementId, saved.clientId(), freelancerId)
                                     .onErrorResume(e -> Mono.empty())
-                                    .thenReturn(toCandidateDTO(saved, freelancerId)));
+                                    .thenReturn(toCandidateDTO(saved, freelancerId)))
+                            .flatMap(this::enrichFromLocalMirror);
                 });
     }
 
@@ -183,22 +207,15 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
         return tenantContextHolder.currentTenantId()
                 .flatMap(tenantId -> deliveryAnnouncementPort.findById(tenantId, announcementId))
                 .flatMapMany(a -> Flux.fromIterable(a.responses()))
-                .map(r -> {
-                    SubscriptionResponseDTO dto = new SubscriptionResponseDTO();
-                    dto.setSubscriptionId(r.id());
-                    dto.setFreelancerId(r.deliveryPersonId());
-                    dto.setStatus(r.status());
-                    dto.setCreatedAt(r.createdAt());
-                    return dto;
-                })
+                .flatMap(this::toEnrichedSubscription)
                 .switchIfEmpty(subscriptionRepository.findAllByAnnouncementId(announcementId)
-                        .map(s -> {
+                        .flatMap(s -> {
                             SubscriptionResponseDTO dto = new SubscriptionResponseDTO();
                             dto.setSubscriptionId(s.getId());
                             dto.setFreelancerId(s.getFreelancerId());
                             dto.setStatus(s.getStatus());
                             dto.setCreatedAt(s.getCreatedAt());
-                            return dto;
+                            return enrichSubscriptionProfile(dto);
                         }));
     }
 
@@ -221,7 +238,9 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
                             return escrow.then(deliveryAnnouncementPort.selectResponse(
                                     tenantId, announcementId, clientId, responseId));
                         }))
-                .flatMap(assigned -> softMirrorAssigned(assigned).thenReturn(toDTO(assigned)));
+                .flatMap(assigned -> softMirrorAssigned(assigned)
+                        .then(softMirrorDeliveryAndInitOtp(assigned))
+                        .flatMap(otpResult -> buildAssignResponse(assigned, otpResult)));
     }
 
     @Override
@@ -279,12 +298,6 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
                 .then();
     }
 
-    /**
-     * Resolves the escrow amount via {@link IDeliveryAnnouncementPort#resolveEscrowAmount} —
-     * tnt-delivery-core owns the FIXED_PRICE/QUOTE_REQUEST resolution rule (see
-     * {@code DeliveryAnnouncement.resolveEscrowAmount}); this method only reads the response's
-     * currency, which is already available on the snapshot.
-     */
     private Mono<Void> escrowOnSelectIfQuote(UUID tenantId, AnnouncementSnapshot announcement, UUID responseId) {
         if (!AnnouncementSnapshot.PRICING_MODE_QUOTE_REQUEST.equals(announcement.pricingMode())) {
             return Mono.empty();
@@ -334,6 +347,7 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
         local.setRecipientLastName(request.getRecipientLastName());
         local.setRecipientEmail(request.getRecipientEmail());
         local.setRecipientPhone(request.getRecipientPhone());
+        local.setSignatureUrl(request.getSignatureUrl());
         if (published.offeredAmount() != null) {
             local.setAmount(published.offeredAmount().doubleValue());
         }
@@ -361,6 +375,59 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
                 })
                 .onErrorResume(e -> Mono.empty())
                 .then();
+    }
+
+    /**
+     * Soft-mirrors the delivery-core Delivery into the gofp {@code deliveries} table (same UUID)
+     * and initialises OTP hashes when absent.
+     */
+    private Mono<OtpInitResult> softMirrorDeliveryAndInitOtp(AnnouncementSnapshot assigned) {
+        UUID deliveryId = assigned.createdDeliveryId();
+        if (deliveryId == null) {
+            log.warn("[Mirror] Announcement {} has no createdDeliveryId after select", assigned.id());
+            return Mono.just(new OtpInitResult(null, null, null, false));
+        }
+        UUID freelancerId = assigned.responses().stream()
+                .filter(r -> r.id().equals(assigned.selectedResponseId()))
+                .map(AnnouncementResponseSnapshot::deliveryPersonId)
+                .findFirst()
+                .orElse(null);
+
+        Instant now = Instant.now();
+        return deliveryRepository.findById(deliveryId)
+                .switchIfEmpty(Mono.defer(() -> {
+                    Delivery local = new Delivery();
+                    local.setId(deliveryId);
+                    local.setAnnouncementId(assigned.id());
+                    local.setFreelancerId(freelancerId);
+                    local.setStatus(DeliveryStatus.CREATED);
+                    local.setPickupMinTime(now);
+                    local.setPickupMaxTime(now.plus(4, ChronoUnit.HOURS));
+                    local.setDeliveryMinTime(now.plus(1, ChronoUnit.HOURS));
+                    local.setDeliveryMaxTime(now.plus(24, ChronoUnit.HOURS));
+                    if (assigned.offeredAmount() != null) {
+                        local.setTarif(assigned.offeredAmount().doubleValue());
+                    }
+                    return deliveryRepository.save(local)
+                            .onErrorResume(e -> {
+                                log.warn("[Mirror] Could not soft-mirror delivery {}: {}",
+                                        deliveryId, e.getMessage());
+                                return Mono.empty();
+                            });
+                }))
+                .flatMap(deliveryOtpService::initOtpIfAbsentWithCodes)
+                .defaultIfEmpty(new OtpInitResult(null, null, null, false));
+    }
+
+    private Mono<AnnouncementResponseDTO> buildAssignResponse(
+            AnnouncementSnapshot assigned, OtpInitResult otpResult) {
+        AnnouncementResponseDTO dto = toDTO(assigned);
+        dto.setDeliveryId(assigned.createdDeliveryId());
+        dto.setTrackingCode(assigned.trackingCode());
+        if (otpResult != null && otpResult.newlyInitialized()) {
+            dto.setConfirmationCode(otpResult.pickupOtp());
+        }
+        return enrichFromLocalMirror(dto).flatMap(this::enrichAssignedFreelancerProfile);
     }
 
     // ── Mapping ─────────────────────────────────────────────────────────────
@@ -427,9 +494,6 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
         return toCandidateDTO(a, null);
     }
 
-    /**
-     * When {@code viewerFreelancerId} is non-null, other freelancers' proposed prices are redacted.
-     */
     private AnnouncementResponseDTO toCandidateDTO(AnnouncementSnapshot a, UUID viewerFreelancerId) {
         AnnouncementResponseDTO dto = new AnnouncementResponseDTO();
         dto.setId(a.id());
@@ -446,14 +510,23 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
         dto.setPricingMode(a.pricingMode());
         dto.setRecipientPhone(a.recipientPhone());
         dto.setRecipientFirstName(a.recipientName());
+        dto.setDeliveryId(a.createdDeliveryId());
+        dto.setTrackingCode(a.trackingCode());
+
+        if (a.pickupAddress() != null) {
+            dto.setPickupAddress(AddressDTO.builder().address(a.pickupAddress()).build());
+        }
+        if (a.deliveryAddress() != null) {
+            dto.setDeliveryAddress(AddressDTO.builder().address(a.deliveryAddress()).build());
+        }
+        dto.setPacket(toPacketDto(a));
+
         if (a.selectedResponseId() != null) {
             a.responses().stream()
                     .filter(r -> r.id().equals(a.selectedResponseId()))
                     .findFirst()
                     .ifPresent(r -> dto.setAssignedFreelancerId(r.deliveryPersonId()));
         }
-        // Asymmetry: viewerFreelancerId is used by getAnnouncementForCandidate;
-        // full client DTO keeps amounts on the announcement itself (not peer offers).
         if (viewerFreelancerId != null) {
             log.trace("[Asymmetry] Candidate view for freelancer {} on announcement {}",
                     viewerFreelancerId, a.id());
@@ -461,9 +534,120 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
         return dto;
     }
 
+    private static PacketDTO toPacketDto(AnnouncementSnapshot a) {
+        if (a.packetWeightKg() == null && a.packetWidthCm() == null && a.packetDescription() == null
+                && a.packetPhotoUrl() == null && a.packetVolumetricWeightDm3() <= 0) {
+            return null;
+        }
+        PacketDTO packet = new PacketDTO();
+        packet.setWeight(a.packetWeightKg());
+        packet.setWidth(a.packetWidthCm());
+        packet.setHeight(a.packetHeightCm());
+        packet.setLength(a.packetLengthCm());
+        packet.setFragile(a.packetFragile());
+        packet.setIsPerishable(a.packetPerishable());
+        packet.setDescription(a.packetDescription());
+        packet.setPhotoPacket(a.packetPhotoUrl());
+        return packet;
+    }
+
+    private Mono<AnnouncementResponseDTO> enrichFromLocalMirror(AnnouncementResponseDTO dto) {
+        if (dto.getId() == null) {
+            return Mono.just(dto);
+        }
+        return announcementRepository.findById(dto.getId())
+                .map(local -> {
+                    if (dto.getShipperFirstName() == null) dto.setShipperFirstName(local.getShipperFirstName());
+                    if (dto.getShipperLastName() == null) dto.setShipperLastName(local.getShipperLastName());
+                    if (dto.getShipperEmail() == null) dto.setShipperEmail(local.getShipperEmail());
+                    if (dto.getShipperPhone() == null) dto.setShipperPhone(local.getShipperPhone());
+                    if (dto.getRecipientLastName() == null) dto.setRecipientLastName(local.getRecipientLastName());
+                    if (dto.getRecipientEmail() == null) dto.setRecipientEmail(local.getRecipientEmail());
+                    if (dto.getRecipientPhone() == null) dto.setRecipientPhone(local.getRecipientPhone());
+                    if (dto.getSignatureUrl() == null) dto.setSignatureUrl(local.getSignatureUrl());
+                    if (dto.getPaymentMethod() == null) dto.setPaymentMethod(local.getPaymentMethod());
+                    if (dto.getTransportMethod() == null) dto.setTransportMethod(local.getTransportMethod());
+                    if (dto.getDistance() == null) dto.setDistance(local.getDistance());
+                    if (dto.getLogisticsPrice() == null) dto.setLogisticsPrice(local.getLogisticsPrice());
+                    if (dto.getRequiredVehicleType() == null) dto.setRequiredVehicleType(local.getRequiredVehicleType());
+                    if (dto.getDestinationRelayPointId() == null) {
+                        dto.setDestinationRelayPointId(local.getDestinationRelayPointId());
+                    }
+                    if (dto.getAssignedFreelancerId() == null) {
+                        dto.setAssignedFreelancerId(local.getAssignedFreelancerId());
+                    }
+                    return dto;
+                })
+                .defaultIfEmpty(dto)
+                .onErrorResume(e -> Mono.just(dto));
+    }
+
+    private Mono<AnnouncementResponseDTO> enrichAssignedFreelancerProfile(AnnouncementResponseDTO dto) {
+        UUID freelancerId = dto.getAssignedFreelancerId();
+        if (freelancerId == null) {
+            return Mono.just(dto);
+        }
+        return findFreelancer(freelancerId)
+                .flatMap(gofp -> gofpUserRepository.findByCoreUserId(gofp.getCoreUserId())
+                        .map(user -> {
+                            dto.setAssignedFreelancerFirstName(user.getFirstName());
+                            dto.setAssignedFreelancerLastName(user.getLastName());
+                            dto.setAssignedFreelancerEmail(user.getEmail());
+                            dto.setAssignedFreelancerPhone(user.getPhone());
+                            return dto;
+                        })
+                        .defaultIfEmpty(dto))
+                .defaultIfEmpty(dto)
+                .onErrorResume(e -> Mono.just(dto));
+    }
+
+    private Mono<SubscriptionResponseDTO> toEnrichedSubscription(AnnouncementResponseSnapshot r) {
+        SubscriptionResponseDTO dto = new SubscriptionResponseDTO();
+        dto.setSubscriptionId(r.id());
+        dto.setFreelancerId(r.deliveryPersonId());
+        dto.setStatus(r.status());
+        dto.setCreatedAt(r.createdAt());
+        dto.setProposedPrice(r.proposedPrice());
+        dto.setCurrency(r.proposedCurrency());
+        return enrichSubscriptionProfile(dto);
+    }
+
+    private Mono<SubscriptionResponseDTO> enrichSubscriptionProfile(SubscriptionResponseDTO dto) {
+        if (dto.getFreelancerId() == null) {
+            return Mono.just(dto);
+        }
+        return findFreelancer(dto.getFreelancerId())
+                .flatMap(gofp -> {
+                    if (gofp.getRating() != null) {
+                        dto.setRating(gofp.getRating());
+                    }
+                    return gofpUserRepository.findByCoreUserId(gofp.getCoreUserId())
+                            .map(user -> applyUser(dto, user))
+                            .defaultIfEmpty(dto);
+                })
+                .defaultIfEmpty(dto)
+                .onErrorResume(e -> Mono.just(dto));
+    }
+
+    private static SubscriptionResponseDTO applyUser(SubscriptionResponseDTO dto, GofpUser user) {
+        dto.setFirstName(user.getFirstName());
+        dto.setLastName(user.getLastName());
+        dto.setEmail(user.getEmail());
+        dto.setPhone(user.getPhone());
+        return dto;
+    }
+
+    private Mono<GofpFreelancer> findFreelancer(UUID freelancerId) {
+        return gofpFreelancerRepository.findById(freelancerId)
+                .switchIfEmpty(gofpFreelancerRepository.findByCoreFreelancerId(freelancerId));
+    }
+
     private AnnouncementResponseDTO localToDTO(Announcement a) {
         AnnouncementResponseDTO dto = new AnnouncementResponseDTO();
         dto.setId(a.getId());
+        dto.setClientId(a.getClientId());
+        dto.setTitle(a.getTitle());
+        dto.setDescription(a.getDescription());
         dto.setPaymentMethod(a.getPaymentMethod());
         dto.setTransportMethod(a.getTransportMethod());
         dto.setDistance(a.getDistance());
@@ -479,9 +663,12 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
         dto.setRecipientLastName(a.getRecipientLastName());
         dto.setRecipientEmail(a.getRecipientEmail());
         dto.setRecipientPhone(a.getRecipientPhone());
+        dto.setSignatureUrl(a.getSignatureUrl());
         dto.setAmount(a.getAmount());
         dto.setCurrency(a.getCurrency());
         dto.setStatus(a.getStatus());
+        dto.setCreatedAt(a.getCreatedAt());
+        dto.setUpdatedAt(a.getUpdatedAt());
         return dto;
     }
 }

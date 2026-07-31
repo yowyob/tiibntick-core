@@ -40,6 +40,19 @@
             <artifactId>tnt-actor-core</artifactId>
         </dependency>
 
+        <!-- tnt-auth-core (L1) : @CurrentUser / TntUserIdentity for tenant+actor identity
+             resolution on every controller method. -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-auth-core</artifactId>
+        </dependency>
+        <!-- tnt-roles-core (L1) : @RequirePermission RBAC enforcement on the application
+             service layer (incident:create / incident:read / incident:manage). -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-roles-core</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webflux</artifactId>

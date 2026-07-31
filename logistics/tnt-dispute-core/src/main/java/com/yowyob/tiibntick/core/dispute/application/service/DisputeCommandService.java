@@ -7,6 +7,7 @@ import com.yowyob.tiibntick.core.dispute.domain.enums.DisputeStatus;
 import com.yowyob.tiibntick.core.dispute.domain.exception.DisputeNotFoundException;
 import com.yowyob.tiibntick.core.dispute.domain.exception.DisputeStateException;
 import com.yowyob.tiibntick.core.dispute.domain.model.*;
+import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -63,6 +64,7 @@ public class DisputeCommandService implements IDisputeCommandUseCase {
 
     @Override
     @Transactional
+    @RequirePermission(resource = "dispute", action = "create")
     public Mono<Dispute> openDispute(final OpenDisputeCommand cmd) {
         Objects.requireNonNull(cmd, "OpenDisputeCommand must not be null");
         log.info("Opening dispute for package={} by claimant={} in tenant={}",
@@ -91,6 +93,7 @@ public class DisputeCommandService implements IDisputeCommandUseCase {
 
     @Override
     @Transactional
+    @RequirePermission(resource = "dispute", action = "resolve")
     public Mono<Dispute> assignMediator(final AssignMediatorCommand cmd) {
         Objects.requireNonNull(cmd, "AssignMediatorCommand must not be null");
         log.info("Assigning mediator={} to dispute={}", cmd.mediatorId(), cmd.disputeId());
@@ -108,6 +111,7 @@ public class DisputeCommandService implements IDisputeCommandUseCase {
 
     @Override
     @Transactional
+    @RequirePermission(resource = "dispute", action = "resolve")
     public Mono<Dispute> startMediation(final StartMediationCommand cmd) {
         Objects.requireNonNull(cmd, "StartMediationCommand must not be null");
         log.info("Starting mediation for dispute={}", cmd.disputeId());
@@ -121,6 +125,7 @@ public class DisputeCommandService implements IDisputeCommandUseCase {
 
     @Override
     @Transactional
+    @RequirePermission(resource = "dispute", action = "resolve")
     public Mono<Dispute> ruleDispute(final RuleDisputeCommand cmd) {
         Objects.requireNonNull(cmd, "RuleDisputeCommand must not be null");
         log.info("Ruling dispute={} with resolution={}", cmd.disputeId(), cmd.resolutionType());
@@ -142,6 +147,7 @@ public class DisputeCommandService implements IDisputeCommandUseCase {
 
     @Override
     @Transactional
+    @RequirePermission(resource = "dispute", action = "resolve")
     public Mono<Dispute> escalateDispute(final EscalateDisputeCommand cmd) {
         Objects.requireNonNull(cmd, "EscalateDisputeCommand must not be null");
         log.info("Escalating dispute={} by={}", cmd.disputeId(), cmd.escalatedBy());
@@ -156,6 +162,7 @@ public class DisputeCommandService implements IDisputeCommandUseCase {
 
     @Override
     @Transactional
+    @RequirePermission(resource = "dispute", action = "resolve")
     public Mono<Dispute> processCompensation(final ProcessCompensationCommand cmd) {
         Objects.requireNonNull(cmd, "ProcessCompensationCommand must not be null");
         log.info("Processing compensation for dispute={} ref={}", cmd.disputeId(), cmd.paymentReference());
@@ -174,6 +181,7 @@ public class DisputeCommandService implements IDisputeCommandUseCase {
 
     @Override
     @Transactional
+    @RequirePermission(resource = "dispute", action = "resolve")
     public Mono<Dispute> closeDispute(final CloseDisputeCommand cmd) {
         Objects.requireNonNull(cmd, "CloseDisputeCommand must not be null");
         log.info("Closing dispute={} type={}", cmd.disputeId(), cmd.closureType());
@@ -192,6 +200,7 @@ public class DisputeCommandService implements IDisputeCommandUseCase {
 
     @Override
     @Transactional
+    @RequirePermission(resource = "dispute", action = "create")
     public Mono<Dispute> withdrawDispute(final WithdrawDisputeCommand cmd) {
         Objects.requireNonNull(cmd, "WithdrawDisputeCommand must not be null");
         log.info("Withdrawing dispute={} by claimant={}", cmd.disputeId(), cmd.claimantId());
@@ -210,6 +219,7 @@ public class DisputeCommandService implements IDisputeCommandUseCase {
 
     @Override
     @Transactional
+    @RequirePermission(resource = "dispute", action = "create")
     public Mono<Dispute> addComment(final AddCommentCommand cmd) {
         Objects.requireNonNull(cmd, "AddCommentCommand must not be null");
         log.debug("Adding comment to dispute={} by={}", cmd.disputeId(), cmd.authorId());
@@ -277,6 +287,7 @@ public class DisputeCommandService implements IDisputeCommandUseCase {
      * the FreelancerOrg-specific command to a standard {@link OpenDisputeCommand}.
      */
     @Override
+    @RequirePermission(resource = "dispute", action = "create")
     public Mono<Dispute> openAgainstFreelancerOrg(OpenDisputeAgainstFreelancerOrgCommand cmd) {
         log.info("Opening dispute against FreelancerOrg={} missionId={} tenant={}",
                 cmd.freelancerOrgId(), cmd.missionId(), cmd.tenantId());

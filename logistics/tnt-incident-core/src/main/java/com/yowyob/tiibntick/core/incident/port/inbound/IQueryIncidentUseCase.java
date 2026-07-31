@@ -15,10 +15,10 @@ import java.util.UUID;
  */
 
 public interface IQueryIncidentUseCase {
-    Mono<Incident> getById(UUID incidentId);
-    Mono<Incident> getByReferenceCode(String referenceCode);
+    Mono<Incident> getById(UUID incidentId, IncidentRequesterContext requester);
+    Mono<Incident> getByReferenceCode(String referenceCode, IncidentRequesterContext requester);
     Flux<Incident> listByAgency(ListIncidentsQuery query);
-    Flux<IncidentEventLog> getTimeline(UUID incidentId);
-    Flux<IncidentBlockchainRecord> getBlockchainChain(UUID incidentId);
-    Mono<AgencyIncidentKpi> getAgencyKpi(UUID agencyId, UUID tenantId);
+    Flux<IncidentEventLog> getTimeline(UUID incidentId, IncidentRequesterContext requester);
+    Flux<IncidentBlockchainRecord> getBlockchainChain(UUID incidentId, IncidentRequesterContext requester);
+    Mono<AgencyIncidentKpi> getAgencyKpi(UUID agencyId, UUID tenantId, IncidentRequesterContext requester);
 }

@@ -11,18 +11,22 @@ Starts: postgres (PostGIS), redis, kafka (KRaft), minio, elasticsearch, promethe
 ```bash
 mvn clean install
 ```
-First build takes a while (31 modules). See `development/testing.md` for targeted builds (`-pl <module> -am`).
+First build takes a while (53 modules). See `development/testing.md` for targeted builds (`-pl <module> -am`).
 
 ## 3. Run the app
+`mvn spring-boot:run` does **NOT** load `tnt-bootstrap/.env` automatically (that's a Docker Compose–only mechanism) — export it manually or `TNT_SYSTEM_TENANT_ID`/DB credentials fall back to defaults and nothing is recognized as `TNT_ADMIN`. Also always pass `-am`: without it, Maven resolves every other module from whatever's already installed in `~/.m2` — after a large multi-module change this is very likely stale and crashes with `ClassNotFoundException`/`NoClassDefFoundError` for a class that clearly exists in source.
 ```bash
-mvn -pl tnt-bootstrap spring-boot:run
+env $(grep -v '^#' tnt-bootstrap/.env | grep '=' | xargs) mvn -pl tnt-bootstrap -am spring-boot:run
 ```
+If running on the bare host (not inside `docker compose --profile app`), also override `KERNEL_DB_HOST=localhost` — `.env`'s default (`postgres`) is a Docker-network-only hostname and won't resolve from the host machine (`DB_HOST` itself already defaults correctly to `localhost` in `application.yml`).
+
 Wait for:
 ```
 ║          TiiBnTick Core v0.0.1 — Application Ready           ║
 ║  Status:     ✅ COMPLETED                                    ║
 ║  Modules:    30 modules active                                ║
 ```
+(This "modules active" count is `TntModuleRegistry`'s live-wired `@Configuration` count via `/actuator/tnt-modules` — a different, smaller number than the 53 Maven modules in `architecture/modules.md`, since not every Maven module is `@Import`ed into `tnt-bootstrap` yet. Verify the current number by hitting that endpoint rather than trusting this example.)
 
 ## 4. Verify
 | Check | URL |

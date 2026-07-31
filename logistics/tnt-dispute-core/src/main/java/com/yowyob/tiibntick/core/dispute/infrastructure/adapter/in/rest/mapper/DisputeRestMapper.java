@@ -135,7 +135,24 @@ public final class DisputeRestMapper {
                 toResolutionResponse(dispute.getResolution()),
                 toCompensationResponse(dispute.getCompensation()),
                 dispute.getEvidences().stream().map(DisputeRestMapper::toEvidenceResponse).toList(),
-                toSlaResponse(dispute.getSlaPolicy(), dispute.getFiledAt()));
+                toSlaResponse(dispute.getSlaPolicy(), dispute.getFiledAt()),
+                dispute.getRespondentOrgId(),
+                dispute.getImpliedSubDelivererId(),
+                dispute.getSubDelivererInvolved());
+    }
+
+    public static DisputeStatsResponse toStatsResponse(DisputeStats stats) {
+        return new DisputeStatsResponse(
+                stats.orgId(),
+                stats.periodLabel(),
+                stats.totalDisputes(),
+                stats.openDisputes(),
+                stats.resolvedDisputes(),
+                stats.closedWithCompensation(),
+                stats.closedWithdrawn(),
+                stats.totalCompensationXAF(),
+                stats.disputeRate(),
+                stats.compensationRate());
     }
 
     public static DisputeSummaryResponse toSummaryResponse(Dispute dispute) {

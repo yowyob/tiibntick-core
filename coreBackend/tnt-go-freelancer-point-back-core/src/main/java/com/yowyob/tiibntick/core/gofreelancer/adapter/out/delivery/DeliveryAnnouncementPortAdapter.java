@@ -27,6 +27,7 @@ import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 /**
@@ -77,7 +78,8 @@ public class DeliveryAnnouncementPortAdapter implements IDeliveryAnnouncementPor
         return deliveryAnnouncementUseCase
                 .selectResponse(new SelectAnnouncementResponseCommand(
                         tenantId, announcementId, clientId, responseId))
-                .map(this::toSnapshot);
+                .map(this::toSnapshot)
+                .flatMap(snap -> enrichTracking(tenantId, snap));
     }
 
     @Override
@@ -102,7 +104,9 @@ public class DeliveryAnnouncementPortAdapter implements IDeliveryAnnouncementPor
 
     @Override
     public Mono<AnnouncementSnapshot> findById(UUID tenantId, UUID announcementId) {
-        return deliveryQueryUseCase.findAnnouncementById(tenantId, announcementId).map(this::toSnapshot);
+        return deliveryQueryUseCase.findAnnouncementById(tenantId, announcementId)
+                .map(this::toSnapshot)
+                .flatMap(snap -> enrichTracking(tenantId, snap));
     }
 
     @Override
@@ -132,15 +136,26 @@ public class DeliveryAnnouncementPortAdapter implements IDeliveryAnnouncementPor
                 DeliveryUrgency.STANDARD);
     }
 
-    private static AnnouncementPricingMode parsePricingMode(String raw) {
+    /**
+     * Accepts canonical {@code FIXED_PRICE}/{@code QUOTE_REQUEST} plus FE aliases
+     * {@code FIXED}/{@code QUOTE} and platform shortcuts {@code GO}/{@code FREELANCER}.
+     */
+    static AnnouncementPricingMode parsePricingMode(String raw) {
         if (raw == null || raw.isBlank()) {
             return AnnouncementPricingMode.FIXED_PRICE;
         }
-        try {
-            return AnnouncementPricingMode.valueOf(raw.trim().toUpperCase());
-        } catch (IllegalArgumentException e) {
-            return AnnouncementPricingMode.FIXED_PRICE;
-        }
+        String normalized = raw.trim().toUpperCase(Locale.ROOT);
+        return switch (normalized) {
+            case "FIXED", "FIXED_PRICE", "GO" -> AnnouncementPricingMode.FIXED_PRICE;
+            case "QUOTE", "QUOTE_REQUEST", "FREELANCER" -> AnnouncementPricingMode.QUOTE_REQUEST;
+            default -> {
+                try {
+                    yield AnnouncementPricingMode.valueOf(normalized);
+                } catch (IllegalArgumentException e) {
+                    yield AnnouncementPricingMode.FIXED_PRICE;
+                }
+            }
+        };
     }
 
     private static DeliveryAddress toDeliveryAddress(Address a, String fallbackLandmark) {
@@ -161,10 +176,20 @@ public class DeliveryAnnouncementPortAdapter implements IDeliveryAnnouncementPor
 
     // ── tnt-delivery-core aggregate -> gofp snapshot ────────────────────
 
+    private Mono<AnnouncementSnapshot> enrichTracking(UUID tenantId, AnnouncementSnapshot snap) {
+        if (snap.createdDeliveryId() == null || snap.trackingCode() != null) {
+            return Mono.just(snap);
+        }
+        return deliveryQueryUseCase.findDeliveryById(tenantId, snap.createdDeliveryId())
+                .map(d -> snap.withDeliveryLinkage(snap.createdDeliveryId(), d.getTrackingCode()))
+                .defaultIfEmpty(snap)
+                .onErrorResume(e -> Mono.just(snap));
+    }
+
     private AnnouncementSnapshot toSnapshot(DeliveryAnnouncement a) {
-        double volumetricWeightDm3 = a.getParcel() != null && a.getParcel().getSpecification() != null
-                ? a.getParcel().getSpecification().volumetricWeightDm3()
-                : 0.0;
+        PackageSpecification spec = a.getParcel() != null ? a.getParcel().getSpecification() : null;
+        double volumetricWeightDm3 = spec != null ? spec.volumetricWeightDm3() : 0.0;
+        String photoUrl = a.getParcel() != null ? a.getParcel().getPhotoUrl() : null;
         List<AnnouncementResponseSnapshot> responses = a.getResponses().stream()
                 .map(this::toResponseSnapshot)
                 .toList();
@@ -183,9 +208,19 @@ public class DeliveryAnnouncementPortAdapter implements IDeliveryAnnouncementPor
                 toCommonAddress(a.getPickupAddress(), "Pickup"),
                 toCommonAddress(a.getDeliveryAddress(), "Delivery"),
                 volumetricWeightDm3,
+                spec != null ? spec.weightKg() : null,
+                spec != null ? spec.widthCm() : null,
+                spec != null ? spec.heightCm() : null,
+                spec != null ? spec.lengthCm() : null,
+                spec != null ? spec.fragile() : null,
+                spec != null ? spec.perishable() : null,
+                spec != null ? spec.description() : null,
+                photoUrl,
                 a.getRecipient() != null ? a.getRecipient().name() : null,
                 a.getRecipient() != null ? a.getRecipient().phoneNumber() : null,
                 a.getSelectedResponseId(),
+                a.getCreatedDeliveryId(),
+                null,
                 responses);
     }
 

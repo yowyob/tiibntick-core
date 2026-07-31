@@ -23,6 +23,9 @@ public interface IncidentR2dbcRepository extends ReactiveCrudRepository<Incident
     Flux<IncidentEntity> findByTenantIdAndStatus(UUID tenantId, String status);
     @Query("SELECT * FROM tnt_incidents WHERE agency_id = :agencyId AND reported_at BETWEEN :from AND :to")
     Flux<IncidentEntity> findByAgencyIdAndReportedAtBetween(UUID agencyId, Instant from, Instant to);
+    @Query("SELECT * FROM tnt_incidents WHERE reported_by_actor_id = :reportedByActorId AND tenant_id = :tenantId AND reported_at BETWEEN :from AND :to")
+    Flux<IncidentEntity> findByReportedByActorIdAndTenantIdAndReportedAtBetween(
+            UUID reportedByActorId, UUID tenantId, Instant from, Instant to);
     @Query("SELECT * FROM tnt_incidents WHERE tenant_id = :tenantId AND source_platform = :platform AND status NOT IN ('CLOSED','CANCELLED')")
     Flux<IncidentEntity> findActiveByPlatform(UUID tenantId, String platform);
     @Query("SELECT * FROM tnt_incidents WHERE tenant_id = :tenantId AND status = 'ESCALATED'")

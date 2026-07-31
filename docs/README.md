@@ -3,17 +3,18 @@
 This is the permanent, external memory for this repository — written so a future session (Claude or human) can understand the project in seconds instead of reading thousands of Java files.
 
 ## What this project is
-TiiBnTick Core is the shared, non-runnable Maven module library for the TiiBnTick logistics/billing platform, built on top of the external **Yowyob Kernel** (RT-comops). 33 modules, hexagonal architecture, fully reactive (Java 21, Spring Boot 4.0.6/Framework 7, WebFlux + R2DBC). `tnt-bootstrap` is the only runnable module — everything else is a library JAR it assembles.
+TiiBnTick Core is the shared, non-runnable Maven module library for the TiiBnTick logistics/billing platform, built on top of the external **Yowyob Kernel** (RT-comops). 53 modules, hexagonal architecture, fully reactive (Java 21, Spring Boot 4.0.6/Framework 7, WebFlux + R2DBC). `tnt-bootstrap` is the only runnable module — everything else is a library JAR it assembles.
 
 → Start with `_quick-start.md` to run it, `architecture/overview.md` to understand it.
 
 ## Microservices / Modules
-33 modules across 7 layers (L0 foundation → L7 bootstrap) — full table in `architecture/modules.md`. Quick summary:
+53 modules across 8 layers (L0 foundation → L7 bootstrap, plus L6-Bis) — full table in `architecture/modules.md`. Quick summary:
 - **Identity** (tnt-actor-core, tnt-organization-core, tnt-tp-core, tnt-administration-core) — who's who, RBAC
 - **Logistics** (tnt-geo-core, tnt-route-core, tnt-delivery-core, tnt-dispute-core, tnt-incident-core, tnt-realtime-core, tnt-sync-core, tnt-notify-core, tnt-media-core) — the delivery platform itself
-- **Business** (tnt-resource-core, tnt-product-core, tnt-inventory-core, tnt-sales-core, tnt-accounting-core) — assets, catalog, ledger
+- **Business** (tnt-resource-core, tnt-product-core, tnt-inventory-core, tnt-sales-core, tnt-accounting-core, tnt-hrm-core, tnt-legacy-documents-core) — assets, catalog, ledger, HR/legacy-document Kernel proxies
 - **Billing** (tnt-billing-dsl/pricing/cost/invoice/wallet/report/templates) — pricing engine, invoicing, payments
 - **Trust** (tnt-trust-core, L6) — cross-cutting blockchain anchoring, positioned above billing; consumes L2→L5 modules but nothing depends back on it
+- **Core Backends** (L6-Bis: tnt-go-freelancer-point-back-core, tnt-agency-back-core [14 sub-modules], tnt-link-back-core, tnt-market-back-core) — one official business backend per TiiBnTick product, orchestrating L0-L5 behind generic APIs, consumed only by `tnt-bootstrap`
 
 ## Technologies
 Java 21 · Spring Boot 4.0.6 / Framework 7 · WebFlux (reactive end-to-end) · R2DBC + PostgreSQL/PostGIS · Liquibase (migrations) · Kafka · Redis · MinIO · Elasticsearch (present, unused) · OR-Tools (VRP) · Lombok + MapStruct · Caffeine (permission cache) · springdoc-openapi 3.x.

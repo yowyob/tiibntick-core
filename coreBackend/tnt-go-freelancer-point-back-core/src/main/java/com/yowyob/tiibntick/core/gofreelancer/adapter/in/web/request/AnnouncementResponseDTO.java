@@ -62,6 +62,16 @@ public class AnnouncementResponseDTO {
     private String assignedFreelancerEmail;
     private String assignedFreelancerPhone;
 
+    /** Delivery created in delivery-core after assign (same id mirrored locally when possible). */
+    private UUID deliveryId;
+    /** Public tracking code from delivery-core, when available. */
+    private String trackingCode;
+    /**
+     * Plain pickup OTP returned once at assign time (shipper confirmation).
+     * Null on subsequent GETs — only the BCrypt hash is persisted.
+     */
+    private String confirmationCode;
+
     public void setPickupAddress(AddressDTO pickupAddress) {
         this.pickupAddress = pickupAddress;
     }

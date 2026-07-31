@@ -86,6 +86,12 @@ public class IncidentPersistenceAdapter implements
     }
 
     @Override
+    public Flux<Incident> findByReportedByActorIdAndCreatedBetween(UUID reportedByActorId, UUID tenantId, Instant from, Instant to) {
+        return incidentRepo.findByReportedByActorIdAndTenantIdAndReportedAtBetween(reportedByActorId, tenantId, from, to)
+                .map(mapper::toDomain);
+    }
+
+    @Override
     public Flux<Incident> findActiveByPlatform(PlatformType platform, UUID tenantId) {
         return incidentRepo.findActiveByPlatform(tenantId, platform.name()).map(mapper::toDomain);
     }

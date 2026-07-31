@@ -8,6 +8,7 @@ import com.yowyob.tiibntick.core.dispute.application.query.ListDisputesQuery;
 import com.yowyob.tiibntick.core.dispute.domain.exception.DisputeNotFoundException;
 import com.yowyob.tiibntick.core.dispute.domain.model.Dispute;
 import com.yowyob.tiibntick.core.dispute.domain.model.DisputeStats;
+import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -33,21 +34,38 @@ public class DisputeQueryService implements IDisputeQueryUseCase {
         this.repository = Objects.requireNonNull(repository);
     }
 
+    /**
+     * A non-privileged caller (no {@code dispute:resolve}) may only see disputes where they
+     * are the claimant or the respondent.
+     */
+    private boolean isVisible(Dispute dispute, String requesterId, boolean privileged) {
+        if (privileged) {
+            return true;
+        }
+        return requesterId != null
+                && (requesterId.equals(dispute.getClaimantId()) || requesterId.equals(dispute.getRespondentId()));
+    }
+
     @Override
+    @RequirePermission(resource = "dispute", action = "read")
     public Mono<Dispute> getDispute(final GetDisputeQuery query) {
         Objects.requireNonNull(query, "GetDisputeQuery must not be null");
         log.debug("Fetching dispute id={} for tenant={}", query.disputeId(), query.tenantId());
         return repository.findByIdAndTenantId(query.disputeId(), query.tenantId())
+                .switchIfEmpty(Mono.error(new DisputeNotFoundException(query.disputeId())))
+                .filter(dispute -> isVisible(dispute, query.requesterId(), query.privileged()))
                 .switchIfEmpty(Mono.error(new DisputeNotFoundException(query.disputeId())));
     }
 
     @Override
+    @RequirePermission(resource = "dispute", action = "read")
     public Mono<DisputePageResult> listDisputes(final ListDisputesQuery query) {
         Objects.requireNonNull(query, "ListDisputesQuery must not be null");
         log.debug("Listing disputes for tenant={}, page={}, size={}", query.tenantId(), query.page(), query.size());
 
         final Mono<Long> totalCount = repository.countAll(query);
-        final Flux<Dispute> disputes = repository.findAll(query);
+        final Flux<Dispute> disputes = repository.findAll(query)
+                .filter(dispute -> isVisible(dispute, query.requesterId(), query.privileged()));
 
         return Mono.zip(disputes.collectList(), totalCount)
                 .map(tuple -> {
@@ -58,10 +76,13 @@ public class DisputeQueryService implements IDisputeQueryUseCase {
     }
 
     @Override
-    public Flux<Dispute> getDisputesByClaimant(final String claimantId, final String tenantId) {
+    @RequirePermission(resource = "dispute", action = "read")
+    public Flux<Dispute> getDisputesByClaimant(final String claimantId, final String tenantId,
+                                                final String requesterId, final boolean privileged) {
         Objects.requireNonNull(claimantId, "claimantId must not be null");
         Objects.requireNonNull(tenantId, "tenantId must not be null");
-        return repository.findActiveByClaimantId(claimantId, tenantId);
+        return repository.findActiveByClaimantId(claimantId, tenantId)
+                .filter(dispute -> isVisible(dispute, requesterId, privileged));
     }
 
     @Override
@@ -72,13 +93,18 @@ public class DisputeQueryService implements IDisputeQueryUseCase {
     }
 
     @Override
-    public Mono<Dispute> getByReference(final String reference, final String tenantId) {
+    @RequirePermission(resource = "dispute", action = "read")
+    public Mono<Dispute> getByReference(final String reference, final String tenantId,
+                                         final String requesterId, final boolean privileged) {
         Objects.requireNonNull(reference, "reference must not be null");
         Objects.requireNonNull(tenantId, "tenantId must not be null");
         return repository.findByReferenceAndTenantId(reference, tenantId)
+                .switchIfEmpty(Mono.error(new DisputeNotFoundException("Dispute not found with reference: " + reference)))
+                .filter(dispute -> isVisible(dispute, requesterId, privileged))
                 .switchIfEmpty(Mono.error(new DisputeNotFoundException("Dispute not found with reference: " + reference)));
     }
     @Override
+    @RequirePermission(resource = "dispute", action = "read")
     public reactor.core.publisher.Flux<Dispute> findDisputesByFreelancerOrg(
             String freelancerOrgId, String status, String tenantId) {
         log.debug("Finding disputes for FreelancerOrg={} status={} tenant={}",
@@ -87,6 +113,7 @@ public class DisputeQueryService implements IDisputeQueryUseCase {
     }
 
     @Override
+    @RequirePermission(resource = "dispute", action = "read")
     public reactor.core.publisher.Mono<DisputeStats> getDisputeStatsByOrg(String freelancerOrgId, String tenantId) {
         log.debug("Computing dispute stats for FreelancerOrg={} tenant={}", freelancerOrgId, tenantId);
         return repository.findByFreelancerOrgId(freelancerOrgId, null, tenantId)

@@ -26,4 +26,8 @@ public class ListIncidentsQuery {
     Instant to;
     int page;
     int size;
+    /** Caller's actorId — non-privileged callers are restricted to incidents they reported. */
+    UUID requesterActorId;
+    /** True when the caller holds {@code incident:manage} (sees every incident in the tenant). */
+    boolean privileged;
 }

@@ -46,6 +46,12 @@
             <artifactId>tnt-auth-core</artifactId>
         </dependency>
 
+        <!-- ── tnt-roles-core (Foundation L1 — @RequirePermission RBAC enforcement) ── -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-roles-core</artifactId>
+        </dependency>
+
         <!-- ── Kernel Yowyob (RT-comops) ── -->
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>

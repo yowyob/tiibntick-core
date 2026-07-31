@@ -10,7 +10,7 @@ Standard Spring Boot Actuator + Micrometer/Prometheus/Zipkin, plus 2 custom endp
 
 | Endpoint | Class | Returns |
 |---|---|---|
-| `GET /actuator/tnt-modules` | `TntModuleInventoryEndpoint` | Full module report (all ~31 module descriptors: name, version, layer, dependencies) |
+| `GET /actuator/tnt-modules` | `TntModuleInventoryEndpoint` | Full module report — one descriptor per module actually `@Import`ed/registered into `TntCoreConfig` (name, version, layer, dependencies). This is smaller than the 53 Maven modules in `architecture/modules.md`, since not every module is wired into `tnt-bootstrap` yet — query the live endpoint for the current count, don't assume a fixed number |
 | `GET /actuator/tnt-modules/{moduleId}` | `TntModuleInventoryEndpoint` | Single module descriptor |
 | `GET /actuator/tnt-kernel` | `TntKernelStatusEndpoint` | Last-known Kernel connectivity status (cached) — version, YowAuth/event-bus reachability, latency |
 | `POST /actuator/tnt-kernel` | `TntKernelStatusEndpoint` | Forces a live Kernel ping, returns refreshed status |

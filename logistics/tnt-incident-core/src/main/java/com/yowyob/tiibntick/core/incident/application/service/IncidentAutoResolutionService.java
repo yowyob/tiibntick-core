@@ -8,6 +8,7 @@ import com.yowyob.tiibntick.core.incident.domain.valueobject.PricingAdjustment;
 import com.yowyob.tiibntick.core.incident.port.inbound.IAssignReplacementDriverUseCase;
 import com.yowyob.tiibntick.core.incident.port.inbound.IStartAutoResolutionUseCase;
 import com.yowyob.tiibntick.core.incident.port.outbound.*;
+import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -60,6 +61,7 @@ public class IncidentAutoResolutionService implements IStartAutoResolutionUseCas
      */
     @Override
     @Transactional
+    @RequirePermission(resource = "incident", action = "manage")
     public Mono<Incident> execute(UUID incidentId) {
         return incidentRepository.findById(incidentId)
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Incident not found: " + incidentId)))
@@ -146,6 +148,7 @@ public class IncidentAutoResolutionService implements IStartAutoResolutionUseCas
 
     @Override
     @Transactional
+    @RequirePermission(resource = "incident", action = "manage")
     public Mono<IncidentDriverReplacement> execute(AssignReplacementDriverCommand command) {
         return incidentRepository.findById(command.getIncidentId())
                 .flatMap(incident -> replacementRepository.findReplacementByIncidentId(incident.getId())

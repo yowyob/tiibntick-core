@@ -24,7 +24,8 @@ public record ListDisputesQuery(
         LocalDateTime from,
         LocalDateTime to,
         int page,
-        int size
+        int size,
+        boolean privileged
 ) {
     public ListDisputesQuery {
         if (tenantId == null || tenantId.isBlank()) {

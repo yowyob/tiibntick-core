@@ -18,7 +18,8 @@ import java.util.UUID;
 @Value @Builder
 public class ReportDriverWithdrawalCommand {
     @NotNull UUID tenantId;
-    @NotNull UUID agencyId;
+    /** Null for GO/FREELANCER-platform missions, which have no owning agency. */
+    UUID agencyId;
     @NotNull UUID missionId;
     @NotNull UUID driverActorId;
     @NotNull ActorRole driverRole;

@@ -5,6 +5,7 @@ import com.yowyob.tiibntick.core.incident.domain.event.IncidentDomainEvents.*;
 import com.yowyob.tiibntick.core.incident.domain.model.*;
 import com.yowyob.tiibntick.core.incident.port.inbound.IInterAgencyCooperationUseCase;
 import com.yowyob.tiibntick.core.incident.port.outbound.*;
+import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -44,6 +45,7 @@ public class IncidentInterAgencyService implements IInterAgencyCooperationUseCas
      */
     @Override
     @Transactional
+    @RequirePermission(resource = "incident", action = "manage")
     public Mono<IncidentInterAgencyCooperation> request(RequestCooperationCommand command) {
         return incidentRepository.findById(command.getIncidentId())
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Incident not found")))
@@ -70,6 +72,7 @@ public class IncidentInterAgencyService implements IInterAgencyCooperationUseCas
      * @return the accepted cooperation record
      */
     @Override
+    @RequirePermission(resource = "incident", action = "manage")
     public Mono<IncidentInterAgencyCooperation> accept(RespondToCooperationCommand command) {
         return cooperationRepository.findCooperationById(command.getCooperationId())
                 .flatMap(coop -> {
@@ -97,6 +100,7 @@ public class IncidentInterAgencyService implements IInterAgencyCooperationUseCas
      * @return the rejected cooperation record
      */
     @Override
+    @RequirePermission(resource = "incident", action = "manage")
     public Mono<IncidentInterAgencyCooperation> reject(RespondToCooperationCommand command) {
         return cooperationRepository.findCooperationById(command.getCooperationId())
                 .flatMap(coop -> {
@@ -114,6 +118,7 @@ public class IncidentInterAgencyService implements IInterAgencyCooperationUseCas
      */
     @Override
     @Transactional
+    @RequirePermission(resource = "incident", action = "manage")
     public Mono<IncidentInterAgencyCooperation> complete(RecordCooperationCompletionCommand command) {
         return cooperationRepository.findCooperationById(command.getCooperationId())
                 .flatMap(coop -> blockchainAuditPort.writeIncidentEvent(

@@ -8,6 +8,7 @@ import com.yowyob.tiibntick.core.incident.port.outbound.IBlockchainAuditPort;
 import com.yowyob.tiibntick.core.incident.port.outbound.IIncidentEvidenceRepository;
 import com.yowyob.tiibntick.core.incident.port.outbound.IIncidentEventLogRepository;
 import com.yowyob.tiibntick.core.incident.port.outbound.IIncidentRepository;
+import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,7 @@ public class IncidentEvidenceService implements IAttachEvidenceUseCase {
     private final IBlockchainAuditPort blockchainAuditPort;
 
     @Override
+    @RequirePermission(resource = "incident", action = "create")
     public Mono<IncidentEvidence> execute(AttachEvidenceCommand command) {
         return incidentRepository.findById(command.getIncidentId())
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Incident not found")))

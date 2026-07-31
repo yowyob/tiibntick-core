@@ -31,6 +31,12 @@
             <artifactId>tnt-auth-core</artifactId>
         </dependency>
 
+        <!-- ── tnt-common-core (Foundation L1 — shared kernelWebClient envelope helpers) ── -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-common-core</artifactId>
+        </dependency>
+
         <!-- ── TiiBnTick L0 — Event Bus ── -->
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>

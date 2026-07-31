@@ -11,7 +11,6 @@ import com.yowyob.tiibntick.core.dispute.infrastructure.adapter.in.rest.mapper.D
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
@@ -19,19 +18,21 @@ import reactor.core.publisher.Mono;
  * REST controller for mediation and arbitration actions on disputes.
  *
  * <p>Exposes mediator-scoped operations: start mediation, issue a ruling,
- * escalate to arbitration. These endpoints are restricted to authenticated
- * mediators and platform administrators.
+ * escalate to arbitration. Access is restricted by {@code @RequirePermission(dispute:resolve)}
+ * on the application service layer — a bare {@code FREELANCER}/{@code CLIENT} JWT cannot
+ * reach these endpoints (Go-Freelancer integration hardening).
  *
  * <p>Tenant isolation via {@code @CurrentUser TntUserIdentity} (Audit n°7 · #4
  * remediation, 2026-07-18) — see {@link DisputeController} javadoc for the full
- * rationale (JWT or platform Client-Id/Api-Key, never a raw header).
+ * rationale (JWT or platform Client-Id/Api-Key, never a raw header). Mediator identity
+ * is likewise resolved from {@code @CurrentUser}, not the previously client-supplied
+ * {@code X-Actor-ID} header.
  *
  * @author MANFOUO Braun
  */
 @RestController
 @RequestMapping("/api/v1/disputes/{disputeId}/mediation")
 @Tag(name = "Mediation & Arbitration", description = "Mediator actions: start mediation, issue ruling, escalate to arbitration")
-@PreAuthorize("isAuthenticated()")
 public class MediationController {
 
     private final IDisputeCommandUseCase commandUseCase;
@@ -50,9 +51,9 @@ public class MediationController {
                     + "Requires an assigned mediator.")
     public Mono<DisputeResponses.DisputeDetailResponse> startMediation(
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
-            @RequestHeader("X-Actor-ID") String mediatorId,
             @PathVariable String disputeId) {
         String tenantId = currentUser.tenantId().toString();
+        String mediatorId = currentUser.actorId() != null ? currentUser.actorId().toString() : null;
         return commandUseCase.startMediation(
                         new StartMediationCommand(DisputeId.of(disputeId), tenantId, mediatorId))
                 .map(DisputeRestMapper::toDetailResponse);
@@ -68,10 +69,10 @@ public class MediationController {
                     + "the dispute transitions to PENDING_COMPENSATION and triggers tnt-billing-wallet.")
     public Mono<DisputeResponses.DisputeDetailResponse> rule(
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
-            @RequestHeader("X-Actor-ID") String ruledBy,
             @PathVariable String disputeId,
             @RequestBody DisputeRequests.RuleDisputeRequest request) {
         String tenantId = currentUser.tenantId().toString();
+        String ruledBy = currentUser.actorId() != null ? currentUser.actorId().toString() : null;
         return commandUseCase.ruleDispute(DisputeRestMapper.toCommand(request, disputeId, tenantId, ruledBy))
                 .map(DisputeRestMapper::toDetailResponse);
     }

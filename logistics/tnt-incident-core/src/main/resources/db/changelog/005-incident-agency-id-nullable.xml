@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- Author: MANFOUO Braun | tnt-incident-core — Go-Freelancer integration hardening -->
+
+    <changeSet id="005-make-incident-agency-id-nullable" author="MANFOUO Braun">
+        <comment>
+            tnt_incidents.agency_id was NOT NULL, but GO/FREELANCER-platform deliveries have no
+            agency (Delivery.agencyId is null for these platforms — responsibility is tracked via
+            responsible_org_id/responsible_org_type instead, added in 003). As written, the schema
+            made it structurally impossible for a freelancer to ever report an incident. The domain
+            aggregate (Incident.createWithFreelancerOrg) already accepted a null agencyId; only the
+            column constraint and the REST/command-layer @NotNull annotations disagreed.
+        </comment>
+
+        <dropNotNullConstraint tableName="tnt_incidents" columnName="agency_id" columnDataType="UUID"/>
+    </changeSet>
+
+</databaseChangeLog>

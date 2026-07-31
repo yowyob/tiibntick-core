@@ -50,6 +50,7 @@ public enum TntRole {
                     REPORT_READ, REPORT_EXPORT,
                     ANNOUNCEMENT_READ, ANNOUNCEMENT_RESPOND, ANNOUNCEMENT_ELECT,
                     DISPUTE_READ, DISPUTE_RESOLVE,
+                    INCIDENT_READ, INCIDENT_MANAGE,
                     TRUST_READ, TRUST_VERIFY,
                     MEDIA_READ, MEDIA_UPLOAD,
                     RESOURCE_READ, RESOURCE_WRITE, RESOURCE_RESERVE,
@@ -82,6 +83,7 @@ public enum TntRole {
                     REPORT_READ,
                     ANNOUNCEMENT_READ, ANNOUNCEMENT_RESPOND,
                     DISPUTE_READ,
+                    INCIDENT_READ, INCIDENT_MANAGE,
                     TRUST_READ,
                     MEDIA_READ, MEDIA_UPLOAD,
                     RESOURCE_READ,
@@ -107,7 +109,8 @@ public enum TntRole {
                     TRUST_READ, TRUST_VERIFY,
                     MEDIA_READ, MEDIA_UPLOAD,
                     GEO_READ, ROUTE_READ,
-                    DISPUTE_CREATE
+                    DISPUTE_CREATE,
+                    INCIDENT_CREATE, INCIDENT_READ
             )
     ),
 
@@ -131,7 +134,8 @@ public enum TntRole {
                     TRUST_READ, TRUST_VERIFY,
                     MEDIA_READ, MEDIA_UPLOAD,
                     GEO_READ, ROUTE_READ,
-                    DISPUTE_CREATE
+                    DISPUTE_CREATE, DISPUTE_READ,
+                    INCIDENT_CREATE, INCIDENT_READ
             )
     ),
 
@@ -151,7 +155,8 @@ public enum TntRole {
                     TRUST_READ, TRUST_VERIFY, TRUST_ANCHOR,
                     MEDIA_READ, MEDIA_UPLOAD,
                     GEO_READ,
-                    DISPUTE_CREATE
+                    DISPUTE_CREATE,
+                    INCIDENT_CREATE, INCIDENT_READ
             )
     ),
 
@@ -172,6 +177,7 @@ public enum TntRole {
                     MEDIA_READ, MEDIA_UPLOAD,
                     GEO_READ,
                     DISPUTE_CREATE,
+                    INCIDENT_CREATE, INCIDENT_READ,
                     ACTOR_READ
             )
     ),
@@ -195,7 +201,8 @@ public enum TntRole {
                     PAYMENT_PROCESS,
                     TRUST_READ, TRUST_VERIFY,
                     MEDIA_READ,
-                    DISPUTE_CREATE, DISPUTE_READ
+                    DISPUTE_CREATE, DISPUTE_READ,
+                    INCIDENT_READ
             )
     ),
 
@@ -218,6 +225,7 @@ public enum TntRole {
                     REPORT_READ,
                     TRUST_READ, TRUST_VERIFY,
                     DISPUTE_READ, DISPUTE_RESOLVE,
+                    INCIDENT_READ, INCIDENT_MANAGE,
                     ADMIN_AUDIT,
                     MEDIA_READ
             )
@@ -242,6 +250,7 @@ public enum TntRole {
                     INVOICE_READ,
                     REPORT_READ, REPORT_EXPORT,
                     DISPUTE_READ, DISPUTE_RESOLVE,
+                    INCIDENT_READ, INCIDENT_MANAGE,
                     TRUST_READ, TRUST_VERIFY,
                     PRODUCT_READ, PRODUCT_WRITE,
                     INVENTORY_READ, INVENTORY_WRITE,

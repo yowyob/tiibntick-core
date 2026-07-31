@@ -362,6 +362,8 @@ Crée une annonce de livraison.
   "clientId": "uuid",
   "title": "Livraison urgent",
   "description": "Colis fragile",
+  "pricingMode": "FIXED_PRICE",
+  "signatureUrl": "https://cdn.example/signature.png",
   "recipientFirstName": "Jean", "recipientLastName": "Paul",
   "recipientEmail": "jean@example.com", "recipientPhone": "+237...",
   "shipperFirstName": "Marie", "shipperLastName": "Dupont",
@@ -371,7 +373,6 @@ Crée une annonce de livraison.
   "transportMethod": "MOTORBIKE",
   "requiredVehicleType": "MOTORBIKE",
   "distance": 12.5, "duration": 30,
-  "autoPublish": true,
   "destinationRelayPointId": "uuid-ou-null",
   "logisticsPrice": 2000,
   "pickupAddress": { "address": { "street": "Rue A", "city": "Yaoundé" }, "type": "PICKUP" },
@@ -382,6 +383,9 @@ Crée une annonce de livraison.
   }
 }
 ```
+
+> `pricingMode` accepte aussi les alias FE : `FIXED`/`GO` → `FIXED_PRICE`, `QUOTE`/`FREELANCER` → `QUOTE_REQUEST`.
+> `signatureUrl` est persisté dans le soft-mirror local gofp (pas dans delivery-core).
 
 **Réponse `201 Created`** → [`AnnouncementResponseDTO`](#announcementresponsedto)
 
@@ -396,7 +400,7 @@ Crée une annonce de livraison.
 ---
 
 ### `PUT /api/announcements/{id}`
-Met à jour une annonce (mêmes champs que la création).
+Met à jour le **miroir local** gofp uniquement (deprecated — préférer cancel + republish via delivery-core).
 
 **Réponse `200 OK`** → [`AnnouncementResponseDTO`](#announcementresponsedto)
 
@@ -407,14 +411,21 @@ Met à jour une annonce (mêmes champs que la création).
 ---
 
 ### `PATCH /api/announcements/{id}/publish`
-Publie une annonce pour la rendre visible aux livreurs.
+**Idempotent / no-op métier** : `createAnnouncement` publie déjà via delivery-core. Cet endpoint relit l'annonce (`getAnnouncement`).
 
-**Réponse `200 OK`** → `AnnouncementResponseDTO` avec `status: PUBLISHED`
+**Réponse `200 OK`** → `AnnouncementResponseDTO` (statut déjà `PUBLISHED` si créée normalement)
 
 ---
 
+### `POST /api/announcements/{id}/respond`
+Un livreur candidate (prix proposé optionnel pour `QUOTE_REQUEST`).
+
+**Corps** : `RespondAnnouncementRequestDTO` (`freelancerId`, `proposedPrice`, `proposedCurrency`, `note`, `estimatedArrivalTime`)
+
+**Réponse `201 Created`** → `AnnouncementResponseDTO` (vue candidat)
+
 ### `POST /api/announcements/{id}/subscribe`
-Un livreur candidate sur une annonce.
+Alias legacy de respond (sans prix).
 
 **Corps de la requête**
 ```json
@@ -426,24 +437,42 @@ Un livreur candidate sur une annonce.
 ---
 
 ### `GET /api/announcements/{id}/subscriptions`
-Liste les candidatures reçues pour une annonce.
+Liste les candidatures (responses delivery-core) enrichies profil/rating.
 
 **Réponse `200 OK`** → tableau de `SubscriptionResponseDTO`
 ```json
-[{ "freelancerId": "uuid", "announcementId": "uuid", "status": "PENDING" }]
+[{
+  "subscriptionId": "uuid-response",
+  "freelancerId": "uuid",
+  "firstName": "Paul", "lastName": "Kamga",
+  "email": "paul@example.com", "phone": "+237...",
+  "rating": 4.7,
+  "status": "SENT",
+  "createdAt": "2026-07-31T12:00:00Z",
+  "proposedPrice": 3500.00,
+  "currency": "XAF"
+}]
 ```
 
 ---
 
 ### `POST /api/announcements/{id}/assign`
-Assigne un livreur à une annonce. Déclenche la création de la livraison.
+Assigne une candidature. Déclenche `selectResponse` delivery-core (création Delivery), soft-mirror gofp Delivery, `initOtpIfAbsent`.
 
-**Corps de la requête**
+**Corps préféré**
+```json
+{ "responseId": "uuid-response", "clientId": "uuid-client" }
+```
+
+**Corps legacy**
 ```json
 { "freelancerId": "uuid-livreur" }
 ```
 
-**Réponse `200 OK`** → `AnnouncementResponseDTO` avec `status: ASSIGNED` et les champs `assignedFreelancer*` renseignés.
+**Réponse `200 OK`** → `AnnouncementResponseDTO` avec notamment :
+- `status: ASSIGNED`, `assignedFreelancer*`
+- `deliveryId`, `trackingCode` (depuis delivery-core)
+- `confirmationCode` : OTP pickup en clair **uniquement à la première init** (ensuite `null` ; hashes seuls en base)
 
 ---
 
@@ -455,15 +484,19 @@ Liste les annonces auxquelles un livreur a candidaté.
 ---
 
 #### AnnouncementResponseDTO
-Reprend tous les champs de la requête plus :
+Reprend les champs utiles de la requête / snapshot delivery-core plus :
 
 | Champ | Description |
 |-------|-------------|
 | `id` | UUID de l'annonce |
-| `status` | `DRAFT`, `PUBLISHED`, `ASSIGNED`, `COMPLETED`, `CANCELLED` |
+| `status` | `DRAFT`, `PUBLISHED`, `IN_NEGOTIATION`, `ASSIGNED`, `COMPLETED`, `CANCELLED` |
+| `pricingMode` | `FIXED_PRICE` ou `QUOTE_REQUEST` |
+| `pickupAddress` / `deliveryAddress` / `packet` | Depuis delivery-core (+ `packet.photoPacket` si URL déjà stockée) |
+| `shipper*` / `signatureUrl` | Soft-mirror local gofp |
 | `createdAt` / `updatedAt` | Horodatages |
-| `assignedFreelancerId` | UUID du livreur assigné |
-| `assignedFreelancerFirstName/LastName/Email/Phone` | Infos livreur assigné |
+| `assignedFreelancerId` + profil | Livreurs assignés |
+| `deliveryId` / `trackingCode` | Après assign |
+| `confirmationCode` | OTP pickup plain, une seule fois à l'assign |
 
 
 ---
@@ -626,8 +659,9 @@ Change le statut d'une livraison. Règles métier intégrées.
 
 ### `POST /api/v1/deliveries/{id}/init-otp`
 Initialise les codes OTP de la livraison (idempotent).
-- Envoie le code de collecte à l'expéditeur.
+- Envoie le code de collecte à l'expéditeur (DeliveryNeed **ou** soft-mirror announcement).
 - Envoie le code de réception au destinataire.
+- Sur le chemin **annonce**, l'OTP pickup plain est aussi renvoyé une fois dans `AnnouncementResponseDTO.confirmationCode` au moment de `POST .../assign`.
 
 **Réponse `200 OK`** — corps vide.
 
@@ -863,6 +897,8 @@ Recherche textuelle sur les adresses.
 ### `POST /api/pricing/calculate/logistics/{id}`
 Calcule le prix proposé par un livreur ou un opérateur logistique.
 
+Pour un livreur : utilise `delivery_person_pricing` si une policy existe (`GET/PUT /api/freelancers/{id}/policies`), sinon taux par défaut (base 500 / kg 100 / km 50).
+
 **Corps de la requête**
 ```json
 {
@@ -947,6 +983,34 @@ Liste les contacts d'un utilisateur, avec filtrage optionnel par nom/email/tél�
 ### `GET /api/v1/contacts/{id}`
 **Réponse `200 OK`** → `ContactDTO`
 
+### `POST /api/v1/contacts`
+Crée un contact (`userId`, `firstName`, `lastName`, `email`, `phone`).
+
+**Réponse `201 Created`** → `ContactDTO`
+
+### `PUT /api/v1/contacts/{id}`
+Met à jour un contact (champs non-null uniquement).
+
+**Réponse `200 OK`** → `ContactDTO`
+
+### `DELETE /api/v1/contacts/{id}` → `204`
+
+---
+
+### Policies tarifaires livreur
+
+#### `GET /api/freelancers/{id}/policies`
+Retourne la grille `delivery_person_pricing`. **`404`** si absente.
+
+#### `PUT /api/freelancers/{id}/policies`
+Crée ou met à jour la grille. Le calculateur `POST /api/pricing/calculate/freelancer/{id}` l'utilise si présente (sinon taux par défaut).
+
+```json
+{
+  "baseFee": 500, "pricePerKg": 100, "pricePerKm": 50, "pricePerCbm": 0,
+  "fragileSurcharge": 200, "perishableSurcharge": 300, "currency": "XAF"
+}
+```
 
 ---
 

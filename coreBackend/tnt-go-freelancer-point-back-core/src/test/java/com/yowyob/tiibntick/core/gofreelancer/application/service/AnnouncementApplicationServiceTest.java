@@ -29,6 +29,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -54,6 +55,10 @@ class AnnouncementApplicationServiceTest {
     @Mock private INegotiationChatPort negotiationChatPort;
     @Mock private IAnnouncementRepository announcementRepository;
     @Mock private AnnouncementSubscriptionRepository subscriptionRepository;
+    @Mock private com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpFreelancerRepository gofpFreelancerRepository;
+    @Mock private com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpUserRepository gofpUserRepository;
+    @Mock private com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepository deliveryRepository;
+    @Mock private DeliveryOtpService deliveryOtpService;
 
     private AnnouncementApplicationService service;
 
@@ -66,7 +71,12 @@ class AnnouncementApplicationServiceTest {
     void setUp() {
         service = new AnnouncementApplicationService(
                 deliveryAnnouncementPort, tenantContextHolder, freelancerQuotaService,
-                walletUseCase, negotiationChatPort, announcementRepository, subscriptionRepository);
+                walletUseCase, negotiationChatPort, announcementRepository, subscriptionRepository,
+                gofpFreelancerRepository, gofpUserRepository, deliveryRepository, deliveryOtpService);
+        lenient().when(announcementRepository.findById(any())).thenReturn(Mono.empty());
+        lenient().when(deliveryRepository.findById(any())).thenReturn(Mono.empty());
+        lenient().when(gofpFreelancerRepository.findById(any())).thenReturn(Mono.empty());
+        lenient().when(gofpFreelancerRepository.findByCoreFreelancerId(any())).thenReturn(Mono.empty());
     }
 
     @Test
@@ -192,7 +202,9 @@ class AnnouncementApplicationServiceTest {
                 announcementId, tenantId, clientId, "Delivery announcement", "desc",
                 AnnouncementStatus.PUBLISHED, Instant.now(), Instant.now(),
                 offeredAmount, currency, pricingMode,
-                null, null, 0.0, "Jean Dupont", "+237600000000",
-                null, responses);
+                null, null, 0.0,
+                null, null, null, null, null, null, null, null,
+                "Jean Dupont", "+237600000000",
+                null, null, null, responses);
     }
 }

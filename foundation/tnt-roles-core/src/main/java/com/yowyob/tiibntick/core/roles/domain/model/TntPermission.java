@@ -151,6 +151,14 @@ public final class TntPermission {
     public static final String DISPUTE_RESOLVE = "dispute:resolve";
 
     // ─────────────────────────────────────────────────────────────
+    // INCIDENT — Delivery incident management (tnt-incident-core)
+    // ─────────────────────────────────────────────────────────────
+
+    public static final String INCIDENT_CREATE = "incident:create";
+    public static final String INCIDENT_READ   = "incident:read";
+    public static final String INCIDENT_MANAGE = "incident:manage";
+
+    // ─────────────────────────────────────────────────────────────
     // MEDIA — QR codes, delivery proofs, PDF bordereaux
     // ─────────────────────────────────────────────────────────────
 

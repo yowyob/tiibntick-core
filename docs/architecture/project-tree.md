@@ -2,13 +2,13 @@
 Physical directory tree of the repo (excludes `target/`, `.idea/`, `.git/`, `node_modules/`) — for quick visual orientation.
 
 # Summary
-33 modules under 6 plain grouping folders + 1 runnable module at root. Each module's `src/main/java` follows the shape documented in `architecture/packages.md`.
+53 modules (39 declared in root `pom.xml` + 14 nested under `coreBackend/tnt-agency-back-core`'s own aggregator POM) under 7 plain grouping folders + 1 runnable module at root. Each module's `src/main/java` follows the shape documented in `architecture/packages.md`.
 
 # Details
 
 ```
 tiibntick-core/
-├── pom.xml                              ← root parent, defines all 33 modules + dependencyManagement
+├── pom.xml                              ← root parent, defines 39 modules + dependencyManagement
 ├── CLAUDE.md                            ← authoritative project instructions
 ├── docs/                                ← this documentation tree
 │
@@ -43,8 +43,10 @@ tiibntick-core/
 │   ├── tnt-product-core/                [L4] Product catalog, service offers
 │   ├── tnt-inventory-core/              [L4] Stock, hub occupancy
 │   ├── tnt-sales-core/                  [L4] Sales order pipeline
-│   └── tnt-accounting-core/             [L4] OHADA general ledger
-│       └── src/main/java/.../accounting/{infrastructure,domain,application}/  ← deviating layout
+│   ├── tnt-accounting-core/             [L4] OHADA general ledger
+│   │   └── src/main/java/.../accounting/{infrastructure,domain,application}/  ← deviating layout
+│   ├── tnt-hrm-core/                    [L4] Kernel HRM/human-resources proxy (16 controllers, 160 ops)
+│   └── tnt-legacy-documents-core/       [L4] Kernel billing-legacy-documents-controller proxy
 │
 ├── billing/
 │   ├── tnt-billing-dsl/                 [L5] Pricing/cost rule DSL (lexer/parser/AST/evaluator)
@@ -61,6 +63,31 @@ tiibntick-core/
 │                                              DID/Badge/BillingPolicy/Payment, incident blockchain chain.
 │                                              Depends down into L2→L5 modules that own its outbound ports;
 │                                              nothing depends back on it.
+│
+├── coreBackend/                         [L6-Bis] Per-product business backends. Orchestrate L0-L5,
+│   │                                             expose generic business APIs (no frontend logic).
+│   │                                             Consumed only by tnt-bootstrap (L7).
+│   ├── tnt-go-freelancer-point-back-core/  Market's Go Freelancer Point — announcements, deliveries,
+│   │                                        relay points, TOPSIS/AHP matching — com.yowyob.tiibntick.core.gofreelancer
+│   ├── tnt-agency-back-core/               packaging=pom aggregator, NO code of its own — 14 real sub-modules:
+│   │   ├── tnt-agency-eventing-core/           shared domain events + Kafka publisher (base module)
+│   │   ├── tnt-agency-org-core/                Agency, Branch, Hub config, hub-ops (internal dependency hub)
+│   │   ├── tnt-agency-staff-core/              Staff members, hub operators, credentials provisioning
+│   │   ├── tnt-agency-workforce-core/          Deliverers, contracts, freelancer associations
+│   │   ├── tnt-agency-assignment-core/         Mission projection + tnt-delivery-core orchestration
+│   │   ├── tnt-agency-commission-core/         Commissions + tnt-billing-wallet payout
+│   │   ├── tnt-agency-billing-core/            Billing policies, estimates, invoices
+│   │   ├── tnt-agency-onboarding-core/         Agency onboarding applications (admin + applicant)
+│   │   ├── tnt-agency-intake-core/             Client intake queue → assignment + hub-ops
+│   │   ├── tnt-agency-inbox-core/              Agency notification inbox
+│   │   ├── tnt-agency-fleet-local-core/        Agency fleet view → tnt-resource-core (+ FleetMan link)
+│   │   ├── tnt-agency-compliance-core/         Disputes / incidents / claims proxy
+│   │   ├── tnt-agency-analytics-core/          Cross-sub-module reporting/analytics
+│   │   └── tnt-agency-sync-core/               Offline sync server, extends tnt-sync-core
+│   ├── tnt-link-back-core/                 Link — network nodes, bulletin board, DAO zones, gamification —
+│   │                                        com.yowyob.tiibntick.core.linkback
+│   └── tnt-market-back-core/               Market — provider discovery, quotes, market orders —
+│                                            com.yowyob.tiibntick.core.marketback
 │
 └── tnt-bootstrap/                       [L7] THE ONLY RUNNABLE MODULE
     ├── docker-compose.yml               ← local dev infra (postgres/redis/kafka/minio/es/prometheus/grafana/zipkin)

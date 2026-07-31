@@ -10,8 +10,7 @@ import java.util.UUID;
 /**
  * DTO for returning subscription details including delivery person info.
  *
- * @author TiiBnTickTeam
- * @date 23/02/2026
+ * @author MANFOUO BRAUN
  */
 @Data
 @NoArgsConstructor
@@ -26,4 +25,8 @@ public class SubscriptionResponseDTO {
     private Double rating;
     private String status;
     private Instant createdAt;
+    /** Proposed bid amount from delivery-core response (QUOTE_REQUEST). */
+    private java.math.BigDecimal proposedPrice;
+    /** Currency of {@link #proposedPrice}. */
+    private String currency;
 }

@@ -38,11 +38,36 @@ public record AnnouncementSnapshot(
         Address pickupAddress,
         Address deliveryAddress,
         double packetVolumetricWeightDm3,
+        Double packetWeightKg,
+        Double packetWidthCm,
+        Double packetHeightCm,
+        Double packetLengthCm,
+        Boolean packetFragile,
+        Boolean packetPerishable,
+        String packetDescription,
+        String packetPhotoUrl,
         String recipientName,
         String recipientPhone,
         UUID selectedResponseId,
+        UUID createdDeliveryId,
+        String trackingCode,
         List<AnnouncementResponseSnapshot> responses) {
 
     public static final String PRICING_MODE_QUOTE_REQUEST = "QUOTE_REQUEST";
     public static final String PRICING_MODE_FIXED_PRICE = "FIXED_PRICE";
+
+    /**
+     * Returns a copy with delivery linkage fields filled after selection.
+     */
+    public AnnouncementSnapshot withDeliveryLinkage(UUID deliveryId, String tracking) {
+        return new AnnouncementSnapshot(
+                id, tenantId, clientId, title, description, status, createdAt, updatedAt,
+                offeredAmount, currency, pricingMode, pickupAddress, deliveryAddress,
+                packetVolumetricWeightDm3, packetWeightKg, packetWidthCm, packetHeightCm,
+                packetLengthCm, packetFragile, packetPerishable, packetDescription, packetPhotoUrl,
+                recipientName, recipientPhone, selectedResponseId,
+                deliveryId != null ? deliveryId : createdDeliveryId,
+                tracking != null ? tracking : trackingCode,
+                responses);
+    }
 }

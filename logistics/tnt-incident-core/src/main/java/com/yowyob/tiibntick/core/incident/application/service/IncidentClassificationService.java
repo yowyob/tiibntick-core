@@ -10,6 +10,7 @@ import com.yowyob.tiibntick.core.incident.domain.valueobject.IncidentGeoSnapshot
 import com.yowyob.tiibntick.core.incident.domain.valueobject.IncidentSlaImpact;
 import com.yowyob.tiibntick.core.incident.port.inbound.ITriageIncidentUseCase;
 import com.yowyob.tiibntick.core.incident.port.outbound.*;
+import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -51,6 +52,7 @@ public class IncidentClassificationService implements ITriageIncidentUseCase {
      */
     @Override
     @Transactional
+    @RequirePermission(resource = "incident", action = "manage")
     public Mono<Incident> execute(TriageIncidentCommand command) {
         return incidentRepository.findById(command.getIncidentId())
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Incident not found: " + command.getIncidentId())))

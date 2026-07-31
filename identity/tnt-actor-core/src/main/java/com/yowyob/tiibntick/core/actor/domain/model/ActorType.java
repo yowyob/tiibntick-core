@@ -14,6 +14,35 @@ package com.yowyob.tiibntick.core.actor.domain.model;
  *       FreelancerOrganization OWNER. Has restricted access to org resources.</li>
  * </ul>
  *
+ * <p><b>Freelancer vocabulary mapping</b> — {@code tnt-actor-core} is L2 and cannot
+ * depend on the L3 modules below, so this is documentation-only, not a compile-time
+ * link. Three distinct concepts must not be conflated when correlating across modules:
+ * <ul>
+ *   <li>{@link #FREELANCER} — a standalone independent courier, <b>not</b> part of any
+ *       FreelancerOrganization. In {@code tnt-dispute-core} this is the individual
+ *       {@code ClaimantType.FREELANCER} / {@code RespondentType.FREELANCER} case (no
+ *       {@code respondentOrgId}).</li>
+ *   <li>{@link #FREELANCER_OWNER} — the OWNER of a micro-organisation
+ *       (FreelancerOrganization) grouping several drivers under one legal entity.
+ *       In {@code tnt-dispute-core} this is the party behind
+ *       {@code RespondentType.FREELANCER_ORG} / {@code Dispute.respondentOrgId}
+ *       (identified individually via {@code OpenDisputeAgainstFreelancerOrgCommand
+ *       .freelancerOrgOwnerId}).</li>
+ *   <li>{@link #FREELANCER_SUB} — a DRIVER/sub-deliverer working <b>under</b> a
+ *       FreelancerOrganization OWNER, not the legal entity itself. In
+ *       {@code tnt-dispute-core} this is {@code Dispute.impliedSubDelivererId} /
+ *       {@code Dispute.subDelivererInvolved} alongside a {@code FREELANCER_ORG}
+ *       respondent; in {@code tnt-incident-core} it is an incident whose
+ *       {@code responsibleOrgType = "FREELANCER_ORG"} carries a
+ *       {@code responsibleOrgId} distinct from {@code reportedByActorId}.</li>
+ * </ul>
+ * All three map to the single {@code ActorRole.FREELANCER_DRIVER} value in
+ * {@code logistics/tnt-incident-core} — that module does not yet distinguish
+ * standalone/OWNER/SUB at the enum level, only via the separate
+ * {@code responsibleOrgId}/{@code responsibleOrgType} fields on {@code Incident}.
+ * The three vocabularies are intentionally separate, module-local enums — never assume
+ * enum-name equality across modules, only correlate by actor UUID/string identity.
+ *
  * @author MANFOUO Braun
  */
 public enum ActorType {

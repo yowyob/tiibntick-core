@@ -71,6 +71,10 @@ class DisputeControllerTest {
                 .userId(UUID.randomUUID())
                 .tenantId(UUID.fromString(TENANT_ID))
                 .authenticated(true)
+                // dispute:resolve -> privileged, so the (unrelated) actor-impersonation
+                // guard added for Go-Freelancer hardening doesn't short-circuit this
+                // HTTP-contract test before it reaches the use case.
+                .permissions(java.util.Set.of("dispute:resolve"))
                 .build();
         org.mockito.Mockito.lenient().when(resolveCurrentUserUseCase.resolveCurrentIdentity())
                 .thenReturn(Mono.just(TntUserIdentity.from(resolvedContext)));

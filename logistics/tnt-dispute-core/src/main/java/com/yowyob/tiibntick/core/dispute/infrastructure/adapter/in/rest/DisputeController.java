@@ -2,6 +2,7 @@ package com.yowyob.tiibntick.core.dispute.infrastructure.adapter.in.rest;
 
 import com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser;
 import com.yowyob.tiibntick.core.auth.domain.model.TntUserIdentity;
+import com.yowyob.tiibntick.core.dispute.application.command.OpenDisputeAgainstFreelancerOrgCommand;
 import com.yowyob.tiibntick.core.dispute.application.port.inbound.IDisputeCommandUseCase;
 import com.yowyob.tiibntick.core.dispute.application.port.inbound.IDisputeQueryUseCase;
 import com.yowyob.tiibntick.core.dispute.application.query.GetDisputeQuery;
@@ -13,11 +14,11 @@ import com.yowyob.tiibntick.core.dispute.domain.model.DisputeId;
 import com.yowyob.tiibntick.core.dispute.infrastructure.adapter.in.rest.dto.request.DisputeRequests;
 import com.yowyob.tiibntick.core.dispute.infrastructure.adapter.in.rest.dto.response.DisputeResponses;
 import com.yowyob.tiibntick.core.dispute.infrastructure.adapter.in.rest.mapper.DisputeRestMapper;
+import com.yowyob.tiibntick.core.roles.domain.exception.TntRoleException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -41,12 +42,19 @@ import java.time.LocalDateTime;
  * {@code @Order(11)} chain) — {@code TntUserIdentity} carries the correctly-resolved
  * tenant either way, so this controller needs no branching logic of its own.
  *
+ * <p>Role/ownership enforcement: {@code @RequirePermission(resource = "dispute", ...)}
+ * on the application service layer (Go-Freelancer integration hardening) replaces the
+ * former class-wide {@code @PreAuthorize("isAuthenticated()")}, which only rejected
+ * anonymous callers and left every authenticated role (including a bare freelancer JWT)
+ * able to call mediator-tier actions on any tenant's dispute. Non-privileged callers
+ * (no {@code dispute:resolve}) are additionally restricted to disputes where they are
+ * the claimant or respondent, enforced in {@code DisputeQueryService}/{@code DisputeCommandService}.
+ *
  * @author MANFOUO Braun
  */
 @RestController
 @RequestMapping("/api/v1/disputes")
 @Tag(name = "Dispute Management", description = "Full dispute lifecycle: open, investigate, mediate, rule, compensate, close")
-@PreAuthorize("isAuthenticated()")
 public class DisputeController {
 
     private final IDisputeCommandUseCase commandUseCase;
@@ -55,6 +63,18 @@ public class DisputeController {
     public DisputeController(IDisputeCommandUseCase commandUseCase, IDisputeQueryUseCase queryUseCase) {
         this.commandUseCase = commandUseCase;
         this.queryUseCase = queryUseCase;
+    }
+
+    private boolean isPrivileged(TntUserIdentity currentUser) {
+        return currentUser.hasPermission("dispute", "resolve");
+    }
+
+    /** Non-privileged callers may only act as themselves — reject impersonation attempts. */
+    private void assertActingAsSelf(TntUserIdentity currentUser, String actorIdInPayload) {
+        String self = currentUser.actorId() != null ? currentUser.actorId().toString() : null;
+        if (!isPrivileged(currentUser) && (actorIdInPayload == null || !actorIdInPayload.equals(self))) {
+            throw TntRoleException.forbidden("dispute", "create");
+        }
     }
 
     // =========================================================================
@@ -68,6 +88,7 @@ public class DisputeController {
     public Mono<DisputeResponses.DisputeOpenedResponse> openDispute(
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestBody DisputeRequests.OpenDisputeRequest request) {
+        assertActingAsSelf(currentUser, request.claimantId());
         String tenantId = currentUser.tenantId().toString();
         return commandUseCase.openDispute(DisputeRestMapper.toCommand(request, tenantId))
                 .map(DisputeRestMapper::toOpenedResponse);
@@ -83,7 +104,8 @@ public class DisputeController {
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @PathVariable String id) {
         String tenantId = currentUser.tenantId().toString();
-        return queryUseCase.getDispute(new GetDisputeQuery(DisputeId.of(id), tenantId, "SYSTEM"))
+        String requesterId = currentUser.actorId() != null ? currentUser.actorId().toString() : null;
+        return queryUseCase.getDispute(new GetDisputeQuery(DisputeId.of(id), tenantId, requesterId, isPrivileged(currentUser)))
                 .map(DisputeRestMapper::toDetailResponse);
     }
 
@@ -98,7 +120,8 @@ public class DisputeController {
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @PathVariable String reference) {
         String tenantId = currentUser.tenantId().toString();
-        return queryUseCase.getByReference(reference, tenantId)
+        String requesterId = currentUser.actorId() != null ? currentUser.actorId().toString() : null;
+        return queryUseCase.getByReference(reference, tenantId, requesterId, isPrivileged(currentUser))
                 .map(DisputeRestMapper::toDetailResponse);
     }
 
@@ -121,10 +144,11 @@ public class DisputeController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         String tenantId = currentUser.tenantId().toString();
+        String requesterId = currentUser.actorId() != null ? currentUser.actorId().toString() : null;
 
         ListDisputesQuery query = new ListDisputesQuery(
                 tenantId,
-                null, // requesterId (optional or missing in current controller signature)
+                requesterId,
                 status != null ? DisputeStatus.valueOf(status) : null,
                 priority != null ? DisputePriority.valueOf(priority) : null,
                 category != null ? DisputeCategory.valueOf(category) : null,
@@ -134,7 +158,8 @@ public class DisputeController {
                 from != null ? LocalDateTime.parse(from) : null,
                 to != null ? LocalDateTime.parse(to) : null,
                 page,
-                size);
+                size,
+                isPrivileged(currentUser));
 
 
         return queryUseCase.listDisputes(query)
@@ -157,7 +182,8 @@ public class DisputeController {
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @PathVariable String claimantId) {
         String tenantId = currentUser.tenantId().toString();
-        return queryUseCase.getDisputesByClaimant(claimantId, tenantId)
+        String requesterId = currentUser.actorId() != null ? currentUser.actorId().toString() : null;
+        return queryUseCase.getDisputesByClaimant(claimantId, tenantId, requesterId, isPrivileged(currentUser))
                 .map(DisputeRestMapper::toSummaryResponse);
     }
 
@@ -187,6 +213,7 @@ public class DisputeController {
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @PathVariable String id,
             @RequestBody DisputeRequests.AddCommentRequest request) {
+        assertActingAsSelf(currentUser, request.authorId());
         String tenantId = currentUser.tenantId().toString();
         return commandUseCase.addComment(DisputeRestMapper.toCommand(request, id, tenantId))
                 .map(DisputeRestMapper::toDetailResponse);
@@ -202,6 +229,7 @@ public class DisputeController {
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @PathVariable String id,
             @RequestBody DisputeRequests.WithdrawDisputeRequest request) {
+        assertActingAsSelf(currentUser, request.claimantId());
         String tenantId = currentUser.tenantId().toString();
         return commandUseCase.withdrawDispute(DisputeRestMapper.toCommand(request, id, tenantId))
                 .map(DisputeRestMapper::toDetailResponse);
@@ -243,39 +271,50 @@ public class DisputeController {
      * Opens a dispute specifically against a FreelancerOrganization.
      */
     @PostMapping("/freelancer-org")
-    @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
-    @io.swagger.v3.oas.annotations.Operation(summary = "Open a dispute against a FreelancerOrg",
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Open a dispute against a FreelancerOrg",
         description = " — Opens a dispute targeting a FreelancerOrganization as the respondent. "
                     + "Optionally tracks the sub-deliverer who executed the disputed delivery.")
-    public reactor.core.publisher.Mono<?> openDisputeAgainstFreelancerOrg(
-            @org.springframework.web.bind.annotation.RequestBody
-                com.yowyob.tiibntick.core.dispute.application.command.OpenDisputeAgainstFreelancerOrgCommand cmd) {
-        return commandUseCase.openAgainstFreelancerOrg(cmd);
+    public Mono<DisputeResponses.DisputeDetailResponse> openDisputeAgainstFreelancerOrg(
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
+            @RequestBody OpenDisputeAgainstFreelancerOrgCommand cmd) {
+        assertActingAsSelf(currentUser, cmd.claimantId());
+        String tenantId = currentUser.tenantId().toString();
+        OpenDisputeAgainstFreelancerOrgCommand tenantSafeCmd = new OpenDisputeAgainstFreelancerOrgCommand(
+                tenantId, cmd.claimantId(), cmd.claimantType(), cmd.freelancerOrgId(), cmd.freelancerOrgOwnerId(),
+                cmd.impliedSubDelivererId(), cmd.cause(), cmd.category(), cmd.priority(), cmd.missionId(),
+                cmd.packageId(), cmd.trackingCode(), cmd.description());
+        return commandUseCase.openAgainstFreelancerOrg(tenantSafeCmd)
+                .map(DisputeRestMapper::toDetailResponse);
     }
 
     /**
-     * GET /disputes/freelancer-org/{orgId}?tenantId=...&status=...
+     * GET /disputes/freelancer-org/{orgId}?status=...
      * Lists all disputes against a FreelancerOrg.
      */
     @GetMapping("/freelancer-org/{orgId}")
-    @io.swagger.v3.oas.annotations.Operation(summary = "List disputes against a FreelancerOrg")
-    public reactor.core.publisher.Flux<?> getDisputesByFreelancerOrg(
-            @org.springframework.web.bind.annotation.PathVariable String orgId,
-            @org.springframework.web.bind.annotation.RequestParam String tenantId,
-            @org.springframework.web.bind.annotation.RequestParam(required = false) String status) {
-        return queryUseCase.findDisputesByFreelancerOrg(orgId, status, tenantId);
+    @Operation(summary = "List disputes against a FreelancerOrg")
+    public Flux<DisputeResponses.DisputeSummaryResponse> getDisputesByFreelancerOrg(
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
+            @PathVariable String orgId,
+            @RequestParam(required = false) String status) {
+        String tenantId = currentUser.tenantId().toString();
+        return queryUseCase.findDisputesByFreelancerOrg(orgId, status, tenantId)
+                .map(DisputeRestMapper::toSummaryResponse);
     }
 
     /**
-     * GET /disputes/freelancer-org/{orgId}/stats?tenantId=...
+     * GET /disputes/freelancer-org/{orgId}/stats
      * Returns dispute statistics for a FreelancerOrg.
      */
     @GetMapping("/freelancer-org/{orgId}/stats")
-    @io.swagger.v3.oas.annotations.Operation(summary = "Dispute stats for a FreelancerOrg")
-    public reactor.core.publisher.Mono<?> getDisputeStatsByOrg(
-            @org.springframework.web.bind.annotation.PathVariable String orgId,
-            @org.springframework.web.bind.annotation.RequestParam String tenantId) {
-        return queryUseCase.getDisputeStatsByOrg(orgId, tenantId);
+    @Operation(summary = "Dispute stats for a FreelancerOrg")
+    public Mono<DisputeResponses.DisputeStatsResponse> getDisputeStatsByOrg(
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
+            @PathVariable String orgId) {
+        String tenantId = currentUser.tenantId().toString();
+        return queryUseCase.getDisputeStatsByOrg(orgId, tenantId)
+                .map(DisputeRestMapper::toStatsResponse);
     }
 
 }

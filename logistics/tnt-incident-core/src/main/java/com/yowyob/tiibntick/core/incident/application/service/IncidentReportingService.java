@@ -12,6 +12,7 @@ import com.yowyob.tiibntick.core.incident.domain.service.IncidentTriageService;
 import com.yowyob.tiibntick.core.incident.port.inbound.IReportDriverWithdrawalUseCase;
 import com.yowyob.tiibntick.core.incident.port.inbound.IReportIncidentUseCase;
 import com.yowyob.tiibntick.core.incident.port.outbound.*;
+import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,6 +57,7 @@ public class IncidentReportingService implements IReportIncidentUseCase, IReport
      */
     @Override
     @Transactional
+    @RequirePermission(resource = "incident", action = "create")
     public Mono<Incident> execute(ReportIncidentCommand command) {
         IncidentType type = command.getType();
         var category = triageService.deriveCategory(type);
@@ -79,6 +81,7 @@ public class IncidentReportingService implements IReportIncidentUseCase, IReport
 
     @Override
     @Transactional
+    @RequirePermission(resource = "incident", action = "create")
     public Mono<Incident> execute(ReportDriverWithdrawalCommand command) {
         var category = triageService.deriveCategory(command.getWithdrawalType());
 
@@ -127,6 +130,11 @@ public class IncidentReportingService implements IReportIncidentUseCase, IReport
     }
 
     private Mono<Incident> notifyAgency(Incident incident) {
+        if (incident.getAgencyId() == null) {
+            // GO/FREELANCER-platform incident with no owning agency — nothing to notify here;
+            // FreelancerOrg-context routing (responsibleOrgId) is handled separately.
+            return Mono.just(incident);
+        }
         return notificationPort.notifyAgency(
                 incident.getAgencyId(),
                 "New Incident: " + incident.getReferenceCode(),

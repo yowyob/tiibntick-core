@@ -27,6 +27,8 @@ public interface IIncidentRepository {
     Flux<Incident> findByAgencyIdAndStatus(UUID agencyId, IncidentStatus status);
     Flux<Incident> findByTenantIdAndStatus(UUID tenantId, IncidentStatus status);
     Flux<Incident> findByAgencyIdAndCreatedBetween(UUID agencyId, Instant from, Instant to);
+    /** For self-service callers with no agency (GO/FREELANCER platforms) — "my incidents" scoped by reporter, not by agency. */
+    Flux<Incident> findByReportedByActorIdAndCreatedBetween(UUID reportedByActorId, UUID tenantId, Instant from, Instant to);
     Flux<Incident> findActiveByPlatform(PlatformType platform, UUID tenantId);
     Flux<Incident> findByStatusIn(Iterable<IncidentStatus> statuses, UUID tenantId);
     Flux<Incident> findEscalatedIncidents(UUID tenantId);

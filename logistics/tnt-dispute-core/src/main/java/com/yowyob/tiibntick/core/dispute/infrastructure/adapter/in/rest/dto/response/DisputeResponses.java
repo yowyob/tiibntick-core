@@ -50,7 +50,22 @@ public final class DisputeResponses {
             ResolutionResponse resolution,
             CompensationResponse compensation,
             List<EvidenceResponse> evidences,
-            SlaResponse sla) {}
+            SlaResponse sla,
+            String respondentOrgId,
+            String impliedSubDelivererId,
+            Boolean subDelivererInvolved) {}
+
+    public record DisputeStatsResponse(
+            String orgId,
+            String periodLabel,
+            long totalDisputes,
+            long openDisputes,
+            long resolvedDisputes,
+            long closedWithCompensation,
+            long closedWithdrawn,
+            BigDecimal totalCompensationXAF,
+            double disputeRate,
+            double compensationRate) {}
 
     public record ResolutionResponse(
             String type,

@@ -9,6 +9,7 @@ import com.yowyob.tiibntick.core.incident.domain.model.IncidentDriverReplacement
 import com.yowyob.tiibntick.core.incident.domain.model.IncidentEventLog;
 import com.yowyob.tiibntick.core.incident.port.inbound.IConfirmHandoverUseCase;
 import com.yowyob.tiibntick.core.incident.port.outbound.*;
+import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -52,6 +53,7 @@ public class IncidentHandoverService implements IConfirmHandoverUseCase {
      */
     @Override
     @Transactional
+    @RequirePermission(resource = "incident", action = "manage")
     public Mono<IncidentDriverReplacement> execute(ConfirmHandoverCommand command) {
         return incidentRepository.findById(command.getIncidentId())
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Incident not found")))

@@ -19,15 +19,15 @@ mvn -pl tnt-bootstrap spring-boot:run                  # app (default/dev profil
 |---|---|
 | Java | 21 |
 | Spring Boot | 4.0.6 / Framework 7 |
-| Modules | 31 (1 runnable: `tnt-bootstrap`) |
+| Modules | 53 (1 runnable: `tnt-bootstrap`) — 39 in root `pom.xml` + 14 nested under `tnt-agency-back-core` |
 | Lombok | 1.18.46 (pinned — see `knowledge/known-issues.md`) |
 | springdoc | 3.0.3 (pinned — Boot 4 only) |
 | App port | 8080 |
-| Postgres | 5432, db `tiibntick_core`, user `tiibntick`/`tiibntick_pass` |
+| Postgres | 5433 (host, mapped from container's 5432), db `tiibntick_core`, user `tiibntick`/`tiibntick_pass` |
 | Redis | 6379 |
 | Kafka | 9092 (host) / `kafka:29092` (internal) |
 | MinIO | 9000 (API) / 9001 (console), `minioadmin`/`minioadmin123` |
-| System tenant ID | `00000000-0000-0000-0000-000000000001` |
+| System tenant ID | `af1f5fb6-0265-481a-ba17-ae55ad53ec41` (see `TNT_SYSTEM_TENANT_ID` in `tnt-bootstrap/.env`; `mvn spring-boot:run` does NOT auto-load `.env` — export it manually) |
 
 ## Permission system modes
 ```yaml

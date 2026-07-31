@@ -7,11 +7,11 @@ import com.yowyob.tiibntick.core.dispute.domain.model.DisputeId;
 import com.yowyob.tiibntick.core.dispute.infrastructure.adapter.in.rest.dto.request.DisputeRequests;
 import com.yowyob.tiibntick.core.dispute.infrastructure.adapter.in.rest.dto.response.DisputeResponses;
 import com.yowyob.tiibntick.core.dispute.infrastructure.adapter.in.rest.mapper.DisputeRestMapper;
+import com.yowyob.tiibntick.core.roles.domain.exception.TntRoleException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -27,18 +27,26 @@ import reactor.core.publisher.Mono;
  * remediation, 2026-07-18) — see {@link DisputeController} javadoc for the full
  * rationale (JWT or platform Client-Id/Api-Key, never a raw header).
  *
+ * <p>Actor identity for mediator actions is resolved from {@code @CurrentUser}, not
+ * the previously client-supplied {@code X-Actor-ID} header — the same forgery class
+ * already fixed once for {@code X-Tenant-ID} was still open here (Go-Freelancer
+ * integration hardening).
+ *
  * @author MANFOUO Braun
  */
 @RestController
 @RequestMapping("/api/v1/disputes/{disputeId}/evidences")
 @Tag(name = "Evidence Management", description = "Submit, list, and verify evidence on a dispute")
-@PreAuthorize("isAuthenticated()")
 public class EvidenceController {
 
     private final IEvidenceUseCase evidenceUseCase;
 
     public EvidenceController(IEvidenceUseCase evidenceUseCase) {
         this.evidenceUseCase = evidenceUseCase;
+    }
+
+    private boolean isPrivileged(TntUserIdentity currentUser) {
+        return currentUser.hasPermission("dispute", "resolve");
     }
 
     // =========================================================================
@@ -54,6 +62,10 @@ public class EvidenceController {
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @PathVariable String disputeId,
             @RequestBody DisputeRequests.AddEvidenceRequest request) {
+        String self = currentUser.actorId() != null ? currentUser.actorId().toString() : null;
+        if (!isPrivileged(currentUser) && (request.submittedBy() == null || !request.submittedBy().equals(self))) {
+            throw TntRoleException.forbidden("dispute", "create");
+        }
         String tenantId = currentUser.tenantId().toString();
         return evidenceUseCase.submitEvidence(DisputeRestMapper.toCommand(request, disputeId, tenantId))
                 .map(DisputeRestMapper::toDetailResponse);
@@ -82,10 +94,10 @@ public class EvidenceController {
             description = "Moves the dispute to AWAITING_EVIDENCE status and notifies the specified party.")
     public Mono<DisputeResponses.DisputeDetailResponse> requestEvidence(
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
-            @RequestHeader("X-Actor-ID") String actorId,
             @PathVariable String disputeId,
             @RequestBody DisputeRequests.RequestEvidenceRequest request) {
         String tenantId = currentUser.tenantId().toString();
+        String actorId = currentUser.actorId() != null ? currentUser.actorId().toString() : null;
         return evidenceUseCase.requestEvidence(DisputeRestMapper.toCommand(request, disputeId, tenantId, actorId))
                 .map(DisputeRestMapper::toDetailResponse);
     }
@@ -103,7 +115,8 @@ public class EvidenceController {
             @PathVariable String evidenceId,
             @RequestBody DisputeRequests.VerifyEvidenceRequest request) {
         String tenantId = currentUser.tenantId().toString();
-        return evidenceUseCase.verifyEvidence(DisputeId.of(disputeId), evidenceId, request.mediatorId(), tenantId)
+        String mediatorId = currentUser.actorId() != null ? currentUser.actorId().toString() : request.mediatorId();
+        return evidenceUseCase.verifyEvidence(DisputeId.of(disputeId), evidenceId, mediatorId, tenantId)
                 .map(DisputeRestMapper::toEvidenceResponse);
     }
 }

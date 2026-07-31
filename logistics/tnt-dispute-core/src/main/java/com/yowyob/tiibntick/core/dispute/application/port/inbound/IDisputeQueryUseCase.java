@@ -39,7 +39,7 @@ public interface IDisputeQueryUseCase {
      * @param tenantId   the tenant scope
      * @return a Flux of active disputes
      */
-    Flux<Dispute> getDisputesByClaimant(String claimantId, String tenantId);
+    Flux<Dispute> getDisputesByClaimant(String claimantId, String tenantId, String requesterId, boolean privileged);
 
     /**
      * Returns all disputes involving a given respondent (for reputation data).
@@ -57,7 +57,7 @@ public interface IDisputeQueryUseCase {
      * @param tenantId  the tenant scope
      * @return the matching dispute, or empty
      */
-    Mono<Dispute> getByReference(String reference, String tenantId);
+    Mono<Dispute> getByReference(String reference, String tenantId, String requesterId, boolean privileged);
 
     /**
      * Returns all disputes where the respondent is the given FreelancerOrg ().

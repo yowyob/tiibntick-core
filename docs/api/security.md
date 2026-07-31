@@ -25,14 +25,16 @@ Every endpoint except explicitly-public ones (tracking by code, announcement bro
 | `wallet`/`payment` | `read`, `write`, `process` | `CLIENT`, `FREELANCER` |
 | `invoice`/`billing` | `read`, `write`, `issue`, `post` | `AGENCY_MANAGER` |
 | `report` | `read`, `export` | `AGENCY_MANAGER`, `SUPPORT_AGENT` |
+| `dispute` | `create`, `read`, `resolve` | `CLIENT`/`FREELANCER` (create/read own), `AGENCY_MANAGER`/`SUPPORT_AGENT`/`ORG_ADMIN` (resolve, any dispute in tenant) |
+| `incident` | `create`, `read`, `manage` | `FREELANCER`/`PERMANENT_DELIVERER`/`RELAY_OPERATOR` (create/read own), `AGENCY_MANAGER`/`BRANCH_MANAGER`/`SUPPORT_AGENT`/`ORG_ADMIN` (manage, any incident in tenant) — added 2026-07-31, see `security/roles.md` |
 | `administration:*` | `permissions:read`, `roles:read/write`, `settings:read/write` | `TNT_ADMIN`, `ORG_ADMIN` |
 | `accounting`, `sales` | `read`, `write` | `ORG_ADMIN`, `tnt:platform:admin` fallback |
 | `platform` | `clients` (platform-client CRUD/rotate/revoke/scopes/audit) | `TNT_ADMIN` only (not granted to any other role's defaults) |
 
 ## Required headers by module (multi-tenancy — see `api/rest.md` for the full pattern table)
-`X-Tenant-Id` — sync, realtime SSE, billing-invoice, wallet, billing-report, disputes.
+`X-Tenant-Id` — sync, realtime SSE, billing-invoice, wallet, billing-report.
 `X-Organization-Id` / `X-Agency-Id` — sales, accounting.
-None (JWT-derived) — actor-core, administration, KYC — preferred pattern for new endpoints.
+None (JWT-derived) — actor-core, administration, KYC, disputes, incidents — preferred pattern for new endpoints. Disputes/incidents still *accept* an `X-Tenant-Id`/`X-Actor-ID` header for backward compatibility, but it is inert: tenant and actor identity are always resolved from `@CurrentUser TntUserIdentity`, never a client-supplied header (dispute since Audit n°7 · #4, 2026-07-18; incident since the Go-Freelancer RBAC hardening, 2026-07-31 — see `knowledge/known-issues.md`).
 
 ## CORS
 `tnt.security.allowed-origins` (default `http://localhost:3000,3001,4200` in dev) — see `tnt-bootstrap/src/main/resources/application.yml`.

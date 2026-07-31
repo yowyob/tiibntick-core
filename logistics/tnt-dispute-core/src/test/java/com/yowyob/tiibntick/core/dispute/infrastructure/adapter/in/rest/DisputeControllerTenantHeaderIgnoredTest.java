@@ -60,6 +60,10 @@ class DisputeControllerTenantHeaderIgnoredTest {
                 .userId(UUID.randomUUID())
                 .tenantId(resolvedTenant)
                 .authenticated(true)
+                // dispute:resolve -> privileged, so the (unrelated) actor-impersonation
+                // guard added for Go-Freelancer hardening doesn't short-circuit this
+                // tenant-resolution test before it reaches the use case.
+                .permissions(java.util.Set.of("dispute:resolve"))
                 .build();
         when(resolveCurrentUserUseCase.resolveCurrentIdentity())
                 .thenReturn(Mono.just(TntUserIdentity.from(resolvedContext)));

@@ -9,6 +9,7 @@ import com.yowyob.tiibntick.core.dispute.application.port.outbound.IDisputeRepos
 import com.yowyob.tiibntick.core.dispute.domain.enums.EvidenceType;
 import com.yowyob.tiibntick.core.dispute.domain.exception.DisputeNotFoundException;
 import com.yowyob.tiibntick.core.dispute.domain.model.*;
+import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -46,6 +47,7 @@ public class EvidenceApplicationService implements IEvidenceUseCase {
 
     @Override
     @Transactional
+    @RequirePermission(resource = "dispute", action = "create")
     public Mono<Dispute> submitEvidence(final AddEvidenceCommand cmd) {
         Objects.requireNonNull(cmd, "AddEvidenceCommand must not be null");
         log.info("Submitting evidence type={} for dispute={}", cmd.evidenceType(), cmd.disputeId());
@@ -66,6 +68,7 @@ public class EvidenceApplicationService implements IEvidenceUseCase {
 
     @Override
     @Transactional
+    @RequirePermission(resource = "dispute", action = "resolve")
     public Mono<Dispute> requestEvidence(final RequestEvidenceCommand cmd) {
         Objects.requireNonNull(cmd, "RequestEvidenceCommand must not be null");
         log.info("Requesting evidence from={} for dispute={}", cmd.requestedFrom(), cmd.disputeId());
@@ -80,6 +83,7 @@ public class EvidenceApplicationService implements IEvidenceUseCase {
 
     @Override
     @Transactional
+    @RequirePermission(resource = "dispute", action = "resolve")
     public Mono<DisputeEvidence> verifyEvidence(
             final DisputeId disputeId,
             final String evidenceId,
@@ -101,6 +105,7 @@ public class EvidenceApplicationService implements IEvidenceUseCase {
     }
 
     @Override
+    @RequirePermission(resource = "dispute", action = "read")
     public Flux<DisputeEvidence> getEvidenceForDispute(final DisputeId disputeId, final String tenantId) {
         return repository.findByIdAndTenantId(disputeId, tenantId)
                 .switchIfEmpty(Mono.error(new DisputeNotFoundException(disputeId)))

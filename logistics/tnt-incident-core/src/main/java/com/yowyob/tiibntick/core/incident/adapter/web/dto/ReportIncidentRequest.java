@@ -18,7 +18,8 @@ import java.util.UUID;
 @Data @Builder @AllArgsConstructor @NoArgsConstructor
 public class ReportIncidentRequest {
     @NotNull UUID tenantId;
-    @NotNull UUID agencyId;
+    /** Null for GO/FREELANCER-platform missions, which have no owning agency. */
+    UUID agencyId;
     @NotNull UUID missionId;
     @NotNull PlatformType platform;
     @NotNull IncidentType type;

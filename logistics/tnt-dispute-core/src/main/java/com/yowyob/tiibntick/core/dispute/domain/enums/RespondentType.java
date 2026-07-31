@@ -13,7 +13,17 @@ package com.yowyob.tiibntick.core.dispute.domain.enums;
  */
 public enum RespondentType {
 
-    /** Individual freelancer courier (not part of a FreelancerOrg). */
+    /**
+     * Individual freelancer courier, <b>standalone</b> — not part of any
+     * FreelancerOrganization. Maps to {@code ActorType.FREELANCER} in
+     * {@code identity/tnt-actor-core} specifically (not {@code FREELANCER_OWNER}/
+     * {@code FREELANCER_SUB} — those belong to a FreelancerOrg and should target
+     * {@link #FREELANCER_ORG} instead, never this value). Also corresponds to
+     * {@code ActorRole.FREELANCER_DRIVER} in {@code tnt-incident-core} for incidents
+     * with no {@code responsibleOrgId}. See {@code ClaimantType}'s javadoc for the
+     * mirrored claimant-side mapping — these vocabularies are deliberately kept
+     * separate per module and correlated only by UUID/string identity.
+     */
     FREELANCER,
 
     /** Permanent deliverer employed by an Agency. */
@@ -38,10 +48,15 @@ public enum RespondentType {
      *
      * <p>Used when the dispute targets a FreelancerOrg as a business entity
      * (rather than an individual freelancer). The {@code respondentOrgId} field
-     * on the {@code Dispute} carries the org UUID.
+     * on the {@code Dispute} carries the org UUID — this identifies the OWNER
+     * ({@code ActorType.FREELANCER_OWNER}) as the legally responsible party.
      *
-     * <p>Associated with: {@code Dispute.respondentOrgId} and optional
-     * {@code Dispute.impliedSubDelivererId} when a SUB_DELIVERER is implicated.
+     * <p>When the mission was actually executed by a DRIVER/sub-deliverer
+     * ({@code ActorType.FREELANCER_SUB}) rather than the OWNER directly, that
+     * individual is tracked separately via {@code Dispute.impliedSubDelivererId}
+     * / {@code Dispute.subDelivererInvolved} — the respondent stays the org
+     * ({@code respondentOrgId}), while the sub-deliverer is carried alongside it
+     * for compensation-split routing, not as a second respondent.
      */
     FREELANCER_ORG,
 

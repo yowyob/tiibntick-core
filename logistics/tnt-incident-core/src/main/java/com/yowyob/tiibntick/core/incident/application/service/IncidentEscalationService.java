@@ -10,6 +10,7 @@ import com.yowyob.tiibntick.core.incident.port.inbound.ICancelIncidentUseCase;
 import com.yowyob.tiibntick.core.incident.port.inbound.ICloseIncidentUseCase;
 import com.yowyob.tiibntick.core.incident.port.inbound.IEscalateIncidentUseCase;
 import com.yowyob.tiibntick.core.incident.port.outbound.*;
+import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -68,6 +69,7 @@ public class IncidentEscalationService implements IEscalateIncidentUseCase,
      */
     @Override
     @Transactional
+    @RequirePermission(resource = "incident", action = "manage")
     public Mono<Incident> execute(EscalateIncidentCommand command) {
         return incidentRepository.findById(command.getIncidentId())
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Incident not found")))
@@ -96,6 +98,7 @@ public class IncidentEscalationService implements IEscalateIncidentUseCase,
 
     @Override
     @Transactional
+    @RequirePermission(resource = "incident", action = "manage")
     public Mono<Incident> execute(UUID incidentId, UUID closedByActorId) {
         return incidentRepository.findById(incidentId)
                 .flatMap(incident -> {
@@ -111,6 +114,7 @@ public class IncidentEscalationService implements IEscalateIncidentUseCase,
 
     @Override
     @Transactional
+    @RequirePermission(resource = "incident", action = "manage")
     public Mono<Incident> execute(UUID incidentId, UUID cancelledByActorId, String reason) {
         return incidentRepository.findById(incidentId)
                 .flatMap(incident -> {

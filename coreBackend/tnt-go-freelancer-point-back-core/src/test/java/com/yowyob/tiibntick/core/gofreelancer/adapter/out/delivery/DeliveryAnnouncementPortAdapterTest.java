@@ -149,6 +149,22 @@ class DeliveryAnnouncementPortAdapterTest {
                 .verifyComplete();
     }
 
+    @Test
+    void parsePricingMode_acceptsFeAliases() {
+        assertThat(DeliveryAnnouncementPortAdapter.parsePricingMode("FIXED"))
+                .isEqualTo(AnnouncementPricingMode.FIXED_PRICE);
+        assertThat(DeliveryAnnouncementPortAdapter.parsePricingMode("QUOTE"))
+                .isEqualTo(AnnouncementPricingMode.QUOTE_REQUEST);
+        assertThat(DeliveryAnnouncementPortAdapter.parsePricingMode("GO"))
+                .isEqualTo(AnnouncementPricingMode.FIXED_PRICE);
+        assertThat(DeliveryAnnouncementPortAdapter.parsePricingMode("FREELANCER"))
+                .isEqualTo(AnnouncementPricingMode.QUOTE_REQUEST);
+        assertThat(DeliveryAnnouncementPortAdapter.parsePricingMode("FIXED_PRICE"))
+                .isEqualTo(AnnouncementPricingMode.FIXED_PRICE);
+        assertThat(DeliveryAnnouncementPortAdapter.parsePricingMode("QUOTE_REQUEST"))
+                .isEqualTo(AnnouncementPricingMode.QUOTE_REQUEST);
+    }
+
     private DeliveryAnnouncement realAnnouncement(AnnouncementPricingMode mode, BigDecimal offeredAmount) {
         return DeliveryAnnouncement.builder()
                 .id(UUID.randomUUID())

@@ -39,4 +39,8 @@ public class IncidentResponse {
     boolean interAgencyInvolved;
     Double riskScore;
     boolean slaBreached;
+    UUID reportedByActorId;
+    String responsibleOrgId;
+    String responsibleOrgType;
+    String trackingCode;
 }

@@ -10,7 +10,7 @@ docs/
 │
 ├── architecture/
 │   ├── overview.md       ← 30-second mental model, layered build diagram
-│   ├── modules.md        ← all 31 modules: layer, owner, purpose
+│   ├── modules.md        ← all 53 modules: layer, owner, purpose
 │   ├── packages.md       ← hexagonal package shape (+ 2 exceptions)
 │   ├── dependencies.md   ← Mermaid inter-module dependency graph
 │   ├── decisions.md      ← ADR log (why things are the way they are)
