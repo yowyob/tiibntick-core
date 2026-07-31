@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.core.delivery.adapter.in.web.response;
 
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.AnnouncementPricingMode;
 import com.yowyob.tiibntick.core.delivery.domain.model.enums.AnnouncementStatus;
 import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryUrgency;
 import com.yowyob.tiibntick.core.delivery.domain.model.enums.ResponseStatus;
@@ -22,6 +23,7 @@ public record DeliveryAnnouncementResponse(
         String description,
         BigDecimal offeredAmount,
         String currency,
+        AnnouncementPricingMode pricingMode,
         AnnouncementStatus status,
         DeliveryUrgency urgency,
         String pickupDisplay,
@@ -39,6 +41,8 @@ public record DeliveryAnnouncementResponse(
             UUID deliveryPersonId,
             Instant estimatedArrivalTime,
             String note,
+            BigDecimal proposedPrice,
+            String proposedCurrency,
             ResponseStatus status,
             Instant createdAt
     ) {}

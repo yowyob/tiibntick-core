@@ -45,47 +45,47 @@ public class DeliveryNeed implements Persistable<UUID>, TntPersistableEntity {
     @Column("user_id")
     private UUID userId;
 
-    // NEW: Tracking code for logistics lifecycle
-    @Column("tracking_code")
+    /**
+     * Not yet present on {@code public.delivery_needs} — kept for domain use only.
+     * @author MANFOUO BRAUN
+     */
+    @Transient
     private TrackingCode trackingCode;
 
     @Column("packet_id")
     private UUID packetId;
 
-    @Column("target_relay_point_id")
+    @Transient
     private UUID targetRelayPointId;
 
-    @Column("requested_storage_days")
+    @Transient
     private Integer requestedStorageDays;
 
-    // ----- Expéditeur -----
-    @Column("sender_first_name")
+    @Transient
     private String senderFirstName;
 
-    @Column("sender_last_name")
+    @Transient
     private String senderLastName;
 
-    @Column("sender_email")
+    @Transient
     private String senderEmail;
 
-    @Column("sender_phone")
+    @Transient
     private String senderPhone;
 
-    // ----- Destinataire -----
-    @Column("recipient_first_name")
+    @Transient
     private String recipientFirstName;
 
-    @Column("recipient_last_name")
+    @Transient
     private String recipientLastName;
 
-    @Column("recipient_email")
+    @Transient
     private String recipientEmail;
 
-    @Column("recipient_phone")
+    @Transient
     private String recipientPhone;
 
     @NotNull
-
     @Column("pickup_address_id")
     private UUID pickupAddressId;
 

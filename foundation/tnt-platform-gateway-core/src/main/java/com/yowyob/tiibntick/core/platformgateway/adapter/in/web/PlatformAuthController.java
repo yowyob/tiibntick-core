@@ -225,6 +225,14 @@ public class PlatformAuthController {
         return proxy("/api/auth/reset-password", body, authorization);
     }
 
+    @PostMapping("/refresh")
+    @Operation(summary = "Refresh an access token using a refresh token")
+    public Mono<ResponseEntity<ApiResponse<JsonNode>>> refresh(
+            @RequestBody JsonNode body,
+            @Parameter(hidden = true) @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization) {
+        return proxy("/api/auth/refresh", body, authorization);
+    }
+
     @PostMapping("/select-context")
     @Operation(summary = "Select a discovered login context and obtain an access token")
     public Mono<ResponseEntity<ApiResponse<JsonNode>>> selectContext(

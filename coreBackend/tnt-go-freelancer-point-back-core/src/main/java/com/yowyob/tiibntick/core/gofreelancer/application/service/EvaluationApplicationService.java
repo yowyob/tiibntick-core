@@ -4,10 +4,10 @@ import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.EvaluationD
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.persistence.repository.EvaluationRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.usecase.SentimentAnalysisUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Evaluation;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.EvaluationUseCase;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.GofpClientRepository;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.GofpFreelancerRepository;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.GofpRelayPointRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.EvaluationUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpClientRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpFreelancerRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpRelayPointRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

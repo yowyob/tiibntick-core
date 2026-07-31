@@ -251,3 +251,13 @@ Valeurs `outcome` d'audit (`AuditOutcome`) : `SUCCESS`, `INVALID_KEY`, `UNKNOWN_
 - **`*` par défaut n'est pas un totem** — c'est la sécurité "immédiatement utilisable", pas "toujours laisser tel quel". Restreindre dès que le besoin réel d'une plateforme est connu et plus étroit que "tout".
 - **Rotation planifiée régulière** recommandée même sans incident (ex. tous les 6-12 mois) — `graceHours` suffisamment large pour laisser la plateforme redéployer.
 - **Auditer périodiquement** `GET .../audit-logs?outcome=FORBIDDEN_SCOPE` — un volume élevé indique soit une plateforme mal configurée, soit une tentative d'accès non autorisé.
+
+---
+
+## 10. Statut de production (2026-07-25)
+
+5 identités plateforme sont créées et pleinement fonctionnelles (client + clé API émis) sur l'instance réelle déployée `https://tiibntick-core.yowyob.com` : Agency, Link, Go, Market, App Mobile (`platformCode=APP_MOBILE`, ajouté après la liste initiale de 5 plateformes de ce guide). **Aucun scope n'a encore été restreint** — les 5 tournent sur le wildcard `*` par défaut de la création ; voir `GET /api/v1/admin/scope-registry` pour le catalogue avant toute décision de restriction.
+
+**Bug corrigé le 2026-07-25 (commit `efdecebb`)** : entre le lancement du module (2026-07-09) et cette date, la création de client/clé retournait bien `201 Created` mais ne persistait **rien** en base — bug R2DBC `Persistable` (voir `docs/knowledge/known-issues.md` #18 et `docs/architecture/decisions.md` ADR-020). Si une ligne de client antérieure au 2026-07-25 17:23 UTC se comporte bizarrement (création réussie, lecture immédiate en échec), c'est probablement une ligne orpheline de cette période — décommissionnable sans risque.
+
+Distribuer `clientId` + clé en clair uniquement via un gestionnaire de secrets (jamais email/Slack) — conforme à la conception "affichage unique" de l'API elle-même.

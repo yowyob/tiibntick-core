@@ -4,8 +4,8 @@ import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.PriceCalcul
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.response.PriceCalculationResponse;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.FreelancerPricingPolicy;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.RelayPointPricingPolicy;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.PricingCalculatorUseCase;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.RelayPointPricingRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.PricingCalculatorUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.RelayPointPricingRepository;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.persistence.repository.FreelancerVehicleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

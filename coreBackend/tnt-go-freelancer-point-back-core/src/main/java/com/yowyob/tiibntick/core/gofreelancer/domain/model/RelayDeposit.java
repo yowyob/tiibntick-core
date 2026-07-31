@@ -15,6 +15,17 @@ import com.yowyob.tiibntick.common.persistence.TntPersistableEntity;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
+/**
+ * Temporary GOFP product mirror of a hub deposit.
+ *
+ * <p>Authoritative stock lives in {@code tnt-inventory-core} ({@code HubPackageEntry});
+ * delivery step in {@code tnt-delivery-core}; hub identity/occupancy in {@code tnt-geo-core}.
+ * Kept for UX/billing until cut-over — synchronised by {@code RelayDepositService}.</p>
+ *
+ * @author MANFOUO BRAUN
+ * @deprecated Prefer HubPackageEntry + delivery lifecycle; retain as sync mirror only.
+ */
+@Deprecated
 @Data
 @Builder
 @NoArgsConstructor

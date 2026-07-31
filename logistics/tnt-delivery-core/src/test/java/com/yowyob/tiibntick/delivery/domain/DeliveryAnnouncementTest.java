@@ -121,6 +121,54 @@ class DeliveryAnnouncementTest {
                 .hasMessageContaining("DRAFT");
     }
 
+    @Test
+    @DisplayName("QUOTE_REQUEST publish allows null offeredAmount")
+    void shouldPublishQuoteRequestWithoutOfferedAmount() {
+        Parcel parcel = Parcel.create(new PackageSpecification(
+                1.0, 20, 15, 10, false, false, "Documents"));
+        DeliveryAnnouncement quote = DeliveryAnnouncement.createDraft(
+                TENANT_ID, CLIENT_ID, "Devis livraison",
+                null, null, "XAF",
+                com.yowyob.tiibntick.core.delivery.domain.model.enums.AnnouncementPricingMode.QUOTE_REQUEST,
+                parcel, pickupAddr(), deliveryAddr(),
+                new RecipientInfo("Marie Ngono", "+237691000002", null),
+                DeliveryUrgency.EXPRESS);
+
+        quote.publish();
+
+        assertThat(quote.getStatus()).isEqualTo(AnnouncementStatus.PUBLISHED);
+        assertThat(quote.getPricingMode()).isEqualTo(
+                com.yowyob.tiibntick.core.delivery.domain.model.enums.AnnouncementPricingMode.QUOTE_REQUEST);
+    }
+
+    @Test
+    @DisplayName("QUOTE_REQUEST respond requires proposedPrice")
+    void shouldRequireProposedPriceOnQuoteRespond() {
+        Parcel parcel = Parcel.create(new PackageSpecification(
+                1.0, 20, 15, 10, false, false, "Documents"));
+        DeliveryAnnouncement quote = DeliveryAnnouncement.createDraft(
+                TENANT_ID, CLIENT_ID, "Devis livraison",
+                null, null, "XAF",
+                com.yowyob.tiibntick.core.delivery.domain.model.enums.AnnouncementPricingMode.QUOTE_REQUEST,
+                parcel, pickupAddr(), deliveryAddr(),
+                new RecipientInfo("Marie Ngono", "+237691000002", null),
+                DeliveryUrgency.EXPRESS);
+        quote.publish();
+
+        AnnouncementResponse withoutPrice = AnnouncementResponse.create(
+                quote.getId(), DRIVER_1_ID, Instant.now().plusSeconds(600), "ok");
+
+        assertThatThrownBy(() -> quote.addResponse(withoutPrice))
+                .isInstanceOf(DeliveryDomainException.class)
+                .hasMessageContaining("proposedPrice");
+
+        AnnouncementResponse withPrice = AnnouncementResponse.create(
+                quote.getId(), DRIVER_1_ID, Instant.now().plusSeconds(600), "ok",
+                BigDecimal.valueOf(4500), "XAF");
+        quote.addResponse(withPrice);
+        assertThat(quote.getResponses()).hasSize(1);
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────
 
     private static DeliveryAddress pickupAddr() {

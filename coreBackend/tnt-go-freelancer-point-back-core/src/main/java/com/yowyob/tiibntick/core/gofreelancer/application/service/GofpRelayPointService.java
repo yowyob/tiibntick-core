@@ -2,9 +2,9 @@ package com.yowyob.tiibntick.core.gofreelancer.application.service;
 
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpRelayPoint;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.relaypoint.RelayPointStatus;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.GofpRelayPointUseCase;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.GofpFreelancerRepository;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.GofpRelayPointRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.GofpRelayPointUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpFreelancerRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpRelayPointRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -17,12 +17,9 @@ import java.util.UUID;
 /**
  * Application service for GofpRelayPoint lifecycle.
  *
- * <p><strong>Composition:</strong> loads the transient {@code owner} (GofpFreelancer)
- * after each read so callers get the relay point with full owner context.
- * Owner contact fields (phone, email, name) are also denormalised directly on
- * the entity for fast notification lookup without extra joins.
+ * <p>{@code coreRelayPointId} maps to {@code tnt-geo-core} {@code RelayHub.id}.
  *
- * @author François-Charles ATANGA
+ * @author MANFOUO BRAUN
  */
 @Slf4j
 @Service
@@ -76,7 +73,7 @@ public class GofpRelayPointService implements GofpRelayPointUseCase {
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("GofpRelayPoint not found: " + id)))
                 .flatMap(rp -> {
                     rp.setStatus(status);
-                    if (status != RelayPointStatus.APPROVED) rp.setIsActive(false);
+                    rp.setIsActive(status == RelayPointStatus.APPROVED);
                     rp.setUpdatedAt(Instant.now());
                     return relayPointRepository.save(rp);
                 })

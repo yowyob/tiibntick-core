@@ -16,6 +16,8 @@ public interface IDeliveryNeedRepository {
 
     Mono<DeliveryNeed> findById(UUID id);
 
+    Flux<DeliveryNeed> findAll();
+
     Flux<DeliveryNeed> findAllByUserId(UUID userId);
 
     Flux<DeliveryNeed> findAllByStatus(DeliveryNeedStatus status);

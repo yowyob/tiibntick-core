@@ -3,7 +3,7 @@ package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpClient;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.client.ClientStatus;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.user.LoyaltyStatus;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.GofpClientUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.GofpClientUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

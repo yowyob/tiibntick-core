@@ -1,7 +1,7 @@
 package com.yowyob.tiibntick.core.gofreelancer.application.service;
 
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.RelayDeposit;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.RelayDepositUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.RelayDepositUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -9,6 +9,13 @@ import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
+/**
+ * Thin delegate over {@link RelayDepositService} (product mirror of hub deposits).
+ *
+ * @author MANFOUO BRAUN
+ * @deprecated Prefer inventory + delivery-core orchestration; kept for REST compatibility.
+ */
+@Deprecated
 @Service
 @RequiredArgsConstructor
 public class RelayDepositUseCaseImpl implements RelayDepositUseCase {

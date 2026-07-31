@@ -1,21 +1,21 @@
 package com.yowyob.tiibntick.core.gofreelancer.application.service;
 
 import com.yowyob.tiibntick.core.billing.wallet.application.port.in.IWalletUseCase;
-import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.InitiatePaymentCommand;
 import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.SplitMissionRevenueCommand;
+import com.yowyob.tiibntick.core.delivery.application.port.in.command.DepositAtRelayPointCommand;
+import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.DeliveryStatusUpdateDTO;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpRelayPointRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryNeedRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.PushNotificationPort;
+import com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery;
+import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpRelayPoint;
+import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryStatus;
 import com.yowyob.tiibntick.core.trust.application.port.in.RecordCustodyTransferUseCase;
 import com.yowyob.tiibntick.core.trust.application.port.in.RecordMissionUseCase;
 import com.yowyob.tiibntick.core.trust.application.port.in.RecordPaymentUseCase;
 import com.yowyob.tiibntick.core.trust.domain.model.enums.CustodyTransferType;
 import com.yowyob.tiibntick.core.trust.domain.model.valueobject.CustodyTransferRecord;
-import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.DeliveryStatusUpdateDTO;
-import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryNeedRepository;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryStatus;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.AdminRelayPointUseCase;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.DeliveryRepository;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.PushNotificationPort;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.RelayPointPricingRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -28,17 +28,10 @@ import java.util.UUID;
 /**
  * Application service handling delivery status transitions.
  *
- * <p>Orchestrates three cross-cutting concerns on delivery completion:
- * <ol>
- *   <li><strong>Wallet / Payment</strong> — Initiates payment via {@code tnt-billing-wallet}
- *       and splits revenue between platform, FreelancerOrg, and sub-deliverer.</li>
- *   <li><strong>Blockchain</strong> — Anchors custody transfers and mission completion
- *       on Hyperledger Fabric via {@code tnt-trust-core}.</li>
- *   <li><strong>Notifications</strong> — Sends push notifications to relay point managers
- *       and clients upon deposit.</li>
- * </ol>
+ * <p>Orchestrates wallet, trust, notifications, and for relay deposits:
+ * {@code tnt-delivery-core#depositAtRelayPoint} + inventory/geo via {@link RelayDepositService}.</p>
  *
- * @author François-Charles ATANGA
+ * @author MANFOUO BRAUN
  */
 @Slf4j
 @Service
@@ -47,9 +40,8 @@ public class DeliveryStatusApplicationService {
 
     private final DeliveryRepository deliveryRepository;
     private final RelayDepositService relayDepositService;
-    private final AdminRelayPointUseCase adminRelayPointUseCase;
+    private final GofpRelayPointRepository gofpRelayPointRepository;
     private final PushNotificationPort pushNotificationPort;
-    private final RelayPointPricingRepository relayPointPricingRepository;
     private final IDeliveryNeedRepository deliveryNeedRepository;
 
     // ── OTP ────────────────────────────────────────────────────────────────
@@ -148,11 +140,11 @@ public class DeliveryStatusApplicationService {
                                         "Blockchain: custody PICKUP_FROM_SENDER anchored (OTP-certified) — " +
                                         "delivery={}, freelancer={}, pocHash={}, txHash={}",
                                         deliveryId, freelancerIdForPickup, pocHash, txHash))
-                                .onErrorResume(e -> {
-                                    log.error("Blockchain: failed to anchor PICKUP_FROM_SENDER for delivery {}",
-                                            deliveryId, e);
-                                    return Mono.empty();
-                                })
+                                .doOnError(e -> log.error(
+                                        "Blockchain: failed to anchor PICKUP_FROM_SENDER for delivery {} — "
+                                                + "best-effort, not blocking (ADR-018)",
+                                        deliveryId, e))
+                                .onErrorResume(e -> Mono.empty())
                                 .then();
 
                         return deliveryRepository.save(delivery)
@@ -162,15 +154,26 @@ public class DeliveryStatusApplicationService {
                     log.info("Updating delivery {} status to {} via core port", deliveryId, dto.getStatus());
 
                     UUID tenantId = TenantContextHolder.SYSTEM_TENANT;
-                    
+
+                    // Apply local status early (relay deposit → AT_RELAY_POINT to align with delivery-core)
+                    boolean isRelayDeposit = dto.getRelayPointId() != null
+                            && (DeliveryStatus.DELIVERED.equals(dto.getStatus())
+                            || DeliveryStatus.AT_RELAY_POINT.equals(dto.getStatus()));
+                    if (isRelayDeposit) {
+                        delivery.setStatus(DeliveryStatus.AT_RELAY_POINT);
+                    } else if (dto.getStatus() != null) {
+                        delivery.setStatus(dto.getStatus());
+                    }
+
                     return deliveryQueryUseCase.findDeliveryById(tenantId, deliveryId)
-                            .switchIfEmpty(Mono.error(new IllegalArgumentException("Core delivery not found: " + deliveryId)))
+                            .switchIfEmpty(Mono.error(new IllegalArgumentException(
+                                    "Core delivery not found: " + deliveryId)))
                             .flatMap(coreDelivery -> {
-                                Mono<Delivery> saveDelivery = deliveryRepository.save(delivery); // Save local changes
-                                
-                                UUID freelancerId = coreDelivery.getDeliveryPersonId() != null 
-                                        ? coreDelivery.getDeliveryPersonId() 
-                                        : UUID.fromString("00000000-0000-0000-0000-000000000002"); // Fallback
+                                Mono<Delivery> saveDelivery = deliveryRepository.save(delivery);
+
+                                UUID freelancerId = coreDelivery.getDeliveryPersonId() != null
+                                        ? coreDelivery.getDeliveryPersonId()
+                                        : UUID.fromString("00000000-0000-0000-0000-000000000002");
 
                                 // ═══════════════════════════════════════════════════════════
                                 // 1. IN_TRANSIT → Ancrer la création de mission sur la blockchain
@@ -179,49 +182,45 @@ public class DeliveryStatusApplicationService {
                                     Mono<Void> blockchainMissionCreated = missionUseCase.recordCreated(
                                                     deliveryId.toString(),
                                                     freelancerId.toString(),
-                                                    "default",  // tenantId
-                                                    1            // packageCount
-                                            )
-                                            .doOnSuccess(txHash -> log.info("Blockchain: mission CREATED anchored for delivery {} — txHash={}",
+                                                    "default",
+                                                    1)
+                                            .doOnSuccess(txHash -> log.info(
+                                                    "Blockchain: mission CREATED anchored for delivery {} — txHash={}",
                                                     deliveryId, txHash))
-                                            .onErrorResume(e -> {
-                                                log.error("Blockchain: failed to anchor mission CREATED for delivery {}", deliveryId, e);
-                                                return Mono.empty();
-                                            })
+                                            .doOnError(e -> log.error(
+                                                    "Blockchain: failed to anchor mission CREATED for delivery {} — "
+                                                            + "best-effort, not blocking (ADR-018)",
+                                                    deliveryId, e))
+                                            .onErrorResume(e -> Mono.empty())
                                             .then();
 
                                     return saveDelivery.flatMap(saved -> blockchainMissionCreated.thenReturn(saved));
                                 }
 
                                 // ═══════════════════════════════════════════════════════════
-                                // 2. DELIVERED → Paiement + Blockchain + Notifications
+                                // 2. DELIVERED / AT_RELAY_POINT → Paiement + Blockchain + Notifications
                                 // ═══════════════════════════════════════════════════════════
-                                if (DeliveryStatus.DELIVERED.equals(dto.getStatus())) {
+                                if (DeliveryStatus.DELIVERED.equals(dto.getStatus())
+                                        || DeliveryStatus.AT_RELAY_POINT.equals(dto.getStatus())) {
 
-                                    // ── 2a. Paiement via Wallet ────────────────────────────
-                                    Mono<Void> processPayment = processDeliveryPayment(delivery, freelancerId)
-                                            .onErrorResume(e -> {
-                                                log.error("Payment processing failed for delivery {}", deliveryId, e);
-                                                return Mono.empty();
-                                            });
+                                    Mono<Void> processPayment = processDeliveryPayment(delivery, freelancerId);
 
-                                    // ── 2b. Blockchain: mission COMPLETED ──────────────────
                                     Mono<Void> blockchainMissionCompleted = missionUseCase.recordCompleted(
                                                     deliveryId.toString(),
                                                     freelancerId.toString(),
-                                                    "default"
-                                            )
-                                            .doOnSuccess(txHash -> log.info("Blockchain: mission COMPLETED anchored for delivery {} — txHash={}",
+                                                    "default")
+                                            .doOnSuccess(txHash -> log.info(
+                                                    "Blockchain: mission COMPLETED anchored for delivery {} — txHash={}",
                                                     deliveryId, txHash))
-                                            .onErrorResume(e -> {
-                                                log.error("Blockchain: failed to anchor mission COMPLETED for delivery {}", deliveryId, e);
-                                                return Mono.empty();
-                                            })
+                                            .doOnError(e -> log.error(
+                                                    "Blockchain: failed to anchor mission COMPLETED for delivery {} — "
+                                                            + "best-effort, not blocking (ADR-018)",
+                                                    deliveryId, e))
+                                            .onErrorResume(e -> Mono.empty())
                                             .then();
 
-                                    // ── 2c. Si livré en point-relais → dépôt + custody blockchain ──
-                                    if (dto.getRelayPointId() != null) {
-
+                                    // ── 2c. Dépôt point-relais → delivery-core + inventory/geo + notifs ──
+                                    if (isRelayDeposit) {
                                         if (dto.getClientId() == null) {
                                             return Mono.error(new IllegalArgumentException(
                                                     "clientId is required when delivering to a relay point"));
@@ -231,61 +230,46 @@ public class DeliveryStatusApplicationService {
                                                 ? delivery.getDeliveryNeedId()
                                                 : deliveryId;
 
-                                        // Blockchain: custody transfer → TRANSFER_TO_HUB
-                                        Mono<Void> blockchainCustody = anchorCustodyTransferToHub(
-                                                deliveryId, freelancerId, packetId, dto.getRelayPointId());
+                                        return resolveHubId(dto.getRelayPointId())
+                                                .flatMap(hubId -> {
+                                                    Mono<Void> coreDeposit = deliveryLifecycleUseCase
+                                                            .depositAtRelayPoint(new DepositAtRelayPointCommand(
+                                                                    tenantId, deliveryId, freelancerId, hubId))
+                                                            .doOnSuccess(d -> log.info(
+                                                                    "delivery-core depositAtRelayPoint ok delivery={} hub={}",
+                                                                    deliveryId, hubId))
+                                                            .doOnError(e -> log.error(
+                                                                    "delivery-core depositAtRelayPoint FAILED delivery={} hub={} — propagating",
+                                                                    deliveryId, hubId, e))
+                                                            .then();
 
-                                        // Créer le RelayDeposit + notifications
-                                        Mono<Void> createDeposit = relayDepositService
-                                                .createRelayDeposit(packetId, dto.getClientId(), dto.getRelayPointId(), dto.getStorageFee())
-                                                .doOnSuccess(deposit ->
-                                                        log.info("RelayDeposit {} created for delivery {} at relay point {}",
-                                                                deposit.getId(), deliveryId, dto.getRelayPointId()))
-                                                .flatMap(deposit ->
-                                                        adminRelayPointUseCase.getRelayPointDetails(dto.getRelayPointId())
-                                                                .zipWith(
-                                                                    deliveryNeedRepository.findById(delivery.getDeliveryNeedId())
-                                                                        .map(need -> need.getRequestedStorageDays() != null ? need.getRequestedStorageDays() : 3)
-                                                                        .defaultIfEmpty(3)
-                                                                )
-                                                                .flatMap(tuple -> {
-                                                                    var relayPoint = tuple.getT1();
-                                                                    var storageDays = tuple.getT2();
+                                                    Mono<Void> blockchainCustody = anchorCustodyTransferToHub(
+                                                            deliveryId, freelancerId, packetId, hubId);
 
-                                                                    // Notifier le gérant du point relais
-                                                                    Mono<Void> notifyRelay = pushNotificationPort.sendPushNotification(
-                                                                            relayPoint.getFreelancerId(),
-                                                                            "Nouveau Dépôt",
-                                                                            "Un nouveau colis a été déposé dans votre point relais. Numéro de suivi : " + packetId
-                                                                    );
+                                                    Mono<Void> createDeposit = relayDepositService
+                                                            .createRelayDeposit(packetId, dto.getClientId(),
+                                                                    hubId, dto.getStorageFee(), freelancerId)
+                                                            .doOnSuccess(deposit -> log.info(
+                                                                    "RelayDeposit mirror {} for delivery {} hub={}",
+                                                                    deposit.getId(), deliveryId, hubId))
+                                                            .flatMap(deposit -> notifyRelayDeposit(
+                                                                    hubId, dto.getClientId(), packetId,
+                                                                    delivery.getDeliveryNeedId()))
+                                                            .then();
 
-                                                                    // Notifier le client final
-                                                                    Mono<Void> notifyClient = pushNotificationPort.sendPushNotification(
-                                                                            dto.getClientId(),
-                                                                            "Colis Arrivé !",
-                                                                            "Votre colis est arrivé au point relais " + relayPoint.getName() + ". Conformément à votre demande, il sera gardé pendant " + storageDays + " jours sans frais de pénalité."
-                                                                    );
-
-                                                                    return Mono.when(notifyRelay, notifyClient);
-                                                                })
-                                                                .onErrorResume(e -> {
-                                                                    log.error("Failed to send notifications upon deposit", e);
-                                                                    return Mono.empty();
-                                                                })
-                                                )
-                                                .then();
-
-                                        return saveDelivery.flatMap(saved ->
-                                                Mono.when(createDeposit, processPayment, blockchainMissionCompleted, blockchainCustody)
-                                                        .thenReturn(saved));
+                                                    return saveDelivery.flatMap(saved ->
+                                                            Mono.when(coreDeposit, createDeposit,
+                                                                            processPayment, blockchainMissionCompleted,
+                                                                            blockchainCustody)
+                                                                    .thenReturn(saved));
+                                                });
                                     }
 
                                     // ── 2d. Livraison directe (sans point-relais) ──────────
-                                    // OTP validation: the delivery person must provide the code given by the recipient
                                     if (dto.getConfirmationCode() == null || dto.getConfirmationCode().isBlank()) {
                                         return Mono.error(new IllegalArgumentException(
-                                                "Un code de confirmation est requis pour confirmer la livraison directe (DELIVERED). " +
-                                                "Demandez le code au destinataire."));
+                                                "Un code de confirmation est requis pour confirmer la livraison directe (DELIVERED). "
+                                                        + "Demandez le code au destinataire."));
                                     }
                                     if (!otpService.verifyOtp(dto.getConfirmationCode(), delivery.getDeliveryOtpHash())) {
                                         return Mono.error(new IllegalArgumentException(
@@ -294,15 +278,12 @@ public class DeliveryStatusApplicationService {
                                     log.info("Delivery OTP verified for delivery {} — setting DELIVERED (direct)", deliveryId);
                                     Instant deliveryTime = Instant.now();
                                     delivery.setActualDeliveryTime(deliveryTime);
+                                    delivery.setStatus(DeliveryStatus.DELIVERED);
 
-                                    // ── Blockchain: TRANSFER_TO_RECIPIENT (OTP-certified) ──
-                                    // Unlike the non-OTP path, this record is anchored AFTER
-                                    // the recipient has confirmed receipt — making it a
-                                    // certified proof of delivery, not a unilateral declaration.
                                     Mono<Void> blockchainCustodyDirect = anchorOtpCertifiedDelivery(
                                             deliveryId, freelancerId, deliveryTime);
 
-                                    return saveDelivery.flatMap(saved ->
+                                    return deliveryRepository.save(delivery).flatMap(saved ->
                                             Mono.when(processPayment, blockchainMissionCompleted, blockchainCustodyDirect)
                                                     .thenReturn(saved));
                                 }
@@ -310,6 +291,55 @@ public class DeliveryStatusApplicationService {
                                 return saveDelivery;
                             });
                 });
+    }
+
+    private Mono<UUID> resolveHubId(UUID relayPointId) {
+        return gofpRelayPointRepository.findByCoreRelayPointId(relayPointId)
+                .switchIfEmpty(gofpRelayPointRepository.findById(relayPointId))
+                .map(GofpRelayPoint::getCoreRelayPointId)
+                .switchIfEmpty(Mono.error(new IllegalArgumentException(
+                        "No GofpRelayPoint found for id/coreRelayPointId: " + relayPointId)));
+    }
+
+    private Mono<Void> notifyRelayDeposit(UUID hubId, UUID clientId, UUID packetId, UUID deliveryNeedId) {
+        Mono<GofpRelayPoint> rpMono = gofpRelayPointRepository.findByCoreRelayPointId(hubId)
+                .switchIfEmpty(gofpRelayPointRepository.findById(hubId));
+
+        Mono<Integer> daysMono = deliveryNeedId == null
+                ? Mono.just(3)
+                : deliveryNeedRepository.findById(deliveryNeedId)
+                .map(need -> need.getRequestedStorageDays() != null ? need.getRequestedStorageDays() : 3)
+                .defaultIfEmpty(3);
+
+        return rpMono.zipWith(daysMono)
+                .flatMap(tuple -> {
+                    GofpRelayPoint rp = tuple.getT1();
+                    int storageDays = tuple.getT2();
+                    String rpName = rp.getName() != null && !rp.getName().isBlank()
+                            ? rp.getName() : "Point Relais";
+
+                    Mono<Void> notifyRelay = Mono.empty();
+                    if (rp.getCoreFreelancerId() != null) {
+                        notifyRelay = pushNotificationPort.sendPushNotification(
+                                rp.getCoreFreelancerId(),
+                                "Nouveau Dépôt",
+                                "Un nouveau colis a été déposé dans votre point relais « "
+                                        + rpName + " ». Suivi : " + packetId);
+                    } else {
+                        log.warn("Relay hub {} has no coreFreelancerId — skip RP push", hubId);
+                    }
+
+                    Mono<Void> notifyClient = pushNotificationPort.sendPushNotification(
+                            clientId,
+                            "Colis Arrivé !",
+                            "Votre colis est arrivé au point relais " + rpName
+                                    + ". Il sera gardé pendant " + storageDays
+                                    + " jours sans frais de pénalité.");
+
+                    return Mono.when(notifyRelay, notifyClient);
+                })
+                .doOnError(e -> log.error("Failed to send deposit notifications hub={}", hubId, e))
+                .onErrorResume(e -> Mono.empty());
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -367,7 +397,7 @@ public class DeliveryStatusApplicationService {
                                 delivery.getId().toString(),
                                 com.yowyob.tiibntick.core.billing.wallet.domain.enums.PaymentChannel.CASH_ON_DELIVERY,
                                 "Commission logicielle (5%) pour la course payée en espèces : " + delivery.getId(),
-                                java.util.UUID.randomUUID().toString()
+                                "cash-commission:" + delivery.getId()
                         )
                 ).doOnSuccess(tx -> log.info("Debited commission {} from freelancer {} for CASH delivery", 
                         platformCommissionAmount, freelancerId)).then();
@@ -403,13 +433,20 @@ public class DeliveryStatusApplicationService {
                     )
                     .doOnSuccess(txHash -> log.info("Blockchain: payment anchored for delivery {} — txHash={}",
                             delivery.getId(), txHash))
-                    .onErrorResume(e -> {
-                        log.error("Blockchain: failed to anchor payment for delivery {}", delivery.getId(), e);
-                        return Mono.empty();
-                    })
+                    .doOnError(e -> log.error(
+                            "Blockchain: failed to anchor payment for delivery {} — "
+                                    + "best-effort, not blocking (ADR-018)",
+                            delivery.getId(), e))
+                    .onErrorResume(e -> Mono.empty())
                     .then();
 
-            return Mono.when(walletAction, anchorPayment);
+            // walletAction is NOT best-effort: a real wallet failure (insufficient funds, wallet
+            // service down) must surface to the caller rather than being silently swallowed —
+            // only blockchain trust-anchoring (anchorPayment, above) is ADR-018 best-effort.
+            return Mono.when(walletAction, anchorPayment)
+                    .doOnError(e -> log.error(
+                            "Payment processing failed for delivery {} — propagating",
+                            delivery.getId(), e));
         });
     }
 
@@ -429,10 +466,11 @@ public class DeliveryStatusApplicationService {
         return custodyTransferUseCase.record(record)
                 .doOnSuccess(txHash -> log.info("Blockchain: custody TRANSFER_TO_HUB anchored — delivery={}, hub={}, txHash={}",
                         deliveryId, relayPointId, txHash))
-                .onErrorResume(e -> {
-                    log.error("Blockchain: failed to anchor custody transfer to hub for delivery {}", deliveryId, e);
-                    return Mono.empty();
-                })
+                .doOnError(e -> log.error(
+                        "Blockchain: failed to anchor custody transfer to hub for delivery {} — "
+                                + "best-effort, not blocking (ADR-018)",
+                        deliveryId, e))
+                .onErrorResume(e -> Mono.empty())
                 .then();
     }
 
@@ -452,28 +490,16 @@ public class DeliveryStatusApplicationService {
         return custodyTransferUseCase.record(record)
                 .doOnSuccess(txHash -> log.info("Blockchain: custody TRANSFER_TO_RECIPIENT anchored — delivery={}, txHash={}",
                         deliveryId, txHash))
-                .onErrorResume(e -> {
-                    log.error("Blockchain: failed to anchor custody transfer to recipient for delivery {}", deliveryId, e);
-                    return Mono.empty();
-                })
+                .doOnError(e -> log.error(
+                        "Blockchain: failed to anchor custody transfer to recipient for delivery {} — "
+                                + "best-effort, not blocking (ADR-018)",
+                        deliveryId, e))
+                .onErrorResume(e -> Mono.empty())
                 .then();
     }
 
     /**
      * Anchors a TRANSFER_TO_RECIPIENT custody record that is OTP-certified.
-     *
-     * <p>Unlike {@link #anchorCustodyTransferToRecipient}, this variant:
-     * <ul>
-     *   <li>Uses the exact {@code actualDeliveryTime} confirmed by the OTP exchange
-     *       rather than the current server time — making the timestamp tamper-evident.</li>
-     *   <li>Computes and attaches a <strong>Proof of Content (PoC) hash</strong>
-     *       that binds package ID, actors, transfer type, and timestamp into a
-     *       SHA-256 digest anchored on-chain. Any post-hoc alteration of these
-     *       fields will invalidate the PoC and be immediately detectable.</li>
-     * </ul>
-     *
-     * <p>This makes the on-chain record a genuine <em>certified proof of delivery</em>
-     * rather than a unilateral declaration by the delivery person.
      *
      * @param deliveryId   UUID of the delivery
      * @param freelancerId UUID of the delivery person handing over the parcel
@@ -482,7 +508,6 @@ public class DeliveryStatusApplicationService {
     private Mono<Void> anchorOtpCertifiedDelivery(UUID deliveryId, UUID freelancerId, Instant deliveryTime) {
         LocalDateTime deliveryLdt = LocalDateTime.ofInstant(deliveryTime, java.time.ZoneOffset.UTC);
 
-        // PoC hash: binds packageId + actors + type + OTP-certified timestamp
         String pocHash = CustodyTransferRecord.computePocHash(
                 deliveryId.toString(),
                 freelancerId.toString(),
@@ -510,11 +535,11 @@ public class DeliveryStatusApplicationService {
                         "Blockchain: custody TRANSFER_TO_RECIPIENT anchored (OTP-certified) — " +
                         "delivery={}, freelancer={}, deliveryTime={}, pocHash={}, txHash={}",
                         deliveryId, freelancerId, deliveryLdt, pocHash, txHash))
-                .onErrorResume(e -> {
-                    log.error("Blockchain: failed to anchor OTP-certified delivery for delivery {}",
-                            deliveryId, e);
-                    return Mono.empty();
-                })
+                .doOnError(e -> log.error(
+                        "Blockchain: failed to anchor OTP-certified delivery for delivery {} — "
+                                + "best-effort, not blocking (ADR-018)",
+                        deliveryId, e))
+                .onErrorResume(e -> Mono.empty())
                 .then();
     }
 }

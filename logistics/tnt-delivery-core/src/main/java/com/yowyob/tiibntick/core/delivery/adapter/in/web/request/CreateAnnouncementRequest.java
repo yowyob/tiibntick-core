@@ -1,6 +1,7 @@
 package com.yowyob.tiibntick.core.delivery.adapter.in.web.request;
 
 import com.yowyob.tiibntick.core.delivery.application.port.in.command.CreateDeliveryAnnouncementCommand;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.AnnouncementPricingMode;
 import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryUrgency;
 import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.DeliveryAddress;
 import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.GeoCoordinates;
@@ -24,8 +25,9 @@ public record CreateAnnouncementRequest(
         @NotNull UUID clientId,
         @NotBlank String title,
         String description,
-        @NotNull @DecimalMin("1") BigDecimal offeredAmount,
+        @DecimalMin("1") BigDecimal offeredAmount,
         @NotBlank String currency,
+        AnnouncementPricingMode pricingMode,
 
         // Package
         @NotNull @Positive double weightKg,
@@ -74,7 +76,10 @@ public record CreateAnnouncementRequest(
 
         RecipientInfo recipient = new RecipientInfo(recipientName, recipientPhone, recipientAltPhone);
 
+        AnnouncementPricingMode mode = pricingMode != null
+                ? pricingMode : AnnouncementPricingMode.FIXED_PRICE;
+
         return new CreateDeliveryAnnouncementCommand(tenantId, clientId, title, description,
-                offeredAmount, currency, spec, pickup, delivery, recipient, urgency);
+                offeredAmount, currency, mode, spec, pickup, delivery, recipient, urgency);
     }
 }

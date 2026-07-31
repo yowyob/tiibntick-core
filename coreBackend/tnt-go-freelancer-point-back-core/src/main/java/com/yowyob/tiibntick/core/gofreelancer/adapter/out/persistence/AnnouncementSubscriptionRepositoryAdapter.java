@@ -1,6 +1,6 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.out.persistence;
 
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.AnnouncementSubscriptionRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.AnnouncementSubscriptionRepository;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.AnnouncementSubscription;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

@@ -1,6 +1,6 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.out.storage;
 
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.FileStoragePort;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.FileStoragePort;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.stereotype.Component;

@@ -1,6 +1,7 @@
 package com.yowyob.tiibntick.core.geo.application.service;
 
 import com.yowyob.tiibntick.core.geo.application.port.in.IFindNearbyHubsUseCase;
+import com.yowyob.tiibntick.core.geo.application.port.in.IManageRelayHubUseCase;
 import com.yowyob.tiibntick.core.geo.application.port.out.IRelayHubRepository;
 import com.yowyob.tiibntick.core.geo.application.port.out.IRoadNodeRepository;
 import com.yowyob.tiibntick.core.geo.domain.exception.GeoNotFoundException;
@@ -17,7 +18,7 @@ import java.util.UUID;
  * Author: MANFOUO Braun
  */
 @Service
-public class RelayHubService implements IFindNearbyHubsUseCase {
+public class RelayHubService implements IFindNearbyHubsUseCase, IManageRelayHubUseCase {
 
     private static final double DEFAULT_SEARCH_RADIUS_KM = 10.0;
 
@@ -62,6 +63,7 @@ public class RelayHubService implements IFindNearbyHubsUseCase {
                 });
     }
 
+    @Override
     public Mono<RelayHub> createHub(UUID tenantId, UUID branchId, String nodeId,
                                      int capacitySlots, String operatorActorId) {
         RoadNodeId roadNodeId = RoadNodeId.of(nodeId);
@@ -75,6 +77,7 @@ public class RelayHubService implements IFindNearbyHubsUseCase {
                 });
     }
 
+    @Override
     public Flux<RelayHub> findHubsByBranch(UUID branchId, UUID tenantId) {
         return hubRepository.findByBranch(branchId, tenantId);
     }

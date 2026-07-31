@@ -3,7 +3,7 @@ package com.yowyob.tiibntick.core.gofreelancer.application.service;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.UserRegistrationDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.response.UserResponseDTO;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryNeedRepository;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.UserUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.UserUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

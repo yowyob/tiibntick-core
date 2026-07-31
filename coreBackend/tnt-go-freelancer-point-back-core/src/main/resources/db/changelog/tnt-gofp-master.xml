@@ -400,4 +400,11 @@
                  splitStatements="false"/>
     </changeSet>
 
+    <changeSet id="068-align-gofp-schema" author="MANFOUO BRAUN">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260731_align_gofp_schema.sql"
+                 relativeToChangelogFile="false"
+                 splitStatements="false"/>
+    </changeSet>
+
 </databaseChangeLog>

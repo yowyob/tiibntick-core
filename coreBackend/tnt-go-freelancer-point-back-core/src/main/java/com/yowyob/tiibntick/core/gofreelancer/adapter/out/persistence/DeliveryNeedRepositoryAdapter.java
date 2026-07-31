@@ -30,6 +30,11 @@ public class DeliveryNeedRepositoryAdapter implements IDeliveryNeedRepository {
     }
 
     @Override
+    public Flux<DeliveryNeed> findAll() {
+        return r2dbcRepository.findAll();
+    }
+
+    @Override
     public Flux<DeliveryNeed> findAllByUserId(UUID userId) {
         return r2dbcRepository.findAllByUserId(userId);
     }

@@ -76,6 +76,13 @@ public final class TntTopics {
     /** Dispute has frozen/released a package. Produced by tnt-dispute-core's DeliveryStatusAdapter. */
     public static final String DELIVERY_PACKAGE_DISPUTED = "tnt.delivery.package.disputed";
     public static final String DELIVERY_PACKAGE_DISPUTE_RELEASED = "tnt.delivery.package.dispute.released";
+    /** Client published a delivery announcement. Produced by KafkaDeliveryEventPublisher on
+     *  AnnouncementPublishedEvent. Consumed by gofp MatchingUseCase (TOPSIS pipeline). */
+    public static final String DELIVERY_ANNOUNCEMENT_PUBLISHED = "tnt.delivery.announcement.published";
+    /** Client selected a delivery-person response. Produced by KafkaDeliveryEventPublisher on
+     *  AnnouncementResponseSelectedEvent. */
+    public static final String DELIVERY_ANNOUNCEMENT_RESPONSE_SELECTED =
+            "tnt.delivery.announcement.response.selected";
 
     // ── Incident (tnt-incident-core, L3) ────────────────────────────────────────
 
@@ -356,6 +363,14 @@ public final class TntTopics {
     public static final String GOFP_ANNOUNCEMENT_PUBLISHED = "gofp.announcement.published";
     public static final String GOFP_DELIVERY_COMPLETED = "gofp.delivery.completed";
     public static final String GOFP_SUBSCRIPTION_SUSPENDED = "gofp.subscription.suspended";
+    /** Freelancer subscription attempt on a published announcement (async confirmation pipeline). */
+    public static final String GOFP_SUBSCRIPTION_ATTEMPTS = "gofp.subscription.attempts";
+    /** Push/SSE matching notifications to freelancers after TOPSIS ranking. */
+    public static final String GOFP_MATCHING_NOTIFICATIONS = "gofp.matching.notifications";
+    /** Ranked freelancer candidates for an announcement (TOPSIS output). */
+    public static final String GOFP_ANNOUNCEMENT_CANDIDATES_RANKED = "gofp.announcement.candidates.ranked";
+    /** Freelancer account created in GOFP. */
+    public static final String GOFP_FREELANCER_CREATED = "gofp.freelancer.created";
 
     // ── Agency (tnt-agency-eventing-core / tnt-agency-compliance-core, coreBackend) ──
 

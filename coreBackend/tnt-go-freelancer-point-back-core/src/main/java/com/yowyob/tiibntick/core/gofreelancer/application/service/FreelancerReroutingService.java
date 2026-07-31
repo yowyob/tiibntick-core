@@ -4,8 +4,8 @@ import com.yowyob.tiibntick.core.realtime.application.port.in.IBroadcastEtaUseCa
 import com.yowyob.tiibntick.core.realtime.domain.model.ReroutingAlert;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery;
 import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryStatus;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.DeliveryRepository;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.PushNotificationPort;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.PushNotificationPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

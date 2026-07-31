@@ -1,7 +1,7 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.out.pricing;
 
 import com.yowyob.tiibntick.core.billing.wallet.domain.model.Money;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.PricingCatalogPort;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.PricingCatalogPort;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 

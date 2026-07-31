@@ -10,7 +10,11 @@ package com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.address;
 public enum AddressType {
 
     PRIMARY("PRIMARY"),
-    SECONDARY("SECONDARY");
+    SECONDARY("SECONDARY"),
+    /** Home / residence address (API alias). */
+    HOME("HOME"),
+    /** Work / operational base address (API alias). */
+    WORK("WORK");
 
     private final String value;
 

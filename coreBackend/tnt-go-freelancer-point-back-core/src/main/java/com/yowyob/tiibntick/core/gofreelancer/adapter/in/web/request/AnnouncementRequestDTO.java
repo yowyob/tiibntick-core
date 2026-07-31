@@ -20,6 +20,11 @@ public class AnnouncementRequestDTO {
     private String shipperPhone;
     private Double amount;
     private String currency;
+    /**
+     * FIXED_PRICE (default) or QUOTE_REQUEST.
+     * FIXED → amount required; QUOTE → amount optional, freelancers propose on respond.
+     */
+    private String pricingMode;
     private String signatureUrl;
     private String paymentMethod;
     private String transportMethod;

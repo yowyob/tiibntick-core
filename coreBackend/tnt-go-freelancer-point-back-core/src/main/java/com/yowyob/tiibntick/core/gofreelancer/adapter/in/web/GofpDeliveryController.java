@@ -3,7 +3,7 @@ package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web;
 import com.yowyob.tiibntick.core.gofreelancer.application.service.DeliveryStatusApplicationService;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.DeliveryStatusUpdateDTO;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.DeliveryUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.DeliveryUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryStatus;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.DeliveryResponseDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.DeliveryTrackingDTO;
@@ -92,17 +92,31 @@ public class GofpDeliveryController {
     public Mono<ResponseEntity<DeliveryTrackingDTO>> trackDelivery(@PathVariable UUID announcementId) {
         return deliveryUseCase.trackDelivery(announcementId).map(ResponseEntity::ok).defaultIfEmpty(ResponseEntity.notFound().build());
     }
-    @GetMapping(value = "/tracking/stream/announcement/{announcementId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<DeliveryTrackingDTO> trackDeliveryStream(@PathVariable UUID announcementId) {
-        return deliveryUseCase.trackDeliveryStream(announcementId);
+    @GetMapping("/tracking/stream/announcement/{announcementId}")
+    public ResponseEntity<Flux<org.springframework.http.codec.ServerSentEvent<DeliveryTrackingDTO>>> trackDeliveryStream(
+            @PathVariable UUID announcementId) {
+        Flux<org.springframework.http.codec.ServerSentEvent<DeliveryTrackingDTO>> body =
+                deliveryUseCase.trackDeliveryStream(announcementId)
+                        .map(dto -> org.springframework.http.codec.ServerSentEvent
+                                .<DeliveryTrackingDTO>builder(dto)
+                                .event("tracking")
+                                .build());
+        return ResponseEntity.ok().contentType(MediaType.TEXT_EVENT_STREAM).body(body);
     }
     @GetMapping("/tracking/delivery-need/{deliveryNeedId}")
     public Mono<ResponseEntity<DeliveryTrackingDTO>> trackDeliveryByNeed(@PathVariable UUID deliveryNeedId) {
         return deliveryUseCase.trackDeliveryByNeed(deliveryNeedId).map(ResponseEntity::ok).defaultIfEmpty(ResponseEntity.notFound().build());
     }
-    @GetMapping(value = "/tracking/stream/delivery-need/{deliveryNeedId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<DeliveryTrackingDTO> trackDeliveryByNeedStream(@PathVariable UUID deliveryNeedId) {
-        return deliveryUseCase.trackDeliveryByNeedStream(deliveryNeedId);
+    @GetMapping("/tracking/stream/delivery-need/{deliveryNeedId}")
+    public ResponseEntity<Flux<org.springframework.http.codec.ServerSentEvent<DeliveryTrackingDTO>>> trackDeliveryByNeedStream(
+            @PathVariable UUID deliveryNeedId) {
+        Flux<org.springframework.http.codec.ServerSentEvent<DeliveryTrackingDTO>> body =
+                deliveryUseCase.trackDeliveryByNeedStream(deliveryNeedId)
+                        .map(dto -> org.springframework.http.codec.ServerSentEvent
+                                .<DeliveryTrackingDTO>builder(dto)
+                                .event("tracking")
+                                .build());
+        return ResponseEntity.ok().contentType(MediaType.TEXT_EVENT_STREAM).body(body);
     }
     @GetMapping("/{id}/assistance")
     public Mono<ResponseEntity<com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.DeliveryAssistanceDTO>> getDeliveryAssistance(@PathVariable UUID id) {

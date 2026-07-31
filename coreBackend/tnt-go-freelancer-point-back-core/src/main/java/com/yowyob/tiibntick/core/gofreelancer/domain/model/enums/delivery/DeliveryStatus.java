@@ -11,6 +11,8 @@ public enum DeliveryStatus {
     CREATED("CREATED"),
     PICKED_UP("PICKED_UP"),
     IN_TRANSIT("IN_TRANSIT"),
+    /** Parcel deposited at relay hub — aligns with delivery-core {@code AT_RELAY_POINT}. */
+    AT_RELAY_POINT("AT_RELAY_POINT"),
     DELIVERED("DELIVERED"),
     FAILED("FAILED"),
     CANCELLED("CANCELLED");

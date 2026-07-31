@@ -14,6 +14,7 @@ import com.yowyob.tiibntick.core.delivery.domain.model.aggregate.Parcel;
 import com.yowyob.tiibntick.core.delivery.domain.exception.AnnouncementNotFoundException;
 import com.yowyob.tiibntick.core.delivery.domain.exception.DeliveryDomainException;
 import com.yowyob.tiibntick.core.delivery.domain.model.entity.AnnouncementResponse;
+import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.GeoCoordinates;
 import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -61,6 +62,7 @@ public class DeliveryAnnouncementService implements DeliveryAnnouncementUseCase,
                 cmd.description(),
                 cmd.offeredAmount(),
                 cmd.currency(),
+                cmd.pricingMode(),
                 parcel,
                 cmd.pickupAddress(),
                 cmd.deliveryAddress(),
@@ -93,7 +95,11 @@ public class DeliveryAnnouncementService implements DeliveryAnnouncementUseCase,
                                     cmd.announcementId(),
                                     cmd.deliveryPersonId(),
                                     cmd.estimatedArrivalTime(),
-                                    cmd.note());
+                                    cmd.note(),
+                                    cmd.proposedPrice(),
+                                    cmd.proposedCurrency() != null
+                                            ? cmd.proposedCurrency()
+                                            : announcement.getCurrency());
                             announcement.addResponse(response);
                             return announcementRepository.save(announcement);
                         }));
@@ -179,19 +185,20 @@ public class DeliveryAnnouncementService implements DeliveryAnnouncementUseCase,
     private Mono<Delivery> createDeliveryFromSelection(UUID tenantId,
                                                        DeliveryAnnouncement announcement,
                                                        AnnouncementResponse selected) {
+        GeoCoordinates pickup = resolveCoords(announcement.getPickupAddress());
+        GeoCoordinates dropoff = resolveCoords(announcement.getDeliveryAddress());
+        double routeKm = Math.max(1.0, pickup.haversineDistanceTo(dropoff));
+
         return deliveryPersonRepository.findById(tenantId, selected.getDeliveryPersonId())
                 .flatMap(dp -> costComputationPort.compute(
-                        announcement.getPickupAddress().coordinates(),
-                        announcement.getDeliveryAddress().coordinates(),
+                        pickup,
+                        dropoff,
                         dp.getLogisticsType(),
                         announcement.getUrgency())
                 .flatMap(cost -> etaComputationPort.computeInitial(
-                        dp.getCurrentLocation() != null
-                                ? dp.getCurrentLocation()
-                                : announcement.getPickupAddress().coordinates(),
-                        announcement.getDeliveryAddress().coordinates(),
-                        announcement.getPickupAddress().coordinates()
-                                .haversineDistanceTo(announcement.getDeliveryAddress().coordinates()))
+                        dp.getCurrentLocation() != null ? dp.getCurrentLocation() : pickup,
+                        dropoff,
+                        routeKm)
                 .map(eta -> {
                     Parcel parcel = announcement.getParcel();
                     Delivery delivery = Delivery.create(
@@ -209,10 +216,18 @@ public class DeliveryAnnouncementService implements DeliveryAnnouncementUseCase,
                     delivery.assignDeliveryPerson(
                             selected.getDeliveryPersonId(),
                             cost,
-                            announcement.getPickupAddress().coordinates()
-                                    .haversineDistanceTo(announcement.getDeliveryAddress().coordinates()),
+                            routeKm,
                             eta.estimatedArrival());
                     return delivery;
                 })));
+    }
+
+    /** Fallback to Yaoundé centre when an address has no GPS (common for informal create payloads). */
+    private static GeoCoordinates resolveCoords(
+            com.yowyob.tiibntick.core.delivery.domain.model.valueobject.DeliveryAddress address) {
+        if (address != null && address.coordinates() != null) {
+            return address.coordinates();
+        }
+        return new GeoCoordinates(3.8480, 11.5021);
     }
 }

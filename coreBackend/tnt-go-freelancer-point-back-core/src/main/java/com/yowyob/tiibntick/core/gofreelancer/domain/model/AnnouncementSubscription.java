@@ -35,7 +35,8 @@ public class AnnouncementSubscription implements Persistable<UUID>, TntPersistab
     @Column("announcement_id")
     private UUID announcementId;
 
-    @Column("freelancer_id")
+    /** Legacy DB column is {@code delivery_person_id}; keep Java name for domain clarity. */
+    @Column("delivery_person_id")
     private UUID freelancerId;
 
     @Column("status")

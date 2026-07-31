@@ -119,6 +119,23 @@
             <artifactId>reactor-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka-test</artifactId>
+            <scope>test</scope>
+        </dependency>
         <!-- Lombok + MapStruct -->
         <dependency>
             <groupId>org.projectlombok</groupId>
@@ -163,11 +180,7 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- Other Core Modules -->
-        <dependency>
-            <groupId>com.yowyob.tiibntick.core</groupId>
-            <artifactId>tnt-organization-core</artifactId>
-        </dependency>
+        <!-- Other Core Modules (L3/L4 — GOFP orchestrates, does not own logistics truth) -->
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>
             <artifactId>tnt-geo-core</artifactId>
@@ -175,6 +188,10 @@
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>
             <artifactId>tnt-delivery-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-inventory-core</artifactId>
         </dependency>
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>

@@ -1,6 +1,6 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web;
 
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.PasswordSetupUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.PasswordSetupUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.SetPasswordRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

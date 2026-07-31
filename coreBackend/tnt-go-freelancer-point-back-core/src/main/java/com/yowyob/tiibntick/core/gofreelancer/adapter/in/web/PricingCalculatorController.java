@@ -1,6 +1,6 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web;
 
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.PricingCalculatorUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.PricingCalculatorUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.PriceCalculationRequest;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.response.PriceCalculationResponse;
 import lombok.RequiredArgsConstructor;

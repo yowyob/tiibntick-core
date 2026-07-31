@@ -15,9 +15,9 @@ import com.yowyob.tiibntick.core.gofreelancer.domain.model.Announcement;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.DeliveryNeed;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryStatus;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.DeliveryUseCase;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.CachePort;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.DeliveryRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.DeliveryUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.CachePort;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -180,9 +180,115 @@ public class DeliveryApplicationService implements DeliveryUseCase {
                 .distinctUntilChanged();
     }
 
+    /**
+     * Builds navigation assistance for the courier based on delivery status and addresses.
+     * Presence lookup failures are ignored (no-op notify / empty GPS).
+     *
+     * @author MANFOUO BRAUN
+     */
     @Override
     public Mono<DeliveryAssistanceDTO> getDeliveryAssistance(UUID id) {
-        return Mono.error(new UnsupportedOperationException("getDeliveryAssistance not yet implemented"));
+        return deliveryRepository.findById(id)
+                .switchIfEmpty(Mono.error(new IllegalArgumentException("Delivery not found: " + id)))
+                .flatMap(delivery -> {
+                    if (delivery.getDeliveryNeedId() == null) {
+                        return Mono.just(DeliveryAssistanceDTO.builder()
+                                .deliveryId(delivery.getId())
+                                .currentStatus(delivery.getStatus())
+                                .stepDescription(stepDescription(delivery.getStatus()))
+                                .build());
+                    }
+                    return deliveryNeedRepository.findById(delivery.getDeliveryNeedId())
+                            .switchIfEmpty(Mono.error(new IllegalArgumentException(
+                                    "DeliveryNeed not found: " + delivery.getDeliveryNeedId())))
+                            .flatMap(need -> {
+                                Mono<AddressEntity> pickup = addressRepository.findById(need.getPickupAddressId())
+                                        .defaultIfEmpty(new AddressEntity());
+                                Mono<AddressEntity> dest = addressRepository.findById(need.getDeliveryAddressId())
+                                        .defaultIfEmpty(new AddressEntity());
+                                Mono<PresenceRecord> presence = delivery.getFreelancerId() != null
+                                        ? getPresenceUseCase.getPresence(
+                                                        delivery.getFreelancerId().toString(), TENANT_ID_DEFAULT)
+                                                .onErrorResume(e -> {
+                                                    log.warn("Assistance presence lookup failed for {}: {}",
+                                                            delivery.getFreelancerId(), e.getMessage());
+                                                    return Mono.empty();
+                                                })
+                                        : Mono.empty();
+
+                                return Mono.zip(pickup, dest)
+                                        .flatMap(tuple -> {
+                                            AddressEntity pickupAddr = tuple.getT1();
+                                            AddressEntity deliveryAddr = tuple.getT2();
+                                            boolean toPickup = delivery.getStatus() == DeliveryStatus.CREATED;
+
+                                            Double targetLat = toPickup
+                                                    ? pickupAddr.getLatitude() : deliveryAddr.getLatitude();
+                                            Double targetLon = toPickup
+                                                    ? pickupAddr.getLongitude() : deliveryAddr.getLongitude();
+
+                                            return presence
+                                                    .map(p -> {
+                                                        Double curLat = p.getCurrentCoordinates() != null
+                                                                ? (double) p.getCurrentCoordinates().latitude()
+                                                                : null;
+                                                        Double curLon = p.getCurrentCoordinates() != null
+                                                                ? (double) p.getCurrentCoordinates().longitude()
+                                                                : null;
+                                                        Double distanceKm = haversineKm(
+                                                                curLat, curLon, targetLat, targetLon);
+                                                        Integer eta = distanceKm != null
+                                                                ? (int) Math.ceil(distanceKm / 0.4)
+                                                                : null;
+                                                        return DeliveryAssistanceDTO.builder()
+                                                                .deliveryId(delivery.getId())
+                                                                .currentStatus(delivery.getStatus())
+                                                                .stepDescription(stepDescription(delivery.getStatus()))
+                                                                .currentLatitude(curLat)
+                                                                .currentLongitude(curLon)
+                                                                .targetLatitude(targetLat)
+                                                                .targetLongitude(targetLon)
+                                                                .distanceKm(distanceKm)
+                                                                .estimatedTimeMinutes(eta)
+                                                                .build();
+                                                    })
+                                                    .defaultIfEmpty(DeliveryAssistanceDTO.builder()
+                                                            .deliveryId(delivery.getId())
+                                                            .currentStatus(delivery.getStatus())
+                                                            .stepDescription(stepDescription(delivery.getStatus()))
+                                                            .targetLatitude(targetLat)
+                                                            .targetLongitude(targetLon)
+                                                            .build());
+                                        });
+                            });
+                });
+    }
+
+    private static String stepDescription(DeliveryStatus status) {
+        if (status == null) {
+            return "Statut inconnu — contactez le support si besoin.";
+        }
+        return switch (status) {
+            case CREATED -> "Rendez-vous au point de collecte.";
+            case PICKED_UP, IN_TRANSIT -> "Livrez le colis à destination.";
+            case AT_RELAY_POINT -> "Colis déposé au point relais — en attente de retrait client.";
+            case DELIVERED -> "Livraison terminée.";
+            case FAILED -> "Livraison échouée — demandez de l'assistance.";
+            case CANCELLED -> "Livraison annulée.";
+        };
+    }
+
+    private static Double haversineKm(Double lat1, Double lon1, Double lat2, Double lon2) {
+        if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) {
+            return null;
+        }
+        double r = 6371.0;
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        return r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
     // ══════════════════════════════════════════════════════════════════════

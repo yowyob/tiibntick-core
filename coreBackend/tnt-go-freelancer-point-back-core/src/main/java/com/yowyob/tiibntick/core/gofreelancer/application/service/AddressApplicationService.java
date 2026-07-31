@@ -5,7 +5,7 @@ import com.yowyob.tiibntick.common.vo.GeoCoordinates;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.AddressDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.persistence.entity.AddressEntity;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.persistence.repository.AddressReactiveRepository;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.AddressUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.AddressUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -76,15 +76,17 @@ public class AddressApplicationService implements AddressUseCase {
         return localResults.switchIfEmpty(
                 geolocationPort.getCoordinatesFromAddress(query)
                         .map(coords -> {
-                            // Création d'une adresse virtuelle basée sur le résultat du géocodeur
                             GeoCoordinates geo = GeoCoordinates.of(coords[0], coords[1]);
                             Address addressVO = Address.builder()
-                                    .street(query) // On utilise la requête comme nom de rue
+                                    .street(query)
+                                    .landmark(query)
+                                    .city("Yaoundé")
+                                    .country("CM")
                                     .coordinates(geo)
                                     .build();
                             return new AddressDTO(UUID.randomUUID(), addressVO, null);
                         })
-                        .flux() // Convertit le Mono en Flux
+                        .flux()
         );
     }
 
@@ -93,12 +95,15 @@ public class AddressApplicationService implements AddressUseCase {
     private AddressEntity toEntity(AddressDTO dto) {
         AddressEntity.AddressEntityBuilder builder = AddressEntity.builder()
                 .id(dto.getId())
-                .type(dto.getType() != null ? dto.getType().name() : null);
+                .type(dto.getType() != null ? dto.getType().name() : "PRIMARY");
 
         if (dto.getAddress() != null) {
-            builder.street(dto.getAddress().getStreet().orElse(null))
-                   .landmark(dto.getAddress().getLandmark().orElse(null))
-                   .quarter(dto.getAddress().getQuarter().orElse(null))
+            String street = dto.getAddress().getStreet().orElse(null);
+            String landmark = dto.getAddress().getLandmark().orElse(null);
+            String quarter = dto.getAddress().getQuarter().orElse(null);
+            builder.street(street)
+                   .landmark(landmark)
+                   .quarter(quarter)
                    .city(dto.getAddress().getCity())
                    .country(dto.getAddress().getCountry())
                    .region(dto.getAddress().getRegion().orElse(null))
@@ -109,7 +114,14 @@ public class AddressApplicationService implements AddressUseCase {
                        .longitude(dto.getAddress().getCoordinates().get().getLongitude());
             }
         }
-        return builder.build();
+        AddressEntity entity = builder.build();
+        // Legacy NOT NULL column "district" — keep filled from quarter/landmark/street.
+        if (entity.getQuarter() == null || entity.getQuarter().isBlank()) {
+            String fallback = entity.getLandmark() != null ? entity.getLandmark()
+                    : (entity.getStreet() != null ? entity.getStreet() : "");
+            entity.setQuarter(fallback);
+        }
+        return entity;
     }
 
     private AddressDTO toDto(AddressEntity entity) {

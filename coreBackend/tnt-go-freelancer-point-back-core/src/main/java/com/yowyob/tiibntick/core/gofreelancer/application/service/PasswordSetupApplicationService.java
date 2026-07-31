@@ -1,8 +1,8 @@
 package com.yowyob.tiibntick.core.gofreelancer.application.service;
 
 import com.yowyob.tiibntick.core.gofreelancer.domain.exception.InvalidTokenException;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.PasswordSetupUseCase;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.EmailPort;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.PasswordSetupUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.EmailPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

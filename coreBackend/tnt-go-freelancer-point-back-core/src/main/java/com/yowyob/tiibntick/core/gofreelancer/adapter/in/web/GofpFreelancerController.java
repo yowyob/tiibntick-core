@@ -1,14 +1,21 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web;
 
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.FreelancerProfileUseCase;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.SubscriptionUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.FreelancerUpdateRequest;
-import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.response.FreelancerDetailsResponse;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.SubscriptionStatusResponseDTO;
+import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.response.FreelancerDetailsResponse;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.FreelancerProfileUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.SubscriptionUseCase;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
@@ -18,8 +25,7 @@ import java.util.UUID;
  * Inbound REST adapter for delivery person profile management.
  * Delegates to the FreelancerProfileUseCase inbound port.
  *
- * @author Kengfack Lagrange
- * @date 25/01/2026
+ * @author MANFOUO BRAUN
  */
 @RestController
 @RequestMapping("/api/freelancers")
@@ -33,8 +39,7 @@ public class GofpFreelancerController {
     public Mono<ResponseEntity<FreelancerDetailsResponse>> getProfile(@PathVariable UUID id) {
         return profileUseCase.getProfile(id)
                 .map(ResponseEntity::ok)
-                .onErrorResume(ResponseStatusException.class,
-                        e -> Mono.just(ResponseEntity.status(e.getStatusCode()).build()));
+                .onErrorResume(this::mapNotFound);
     }
 
     @PutMapping("/{id}")
@@ -43,8 +48,7 @@ public class GofpFreelancerController {
             @Valid @RequestBody FreelancerUpdateRequest request) {
         return profileUseCase.updateProfile(id, request)
                 .then(Mono.just(ResponseEntity.ok().<Void>build()))
-                .onErrorResume(ResponseStatusException.class,
-                        e -> Mono.just(ResponseEntity.status(e.getStatusCode()).<Void>build()));
+                .onErrorResume(e -> mapNotFound(e).map(r -> ResponseEntity.status(r.getStatusCode()).build()));
     }
 
     @DeleteMapping("/{id}")
@@ -52,18 +56,13 @@ public class GofpFreelancerController {
         return profileUseCase.deleteProfile(id)
                 .then(Mono.just(ResponseEntity.noContent().<Void>build()))
                 .onErrorResume(ResponseStatusException.class,
-                        e -> Mono.just(ResponseEntity.status(e.getStatusCode()).<Void>build()));
+                        e -> Mono.just(ResponseEntity.status(e.getStatusCode()).<Void>build()))
+                .onErrorResume(UnsupportedOperationException.class,
+                        e -> Mono.just(ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).<Void>build()));
     }
 
     /**
      * Returns the full subscription state of a delivery person.
-     *
-     * Response includes:
-     *   - plan type (FREE / STANDARD / ADVANCE)
-     *   - status (ACTIVE / SUSPENDED / EXPIRED / ...)
-     *   - quota: deliveriesUsed, deliveriesRemaining, maxDeliveries, resetDate
-     *   - commission: commissionPercent (TiiBnTick share), netPercent (livreur share)
-     *   - validity: startDate, endDate
      *
      * Returns 404 if the delivery person has no subscription.
      */
@@ -72,7 +71,20 @@ public class GofpFreelancerController {
             @PathVariable UUID id) {
         return subscriptionUseCase.getSubscriptionStatus(id)
                 .map(ResponseEntity::ok)
-                .onErrorResume(ResponseStatusException.class,
-                        e -> Mono.just(ResponseEntity.status(e.getStatusCode()).build()));
+                .onErrorResume(this::mapNotFound);
+    }
+
+    private <T> Mono<ResponseEntity<T>> mapNotFound(Throwable e) {
+        if (e instanceof ResponseStatusException rse) {
+            return Mono.just(ResponseEntity.status(rse.getStatusCode()).build());
+        }
+        if (e instanceof IllegalArgumentException iae) {
+            String msg = iae.getMessage() != null ? iae.getMessage().toLowerCase() : "";
+            if (msg.contains("not found")) {
+                return Mono.just(ResponseEntity.notFound().build());
+            }
+            return Mono.just(ResponseEntity.badRequest().build());
+        }
+        return Mono.error(e);
     }
 }

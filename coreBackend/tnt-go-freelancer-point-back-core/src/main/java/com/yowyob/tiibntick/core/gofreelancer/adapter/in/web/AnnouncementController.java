@@ -1,11 +1,12 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web;
 
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.AnnouncementUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.AnnouncementRequestDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.AnnouncementResponseDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.AssignFreelancerRequestDTO;
+import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.RespondAnnouncementRequestDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.SubscriptionRequestDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.SubscriptionResponseDTO;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.AnnouncementUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,11 +18,9 @@ import java.util.UUID;
 
 /**
  * Inbound REST adapter for announcement management.
- * Consolidates both announcement CRUD and subscription/assignment endpoints.
- * Delegates to the AnnouncementUseCase inbound port.
+ * Orchestrates delivery-core announcement lifecycle via {@link AnnouncementUseCase}.
  *
- * @author François-Charles ATANGA
- * @date 03/02/2026
+ * @author MANFOUO BRAUN
  */
 @RestController
 @RequestMapping("/api/announcements")
@@ -47,7 +46,12 @@ public class AnnouncementController {
     }
 
     @GetMapping("/{id}")
-    public Mono<AnnouncementResponseDTO> getAnnouncement(@PathVariable UUID id) {
+    public Mono<AnnouncementResponseDTO> getAnnouncement(
+            @PathVariable UUID id,
+            @RequestParam(required = false) UUID viewerFreelancerId) {
+        if (viewerFreelancerId != null) {
+            return announcementUseCase.getAnnouncementForCandidate(id, viewerFreelancerId);
+        }
         return announcementUseCase.getAnnouncement(id);
     }
 
@@ -68,13 +72,21 @@ public class AnnouncementController {
         return announcementUseCase.publishAnnouncement(id);
     }
 
-    // Subscription endpoints
+    @PostMapping("/{id}/respond")
+    @ResponseStatus(HttpStatus.CREATED)
+    public Mono<AnnouncementResponseDTO> respond(
+            @PathVariable("id") UUID announcementId,
+            @RequestBody RespondAnnouncementRequestDTO request) {
+        return announcementUseCase.respondToAnnouncement(announcementId, request);
+    }
 
     @PostMapping("/{id}/subscribe")
     public Mono<ResponseEntity<Void>> subscribe(
             @PathVariable("id") UUID announcementId,
             @RequestBody SubscriptionRequestDTO request) {
-        return announcementUseCase.initiateSubscription(announcementId, request.getFreelancerId())
+        RespondAnnouncementRequestDTO respond = new RespondAnnouncementRequestDTO();
+        respond.setFreelancerId(request.getFreelancerId());
+        return announcementUseCase.respondToAnnouncement(announcementId, respond)
                 .then(Mono.just(ResponseEntity.accepted().<Void>build()));
     }
 
@@ -87,6 +99,11 @@ public class AnnouncementController {
     public Mono<ResponseEntity<AnnouncementResponseDTO>> assignFreelancer(
             @PathVariable("id") UUID announcementId,
             @RequestBody AssignFreelancerRequestDTO request) {
+        if (request.getResponseId() != null && request.getClientId() != null) {
+            return announcementUseCase
+                    .assignResponse(announcementId, request.getClientId(), request.getResponseId())
+                    .map(ResponseEntity::ok);
+        }
         return announcementUseCase.assignFreelancer(announcementId, request.getFreelancerId())
                 .map(ResponseEntity::ok);
     }

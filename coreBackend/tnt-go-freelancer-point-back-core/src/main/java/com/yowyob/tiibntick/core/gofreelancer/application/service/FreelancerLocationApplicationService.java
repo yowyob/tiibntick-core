@@ -3,7 +3,7 @@ package com.yowyob.tiibntick.core.gofreelancer.application.service;
 import com.yowyob.tiibntick.core.realtime.application.port.in.IProcessGpsPingUseCase;
 import com.yowyob.tiibntick.core.realtime.domain.model.GeoCoordinates;
 import com.yowyob.tiibntick.core.realtime.domain.model.GPSStreamEntry;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.FreelancerLocationUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.FreelancerLocationUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

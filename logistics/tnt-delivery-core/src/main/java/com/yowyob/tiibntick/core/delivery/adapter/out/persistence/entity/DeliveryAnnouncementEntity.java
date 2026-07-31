@@ -48,6 +48,9 @@ public class DeliveryAnnouncementEntity implements Persistable<UUID> {
     @Column("currency")
     private String currency;
 
+    @Column("pricing_mode")
+    private String pricingMode;
+
     @Column("parcel_id")
     private UUID parcelId;
 

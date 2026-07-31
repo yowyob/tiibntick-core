@@ -5,6 +5,7 @@ import com.yowyob.tiibntick.core.delivery.domain.event.AnnouncementResponseSelec
 import com.yowyob.tiibntick.core.delivery.domain.event.DeliveryDomainEvent;
 import com.yowyob.tiibntick.core.delivery.domain.exception.DeliveryDomainException;
 import com.yowyob.tiibntick.core.delivery.domain.model.entity.AnnouncementResponse;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.AnnouncementPricingMode;
 import com.yowyob.tiibntick.core.delivery.domain.model.enums.AnnouncementStatus;
 import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryUrgency;
 import com.yowyob.tiibntick.core.delivery.domain.model.enums.ResponseStatus;
@@ -21,7 +22,7 @@ import java.util.*;
  * Aggregate representing a client's delivery announcement.
  *
  * <p>A client (sender) publishes an announcement describing the parcel and locations.
- * Eligible delivery persons respond with an arrival time and optional note.
+ * Eligible delivery persons respond with an arrival time and optional note / proposed price.
  * The client selects one response, which triggers creation of a {@link Delivery}.
  *
  * <p>Lifecycle:
@@ -41,6 +42,9 @@ public class DeliveryAnnouncement {
     private String description;
     private BigDecimal offeredAmount;
     private String currency;
+
+    @Builder.Default
+    private AnnouncementPricingMode pricingMode = AnnouncementPricingMode.FIXED_PRICE;
 
     private final Parcel parcel;
     private final DeliveryAddress pickupAddress;
@@ -66,7 +70,7 @@ public class DeliveryAnnouncement {
     private final List<DeliveryDomainEvent> domainEvents = new ArrayList<>();
 
     /**
-     * Factory method: creates a draft announcement.
+     * Factory method: creates a draft announcement (defaults to {@link AnnouncementPricingMode#FIXED_PRICE}).
      */
     public static DeliveryAnnouncement createDraft(UUID tenantId,
                                                     UUID clientId,
@@ -79,6 +83,28 @@ public class DeliveryAnnouncement {
                                                     DeliveryAddress deliveryAddress,
                                                     RecipientInfo recipient,
                                                     DeliveryUrgency urgency) {
+        return createDraft(tenantId, clientId, title, description, offeredAmount, currency,
+                AnnouncementPricingMode.FIXED_PRICE, parcel, pickupAddress, deliveryAddress,
+                recipient, urgency);
+    }
+
+    /**
+     * Factory method: creates a draft announcement with an explicit pricing mode.
+     */
+    public static DeliveryAnnouncement createDraft(UUID tenantId,
+                                                    UUID clientId,
+                                                    String title,
+                                                    String description,
+                                                    BigDecimal offeredAmount,
+                                                    String currency,
+                                                    AnnouncementPricingMode pricingMode,
+                                                    Parcel parcel,
+                                                    DeliveryAddress pickupAddress,
+                                                    DeliveryAddress deliveryAddress,
+                                                    RecipientInfo recipient,
+                                                    DeliveryUrgency urgency) {
+        AnnouncementPricingMode mode = pricingMode != null
+                ? pricingMode : AnnouncementPricingMode.FIXED_PRICE;
         return DeliveryAnnouncement.builder()
                 .id(UUID.randomUUID())
                 .tenantId(tenantId)
@@ -87,6 +113,7 @@ public class DeliveryAnnouncement {
                 .description(description)
                 .offeredAmount(offeredAmount)
                 .currency(currency)
+                .pricingMode(mode)
                 .parcel(parcel)
                 .pickupAddress(pickupAddress)
                 .deliveryAddress(deliveryAddress)
@@ -125,6 +152,7 @@ public class DeliveryAnnouncement {
             throw new DeliveryDomainException(
                 "Cannot add response to announcement in status: " + status);
         }
+        validateResponsePricing(response);
         responses.add(response);
         if (status == AnnouncementStatus.PUBLISHED) {
             this.status = AnnouncementStatus.IN_NEGOTIATION;
@@ -165,6 +193,23 @@ public class DeliveryAnnouncement {
         domainEvents.add(new AnnouncementResponseSelectedEvent(
                 id, tenantId, clientId, selected.getDeliveryPersonId(), updatedAt));
         return selected;
+    }
+
+    /**
+     * Effective escrow amount: offeredAmount for FIXED_PRICE, selected proposedPrice for QUOTE.
+     */
+    public BigDecimal resolveEscrowAmount(AnnouncementResponse selected) {
+        if (pricingMode == AnnouncementPricingMode.QUOTE_REQUEST) {
+            if (selected.getProposedPrice() == null || selected.getProposedPrice().signum() <= 0) {
+                throw new DeliveryDomainException(
+                        "Selected response has no valid proposedPrice for QUOTE_REQUEST announcement");
+            }
+            return selected.getProposedPrice();
+        }
+        if (offeredAmount == null || offeredAmount.signum() <= 0) {
+            throw new DeliveryDomainException("Offered amount must be positive for FIXED_PRICE escrow");
+        }
+        return offeredAmount;
     }
 
     /**
@@ -225,8 +270,21 @@ public class DeliveryAnnouncement {
         if (recipient == null) {
             throw new DeliveryDomainException("Recipient information is required");
         }
-        if (offeredAmount == null || offeredAmount.signum() <= 0) {
-            throw new DeliveryDomainException("Offered amount must be positive");
+        if (pricingMode == AnnouncementPricingMode.FIXED_PRICE) {
+            if (offeredAmount == null || offeredAmount.signum() <= 0) {
+                throw new DeliveryDomainException(
+                        "Offered amount must be positive for FIXED_PRICE announcements");
+            }
+        }
+        // QUOTE_REQUEST: offeredAmount is optional / nullable at publish
+    }
+
+    private void validateResponsePricing(AnnouncementResponse response) {
+        if (pricingMode == AnnouncementPricingMode.QUOTE_REQUEST) {
+            if (response.getProposedPrice() == null || response.getProposedPrice().signum() <= 0) {
+                throw new DeliveryDomainException(
+                        "proposedPrice is required when responding to a QUOTE_REQUEST announcement");
+            }
         }
     }
 }

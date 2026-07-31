@@ -4,9 +4,9 @@ import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.RelayPointS
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.RelayPointSubscriptionStatusDTO;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.RelayPointSubscription;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.subscription.SubscriptionStatus;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.RelayPointSubscriptionUseCase;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.RelayPointSubscriptionRepository;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.PricingCatalogPort;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.RelayPointSubscriptionUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.RelayPointSubscriptionRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.PricingCatalogPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

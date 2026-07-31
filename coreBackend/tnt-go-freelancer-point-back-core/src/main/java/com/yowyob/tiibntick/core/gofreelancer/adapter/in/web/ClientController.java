@@ -1,6 +1,6 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web;
 
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.ClientUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.ClientUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.ClientDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.ClientResponseDTO;
 import lombok.RequiredArgsConstructor;

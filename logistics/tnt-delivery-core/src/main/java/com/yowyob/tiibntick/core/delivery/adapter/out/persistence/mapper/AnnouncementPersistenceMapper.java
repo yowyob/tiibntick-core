@@ -5,6 +5,7 @@ import com.yowyob.tiibntick.core.delivery.adapter.out.persistence.entity.Deliver
 import com.yowyob.tiibntick.core.delivery.domain.model.aggregate.DeliveryAnnouncement;
 import com.yowyob.tiibntick.core.delivery.domain.model.aggregate.Parcel;
 import com.yowyob.tiibntick.core.delivery.domain.model.entity.AnnouncementResponse;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.AnnouncementPricingMode;
 import com.yowyob.tiibntick.core.delivery.domain.model.enums.AnnouncementStatus;
 import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryUrgency;
 import com.yowyob.tiibntick.core.delivery.domain.model.enums.ResponseStatus;
@@ -35,6 +36,7 @@ public final class AnnouncementPersistenceMapper {
                 .description(a.getDescription())
                 .offeredAmount(a.getOfferedAmount())
                 .currency(a.getCurrency())
+                .pricingMode(a.getPricingMode() != null ? a.getPricingMode().name() : AnnouncementPricingMode.FIXED_PRICE.name())
                 .parcelId(a.getParcel() != null ? a.getParcel().getId() : null)
                 .status(a.getStatus().name())
                 .urgency(a.getUrgency().name())
@@ -69,6 +71,10 @@ public final class AnnouncementPersistenceMapper {
         GeoCoordinates pc = coords(e.getPickupLatitude(), e.getPickupLongitude());
         GeoCoordinates dc = coords(e.getDeliveryLatitude(), e.getDeliveryLongitude());
 
+        AnnouncementPricingMode pricingMode = e.getPricingMode() != null
+                ? AnnouncementPricingMode.valueOf(e.getPricingMode())
+                : AnnouncementPricingMode.FIXED_PRICE;
+
         return DeliveryAnnouncement.builder()
                 .id(e.getId())
                 .tenantId(e.getTenantId())
@@ -77,6 +83,7 @@ public final class AnnouncementPersistenceMapper {
                 .description(e.getDescription())
                 .offeredAmount(e.getOfferedAmount())
                 .currency(e.getCurrency())
+                .pricingMode(pricingMode)
                 .parcel(parcel)
                 .status(AnnouncementStatus.valueOf(e.getStatus()))
                 .urgency(DeliveryUrgency.valueOf(e.getUrgency()))
@@ -102,6 +109,8 @@ public final class AnnouncementPersistenceMapper {
                 .deliveryPersonId(r.getDeliveryPersonId())
                 .estimatedArrivalTime(r.getEstimatedArrivalTime())
                 .note(r.getNote())
+                .proposedPrice(r.getProposedPrice())
+                .proposedCurrency(r.getProposedCurrency())
                 .status(r.getStatus().name())
                 .createdAt(r.getCreatedAt())
                 .updatedAt(r.getUpdatedAt())
@@ -116,6 +125,8 @@ public final class AnnouncementPersistenceMapper {
                 .deliveryPersonId(e.getDeliveryPersonId())
                 .estimatedArrivalTime(e.getEstimatedArrivalTime())
                 .note(e.getNote())
+                .proposedPrice(e.getProposedPrice())
+                .proposedCurrency(e.getProposedCurrency())
                 .status(ResponseStatus.valueOf(e.getStatus()))
                 .createdAt(e.getCreatedAt())
                 .updatedAt(e.getUpdatedAt())

@@ -1,7 +1,7 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web;
 
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.RelayDeposit;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.RelayDepositUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.RelayDepositUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

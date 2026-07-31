@@ -3,7 +3,7 @@ package com.yowyob.tiibntick.core.gofreelancer.adapter.out.notification;
 import com.yowyob.kernel.i18n.domain.enums.SupportedLanguage;
 import com.yowyob.tiibntick.core.gofreelancer.application.service.TenantContextHolder;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpNotificationTemplates;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.PushNotificationPort;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.PushNotificationPort;
 import com.yowyob.tiibntick.core.notify.application.port.in.ISendNotificationUseCase;
 import com.yowyob.tiibntick.core.notify.config.NotifyProperties;
 import com.yowyob.tiibntick.core.notify.domain.enums.NotificationChannel;
@@ -20,6 +20,8 @@ import java.util.UUID;
 /**
  * Push notification adapter — delegates to tnt-notify-core (in-app WebSocket + FCM via Kernel).
  * Replaces the former log-only {@code PushNotificationAdapter}.
+ *
+ * @author MANFOUO BRAUN
  */
 @Slf4j
 @Component

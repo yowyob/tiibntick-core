@@ -1,7 +1,7 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web;
 
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Evaluation;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.EvaluationUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.EvaluationUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.EvaluationDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

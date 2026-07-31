@@ -16,6 +16,8 @@ import com.yowyob.tiibntick.core.delivery.domain.event.FreelancerOrgAssignedEven
 import com.yowyob.tiibntick.core.delivery.domain.event.MissionStatusChangedEvent;
 import com.yowyob.tiibntick.core.delivery.domain.event.ParcelAtRelayPointEvent;
 import com.yowyob.tiibntick.core.delivery.domain.event.ParcelPickedUpEvent;
+import com.yowyob.tiibntick.core.delivery.domain.event.AnnouncementPublishedEvent;
+import com.yowyob.tiibntick.core.delivery.domain.event.AnnouncementResponseSelectedEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
@@ -114,6 +116,12 @@ public class KafkaDeliveryEventPublisher implements DeliveryEventPublisher {
         if (event instanceof DeliveryCreatedEvent) {
             // Consumed by coreBackend's agency-assignment (property core-mission-created).
             topics.add(TntTopics.DELIVERY_MISSION_CREATED);
+        } else if (event instanceof AnnouncementPublishedEvent) {
+            topics.add(TntTopics.DELIVERY_ANNOUNCEMENT_PUBLISHED);
+            // Legacy GOFP alias kept for transitional consumers still on gofp.* prefix.
+            topics.add(TntTopics.GOFP_ANNOUNCEMENT_PUBLISHED);
+        } else if (event instanceof AnnouncementResponseSelectedEvent) {
+            topics.add(TntTopics.DELIVERY_ANNOUNCEMENT_RESPONSE_SELECTED);
         } else if (event instanceof ParcelPickedUpEvent) {
             // Physical pickup = fulfillment start. Consumed by tnt-sales-core.
             topics.add(TntTopics.DELIVERY_MISSION_STARTED);

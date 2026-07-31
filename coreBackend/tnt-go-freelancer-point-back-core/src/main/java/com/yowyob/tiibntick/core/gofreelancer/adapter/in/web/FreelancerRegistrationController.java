@@ -1,6 +1,6 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web;
 
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.FreelancerRegistrationUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.FreelancerRegistrationUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.FreelancerRegistrationRequest;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.response.FreelancerRegistrationResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;

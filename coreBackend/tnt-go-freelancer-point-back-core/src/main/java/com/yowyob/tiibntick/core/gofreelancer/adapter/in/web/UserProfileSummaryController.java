@@ -1,10 +1,10 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web;
 
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.response.UserProfileSummaryDTO;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.GofpClientUseCase;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.GofpFreelancerUseCase;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.GofpRelayPointUseCase;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.GofpUserUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.GofpClientUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.GofpFreelancerUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.GofpRelayPointUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.GofpUserUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;

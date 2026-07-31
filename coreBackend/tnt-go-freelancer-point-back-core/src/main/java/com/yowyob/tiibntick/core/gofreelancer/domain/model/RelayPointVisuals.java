@@ -36,7 +36,7 @@ public class RelayPointVisuals implements Persistable<UUID>, TntPersistableEntit
     @Column("id")
     private UUID id;
 
-    // L'ID du RelayPoint / Organization dans le Core (tnt-organization-core)
+    // L'ID du RelayHub dans tnt-geo-core (coreRelayPointId)
     @Column("core_relay_point_id")
     private UUID coreRelayPointId;
 

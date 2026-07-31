@@ -1,6 +1,6 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.out.notification;
 
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.NotificationStreamPort;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.NotificationStreamPort;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.kafka.event.MatchingNotificationEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

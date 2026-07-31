@@ -6,8 +6,11 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * A physical parcel relay hub managed by an agency branch.
+ * A physical parcel relay hub, optionally managed by an agency branch.
  * RelayHubs are RELAY_HUB-typed road network nodes that can temporarily store parcels.
+ *
+ * <p>{@code branchId} is {@code null} for a freelance/independent hub (e.g. a GOFP relay
+ * point, which by construction has no agency) and non-null for an agency-managed hub.
  *
  * Author: MANFOUO Braun
  */
@@ -30,7 +33,8 @@ public final class RelayHub {
                      HubStatus status, Instant createdAt, Instant updatedAt) {
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.tenantId = Objects.requireNonNull(tenantId, "tenantId must not be null");
-        this.branchId = Objects.requireNonNull(branchId, "branchId must not be null");
+        // branchId is nullable: null means a freelance/independent hub with no agency branch.
+        this.branchId = branchId;
         this.nodeId = Objects.requireNonNull(nodeId, "nodeId must not be null");
         if (capacitySlots <= 0) throw new IllegalArgumentException("capacitySlots must be > 0");
         if (currentOccupancy < 0) throw new IllegalArgumentException("currentOccupancy must be >= 0");
@@ -45,6 +49,10 @@ public final class RelayHub {
         this.updatedAt = Objects.requireNonNull(updatedAt);
     }
 
+    /**
+     * @param branchId agency branch owning this hub, or {@code null} for a
+     *                 freelance/independent hub with no agency.
+     */
     public static RelayHub create(UUID tenantId, UUID branchId, RoadNodeId nodeId,
                                   int capacitySlots, String operatorActorId) {
         Instant now = Instant.now();

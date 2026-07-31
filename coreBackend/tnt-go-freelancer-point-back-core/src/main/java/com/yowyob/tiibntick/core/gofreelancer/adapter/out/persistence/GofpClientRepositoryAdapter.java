@@ -3,7 +3,7 @@ package com.yowyob.tiibntick.core.gofreelancer.adapter.out.persistence;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.persistence.repository.GofpClientR2dbcRepository;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpClient;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.client.ClientStatus;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.GofpClientRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpClientRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;

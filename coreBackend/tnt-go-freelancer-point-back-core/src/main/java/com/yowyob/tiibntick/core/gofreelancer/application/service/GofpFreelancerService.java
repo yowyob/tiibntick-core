@@ -2,9 +2,9 @@ package com.yowyob.tiibntick.core.gofreelancer.application.service;
 
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpFreelancer;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.freelancer.FreelancerStatus;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.GofpFreelancerUseCase;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.GofpFreelancerRepository;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.GofpUserRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.GofpFreelancerUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpFreelancerRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpUserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

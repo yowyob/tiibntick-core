@@ -5,6 +5,7 @@ import com.yowyob.tiibntick.core.delivery.domain.model.enums.ResponseStatus;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -28,6 +29,12 @@ public class AnnouncementResponse {
     /** Optional note from the delivery person. */
     private String note;
 
+    /** Proposed price when announcement is QUOTE_REQUEST (nullable for FIXED_PRICE). */
+    private final BigDecimal proposedPrice;
+
+    /** ISO currency for {@link #proposedPrice}; typically matches announcement currency. */
+    private final String proposedCurrency;
+
     private ResponseStatus status;
 
     private final Instant createdAt;
@@ -35,18 +42,32 @@ public class AnnouncementResponse {
     private Long version;
 
     /**
-     * Factory method for a new response.
+     * Factory method for a new response (no proposed price — FIXED_PRICE path).
      */
     public static AnnouncementResponse create(UUID announcementId,
                                                UUID deliveryPersonId,
                                                Instant estimatedArrivalTime,
                                                String note) {
+        return create(announcementId, deliveryPersonId, estimatedArrivalTime, note, null, null);
+    }
+
+    /**
+     * Factory method for a new response with optional proposed price (QUOTE_REQUEST).
+     */
+    public static AnnouncementResponse create(UUID announcementId,
+                                               UUID deliveryPersonId,
+                                               Instant estimatedArrivalTime,
+                                               String note,
+                                               BigDecimal proposedPrice,
+                                               String proposedCurrency) {
         return AnnouncementResponse.builder()
                 .id(UUID.randomUUID())
                 .announcementId(announcementId)
                 .deliveryPersonId(deliveryPersonId)
                 .estimatedArrivalTime(estimatedArrivalTime)
                 .note(note)
+                .proposedPrice(proposedPrice)
+                .proposedCurrency(proposedCurrency)
                 .status(ResponseStatus.SENT)
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())

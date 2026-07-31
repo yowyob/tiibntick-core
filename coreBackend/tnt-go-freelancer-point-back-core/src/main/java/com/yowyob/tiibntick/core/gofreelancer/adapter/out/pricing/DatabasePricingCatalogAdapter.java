@@ -1,8 +1,8 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.out.pricing;
 
 import com.yowyob.tiibntick.core.billing.wallet.domain.model.Money;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.ExchangeRatePort;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.PricingCatalogPort;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.ExchangeRatePort;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.PricingCatalogPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Primary;
 import org.springframework.r2dbc.core.DatabaseClient;

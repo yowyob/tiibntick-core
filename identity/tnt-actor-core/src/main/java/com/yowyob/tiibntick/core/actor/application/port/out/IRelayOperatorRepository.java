@@ -14,6 +14,12 @@ public interface IRelayOperatorRepository {
 
     Mono<RelayOperatorProfile> findByActorId(UUID tenantId, UUID actorId);
 
+    /**
+     * @param hubId {@code tnt-geo-core} {@code RelayHub.id} — same identity space as
+     *              GOFP's {@code GofpRelayPoint.coreRelayPointId}. Callers from other
+     *              product backends (e.g. GOFP) must resolve to that hub id first,
+     *              never pass a product-local relay-point id directly.
+     */
     Mono<RelayOperatorProfile> findByHubId(UUID tenantId, UUID hubId);
 
     Flux<RelayOperatorProfile> findByTenantId(UUID tenantId);

@@ -9,7 +9,7 @@ import com.yowyob.tiibntick.core.gofreelancer.adapter.out.kafka.event.Freelancer
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.kafka.event.FreelancerValidatedEvent;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.kafka.event.MatchingNotificationEvent;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.kafka.event.SubscriptionAttemptEvent;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.EventPublisher;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.EventPublisher;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
@@ -20,22 +20,18 @@ import java.util.UUID;
 /**
  * Outbox-backed event publisher for the Go-Freelancer-Point module.
  *
- * <p>Delegates to {@link PublishEventUseCase} (yow-event-kernel transactional outbox)
- * instead of sending directly to Kafka via KafkaTemplate — guarantees at-least-once
- * delivery even if Kafka is temporarily unavailable.
+ * <p>Topic names come from {@link TntTopics} — no diverted mappings.
  *
- * <p>Topic names come from {@link TntTopics} constants — no string literals in this class.
- *
- * @author François-Charles ATANGA
+ * @author MANFOUO BRAUN
  */
 @Slf4j
 @Service("gofpKafkaEventPublisher")
 public class KafkaEventPublisher implements EventPublisher {
 
-    private static final String AGGREGATE_TYPE_FREELANCER    = "Freelancer";
-    private static final String AGGREGATE_TYPE_ANNOUNCEMENT  = "Announcement";
-    private static final String AGGREGATE_TYPE_SUBSCRIPTION  = "Subscription";
-    private static final String SOLUTION_CODE                = "TNT";
+    private static final String AGGREGATE_TYPE_FREELANCER = "Freelancer";
+    private static final String AGGREGATE_TYPE_ANNOUNCEMENT = "Announcement";
+    private static final String AGGREGATE_TYPE_SUBSCRIPTION = "Subscription";
+    private static final String SOLUTION_CODE = "TNT";
 
     private final PublishEventUseCase publishEventUseCase;
     private final ObjectMapper objectMapper;
@@ -49,7 +45,7 @@ public class KafkaEventPublisher implements EventPublisher {
 
     @Override
     public void publishFreelancerCreated(FreelancerCreatedEvent event) {
-        enqueue(TntTopics.GOFP_ANNOUNCEMENT_PUBLISHED, event,
+        enqueue(TntTopics.GOFP_FREELANCER_CREATED, event,
                 event.getFreelancerId().toString(),
                 AGGREGATE_TYPE_FREELANCER,
                 SOLUTION_CODE);
@@ -73,7 +69,7 @@ public class KafkaEventPublisher implements EventPublisher {
 
     @Override
     public void publishSubscriptionAttempt(SubscriptionAttemptEvent event) {
-        enqueue(TntTopics.GOFP_SUBSCRIPTION_SUSPENDED, event,
+        enqueue(TntTopics.GOFP_SUBSCRIPTION_ATTEMPTS, event,
                 event.getAnnouncementId().toString(),
                 AGGREGATE_TYPE_SUBSCRIPTION,
                 SOLUTION_CODE);
@@ -81,13 +77,11 @@ public class KafkaEventPublisher implements EventPublisher {
 
     @Override
     public void publishMatchingNotification(MatchingNotificationEvent event) {
-        enqueue(TntTopics.GOFP_ANNOUNCEMENT_PUBLISHED, event,
+        enqueue(TntTopics.GOFP_MATCHING_NOTIFICATIONS, event,
                 event.getFreelancerId().toString(),
                 AGGREGATE_TYPE_FREELANCER,
                 SOLUTION_CODE);
     }
-
-    // ── Helper ─────────────────────────────────────────────────────────────────
 
     private void enqueue(String topic, Object event, String aggregateId,
                          String aggregateType, String solutionCode) {
@@ -98,7 +92,7 @@ public class KafkaEventPublisher implements EventPublisher {
                     .eventType(event.getClass().getSimpleName())
                     .aggregateId(aggregateId)
                     .aggregateType(aggregateType)
-                    .tenantId(SOLUTION_CODE)   // tenantId resolved at runtime via SecurityContext
+                    .tenantId(SOLUTION_CODE)
                     .solutionCode(solutionCode)
                     .payload(payload)
                     .kafkaTopic(topic)

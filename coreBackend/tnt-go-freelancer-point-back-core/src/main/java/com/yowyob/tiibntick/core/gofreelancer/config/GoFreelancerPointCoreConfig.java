@@ -1,5 +1,9 @@
 package com.yowyob.tiibntick.core.gofreelancer.config;
 
+import com.yowyob.tiibntick.core.gofreelancer.adapter.out.chat.NoOpNegotiationChatAdapter;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.INegotiationChatPort;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.r2dbc.repository.config.EnableR2dbcRepositories;
@@ -24,4 +28,15 @@ import org.springframework.data.r2dbc.repository.config.EnableR2dbcRepositories;
         basePackages = "com.yowyob.tiibntick.core.gofreelancer.adapter.out.persistence.repository"
 )
 public class GoFreelancerPointCoreConfig {
+
+    /**
+     * Fallback negotiation-chat adapter until a product BFF provides a real implementation.
+     *
+     * @author MANFOUO BRAUN
+     */
+    @Bean
+    @ConditionalOnMissingBean(INegotiationChatPort.class)
+    public INegotiationChatPort negotiationChatPort() {
+        return new NoOpNegotiationChatAdapter();
+    }
 }

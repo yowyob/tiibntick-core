@@ -1,0 +1,34 @@
+databaseChangeLog:
+  - changeSet:
+      id: 008-add-announcement-pricing-mode-and-proposed-price
+      author: MANFOUO BRAUN
+      comment: >
+        Adds pricing_mode on tnt_delivery_announcements (FIXED_PRICE | QUOTE_REQUEST)
+        and proposed_price / proposed_currency on tnt_announcement_responses for
+        Freelancer quote-request bidding.
+      changes:
+        - addColumn:
+            tableName: tnt_delivery_announcements
+            columns:
+              - column:
+                  name: pricing_mode
+                  type: VARCHAR(32)
+                  defaultValue: FIXED_PRICE
+                  constraints:
+                    nullable: false
+                  remarks: "FIXED_PRICE or QUOTE_REQUEST"
+        - dropNotNullConstraint:
+            tableName: tnt_delivery_announcements
+            columnName: offered_amount
+            columnDataType: NUMERIC(15,2)
+        - addColumn:
+            tableName: tnt_announcement_responses
+            columns:
+              - column:
+                  name: proposed_price
+                  type: NUMERIC(15,2)
+                  remarks: "Freelancer proposed price (required when announcement pricing_mode=QUOTE_REQUEST)"
+              - column:
+                  name: proposed_currency
+                  type: VARCHAR(3)
+                  remarks: "ISO currency for proposed_price; defaults to announcement currency"

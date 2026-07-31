@@ -8,6 +8,7 @@ import org.springframework.data.annotation.Version;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -40,6 +41,12 @@ public class AnnouncementResponseEntity implements Persistable<UUID> {
 
     @Column("note")
     private String note;
+
+    @Column("proposed_price")
+    private BigDecimal proposedPrice;
+
+    @Column("proposed_currency")
+    private String proposedCurrency;
 
     @Column("status")
     private String status;

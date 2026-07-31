@@ -3,7 +3,7 @@ package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web;
 import com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser;
 import com.yowyob.tiibntick.core.auth.domain.model.TntTokenPair;
 import com.yowyob.tiibntick.core.auth.domain.model.TntUserIdentity;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.AuthUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.AuthUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.AuthRequestDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.AuthResponseDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.UserRegistrationDTO;

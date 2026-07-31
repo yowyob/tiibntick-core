@@ -1,6 +1,6 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web;
 
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.ContactUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.ContactUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.ContactDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;

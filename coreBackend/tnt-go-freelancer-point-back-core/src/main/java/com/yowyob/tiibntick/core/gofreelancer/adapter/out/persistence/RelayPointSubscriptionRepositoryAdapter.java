@@ -1,7 +1,7 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.out.persistence;
 
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.RelayPointSubscription;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.RelayPointSubscriptionRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.RelayPointSubscriptionRepository;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.persistence.repository.RelayPointSubscriptionR2dbcRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

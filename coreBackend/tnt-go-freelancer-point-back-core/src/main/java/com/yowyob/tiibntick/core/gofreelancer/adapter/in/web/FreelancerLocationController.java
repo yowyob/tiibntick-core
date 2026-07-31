@@ -1,6 +1,6 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web;
 
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.FreelancerLocationUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.FreelancerLocationUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.FreelancerLocationUpdateRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +31,10 @@ public class FreelancerLocationController {
             @PathVariable UUID id,
             @Valid @RequestBody FreelancerLocationUpdateRequest request,
             @AuthenticationPrincipal TntSecurityContext securityContext) {
+        if (securityContext == null || securityContext.tenantId() == null) {
+            return Mono.error(new IllegalArgumentException(
+                    "Authenticated tenant context is required to update freelancer location"));
+        }
         return locationUseCase.updateLocation(
                         id,
                         securityContext.tenantId().toString(),

@@ -1,5 +1,8 @@
 package com.yowyob.tiibntick.core.gofreelancer.domain.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.relaypoint.RelayPointStatus;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -26,7 +29,7 @@ import java.util.UUID;
  * for fast access without an extra join.
  *
  * <p>The {@code coreRelayPointId} is the FK to the authoritative
- * {@code logistics} table in the ATANGA backend.
+ * {@code tnt-geo-core} {@code RelayHub.id} (hub identity source of truth).
  *
  * <p><strong>Double address:</strong>
  * <ul>
@@ -43,11 +46,13 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 @Table("gofp_relay_points")
 public class GofpRelayPoint implements Persistable<UUID>, TntPersistableEntity {
-    @Transient @Builder.Default private boolean isNew = true;
+    @Transient @Builder.Default @JsonIgnore private boolean isNew = true;
 
     @Override
+    @JsonIgnore
     public boolean isNew() { return isNew; }
 
     @Override
@@ -58,7 +63,7 @@ public class GofpRelayPoint implements Persistable<UUID>, TntPersistableEntity {
     @Column("id")
     private UUID id;
 
-    /** FK → logistics.id in ATANGA backend. */
+    /** FK → tnt-geo-core RelayHub.id (authoritative hub identity). */
     @NotNull
     @Column("core_relay_point_id")
     private UUID coreRelayPointId;
@@ -112,6 +117,7 @@ public class GofpRelayPoint implements Persistable<UUID>, TntPersistableEntity {
 
     @Column("is_active")
     @Builder.Default
+    @JsonProperty("isActive")
     private Boolean isActive = false;
 
     /**

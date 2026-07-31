@@ -1,7 +1,7 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.out.persistence;
 
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Contact;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.ContactRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.ContactRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;

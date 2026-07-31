@@ -1,5 +1,7 @@
 package com.yowyob.tiibntick.core.gofreelancer.domain.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.user.UserStatus;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -36,11 +38,13 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 @Table("gofp_users")
 public class GofpUser implements Persistable<UUID>, TntPersistableEntity {
-    @Transient @Builder.Default private boolean isNew = true;
+    @Transient @Builder.Default @JsonIgnore private boolean isNew = true;
 
     @Override
+    @JsonIgnore
     public boolean isNew() { return isNew; }
 
     @Override

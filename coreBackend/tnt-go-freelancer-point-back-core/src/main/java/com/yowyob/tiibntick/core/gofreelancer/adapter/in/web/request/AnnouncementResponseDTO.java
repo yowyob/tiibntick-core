@@ -36,6 +36,7 @@ public class AnnouncementResponseDTO {
     private String shipperPhone;
     private Double amount;
     private String currency;
+    private String pricingMode;
     private String signatureUrl;
     private String paymentMethod;
     private String transportMethod;

@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.out.kafka.consumer;
 
+import com.yowyob.tiibntick.common.kafka.TntTopics;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.kafka.event.SubscriptionAttemptEvent;
 import com.yowyob.tiibntick.core.gofreelancer.application.service.FreelancerQuotaService;
 import com.yowyob.tiibntick.core.gofreelancer.application.service.FreelancerVehicleApplicationService;
@@ -10,10 +11,10 @@ import com.yowyob.tiibntick.core.gofreelancer.domain.model.FreelancerVehicle;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpFreelancer;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.announcement.AnnouncementStatus;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IAnnouncementRepository;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.AnnouncementSubscriptionRepository;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.DeliveryRepository;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.GofpFreelancerRepository;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.PushNotificationPort;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.AnnouncementSubscriptionRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpFreelancerRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.PushNotificationPort;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.persistence.repository.FreelancerVehicleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -59,7 +60,7 @@ public class SubscriptionConfirmationConsumer {
 
     // ── Kafka consumer ────────────────────────────────────────────────────────
 
-    @KafkaListener(topics = "subscription-attempts", groupId = "tnt-go-freelancer-core-subscription-group")
+    @KafkaListener(topics = TntTopics.GOFP_SUBSCRIPTION_ATTEMPTS, groupId = "tnt-go-freelancer-core-subscription-group")
     public void consumeSubscriptionAttempt(SubscriptionAttemptEvent event) {
         log.info("[SubConfirm] Subscription attempt — announcementId={} freelancerId={}",
                 event.getAnnouncementId(), event.getFreelancerId());

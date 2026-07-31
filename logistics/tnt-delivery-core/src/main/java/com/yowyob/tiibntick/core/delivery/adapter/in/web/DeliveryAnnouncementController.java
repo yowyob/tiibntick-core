@@ -51,9 +51,12 @@ public class DeliveryAnnouncementController {
     @GetMapping("/{announcementId}")
     public Mono<DeliveryAnnouncementResponse> getById(
             @PathVariable UUID tenantId,
-            @PathVariable UUID announcementId) {
+            @PathVariable UUID announcementId,
+            @RequestParam(required = false) UUID viewerDeliveryPersonId) {
         return queryUseCase.findAnnouncementById(tenantId, announcementId)
-                .map(DeliveryAnnouncementResponseMapper::toResponse);
+                .map(a -> viewerDeliveryPersonId != null
+                        ? DeliveryAnnouncementResponseMapper.toCandidateResponse(a, viewerDeliveryPersonId)
+                        : DeliveryAnnouncementResponseMapper.toResponse(a));
     }
 
     @Operation(summary = "List open announcements (PUBLISHED or IN_NEGOTIATION)")
@@ -82,7 +85,8 @@ public class DeliveryAnnouncementController {
 
         RespondToAnnouncementCommand cmd = new RespondToAnnouncementCommand(
                 tenantId, announcementId, req.deliveryPersonId(),
-                req.estimatedArrivalTime(), req.note());
+                req.estimatedArrivalTime(), req.note(),
+                req.proposedPrice(), req.proposedCurrency());
         return announcementUseCase.respondToAnnouncement(cmd)
                 .map(DeliveryAnnouncementResponseMapper::toResponse);
     }

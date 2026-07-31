@@ -27,7 +27,12 @@ public class DomainDeliveryCostAdapter implements DeliveryCostComputationPort {
                                        GeoCoordinates destination,
                                        LogisticsType logisticsType,
                                        DeliveryUrgency urgency) {
-        double distKm = origin.haversineDistanceTo(destination);
+        GeoCoordinates from = origin != null ? origin : new GeoCoordinates(3.8480, 11.5021);
+        GeoCoordinates to = destination != null ? destination : from;
+        double distKm = from.haversineDistanceTo(to);
+        if (distKm <= 0) {
+            distKm = 1.0; // minimum urban hop when GPS is absent on both ends
+        }
         int estimatedMinutes = (int) Math.ceil((distKm / AVG_SPEED_KMH) * 60);
         DeliveryCost cost = DeliveryCostPolicy.computeSimple(distKm, estimatedMinutes,
                 logisticsType, urgency);

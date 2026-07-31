@@ -2,7 +2,7 @@ package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web;
 
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpFreelancer;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.freelancer.FreelancerStatus;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.GofpFreelancerUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.GofpFreelancerUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

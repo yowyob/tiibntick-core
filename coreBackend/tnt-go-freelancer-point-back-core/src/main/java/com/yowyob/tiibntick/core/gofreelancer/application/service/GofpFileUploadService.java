@@ -1,8 +1,8 @@
 package com.yowyob.tiibntick.core.gofreelancer.application.service;
 
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.*;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.FileStoragePort;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.GofpUserRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.FileStoragePort;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpUserRepository;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.persistence.repository.FreelancerOnboardingDocsRepository;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.persistence.repository.FreelancerVehicleRepository;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.persistence.repository.RelayPointVisualsRepository;

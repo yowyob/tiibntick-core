@@ -3,7 +3,7 @@ package com.yowyob.tiibntick.core.gofreelancer.application.service;
 import com.yowyob.tiibntick.core.gofreelancer.domain.exception.InvalidTokenException;
 import com.yowyob.tiibntick.core.gofreelancer.domain.exception.ResourceNotFoundException;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.PasswordToken;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.PasswordTokenRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.PasswordTokenRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;

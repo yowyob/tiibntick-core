@@ -43,10 +43,12 @@ public class AddressEntity implements Persistable<UUID>, TntPersistableEntity {
     @Column("street")
     private String street;
 
-    @Column("landmark")
+    /** Mapped to legacy {@code description} column (human landmark / free text). */
+    @Column("description")
     private String landmark;
 
-    @Column("quarter")
+    /** Mapped to legacy {@code district} column (quarter / neighborhood). */
+    @Column("district")
     private String quarter;
 
     @Column("city")

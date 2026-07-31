@@ -1,6 +1,6 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.out.clients;
 
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.KycVerificationPort;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.KycVerificationPort;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.buffer.DataBuffer;

@@ -1,7 +1,7 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.out.persistence;
 
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Evaluation;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.EvaluationRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.EvaluationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;

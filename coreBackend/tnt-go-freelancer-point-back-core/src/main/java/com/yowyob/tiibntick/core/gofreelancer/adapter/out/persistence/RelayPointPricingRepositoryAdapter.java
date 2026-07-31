@@ -1,7 +1,7 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.out.persistence;
 
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.RelayPointPricingPolicy;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.RelayPointPricingRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.RelayPointPricingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;

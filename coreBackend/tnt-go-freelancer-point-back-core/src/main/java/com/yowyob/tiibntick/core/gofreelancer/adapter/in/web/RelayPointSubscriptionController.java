@@ -1,6 +1,6 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web;
 
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.RelayPointSubscriptionUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.RelayPointSubscriptionUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.RelayPointSubscriptionRequestDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.RelayPointSubscriptionStatusDTO;
 import jakarta.validation.Valid;

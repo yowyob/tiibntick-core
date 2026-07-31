@@ -42,3 +42,6 @@ databaseChangeLog:
   - include:
       file: db/changelog/v1.0/06_freelancer_org_service_zones.sql
       relativeToChangelogFile: false
+  - include:
+      file: db/changelog/v1.0/07_relay_hubs_branch_id_nullable.sql
+      relativeToChangelogFile: false

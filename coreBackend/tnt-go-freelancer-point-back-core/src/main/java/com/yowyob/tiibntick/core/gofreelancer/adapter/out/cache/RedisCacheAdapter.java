@@ -1,6 +1,6 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.out.cache;
 
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.CachePort;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.CachePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;

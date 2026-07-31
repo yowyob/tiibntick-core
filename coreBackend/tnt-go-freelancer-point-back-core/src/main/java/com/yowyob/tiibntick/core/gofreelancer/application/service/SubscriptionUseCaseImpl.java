@@ -2,8 +2,8 @@ package com.yowyob.tiibntick.core.gofreelancer.application.service;
 
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Subscription;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.subscription.SubscriptionType;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.SubscriptionUseCase;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.SubscriptionRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.SubscriptionUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.SubscriptionRepository;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.SubscriptionStatusResponseDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

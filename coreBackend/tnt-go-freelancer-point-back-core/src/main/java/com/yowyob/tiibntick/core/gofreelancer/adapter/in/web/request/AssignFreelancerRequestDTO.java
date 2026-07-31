@@ -14,5 +14,9 @@ import java.util.UUID;
 @Data
 @NoArgsConstructor
 public class AssignFreelancerRequestDTO {
+    /** Preferred: select by delivery-core response id. */
+    private UUID responseId;
+    /** Legacy: resolve response by freelancer id when responseId is absent. */
     private UUID freelancerId;
+    private UUID clientId;
 }

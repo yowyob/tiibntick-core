@@ -9,6 +9,7 @@ import java.util.UUID;
 
 public final class RelayOperatorProfile extends TntActorProfile {
 
+    /** {@code tnt-geo-core} {@code RelayHub.id} — see {@link com.yowyob.tiibntick.core.actor.application.port.out.IRelayOperatorRepository#findByHubId}. */
     private final UUID hubId;
     private final List<AvailabilitySlot> openingHours;
     private final int declaredCapacityParcels;
@@ -97,6 +98,20 @@ public final class RelayOperatorProfile extends TntActorProfile {
 
     public RelayOperatorProfile activate() {
         return new RelayOperatorProfile(id(), tenantId(), actorId(), ActorStatus.ACTIVE, kycStatus(),
+                currentLocation(), rating(), badges(), createdAt(), Instant.now(),
+                hubId, openingHours, declaredCapacityParcels, blockchainDid());
+    }
+
+    /** Suspends the operator (admin action from product backends such as GOFP). */
+    public RelayOperatorProfile suspend() {
+        return new RelayOperatorProfile(id(), tenantId(), actorId(), ActorStatus.SUSPENDED, kycStatus(),
+                currentLocation(), rating(), badges(), createdAt(), Instant.now(),
+                hubId, openingHours, declaredCapacityParcels, blockchainDid());
+    }
+
+    /** Deactivates / revokes the operator profile. */
+    public RelayOperatorProfile deactivate() {
+        return new RelayOperatorProfile(id(), tenantId(), actorId(), ActorStatus.INACTIVE, kycStatus(),
                 currentLocation(), rating(), badges(), createdAt(), Instant.now(),
                 hubId, openingHours, declaredCapacityParcels, blockchainDid());
     }

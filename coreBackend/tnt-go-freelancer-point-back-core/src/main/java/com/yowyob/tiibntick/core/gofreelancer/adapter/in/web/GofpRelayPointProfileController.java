@@ -3,7 +3,7 @@ package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.RelayPointUpdateRequest;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpRelayPoint;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.relaypoint.RelayPointStatus;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.in.GofpRelayPointUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.GofpRelayPointUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

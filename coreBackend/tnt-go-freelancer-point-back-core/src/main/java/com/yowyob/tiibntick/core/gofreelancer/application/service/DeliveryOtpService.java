@@ -2,9 +2,9 @@ package com.yowyob.tiibntick.core.gofreelancer.application.service;
 
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryNeedRepository;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.DeliveryRepository;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.EmailPort;
-import com.yowyob.tiibntick.core.gofreelancer.domain.port.out.PushNotificationPort;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.EmailPort;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.PushNotificationPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

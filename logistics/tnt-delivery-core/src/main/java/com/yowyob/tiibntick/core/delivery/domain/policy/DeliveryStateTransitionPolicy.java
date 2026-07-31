@@ -22,7 +22,7 @@ import java.util.Set;
  * CREATED          → PICKED_UP, CANCELLED, PAUSED_BY_INCIDENT
  * PICKED_UP        → IN_TRANSIT, FAILED, CANCELLED, PAUSED_BY_INCIDENT
  * IN_TRANSIT       → DELIVERED, FAILED, AT_RELAY_POINT, PAUSED_BY_INCIDENT
- * AT_RELAY_POINT   → IN_TRANSIT, FAILED, PAUSED_BY_INCIDENT
+ * AT_RELAY_POINT   → IN_TRANSIT, DELIVERED, FAILED, PAUSED_BY_INCIDENT
  * PAUSED_BY_INCIDENT → IN_TRANSIT, PICKED_UP, CANCELLED (incident resolved / driver swapped)
  * DELIVERED        → (terminal)
  * FAILED           → IN_TRANSIT  (retry)
@@ -52,8 +52,9 @@ public final class DeliveryStateTransitionPolicy {
                 EnumSet.of(DeliveryStatus.DELIVERED, DeliveryStatus.FAILED,
                            DeliveryStatus.AT_RELAY_POINT, DeliveryStatus.PAUSED_BY_INCIDENT));
 
+        // DELIVERED: client retrieved the parcel directly from the relay point (no further courier leg)
         ALLOWED_TRANSITIONS.put(DeliveryStatus.AT_RELAY_POINT,
-                EnumSet.of(DeliveryStatus.IN_TRANSIT, DeliveryStatus.FAILED,
+                EnumSet.of(DeliveryStatus.IN_TRANSIT, DeliveryStatus.DELIVERED, DeliveryStatus.FAILED,
                            DeliveryStatus.PAUSED_BY_INCIDENT));
 
         // From PAUSED_BY_INCIDENT — incident resolved: resume with new or same driver
