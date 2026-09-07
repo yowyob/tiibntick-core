@@ -82,9 +82,16 @@ services:
       DB_POOL_MAX_SIZE: "10"
       DB_POOL_MAX_IDLE_MINUTES: "30"
     healthcheck:
-      # Liveness (léger, sans ping externe au kernel) : évite que le healthcheck hang/flap
-      # quand l'agrégat /actuator/health bloque sur le kernel-ping. Fallback vers / si absent.
-      test: ["CMD-SHELL", "curl -sf -o /dev/null --max-time 8 http://localhost:8080/actuator/health/liveness || curl -sf -o /dev/null --max-time 8 http://localhost:8080/actuator/health || exit 1"]
+      # UNIQUEMENT liveness. Le repli vers l'agrégat /actuator/health a été retiré : cet
+      # endpoint FUIT des connexions à la base. TntDatabasePyramidHealthIndicator fait
+      # `.doFinally(s -> conn.close())`, or en R2DBC `close()` renvoie un Publisher qui ne
+      # fait rien tant qu'on ne s'y abonne pas — la connexion n'est jamais rendue au pool.
+      # Mesuré le 2026-09-07 : 7 connexions au repos, 21 après UN SEUL appel, plafond à 24
+      # puis « Connection acquisition timed out » sur tout le service jusqu'au redémarrage.
+      # Pendant le start_period, liveness n'existe pas encore : le repli s'exécutait toutes
+      # les 20 s et vidait le pool à lui seul. Correctif applicatif à faire en amont
+      # (souscrire à close(), p. ex. `Mono.usingWhen`).
+      test: ["CMD-SHELL", "curl -sf -o /dev/null --max-time 8 http://localhost:8080/actuator/health/liveness || exit 1"]
       interval: 20s
       timeout: 10s
       retries: 20
