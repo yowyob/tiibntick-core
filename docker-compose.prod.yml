@@ -3,7 +3,14 @@
 # ==============================================================
 #  Resource server : valide les JWT via la JWKS de kernel-core, et relaie vers
 #  kernel-core (client tibntick-backend). Exposé sur tiibntick-core.yowyob.com.
-#  Infra en sidecars privés : Postgres + Redis + Kafka (KRaft) + MinIO.
+#
+#  INFRA ENTIÈREMENT PARTAGÉE — ce fichier ne crée AUCUN conteneur d'infra.
+#  Postgres `database`, Redis `kernel-core-redis-1`, Elasticsearch
+#  `kernel-core-elasticsearch-1`, MinIO `kernel-core-minio-1`, Kafka
+#  `yowyob-shared-kafka`. Les trois annexes privées (Postgres/Redis/MinIO) ont été
+#  retirées le 2026-09-07 : la base a été migrée telle quelle dans le cluster
+#  partagé (194 tables, comptages de lignes vérifiés un à un) et l'unique seau
+#  MinIO recréé sous un compte de service limité à ce seul seau.
 # ==============================================================
 services:
 
@@ -18,25 +25,44 @@ services:
       SERVER_FORWARD_HEADERS_STRATEGY: "framework"
       SWAGGER_SERVER_URL: "https://tiibntick-core.yowyob.com"
       CORS_ALLOWED_ORIGINS: "https://tiibntick.yowyob.com,https://tiibntick-market.yowyob.com,https://tiibntick-link.yowyob.com,https://tiibntick-go.yowyob.com,https://tiibntick-point.yowyob.com,https://tiibntick-agency.yowyob.com"
-      # ── Postgres privé ──
-      DB_HOST: "tnt-core-db"
+      # ── Postgres partagé (conteneur `database`, PG18) ──
+      # Le rôle `tiibntick` y est volontairement NOSUPERUSER / NOCREATEDB / NOBYPASSRLS :
+      # il n'est plus le superutilisateur de son propre serveur, il cohabite avec les
+      # autres bases du cluster. D'où DB_AUTO_CREATE_DATABASE à false — la base est
+      # créée et possédée en amont, l'application n'a pas à la fabriquer.
+      DB_HOST: "database"
       DB_PORT: "5432"
       DB_NAME: "tiibntick_core"
       DB_USER: "tiibntick"
       DB_PASSWORD: "${TNT_CORE_DB_PASSWORD:?TNT_CORE_DB_PASSWORD requis dans .env}"
       DB_SSL_MODE: "disable"
-      # ── Redis privé ──
-      REDIS_HOST: "tnt-core-redis"
+      DB_AUTO_CREATE_DATABASE: "false"
+      # ── Redis partagé ──
+      # L'application n'expose que host/port/password : l'index de base se règle par la
+      # propriété Spring elle-même. Index 3 pour ne pas partager l'espace de clés du
+      # noyau, qui n'utilise que db0.
+      REDIS_HOST: "kernel-core-redis-1"
       REDIS_PORT: "6379"
-      # ── Kafka privé ──
+      SPRING_DATA_REDIS_DATABASE: "3"
+      # ── Kafka partagé ──
       KAFKA_BOOTSTRAP: "yowyob-shared-kafka:9092"
       KAFKA_REPLICATION: "1"
-      # ── MinIO privé (média) ──
-      MINIO_ENDPOINT: "http://tnt-core-minio:9000"
-      MINIO_PUBLIC_ENDPOINT: "http://tnt-core-minio:9000"
-      MINIO_ACCESS_KEY: "minioadmin"
-      MINIO_SECRET_KEY: "${TNT_CORE_MINIO_SECRET:?TNT_CORE_MINIO_SECRET requis dans .env}"
+      # ── Elasticsearch partagé ──
+      # La recherche Go Freelancer reste désactivée, mais l'auto-configuration Spring
+      # sonde l'URI quoi qu'il arrive : la laisser sur localhost:9200 maintenait
+      # /actuator/health en DOWN permanent, ce qui masque les vraies pannes.
+      ELASTICSEARCH_ENABLED: "false"
+      ELASTICSEARCH_URIS: "http://kernel-core-elasticsearch-1:9200"
+      # ── MinIO partagé (média) ──
+      # Compte de service limité au seul seau tnt-incident-evidences, pas le compte root.
+      MINIO_ENDPOINT: "http://kernel-core-minio-1:9000"
+      MINIO_PUBLIC_ENDPOINT: "http://kernel-core-minio-1:9000"
+      MINIO_ACCESS_KEY: "${TNT_MINIO_ACCESS_KEY:?TNT_MINIO_ACCESS_KEY requis dans .env}"
+      MINIO_SECRET_KEY: "${TNT_MINIO_SECRET_KEY:?TNT_MINIO_SECRET_KEY requis dans .env}"
       # ── Sécurité JWT : resource server valide via la JWKS de kernel-core ──
+      # Volontairement jwk-set-uri SEUL, sans issuer-uri : le noyau émet iss:"kernel-core",
+      # qui n'est pas une URL, donc la découverte OIDC de Spring ne peut pas s'en servir.
+      # La signature et l'expiration sont vérifiées ; le claim iss ne l'est pas.
       JWT_JWK_SET_URI: "https://kernel-core.yowyob.com/kernel-api/.well-known/jwks.json"
       JWT_AUTO_GENERATE_KEY_PAIR: "true"
       QR_HMAC_SECRET: "${TNT_CORE_QR_HMAC_SECRET:?TNT_CORE_QR_HMAC_SECRET requis dans .env}"
@@ -48,8 +74,8 @@ services:
       # le job de déploiement recopie ce fichier et écraserait le correctif appliqué à la main.
       TNT_SYSTEM_TENANT_ID: "${TNT_SYSTEM_TENANT_ID:?TNT_SYSTEM_TENANT_ID requis dans .env}"
       # ── Variables applicatives reprises de tnt-bootstrap/.env.prod.example ──
-      # (les endpoints d'infra restent nos sidecars ; on n'active PAS le profil prod
-      #  car il désactive Swagger et exige Postgres TLS + clé JWT montée, non dispo ici.)
+      # (on n'active PAS le profil prod : il désactive Swagger et exige Postgres TLS +
+      #  clé JWT montée, non disponibles ici.)
       TNT_AUTH_SERVICE_CODE: "TNT_AGENCY"
       JWT_KEY_ID: "tnt-core-key-prod"
       DB_POOL_INITIAL_SIZE: "2"
@@ -75,63 +101,14 @@ services:
       - "traefik.http.routers.tnt-core.priority=100"
       - "traefik.http.services.tnt-core.loadbalancer.server.port=8080"
       - "traefik.docker.network=yowyob"
-    depends_on:
-      tnt-core-db: { condition: service_healthy }
-      tnt-core-redis: { condition: service_healthy }
-    networks: [yowyob, tnt-core-net]
-
-  tnt-core-db:
-    image: postgis/postgis:16-3.4-alpine
-    container_name: tiibntick-core-db
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: "tiibntick_core"
-      POSTGRES_USER: "tiibntick"
-      POSTGRES_PASSWORD: "${TNT_CORE_DB_PASSWORD:?TNT_CORE_DB_PASSWORD requis dans .env}"
-    volumes:
-      - tnt-core-db-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tiibntick -d tiibntick_core"]
-      interval: 5s
-      timeout: 5s
-      retries: 15
-    networks: [tnt-core-net]
-
-  tnt-core-redis:
-    image: redis:7-alpine
-    container_name: tiibntick-core-redis
-    restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
-    volumes:
-      - tnt-core-redis-data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks: [tnt-core-net]
-
-
-  tnt-core-minio:
-    image: minio/minio:latest
-    container_name: tiibntick-core-minio
-    restart: unless-stopped
-    command: ["server", "/data"]
-    environment:
-      MINIO_ROOT_USER: "minioadmin"
-      MINIO_ROOT_PASSWORD: "${TNT_CORE_MINIO_SECRET:?TNT_CORE_MINIO_SECRET requis dans .env}"
-    volumes:
-      - tnt-core-minio-data:/data
-    networks: [tnt-core-net]
-
-volumes:
-  tnt-core-db-data:
-  tnt-core-redis-data:
-  tnt-core-minio-data:
+    # `yowyob` porte Traefik, `database` et Kafka ; `kernel-network` porte Redis,
+    # Elasticsearch et MinIO du noyau. Aucun réseau propre à ce service.
+    networks: [yowyob, kernel-network]
 
 networks:
   yowyob:
     external: true
     name: yowyob
-  tnt-core-net:
-    name: tiibntick-core-net
+  kernel-network:
+    external: true
+    name: kernel-network
