@@ -68,7 +68,10 @@ services:
       QR_HMAC_SECRET: "${TNT_CORE_QR_HMAC_SECRET:?TNT_CORE_QR_HMAC_SECRET requis dans .env}"
       # ── Relais vers kernel-core (client dédié, cf. .env.prod.example) ──
       TNT_KERNEL_BASE_URL: "https://kernel-core.yowyob.com/kernel-api"
-      TNT_KERNEL_CLIENT_ID: "tibntick-backend"
+      # Identifiant et clé viennent TOUS DEUX du .env du serveur : figer l'identifiant ici le
+      # faisait écraser la valeur du .env (environment l'emporte sur env_file), donc changer de
+      # client applicatif obligeait à modifier le dépôt. Le défaut conserve le client historique.
+      TNT_KERNEL_CLIENT_ID: "${TNT_KERNEL_CLIENT_ID:-tibntick-backend}"
       TNT_KERNEL_API_KEY: "${TNT_KERNEL_API_KEY:?TNT_KERNEL_API_KEY requis dans .env}"
       # Valeur réelle fournie par le .env du serveur : ne jamais figer un gabarit ici,
       # le job de déploiement recopie ce fichier et écraserait le correctif appliqué à la main.
