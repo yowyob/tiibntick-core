@@ -96,10 +96,20 @@ public final class EnvVarDescriptor {
             .category(EnvCategory.STORAGE)
             .build();
 
+    /**
+     * Not consumed by the resource server: incoming Kernel-issued JWTs are validated
+     * via {@code jwk-set-uri} only (signature + expiry), since the Kernel's {@code iss}
+     * claim ("kernel-core") isn't a URL and can't satisfy Spring's issuer-uri discovery
+     * contract. {@code iwm.security.jwt.issuer} (this var) only feeds the unused
+     * RT-comops-kernel-core auto-key-pair token issuance path, which has no live code
+     * in this repo since the Kernel HTTP-only migration — kept here as documentation
+     * only, and deliberately excluded from {@link DockerImageDescriptor#REQUIRED_ENV_VARS}
+     * (confirmed with the Kernel maintainer, 2026-09-08).
+     */
     public static final EnvVarDescriptor JWT_ISSUER_URI = EnvVarDescriptor.builder()
             .name("JWT_ISSUER_URI")
-            .description("OAuth2 JWT issuer URI (comops-auth-core / YowAuth0)")
-            .required(true)
+            .description("Unused by this app's resource server (jwk-set-uri only); legacy iwm.security.jwt.issuer placeholder")
+            .required(false)
             .defaultValue("http://localhost:9000")
             .category(EnvCategory.SECURITY)
             .build();

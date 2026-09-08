@@ -1,6 +1,6 @@
 # Kernel API — Schemas Reference
 
-Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name from `endpoints.md` (request/response bodies).
+Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name from `endpoints.md` (request/response bodies).
 
 **Do not edit by hand** — see regeneration instructions in `endpoints.md`.
 
@@ -305,6 +305,14 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `categorie` | `string` | no |
 | `justificatifFileId` | `string(uuid)` | no |
 
+## AddIdentifierRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `type` | `string` | yes |
+| `value` | `string` | yes |
+| `primary` | `boolean` | no |
+
 ## AddObjectiveRequest
 
 | Field | Type | Required |
@@ -312,12 +320,12 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `description` | `string` | no |
 | `poids` | `number` | no |
 
-## AddVariantAttributeRequest
+## AddVariantRequest
 
 | Field | Type | Required |
 |---|---|---|
-| `attributeName` | `string` | yes |
-| `attributeValue` | `string` | yes |
+| `sku` | `string` | yes |
+| `variantName` | `string` | yes |
 
 ## AddressResponse
 
@@ -334,7 +342,6 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `state` | `string` | no |
 | `locality` | `string` | no |
 | `countryId` | `string(uuid)` | no |
-| `zipCode` | `string` | no |
 | `postalCode` | `string` | no |
 | `poBox` | `string` | no |
 | `isDefault` | `boolean` | no |
@@ -380,7 +387,7 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `negotiateSellingPrice` | `boolean` | no |
 | `sellingPriceIncludeVat` | `boolean` | no |
 | `authorizeExceptionalDiscount` | `boolean` | no |
-| `grantableDiscountRate` | `number(double)` | no |
+| `grantableDiscountRate` | `number` | no |
 | `printLogo` | `boolean` | no |
 | `paperFormat` | `string` | no |
 | `lengthOfVatInvoiceNumber` | `integer(int32)` | no |
@@ -642,6 +649,15 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `contractStartDate` | `string(date)` | no |
 | `contractEndDate` | `string(date)` | no |
 
+## AllocateRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `requirementId` | `string(uuid)` | no |
+| `operationalResourceId` | `string(uuid)` | yes |
+| `allocatedFrom` | `string(date-time)` | yes |
+| `allocatedUntil` | `string(date-time)` | no |
+
 ## AmendMissionOrderRequest
 
 | Field | Type | Required |
@@ -663,6 +679,13 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `sourceReference` | `string` | no |
 | `documentHash` | `string` | no |
 | `metadata` | `string` | no |
+
+## AnswerRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `answer` | `string` | yes |
+| `officialAnswer` | `boolean` | no |
 
 ## ApiResponse
 
@@ -884,82 +907,12 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
-## ApiResponseArtistProfileResponse
+## ApiResponseApplicationVisitResponse
 
 | Field | Type | Required |
 |---|---|---|
 | `success` | `boolean` | no |
-| `data` | `ArtistProfileResponse` | no |
-| `message` | `string` | no |
-| `errorCode` | `string` | no |
-| `timestamp` | `string(date-time)` | no |
-
-## ApiResponseArtworkCommentResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `success` | `boolean` | no |
-| `data` | `ArtworkCommentResponse` | no |
-| `message` | `string` | no |
-| `errorCode` | `string` | no |
-| `timestamp` | `string(date-time)` | no |
-
-## ApiResponseArtworkInvoiceLinkResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `success` | `boolean` | no |
-| `data` | `ArtworkInvoiceLinkResponse` | no |
-| `message` | `string` | no |
-| `errorCode` | `string` | no |
-| `timestamp` | `string(date-time)` | no |
-
-## ApiResponseArtworkLikeResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `success` | `boolean` | no |
-| `data` | `ArtworkLikeResponse` | no |
-| `message` | `string` | no |
-| `errorCode` | `string` | no |
-| `timestamp` | `string(date-time)` | no |
-
-## ApiResponseArtworkMediaResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `success` | `boolean` | no |
-| `data` | `ArtworkMediaResponse` | no |
-| `message` | `string` | no |
-| `errorCode` | `string` | no |
-| `timestamp` | `string(date-time)` | no |
-
-## ApiResponseArtworkProductLinkResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `success` | `boolean` | no |
-| `data` | `ArtworkProductLinkResponse` | no |
-| `message` | `string` | no |
-| `errorCode` | `string` | no |
-| `timestamp` | `string(date-time)` | no |
-
-## ApiResponseArtworkResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `success` | `boolean` | no |
-| `data` | `ArtworkResponse` | no |
-| `message` | `string` | no |
-| `errorCode` | `string` | no |
-| `timestamp` | `string(date-time)` | no |
-
-## ApiResponseArtworkSaleLinkResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `success` | `boolean` | no |
-| `data` | `ArtworkSaleLinkResponse` | no |
+| `data` | `ApplicationVisitResponse` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -980,6 +933,26 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `AssetProfileResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseAttributeDefinitionView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `AttributeDefinitionView` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseAttributeView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `AttributeView` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -1084,12 +1057,12 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
-## ApiResponseBatchResponse
+## ApiResponseBigDecimal
 
 | Field | Type | Required |
 |---|---|---|
 | `success` | `boolean` | no |
-| `data` | `BatchResponse` | no |
+| `data` | `number` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -1114,6 +1087,16 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseBomResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `BomResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseBoolean
 
 | Field | Type | Required |
@@ -1124,12 +1107,32 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseBrandView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `BrandView` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseBrouillardComptableDto
 
 | Field | Type | Required |
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `BrouillardComptableDto` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseBundleView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `BundleView` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -1204,12 +1207,22 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
-## ApiResponseCategoryI18nResponse
+## ApiResponseCatalogView
 
 | Field | Type | Required |
 |---|---|---|
 | `success` | `boolean` | no |
-| `data` | `CategoryI18nResponse` | no |
+| `data` | `CatalogView` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseCategoryView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `CategoryView` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -1394,22 +1407,22 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
-## ApiResponseContextualLoginResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `success` | `boolean` | no |
-| `data` | `ContextualLoginResponse` | no |
-| `message` | `string` | no |
-| `errorCode` | `string` | no |
-| `timestamp` | `string(date-time)` | no |
-
 ## ApiResponseContractResponse
 
 | Field | Type | Required |
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `ContractResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseCountView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `CountView` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -1454,6 +1467,16 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseDeliveryView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `DeliveryView` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseDepartmentMemberResponse
 
 | Field | Type | Required |
@@ -1480,6 +1503,16 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `DependentResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseDigitalProductDetails
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `DigitalProductDetails` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -1644,6 +1677,36 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseEntitlementView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `EntitlementView` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseEntryView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `EntryView` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseExecutionView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `ExecutionView` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseExecutiveSummaryDto
 
 | Field | Type | Required |
@@ -1704,36 +1767,6 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
-## ApiResponseGalleryEventResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `success` | `boolean` | no |
-| `data` | `GalleryEventResponse` | no |
-| `message` | `string` | no |
-| `errorCode` | `string` | no |
-| `timestamp` | `string(date-time)` | no |
-
-## ApiResponseGalleryReservationResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `success` | `boolean` | no |
-| `data` | `GalleryReservationResponse` | no |
-| `message` | `string` | no |
-| `errorCode` | `string` | no |
-| `timestamp` | `string(date-time)` | no |
-
-## ApiResponseGalleryTicketResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `success` | `boolean` | no |
-| `data` | `GalleryTicketResponse` | no |
-| `message` | `string` | no |
-| `errorCode` | `string` | no |
-| `timestamp` | `string(date-time)` | no |
-
 ## ApiResponseGarnishmentResponse
 
 | Field | Type | Required |
@@ -1774,6 +1807,16 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseIdentifierView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `IdentifierView` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseIdentifyAccountResponse
 
 | Field | Type | Required |
@@ -1790,6 +1833,26 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `IdentityOnboardingGovernanceResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseInspectionView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `InspectionView` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseIntangibleDetails
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `IntangibleDetails` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -1864,6 +1927,16 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseItemResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `ItemResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseJobOfferResponse
 
 | Field | Type | Required |
@@ -1910,6 +1983,16 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `LegalDocumentResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseLineView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `LineView` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -2084,42 +2167,12 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
-## ApiResponseListArtworkCommentResponse
+## ApiResponseListApplicationVisitResponse
 
 | Field | Type | Required |
 |---|---|---|
 | `success` | `boolean` | no |
-| `data` | `ArtworkCommentResponse[]` | no |
-| `message` | `string` | no |
-| `errorCode` | `string` | no |
-| `timestamp` | `string(date-time)` | no |
-
-## ApiResponseListArtworkLikeResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `success` | `boolean` | no |
-| `data` | `ArtworkLikeResponse[]` | no |
-| `message` | `string` | no |
-| `errorCode` | `string` | no |
-| `timestamp` | `string(date-time)` | no |
-
-## ApiResponseListArtworkMediaResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `success` | `boolean` | no |
-| `data` | `ArtworkMediaResponse[]` | no |
-| `message` | `string` | no |
-| `errorCode` | `string` | no |
-| `timestamp` | `string(date-time)` | no |
-
-## ApiResponseListArtworkResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `success` | `boolean` | no |
-| `data` | `ArtworkResponse[]` | no |
+| `data` | `ApplicationVisitResponse[]` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -2130,6 +2183,26 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `AssetProfileResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListAttributeDefinitionView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `AttributeDefinitionView[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListAttributeView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `AttributeView[]` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -2204,22 +2277,22 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
-## ApiResponseListBatchResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `success` | `boolean` | no |
-| `data` | `BatchResponse[]` | no |
-| `message` | `string` | no |
-| `errorCode` | `string` | no |
-| `timestamp` | `string(date-time)` | no |
-
 ## ApiResponseListBlockResponse
 
 | Field | Type | Required |
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `BlockResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListBomResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `BomResponse[]` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -2274,12 +2347,22 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
-## ApiResponseListCategoryI18nResponse
+## ApiResponseListCategoryView
 
 | Field | Type | Required |
 |---|---|---|
 | `success` | `boolean` | no |
-| `data` | `CategoryI18nResponse[]` | no |
+| `data` | `CategoryView[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListCertView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `CertView[]` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -2404,6 +2487,16 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseListDeliveryView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `DeliveryView[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseListDepartmentMemberResponse
 
 | Field | Type | Required |
@@ -2524,6 +2617,16 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseListEntryView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `EntryView[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseListExpenseLineResponse
 
 | Field | Type | Required |
@@ -2564,32 +2667,22 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
-## ApiResponseListGalleryEventResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `success` | `boolean` | no |
-| `data` | `GalleryEventResponse[]` | no |
-| `message` | `string` | no |
-| `errorCode` | `string` | no |
-| `timestamp` | `string(date-time)` | no |
-
-## ApiResponseListGalleryReservationResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `success` | `boolean` | no |
-| `data` | `GalleryReservationResponse[]` | no |
-| `message` | `string` | no |
-| `errorCode` | `string` | no |
-| `timestamp` | `string(date-time)` | no |
-
 ## ApiResponseListGarnishmentResponse
 
 | Field | Type | Required |
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `GarnishmentResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListGenealogyView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `GenealogyView[]` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -2644,6 +2737,26 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseListItemResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `ItemResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListItemView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `ItemView[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseListJobOfferResponse
 
 | Field | Type | Required |
@@ -2694,6 +2807,16 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseListLineView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `LineView[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseListLoanAdvanceResponse
 
 | Field | Type | Required |
@@ -2714,6 +2837,16 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseListLocationView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `LocationView[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseListLookupTableResponse
 
 | Field | Type | Required |
@@ -2730,6 +2863,26 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `MaintenanceRecordResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListMarketView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `MarketView[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListMaterialProductLocationResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `MaterialProductLocationResponse[]` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -2764,12 +2917,62 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
-## ApiResponseListMediaAssetResponse
+## ApiResponseListMaterialStockBalanceResponse
 
 | Field | Type | Required |
 |---|---|---|
 | `success` | `boolean` | no |
-| `data` | `MediaAssetResponse[]` | no |
+| `data` | `MaterialStockBalanceResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListMaterialStockMovementResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `MaterialStockMovementResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListMaterialStockTransferResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `MaterialStockTransferResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListMaterialStockTransformationResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `MaterialStockTransformationResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListMeasurementView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `MeasurementView[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListMediaView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `MediaView[]` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -3054,16 +3257,6 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
-## ApiResponseListProductCategoryResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `success` | `boolean` | no |
-| `data` | `ProductCategoryResponse[]` | no |
-| `message` | `string` | no |
-| `errorCode` | `string` | no |
-| `timestamp` | `string(date-time)` | no |
-
 ## ApiResponseListProductLocationResponse
 
 | Field | Type | Required |
@@ -3074,32 +3267,12 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
-## ApiResponseListProductPriceResponse
+## ApiResponseListProductSearchResult
 
 | Field | Type | Required |
 |---|---|---|
 | `success` | `boolean` | no |
-| `data` | `ProductPriceResponse[]` | no |
-| `message` | `string` | no |
-| `errorCode` | `string` | no |
-| `timestamp` | `string(date-time)` | no |
-
-## ApiResponseListProductResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `success` | `boolean` | no |
-| `data` | `ProductResponse[]` | no |
-| `message` | `string` | no |
-| `errorCode` | `string` | no |
-| `timestamp` | `string(date-time)` | no |
-
-## ApiResponseListProductSearchResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `success` | `boolean` | no |
-| `data` | `ProductSearchResponse[]` | no |
+| `data` | `ProductSearchResult[]` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -3110,6 +3283,36 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `ProductTransformationResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListProductView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `ProductView[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListProductionCapacity
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `ProductionCapacity[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListProductionOrderResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `ProductionOrderResponse[]` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -3164,12 +3367,32 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseListRelationView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `RelationView[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseListRenewalOrderResponse
 
 | Field | Type | Required |
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `RenewalOrderResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListRequiredMaterial
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `RequiredMaterial[]` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -3214,6 +3437,16 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseListResourceView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `ResourceView[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseListRetroactiveResponse
 
 | Field | Type | Required |
@@ -3234,6 +3467,16 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseListReviewView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `ReviewView[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseListRhKpiSnapshotResponse
 
 | Field | Type | Required |
@@ -3244,12 +3487,32 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseListRoleView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `RoleView[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseListSalesOrderResponse
 
 | Field | Type | Required |
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `SalesOrderResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListSellableProduct
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `SellableProduct[]` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -3294,12 +3557,42 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseListSpecView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `SpecView[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseListStatementLineResponse
 
 | Field | Type | Required |
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `StatementLineResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListStepView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `StepView[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListStockBalanceResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `StockBalanceResponse[]` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -3314,12 +3607,52 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseListStockTransferResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `StockTransferResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListStockTransformationResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `StockTransformationResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListSubServiceView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `SubServiceView[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseListSubscriptionResponse
 
 | Field | Type | Required |
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `SubscriptionResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListSupplierView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `SupplierView[]` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -3454,6 +3787,16 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseListUomView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `UomView[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseListUserMembershipResponse
 
 | Field | Type | Required |
@@ -3464,32 +3807,22 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
-## ApiResponseListVariantAttributeResponse
+## ApiResponseListUserWorkspaceResponse
 
 | Field | Type | Required |
 |---|---|---|
 | `success` | `boolean` | no |
-| `data` | `VariantAttributeResponse[]` | no |
+| `data` | `UserWorkspaceResponse[]` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
-## ApiResponseListVariantPriceResponse
+## ApiResponseListVariantView
 
 | Field | Type | Required |
 |---|---|---|
 | `success` | `boolean` | no |
-| `data` | `VariantPriceResponse[]` | no |
-| `message` | `string` | no |
-| `errorCode` | `string` | no |
-| `timestamp` | `string(date-time)` | no |
-
-## ApiResponseListVariantResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `success` | `boolean` | no |
-| `data` | `VariantResponse[]` | no |
+| `data` | `VariantView[]` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -3524,6 +3857,26 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseListWarehouseView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `WarehouseView[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListWorkCenterView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `WorkCenterView[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseListWorkflowRequestResponse
 
 | Field | Type | Required |
@@ -3540,6 +3893,16 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `LoanAdvanceResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseLocationView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `LocationView` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -3574,6 +3937,16 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseLotView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `LotView` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseManagerResponse
 
 | Field | Type | Required |
@@ -3590,6 +3963,36 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `object` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseMapStringUUID
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `object` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseMarketView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `MarketView` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseMaterialProductLocationResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `MaterialProductLocationResponse` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -3614,12 +4017,72 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
-## ApiResponseMediaAssetResponse
+## ApiResponseMaterialStockBalanceResponse
 
 | Field | Type | Required |
 |---|---|---|
 | `success` | `boolean` | no |
-| `data` | `MediaAssetResponse` | no |
+| `data` | `MaterialStockBalanceResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseMaterialStockMovementResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `MaterialStockMovementResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseMaterialStockReservationResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `MaterialStockReservationResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseMaterialStockTransferResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `MaterialStockTransferResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseMaterialStockTransformationResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `MaterialStockTransformationResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseMeasurementView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `MeasurementView` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseMediaView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `MediaView` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -3700,6 +4163,16 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `ObjectiveResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseOfferingView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `OfferingView` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -3804,6 +4277,16 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseOrgProductView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `OrgProductView` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseOrganizationActorResponse
 
 | Field | Type | Required |
@@ -3904,6 +4387,16 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponsePaymentChallengeResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `PaymentChallengeResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponsePaymentOrderResponse
 
 | Field | Type | Required |
@@ -3994,16 +4487,6 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
-## ApiResponseProductCategoryResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `success` | `boolean` | no |
-| `data` | `ProductCategoryResponse` | no |
-| `message` | `string` | no |
-| `errorCode` | `string` | no |
-| `timestamp` | `string(date-time)` | no |
-
 ## ApiResponseProductLocationResponse
 
 | Field | Type | Required |
@@ -4014,42 +4497,62 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
-## ApiResponseProductPriceResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `success` | `boolean` | no |
-| `data` | `ProductPriceResponse` | no |
-| `message` | `string` | no |
-| `errorCode` | `string` | no |
-| `timestamp` | `string(date-time)` | no |
-
-## ApiResponseProductResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `success` | `boolean` | no |
-| `data` | `ProductResponse` | no |
-| `message` | `string` | no |
-| `errorCode` | `string` | no |
-| `timestamp` | `string(date-time)` | no |
-
-## ApiResponseProductSpecResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `success` | `boolean` | no |
-| `data` | `ProductSpecResponse` | no |
-| `message` | `string` | no |
-| `errorCode` | `string` | no |
-| `timestamp` | `string(date-time)` | no |
-
 ## ApiResponseProductTransformationResponse
 
 | Field | Type | Required |
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `ProductTransformationResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseProductView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `ProductView` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseProductionCapacity
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `ProductionCapacity` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseProductionFeasibility
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `ProductionFeasibility` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseProductionMix
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `ProductionMix` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseProductionOrderResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `ProductionOrderResponse` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -4144,6 +4647,16 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseRelationView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `RelationView` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseRenewalOrderResponse
 
 | Field | Type | Required |
@@ -4160,6 +4673,16 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `RenewalProcessResult` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseResolvedPriceView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `ResolvedPriceView` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -4184,6 +4707,16 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseResourceView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `ResourceView` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseRetroactiveResponse
 
 | Field | Type | Required |
@@ -4200,6 +4733,16 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `ReviewResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseReviewView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `ReviewView` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -4224,12 +4767,42 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseRoleView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `RoleView` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseSalesOrderResponse
 
 | Field | Type | Required |
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `SalesOrderResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseSalesReturnResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `SalesReturnResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseSellableProduct
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `SellableProduct` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -4260,6 +4833,16 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `ServiceBundleQuoteResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseServiceView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `ServiceView` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -4324,6 +4907,16 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseSpecView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `SpecView` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseStatementLineResponse
 
 | Field | Type | Required |
@@ -4340,6 +4933,16 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `StatementUploadResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseStepView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `StepView` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -4364,6 +4967,36 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseStockReservationResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `StockReservationResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseStockTransferResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `StockTransferResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseStockTransformationResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `StockTransformationResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseStoredFileResponse
 
 | Field | Type | Required |
@@ -4384,12 +5017,42 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseSubscriptionProductDetails
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `SubscriptionProductDetails` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseSubscriptionResponse
 
 | Field | Type | Required |
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `SubscriptionResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseSupplierView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `SupplierView` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseTangibleDetails
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `TangibleDetails` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -4430,6 +5093,26 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `ThirdPartyStatisticsResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseTicketResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `TicketResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseTicketView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `TicketView` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -4494,6 +5177,26 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseUUID
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `string(uuid)` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseUomView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `UomView` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseUserAccountResponse
 
 | Field | Type | Required |
@@ -4514,32 +5217,22 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
-## ApiResponseVariantAttributeResponse
+## ApiResponseVariantView
 
 | Field | Type | Required |
 |---|---|---|
 | `success` | `boolean` | no |
-| `data` | `VariantAttributeResponse` | no |
+| `data` | `VariantView` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
-## ApiResponseVariantPriceResponse
+## ApiResponseVirtualCreditProductDetails
 
 | Field | Type | Required |
 |---|---|---|
 | `success` | `boolean` | no |
-| `data` | `VariantPriceResponse` | no |
-| `message` | `string` | no |
-| `errorCode` | `string` | no |
-| `timestamp` | `string(date-time)` | no |
-
-## ApiResponseVariantResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `success` | `boolean` | no |
-| `data` | `VariantResponse` | no |
+| `data` | `VirtualCreditProductDetails` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -4594,6 +5287,26 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseWarehouseView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `WarehouseView` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseWorkCenterView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `WorkCenterView` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseWorkflowRequestResponse
 
 | Field | Type | Required |
@@ -4615,7 +5328,7 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `negotiateSellingPrice` | `boolean` | no |
 | `sellingPriceIncludeVat` | `boolean` | no |
 | `authorizeExceptionalDiscount` | `boolean` | no |
-| `grantableDiscountRate` | `number(double)` | no |
+| `grantableDiscountRate` | `number` | no |
 | `printLogo` | `boolean` | no |
 | `paperFormat` | `string` | no |
 | `lengthOfVatInvoiceNumber` | `integer(int32)` | no |
@@ -4642,6 +5355,18 @@ Auto-generated from `openapi.json`. 1237 component schemas. Referenced by name f
 | `lettreMotivationFileId` | `string(uuid)` | no |
 | `status` | `string` | no |
 
+## ApplicationVisitResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `code` | `string` | no |
+| `name` | `string` | no |
+| `url` | `string` | no |
+| `organizationId` | `string(uuid)` | no |
+| `organizationName` | `string` | no |
+| `lastUsedAt` | `string(date-time)` | no |
+
 ## ApplyCommercialSubscriptionRequest
 
 | Field | Type | Required |
@@ -4659,103 +5384,6 @@ Type: `object`
 |---|---|---|
 | `expiresAt` | `string(date-time)` | no |
 | `notes` | `string` | no |
-
-## ArtistProfileResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `id` | `string(uuid)` | no |
-| `organizationId` | `string(uuid)` | no |
-| `businessActorId` | `string(uuid)` | no |
-| `ownerUserId` | `string(uuid)` | no |
-| `slug` | `string` | no |
-| `displayName` | `string` | no |
-| `bannerFileId` | `string(uuid)` | no |
-| `biography` | `string` | no |
-| `location` | `string` | no |
-| `status` | `string` | no |
-| `createdAt` | `string(date-time)` | no |
-| `updatedAt` | `string(date-time)` | no |
-
-## ArtworkCommentResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `id` | `string(uuid)` | no |
-| `artworkId` | `string(uuid)` | no |
-| `authorUserId` | `string(uuid)` | no |
-| `content` | `string` | no |
-| `createdAt` | `string(date-time)` | no |
-
-## ArtworkInvoiceLinkResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `id` | `string(uuid)` | no |
-| `artworkId` | `string(uuid)` | no |
-| `invoiceId` | `string(uuid)` | no |
-| `invoiceStatus` | `string` | no |
-| `createdAt` | `string(date-time)` | no |
-| `updatedAt` | `string(date-time)` | no |
-
-## ArtworkLikeResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `id` | `string(uuid)` | no |
-| `artworkId` | `string(uuid)` | no |
-| `userId` | `string(uuid)` | no |
-| `createdAt` | `string(date-time)` | no |
-
-## ArtworkMediaResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `id` | `string(uuid)` | no |
-| `artworkId` | `string(uuid)` | no |
-| `fileId` | `string(uuid)` | no |
-| `kind` | `string` | no |
-| `position` | `integer(int32)` | no |
-| `createdAt` | `string(date-time)` | no |
-
-## ArtworkProductLinkResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `id` | `string(uuid)` | no |
-| `artworkId` | `string(uuid)` | no |
-| `productId` | `string(uuid)` | no |
-| `commercializationStatus` | `string` | no |
-| `createdAt` | `string(date-time)` | no |
-
-## ArtworkResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `id` | `string(uuid)` | no |
-| `organizationId` | `string(uuid)` | no |
-| `artistProfileId` | `string(uuid)` | no |
-| `title` | `string` | no |
-| `description` | `string` | no |
-| `technique` | `string` | no |
-| `style` | `string` | no |
-| `dimensions` | `string` | no |
-| `tags` | `string[]` | no |
-| `status` | `string` | no |
-| `publishedAt` | `string(date-time)` | no |
-| `createdAt` | `string(date-time)` | no |
-| `updatedAt` | `string(date-time)` | no |
-
-## ArtworkSaleLinkResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `id` | `string(uuid)` | no |
-| `artworkId` | `string(uuid)` | no |
-| `salesOrderId` | `string(uuid)` | no |
-| `saleStatus` | `string` | no |
-| `createdAt` | `string(date-time)` | no |
-| `updatedAt` | `string(date-time)` | no |
 
 ## AssetPortfolioSnapshot
 
@@ -4889,6 +5517,15 @@ Type: `object`
 | `active` | `boolean` | no |
 | `notes` | `string` | no |
 
+## AssignRoleRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `siteId` | `string(uuid)` | no |
+| `roleType` | `string` | yes |
+| `primary` | `boolean` | no |
+| `priority` | `integer(int32)` | no |
+
 ## AssignRoleToUserRequest
 
 | Field | Type | Required |
@@ -4898,14 +5535,6 @@ Type: `object`
 | `scopeType` | `string` | no |
 | `scopeId` | `string(uuid)` | no |
 | `scope` | `string` | yes |
-
-## AttachArtworkMediaRequest
-
-| Field | Type | Required |
-|---|---|---|
-| `fileId` | `string(uuid)` | yes |
-| `kind` | `string` | yes |
-| `position` | `integer(int32)` | no |
 
 ## AttachDocumentRequest
 
@@ -4929,6 +5558,35 @@ Type: `object`
 | `contentType` | `string` | no |
 | `sizeBytes` | `integer(int64)` | no |
 | `createdAt` | `string(date-time)` | no |
+
+## AttributeDefinitionView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `code` | `string` | no |
+| `name` | `string` | no |
+| `dataType` | `string` | no |
+| `unitUomId` | `string(uuid)` | no |
+| `active` | `boolean` | no |
+
+## AttributeRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `attributeDefinitionId` | `string(uuid)` | yes |
+| `value` | `string` | yes |
+| `locale` | `string` | no |
+
+## AttributeView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `productId` | `string(uuid)` | no |
+| `attributeDefinitionId` | `string(uuid)` | no |
+| `value` | `string` | no |
+| `locale` | `string` | no |
 
 ## AuditLogResponse
 
@@ -5167,17 +5825,6 @@ Type: `object`
 | `active` | `boolean` | no |
 | `createdAt` | `string(date-time)` | no |
 
-## BatchResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `id` | `string(uuid)` | no |
-| `productId` | `string(uuid)` | no |
-| `lotNumber` | `string` | no |
-| `manufacturingDate` | `string(date)` | no |
-| `expiryDate` | `string(date)` | no |
-| `quantity` | `integer(int32)` | no |
-
 ## BatchStatementLinesRequest
 
 | Field | Type | Required |
@@ -5281,6 +5928,29 @@ Type: `object`
 | `readingTime` | `integer(int32)` | yes |
 | `categories` | `string[]` | yes |
 
+## BomComponentRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `componentProductId` | `string(uuid)` | yes |
+| `quantityPerBatch` | `number` | yes |
+| `role` | `string` | no |
+| `scrapRate` | `number` | no |
+
+## BomResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `organizationId` | `string(uuid)` | no |
+| `agencyId` | `string(uuid)` | no |
+| `code` | `string` | no |
+| `name` | `string` | no |
+| `outputProductId` | `string(uuid)` | no |
+| `outputQuantity` | `number` | no |
+| `status` | `string` | no |
+| `components` | `Component[]` | no |
+
 ## BracketLine
 
 | Field | Type | Required |
@@ -5289,6 +5959,20 @@ Type: `object`
 | `lowerBound` | `number` | no |
 | `upperBound` | `number` | no |
 | `rate` | `number` | no |
+
+## BrandRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `name` | `string` | yes |
+
+## BrandView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `name` | `string` | no |
+| `ownerOrganizationId` | `string(uuid)` | no |
 
 ## BrouillardComptableDto
 
@@ -5359,6 +6043,16 @@ Type: `object`
 | `budgeted` | `number` | no |
 | `realised` | `number` | no |
 | `variance` | `number` | no |
+
+## BundleView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `bundleCode` | `string` | no |
+| `name` | `string` | no |
+| `bundleType` | `string` | no |
+| `status` | `string` | no |
 
 ## BusinessActorRequest
 
@@ -5473,6 +6167,12 @@ Type: `object`
 | `activeCampaigns` | `integer(int64)` | no |
 | `pendingApprovalCampaigns` | `integer(int64)` | no |
 
+## CapacityRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `totalCapacity` | `number` | yes |
+
 ## CaptchaChallengeResponse
 
 | Field | Type | Required |
@@ -5537,6 +6237,20 @@ Type: `object`
 | `targetId` | `string(uuid)` | no |
 | `reference` | `string` | no |
 | `createdAt` | `string(date-time)` | no |
+
+## CashDrawerAccountView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `organizationId` | `string(uuid)` | no |
+| `ownerId` | `string(uuid)` | no |
+| `ownerName` | `string` | no |
+| `number` | `string` | no |
+| `balance` | `number` | no |
+| `currency` | `string` | no |
+| `type` | `string` | no |
+| `linkedThirdPartyId` | `string(uuid)` | no |
 
 ## CashFlowDto
 
@@ -5673,7 +6387,7 @@ Type: `object`
 | `organizations` | `KernelOrganizationView[]` | no |
 | `agencies` | `KernelAgencyView[]` | no |
 | `cashiers` | `CashierProfileView[]` | no |
-| `accounts` | `WalletAccountView[]` | no |
+| `accounts` | `CashDrawerAccountView[]` | no |
 | `customers` | `CounterpartyView[]` | no |
 
 ## CashierProfileView
@@ -5716,6 +6430,16 @@ Type: `object`
 | `description` | `string` | no |
 | `nativeService` | `boolean` | no |
 | `active` | `boolean` | no |
+
+## CatalogView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `code` | `string` | no |
+| `name` | `string` | no |
+| `catalogType` | `string` | no |
+| `status` | `string` | no |
 
 ## Categorie
 
@@ -5764,15 +6488,44 @@ Type: `object`
 | `createdAt` | `string(date-time)` | no |
 | `updatedAt` | `string(date-time)` | no |
 
-## CategoryI18nResponse
+## CategoryRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `parentId` | `string(uuid)` | no |
+| `code` | `string` | yes |
+| `name` | `string` | yes |
+
+## CategoryView
 
 | Field | Type | Required |
 |---|---|---|
 | `id` | `string(uuid)` | no |
-| `categoryId` | `string(uuid)` | no |
-| `locale` | `string` | no |
+| `parentCategoryId` | `string(uuid)` | no |
+| `code` | `string` | no |
 | `name` | `string` | no |
-| `description` | `string` | no |
+| `path` | `string` | no |
+| `status` | `string` | no |
+
+## CertView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `certificationType` | `string` | no |
+| `certificateNumber` | `string` | no |
+| `status` | `string` | no |
+
+## CertificationRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationProductId` | `string(uuid)` | yes |
+| `certificationType` | `string` | yes |
+| `certificateNumber` | `string` | yes |
+| `issuingAuthority` | `string` | yes |
+| `issuedAt` | `string(date)` | yes |
+| `expiresAt` | `string(date)` | no |
 
 ## CertificationResponse
 
@@ -5813,6 +6566,16 @@ Type: `object`
 | `action` | `string` | no |
 | `status` | `string` | no |
 | `decisionReason` | `string` | no |
+
+## CharacteristicRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `name` | `string` | yes |
+| `unitId` | `string(uuid)` | no |
+| `minimumValue` | `number` | no |
+| `targetValue` | `number` | no |
+| `maximumValue` | `number` | no |
 
 ## CheckDepositItemResponse
 
@@ -5986,12 +6749,6 @@ Type: `object`
 | `entityType` | `string` | no |
 | `tenantId` | `string(uuid)` | no |
 | `organizationId` | `string(uuid)` | no |
-
-## CommentArtworkRequest
-
-| Field | Type | Required |
-|---|---|---|
-| `content` | `string` | yes |
 
 ## CommentDTO
 
@@ -6216,15 +6973,6 @@ DTO représentant une réponse à un commentaire.
 | `plans` | `CommercialPlanCatalogResponse[]` | no |
 | `addOns` | `CommercialAddOnCatalogResponse[]` | no |
 
-## CommercializeArtworkRequest
-
-| Field | Type | Required |
-|---|---|---|
-| `unitPrice` | `number` | yes |
-| `currency` | `string` | yes |
-| `familyCode` | `string` | no |
-| `categoryCode` | `string` | no |
-
 ## CommissionAssetRequest
 
 | Field | Type | Required |
@@ -6274,11 +7022,56 @@ DTO représentant une réponse à un commentaire.
 | `notes` | `string` | no |
 | `resultat` | `string` | no |
 
+## CompleteProductionOrderRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `producedQuantity` | `number` | yes |
+| `conversionCost` | `number` | no |
+| `currency` | `string` | no |
+
+## CompleteRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `actualCost` | `number` | yes |
+| `currency` | `string` | no |
+
 ## CompleteSynchronizationJobRequest
 
 | Field | Type | Required |
 |---|---|---|
 | `summary` | `string` | yes |
+
+## Component
+
+| Field | Type | Required |
+|---|---|---|
+| `componentProductId` | `string(uuid)` | no |
+| `quantityPerBatch` | `number` | no |
+| `role` | `string` | no |
+| `scrapRate` | `number` | no |
+
+## ComponentCapacity
+
+| Field | Type | Required |
+|---|---|---|
+| `componentProductId` | `string(uuid)` | no |
+| `role` | `string` | no |
+| `available` | `number` | no |
+| `requiredPerUnit` | `number` | no |
+| `maxFromThis` | `number` | no |
+| `limiting` | `boolean` | no |
+
+## ComponentRequirement
+
+| Field | Type | Required |
+|---|---|---|
+| `componentProductId` | `string(uuid)` | no |
+| `role` | `string` | no |
+| `required` | `number` | no |
+| `available` | `number` | no |
+| `shortfall` | `number` | no |
 
 ## CompteResultatDto
 
@@ -6319,6 +7112,23 @@ DTO représentant une réponse à un commentaire.
 | `required` | `boolean` | no |
 | `displayOrder` | `integer(int32)` | no |
 
+## ConsumeRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationProductId` | `string(uuid)` | yes |
+| `quantity` | `number` | yes |
+| `fifo` | `boolean` | no |
+
+## ConsumptionRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `requirementId` | `string(uuid)` | no |
+| `organizationProductId` | `string(uuid)` | yes |
+| `quantityPlanned` | `number` | yes |
+| `uomId` | `string(uuid)` | yes |
+
 ## ContactResponse
 
 | Field | Type | Required |
@@ -6343,14 +7153,6 @@ DTO représentant une réponse à un commentaire.
 | `createdAt` | `string(date-time)` | no |
 | `updatedAt` | `string(date-time)` | no |
 | `deletedAt` | `string(date-time)` | no |
-
-## ContextualLoginResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `selectedTenantId` | `string(uuid)` | no |
-| `selectedOrganizationId` | `string(uuid)` | no |
-| `session` | `LoginResponse` | no |
 
 ## ContractResponse
 
@@ -6390,6 +7192,35 @@ DTO représentant une réponse à un commentaire.
 | `salaireBase` | `number` | no |
 | `avantagesNature` | `number` | no |
 | `periodeEssai` | `integer(int32)` | no |
+
+## ConvertMaterialRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationId` | `string(uuid)` | yes |
+| `agencyId` | `string(uuid)` | yes |
+| `sourceProductId` | `string(uuid)` | yes |
+| `sourceQuantity` | `number` | yes |
+| `targetProductId` | `string(uuid)` | yes |
+| `targetQuantity` | `number` | yes |
+| `referenceNumber` | `string` | yes |
+
+## CountRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `warehouseId` | `string(uuid)` | yes |
+| `countType` | `string` | yes |
+| `scheduledAt` | `string(date-time)` | yes |
+
+## CountView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `warehouseId` | `string(uuid)` | no |
+| `countType` | `string` | no |
+| `status` | `string` | no |
 
 ## CounterpartRequest
 
@@ -6554,7 +7385,6 @@ DTO représentant une réponse à un commentaire.
 | `state` | `string` | no |
 | `locality` | `string` | no |
 | `countryId` | `string(uuid)` | no |
-| `zipCode` | `string` | no |
 | `postalCode` | `string` | no |
 | `poBox` | `string` | no |
 | `isDefault` | `boolean` | no |
@@ -6632,32 +7462,6 @@ DTO représentant une réponse à un commentaire.
 | `cvFileId` | `string(uuid)` | no |
 | `lettreMotivationFileId` | `string(uuid)` | no |
 
-## CreateArtistProfileRequest
-
-| Field | Type | Required |
-|---|---|---|
-| `organizationId` | `string(uuid)` | yes |
-| `businessActorId` | `string(uuid)` | yes |
-| `ownerUserId` | `string(uuid)` | yes |
-| `slug` | `string` | yes |
-| `displayName` | `string` | yes |
-| `bannerFileId` | `string(uuid)` | no |
-| `biography` | `string` | no |
-| `location` | `string` | no |
-
-## CreateArtworkRequest
-
-| Field | Type | Required |
-|---|---|---|
-| `organizationId` | `string(uuid)` | yes |
-| `artistProfileId` | `string(uuid)` | yes |
-| `title` | `string` | yes |
-| `description` | `string` | no |
-| `technique` | `string` | yes |
-| `style` | `string` | yes |
-| `dimensions` | `string` | no |
-| `tags` | `string[]` | no |
-
 ## CreateAssignmentRequest
 
 | Field | Type | Required |
@@ -6707,15 +7511,6 @@ DTO représentant une réponse à un commentaire.
 | `amount` | `number` | yes |
 | `currency` | `string` | yes |
 
-## CreateBatchRequest
-
-| Field | Type | Required |
-|---|---|---|
-| `lotNumber` | `string` | yes |
-| `manufacturingDate` | `string(date)` | no |
-| `expiryDate` | `string(date)` | no |
-| `quantity` | `integer(int32)` | yes |
-
 ## CreateBillRequest
 
 | Field | Type | Required |
@@ -6724,6 +7519,19 @@ DTO représentant une réponse à un commentaire.
 | `reference` | `string` | yes |
 | `totalAmount` | `number` | yes |
 | `currency` | `string` | yes |
+
+## CreateBomRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationId` | `string(uuid)` | yes |
+| `agencyId` | `string(uuid)` | yes |
+| `code` | `string` | yes |
+| `name` | `string` | yes |
+| `outputProductId` | `string(uuid)` | yes |
+| `outputQuantity` | `number` | yes |
+| `uomId` | `string(uuid)` | no |
+| `components` | `BomComponentRequest[]` | yes |
 
 ## CreateBusinessDomainRequest
 
@@ -7064,22 +7872,6 @@ DTO représentant une réponse à un commentaire.
 | `amount` | `number` | yes |
 | `reason` | `string` | no |
 
-## CreateGalleryEventRequest
-
-| Field | Type | Required |
-|---|---|---|
-| `organizationId` | `string(uuid)` | yes |
-| `artistProfileId` | `string(uuid)` | yes |
-| `name` | `string` | yes |
-| `description` | `string` | no |
-| `posterFileId` | `string(uuid)` | no |
-| `startAt` | `string(date-time)` | yes |
-| `endAt` | `string(date-time)` | yes |
-| `location` | `string` | yes |
-| `type` | `string` | yes |
-| `maxCapacity` | `integer(int32)` | no |
-| `ticketPrice` | `number` | no |
-
 ## CreateInventorySessionRequest
 
 | Field | Type | Required |
@@ -7184,17 +7976,6 @@ DTO représentant une réponse à un commentaire.
 | `reasonText` | `string` | no |
 | `expectedReturnAt` | `string(date-time)` | no |
 | `items` | `MaterialRequestItemInput[]` | yes |
-
-## CreateMediaAssetRequest
-
-| Field | Type | Required |
-|---|---|---|
-| `targetType` | `string` | yes |
-| `targetId` | `string(uuid)` | yes |
-| `fileId` | `string(uuid)` | yes |
-| `mimeType` | `string` | yes |
-| `position` | `integer(int32)` | no |
-| `altText` | `string` | no |
 
 ## CreateMedicalCertificateRequest
 
@@ -7412,38 +8193,15 @@ DTO représentant une réponse à un commentaire.
 | `entryId` | `string(uuid)` | yes |
 | `notes` | `string` | yes |
 
-## CreateProductCategoryRequest
+## CreateProductionOrderRequest
 
 | Field | Type | Required |
 |---|---|---|
 | `organizationId` | `string(uuid)` | yes |
-| `code` | `string` | yes |
-| `name` | `string` | yes |
-| `parentCode` | `string` | no |
-| `description` | `string` | no |
-
-## CreateProductRequest
-
-| Field | Type | Required |
-|---|---|---|
-| `organizationId` | `string(uuid)` | yes |
-| `sku` | `string` | yes |
-| `name` | `string` | yes |
-| `familyCode` | `string` | yes |
-| `categoryCode` | `string` | no |
-| `variantLabel` | `string` | yes |
-| `barcode` | `string` | no |
-| `description` | `string` | no |
-| `minStockLevel` | `integer(int32)` | no |
-| `maxStockLevel` | `integer(int32)` | no |
-| `unitPrice` | `number` | yes |
-| `currency` | `string` | yes |
-| `status` | `string` | no |
-| `cost` | `number` | no |
-| `photo` | `string` | no |
-| `uom` | `string` | no |
-| `quantity` | `number` | no |
-| `allowedSaleSizes` | `SaleSize[]` | no |
+| `agencyId` | `string(uuid)` | yes |
+| `bomId` | `string(uuid)` | yes |
+| `referenceNumber` | `string` | yes |
+| `plannedQuantity` | `number` | yes |
 
 ## CreateProposedActivityRequest
 
@@ -7589,6 +8347,18 @@ DTO représentant une réponse à un commentaire.
 | `periode` | `string` | no |
 | `format` | `string` | no |
 
+## CreateSpecRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationId` | `string(uuid)` | yes |
+| `siteId` | `string(uuid)` | no |
+| `code` | `string` | yes |
+| `name` | `string` | yes |
+| `specificationType` | `string` | yes |
+| `standardBatchSize` | `number` | yes |
+| `batchUomId` | `string(uuid)` | yes |
+
 ## CreateStatementLineRequest
 
 | Field | Type | Required |
@@ -7700,15 +8470,15 @@ DTO représentant une réponse à un commentaire.
 | `label` | `string` | yes |
 | `inbound` | `boolean` | no |
 
-## CreateVariantRequest
+## CreateUomRequest
 
 | Field | Type | Required |
 |---|---|---|
-| `sku` | `string` | yes |
-| `barcode` | `string` | no |
-| `label` | `string` | yes |
-| `isDefault` | `boolean` | no |
-| `status` | `string` | no |
+| `code` | `string` | yes |
+| `name` | `string` | yes |
+| `symbol` | `string` | no |
+| `dimension` | `string` | yes |
+| `baseFactor` | `number` | no |
 
 ## CreateWalletRequest
 
@@ -7861,8 +8631,7 @@ Type: `object`
 
 | Field | Type | Required |
 |---|---|---|
-| `approved` | `boolean` | no |
-| `reason` | `string` | no |
+| `decision` | `string` | yes |
 
 ## DeclarationResponse
 
@@ -7883,23 +8652,15 @@ Type: `object`
 |---|---|---|
 | `reason` | `string` | yes |
 
-## DefineProductPriceRequest
+## DefineProductRequest
 
 | Field | Type | Required |
 |---|---|---|
-| `priceType` | `string` | yes |
-| `amount` | `number` | yes |
-| `currency` | `string` | yes |
-| `effectiveFrom` | `string(date-time)` | no |
-
-## DefineVariantPriceRequest
-
-| Field | Type | Required |
-|---|---|---|
-| `priceType` | `string` | yes |
-| `amount` | `number` | yes |
-| `currency` | `string` | yes |
-| `effectiveFrom` | `string(date-time)` | no |
+| `globalCode` | `string` | yes |
+| `name` | `string` | yes |
+| `nature` | `string` | yes |
+| `articleKind` | `string` | no |
+| `defaultUomId` | `string(uuid)` | yes |
 
 ## DeleteAssignmentRequest
 
@@ -7915,6 +8676,26 @@ Type: `object`
 | `code` | `string` | yes |
 | `confirmation` | `string` | yes |
 | `reason` | `string` | no |
+
+## DeliveryRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationId` | `string(uuid)` | yes |
+| `code` | `string` | yes |
+| `name` | `string` | yes |
+| `deliveryType` | `string` | yes |
+| `serviceAreaWkt` | `string` | no |
+
+## DeliveryView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `code` | `string` | no |
+| `name` | `string` | no |
+| `deliveryType` | `string` | no |
+| `status` | `string` | no |
 
 ## DenominationView
 
@@ -7961,6 +8742,35 @@ Type: `object`
 | Field | Type | Required |
 |---|---|---|
 | `months` | `integer(int32)` | yes |
+
+## DigitalDetailsRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `fileFormat` | `string` | yes |
+| `currentVersion` | `string` | yes |
+| `fileSizeBytes` | `integer(int64)` | no |
+| `checksumAlgorithm` | `string` | no |
+| `checksum` | `string` | no |
+| `downloadLimit` | `integer(int32)` | no |
+| `streamingAllowed` | `boolean` | no |
+| `offlineUseAllowed` | `boolean` | no |
+| `platformRequirements` | `string` | no |
+
+## DigitalProductDetails
+
+| Field | Type | Required |
+|---|---|---|
+| `productId` | `string(uuid)` | no |
+| `fileFormat` | `string` | no |
+| `currentVersion` | `string` | no |
+| `fileSizeBytes` | `integer(int64)` | no |
+| `checksumAlgorithm` | `string` | no |
+| `checksum` | `string` | no |
+| `downloadLimit` | `integer(int32)` | no |
+| `streamingAllowed` | `boolean` | no |
+| `offlineUseAllowed` | `boolean` | no |
+| `platformRequirements` | `string` | no |
 
 ## DiscoverLoginContextsResponse
 
@@ -8382,6 +9192,24 @@ Type: `object`
 | `referenceCode` | `string` | no |
 | `displayName` | `string` | no |
 
+## EntitlementRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `ownerId` | `string(uuid)` | yes |
+| `intangibleProductId` | `string(uuid)` | yes |
+| `licensePolicyId` | `string(uuid)` | no |
+| `validUntil` | `string(date-time)` | no |
+
+## EntitlementView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `ownerId` | `string(uuid)` | no |
+| `intangibleProductId` | `string(uuid)` | no |
+| `status` | `string` | no |
+
 ## EntityStats
 
 | Field | Type | Required |
@@ -8421,6 +9249,23 @@ Type: `object`
 | `credit` | `number` | no |
 | `label` | `string` | no |
 
+## EntryRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `sectionId` | `string(uuid)` | no |
+| `productOfferingId` | `string(uuid)` | yes |
+| `displayOrder` | `integer(int32)` | no |
+
+## EntryView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `productOfferingId` | `string(uuid)` | no |
+| `displayOrder` | `integer(int32)` | no |
+| `publicationStatus` | `string` | no |
+
 ## EvaluateObjectiveRequest
 
 | Field | Type | Required |
@@ -8450,6 +9295,16 @@ Type: `object`
 | `rate` | `number` | no |
 | `rateDate` | `string(date)` | no |
 | `createdAt` | `string(date-time)` | no |
+
+## ExecutionView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `serviceId` | `string(uuid)` | no |
+| `executionNumber` | `string` | no |
+| `quantity` | `number` | no |
+| `status` | `string` | no |
 
 ## ExecutiveSummaryDto
 
@@ -8489,6 +9344,12 @@ Type: `object`
 | `motif` | `string` | no |
 | `status` | `string` | no |
 | `missionOrderId` | `string(uuid)` | no |
+
+## FacilityRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `facilityType` | `string` | yes |
 
 ## FactureFournisseurResponse
 
@@ -8721,49 +9582,6 @@ Type: `object`
 | `reason` | `string` | no |
 | `createdAt` | `string(date-time)` | no |
 
-## GalleryEventResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `id` | `string(uuid)` | no |
-| `organizationId` | `string(uuid)` | no |
-| `artistProfileId` | `string(uuid)` | no |
-| `name` | `string` | no |
-| `description` | `string` | no |
-| `posterFileId` | `string(uuid)` | no |
-| `startAt` | `string(date-time)` | no |
-| `endAt` | `string(date-time)` | no |
-| `location` | `string` | no |
-| `type` | `string` | no |
-| `maxCapacity` | `integer(int32)` | no |
-| `reservedCount` | `integer(int32)` | no |
-| `ticketPrice` | `number` | no |
-| `status` | `string` | no |
-| `createdAt` | `string(date-time)` | no |
-| `updatedAt` | `string(date-time)` | no |
-
-## GalleryReservationResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `id` | `string(uuid)` | no |
-| `eventId` | `string(uuid)` | no |
-| `userId` | `string(uuid)` | no |
-| `status` | `string` | no |
-| `createdAt` | `string(date-time)` | no |
-| `updatedAt` | `string(date-time)` | no |
-
-## GalleryTicketResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `id` | `string(uuid)` | no |
-| `reservationId` | `string(uuid)` | no |
-| `qrCodeData` | `string` | no |
-| `scanned` | `boolean` | no |
-| `scannedAt` | `string(date-time)` | no |
-| `createdAt` | `string(date-time)` | no |
-
 ## GarnishmentResponse
 
 | Field | Type | Required |
@@ -8777,6 +9595,25 @@ Type: `object`
 | `remainingBalance` | `number` | no |
 | `monthlyAmount` | `number` | no |
 | `status` | `string` | no |
+
+## GenealogyRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `productionOrderId` | `string(uuid)` | yes |
+| `inputLotId` | `string(uuid)` | yes |
+| `outputLotId` | `string(uuid)` | yes |
+| `inputQuantity` | `number` | yes |
+| `inputUomId` | `string(uuid)` | yes |
+
+## GenealogyView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `inputLotId` | `string(uuid)` | no |
+| `outputLotId` | `string(uuid)` | no |
+| `inputQuantity` | `number` | no |
 
 ## GeneralLedger
 
@@ -8941,6 +9778,13 @@ Type: `object`
 | `fingerprint` | `string` | no |
 | `createdAt` | `string(date-time)` | no |
 
+## GeoRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `latitude` | `number` | yes |
+| `longitude` | `number` | yes |
+
 ## GovernanceActionRequest
 
 | Field | Type | Required |
@@ -8958,6 +9802,22 @@ Type: `object`
 | `totalCredit` | `number` | no |
 | `soldeCloture` | `number` | no |
 | `lignes` | `LigneGrandLivreDto[]` | no |
+
+## HumanRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `employmentType` | `string` | yes |
+
+## IdentifierView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `productVariantId` | `string(uuid)` | no |
+| `type` | `string` | no |
+| `value` | `string` | no |
+| `primary` | `boolean` | no |
 
 ## IdentifyAccountRequest
 
@@ -9013,6 +9873,55 @@ Type: `object`
 | `payerReference` | `string` | no |
 | `description` | `string` | no |
 | `callbackUrl` | `string` | no |
+
+## InputRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `inputOrganizationProductId` | `string(uuid)` | yes |
+| `inputRole` | `string` | yes |
+| `sequenceNumber` | `integer(int32)` | no |
+| `requiredQuantity` | `number` | yes |
+| `uomId` | `string(uuid)` | yes |
+| `quantityBasis` | `string` | yes |
+
+## InspectionRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `qualitySpecificationId` | `string(uuid)` | yes |
+| `inspectionType` | `string` | yes |
+| `referenceType` | `string` | no |
+| `referenceId` | `string(uuid)` | no |
+
+## InspectionView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `status` | `string` | no |
+| `decision` | `string` | no |
+
+## IntangibleDetails
+
+| Field | Type | Required |
+|---|---|---|
+| `productId` | `string(uuid)` | no |
+| `deliveryMode` | `string` | no |
+| `accessMode` | `string` | no |
+| `validityPeriodSeconds` | `integer(int64)` | no |
+| `usageLimit` | `number` | no |
+| `usageUnitId` | `string(uuid)` | no |
+| `maximumConcurrentUsers` | `integer(int32)` | no |
+| `activationRequired` | `boolean` | no |
+| `regionRestricted` | `boolean` | no |
+
+## IntangibleDetailsRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `deliveryMode` | `string` | yes |
+| `accessMode` | `string` | yes |
 
 ## IntegrityReport
 
@@ -9083,18 +9992,6 @@ Type: `object`
 | `customerAccountingAccount` | `string` | no |
 | `accountingStatus` | `string` | no |
 | `createdAt` | `string(date-time)` | no |
-
-## InvoiceArtworkSaleRequest
-
-| Field | Type | Required |
-|---|---|---|
-| `customerThirdPartyId` | `string(uuid)` | yes |
-| `productId` | `string(uuid)` | yes |
-| `salesOrderId` | `string(uuid)` | yes |
-| `quantity` | `number` | yes |
-| `unitPrice` | `number` | yes |
-| `currency` | `string` | yes |
-| `invoiceNumber` | `string` | yes |
 
 ## InvoiceLineResponse
 
@@ -9186,6 +10083,20 @@ Type: `object`
 | `selectionToken` | `string` | yes |
 | `contextId` | `string` | yes |
 
+## IssueToCustomerRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationId` | `string(uuid)` | yes |
+| `agencyId` | `string(uuid)` | yes |
+| `productId` | `string(uuid)` | yes |
+| `quantity` | `number` | yes |
+| `customerThirdPartyId` | `string(uuid)` | no |
+| `reservationId` | `string(uuid)` | no |
+| `referenceType` | `string` | no |
+| `referenceId` | `string(uuid)` | no |
+| `referenceNumber` | `string` | yes |
+
 ## IssuedAuthChallengeResponse
 
 | Field | Type | Required |
@@ -9193,6 +10104,36 @@ Type: `object`
 | `deliveryMode` | `string` | no |
 | `challengeTokenPreview` | `string` | no |
 | `expiresInSeconds` | `integer(int64)` | no |
+
+## ItemRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationId` | `string(uuid)` | yes |
+| `agencyId` | `string(uuid)` | yes |
+| `payload` | `JsonNode` | yes |
+
+## ItemResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `organizationId` | `string(uuid)` | no |
+| `agencyId` | `string(uuid)` | no |
+| `type` | `string` | no |
+| `payload` | `JsonNode` | no |
+| `version` | `integer(int64)` | no |
+| `createdAt` | `string(date-time)` | no |
+| `updatedAt` | `string(date-time)` | no |
+
+## ItemView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `productOfferingId` | `string(uuid)` | no |
+| `quantity` | `number` | no |
+| `sortOrder` | `integer(int32)` | no |
 
 ## JobOfferResponse
 
@@ -9314,6 +10255,24 @@ Type: `object`
 | `active` | `boolean` | no |
 | `services` | `string[]` | no |
 
+## LayerRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationProductId` | `string(uuid)` | yes |
+| `inventoryLotId` | `string(uuid)` | no |
+| `receiptMovementId` | `string(uuid)` | yes |
+| `valuationMethod` | `string` | yes |
+| `quantity` | `number` | yes |
+| `unitCost` | `number` | yes |
+| `currency` | `string` | no |
+
+## LeadTimeRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `leadTimeSeconds` | `integer(int64)` | yes |
+
 ## LeaveBalanceResponse
 
 | Field | Type | Required |
@@ -9389,6 +10348,15 @@ Type: `object`
 | `matchedAmount` | `number` | no |
 | `createdAt` | `string(date-time)` | no |
 
+## LicenseRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `intangibleProductId` | `string(uuid)` | yes |
+| `licenseType` | `string` | yes |
+| `seatLimit` | `integer(int32)` | no |
+| `deviceLimit` | `integer(int32)` | no |
+
 ## LigneBalanceDto
 
 | Field | Type | Required |
@@ -9429,6 +10397,14 @@ Type: `object`
 | `libelle` | `string` | no |
 | `debit` | `number` | no |
 | `credit` | `number` | no |
+
+## Line
+
+| Field | Type | Required |
+|---|---|---|
+| `productId` | `string(uuid)` | no |
+| `quantity` | `number` | no |
+| `unitCost` | `number` | no |
 
 ## LineEntry
 
@@ -9471,6 +10447,16 @@ Type: `object`
 | `receivedQty` | `integer(int32)` | no |
 | `note` | `string` | no |
 
+## LineRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationProductId` | `string(uuid)` | yes |
+| `inventoryLotId` | `string(uuid)` | no |
+| `storageLocationId` | `string(uuid)` | yes |
+| `systemQuantity` | `number` | yes |
+| `uomId` | `string(uuid)` | yes |
+
 ## LineResponse
 
 | Field | Type | Required |
@@ -9482,6 +10468,16 @@ Type: `object`
 | `grossBase` | `number` | no |
 | `employeeContribution` | `number` | no |
 | `employerContribution` | `number` | no |
+
+## LineView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `organizationProductId` | `string(uuid)` | no |
+| `systemQuantity` | `number` | no |
+| `countedQuantity` | `number` | no |
+| `varianceQuantity` | `number` | no |
 
 ## LinkAgencyDomainRequest
 
@@ -9540,6 +10536,27 @@ Type: `object`
 | `soldeApres` | `number` | no |
 | `recordedAt` | `string(date-time)` | no |
 
+## LocationRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `parentLocationId` | `string(uuid)` | no |
+| `code` | `string` | yes |
+| `name` | `string` | yes |
+| `locationType` | `string` | yes |
+
+## LocationView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `warehouseId` | `string(uuid)` | no |
+| `parentLocationId` | `string(uuid)` | no |
+| `code` | `string` | no |
+| `name` | `string` | no |
+| `locationType` | `string` | no |
+| `status` | `string` | no |
+
 ## LoginRequest
 
 | Field | Type | Required |
@@ -9597,6 +10614,24 @@ Type: `object`
 | `active` | `boolean` | no |
 | `entries` | `EntryLine[]` | no |
 
+## LotRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationProductId` | `string(uuid)` | yes |
+| `lotNumber` | `string` | yes |
+| `receivedAt` | `string(date-time)` | no |
+
+## LotView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `organizationProductId` | `string(uuid)` | no |
+| `lotNumber` | `string` | no |
+| `qualityStatus` | `string` | no |
+| `inventoryStatus` | `string` | no |
+
 ## MaintenanceRecordResponse
 
 | Field | Type | Required |
@@ -9631,6 +10666,26 @@ Type: `object`
 | `statementId` | `string(uuid)` | no |
 | `statementLineId` | `string(uuid)` | no |
 
+## MarketRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationId` | `string(uuid)` | yes |
+| `code` | `string` | yes |
+| `name` | `string` | yes |
+| `currencyCode` | `string` | yes |
+| `serviceAreaWkt` | `string` | no |
+
+## MarketView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `code` | `string` | no |
+| `name` | `string` | no |
+| `currencyCode` | `string` | no |
+| `status` | `string` | no |
+
 ## MatchWithNewTransactionRequest
 
 | Field | Type | Required |
@@ -9647,6 +10702,15 @@ Type: `object`
 |---|---|---|
 | `items` | `MaterialQuantityUpdate[]` | yes |
 | `note` | `string` | no |
+
+## MaterialProductLocationResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `productId` | `string(uuid)` | no |
+| `locationId` | `string(uuid)` | no |
+| `locationLabel` | `string` | no |
+| `updatedAt` | `string(date-time)` | no |
 
 ## MaterialQuantityUpdate
 
@@ -9732,17 +10796,115 @@ Type: `object`
 | `ipAddress` | `string` | no |
 | `macAddress` | `string` | no |
 
-## MediaAssetResponse
+## MaterialSetProductLocationRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationId` | `string(uuid)` | yes |
+| `agencyId` | `string(uuid)` | yes |
+| `productId` | `string(uuid)` | yes |
+| `locationId` | `string(uuid)` | no |
+| `locationLabel` | `string` | yes |
+
+## MaterialStockBalanceResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationId` | `string(uuid)` | no |
+| `agencyId` | `string(uuid)` | no |
+| `productId` | `string(uuid)` | no |
+| `onHandQuantity` | `number` | no |
+| `reservedQuantity` | `number` | no |
+| `availableQuantity` | `number` | no |
+| `averageUnitCost` | `number` | no |
+| `currency` | `string` | no |
+
+## MaterialStockMovementResponse
 
 | Field | Type | Required |
 |---|---|---|
 | `id` | `string(uuid)` | no |
-| `targetType` | `string` | no |
-| `targetId` | `string(uuid)` | no |
-| `fileId` | `string(uuid)` | no |
-| `mimeType` | `string` | no |
-| `position` | `integer(int32)` | no |
-| `altText` | `string` | no |
+| `organizationId` | `string(uuid)` | no |
+| `agencyId` | `string(uuid)` | no |
+| `productId` | `string(uuid)` | no |
+| `movementType` | `string` | no |
+| `quantity` | `number` | no |
+| `unitCost` | `number` | no |
+| `currency` | `string` | no |
+| `thirdPartyId` | `string(uuid)` | no |
+| `counterpartyAgencyId` | `string(uuid)` | no |
+| `referenceType` | `string` | no |
+| `referenceId` | `string(uuid)` | no |
+| `referenceNumber` | `string` | no |
+| `occurredAt` | `string(date-time)` | no |
+
+## MaterialStockReservationResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `organizationId` | `string(uuid)` | no |
+| `agencyId` | `string(uuid)` | no |
+| `productId` | `string(uuid)` | no |
+| `reservationType` | `string` | no |
+| `referenceType` | `string` | no |
+| `referenceId` | `string(uuid)` | no |
+| `reservedQuantity` | `number` | no |
+| `consumedQuantity` | `number` | no |
+| `remainingQuantity` | `number` | no |
+| `status` | `string` | no |
+| `expiresAt` | `string(date-time)` | no |
+
+## MaterialStockTransferResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `organizationId` | `string(uuid)` | no |
+| `sourceAgencyId` | `string(uuid)` | no |
+| `targetAgencyId` | `string(uuid)` | no |
+| `productId` | `string(uuid)` | no |
+| `quantity` | `number` | no |
+| `referenceNumber` | `string` | no |
+| `status` | `string` | no |
+
+## MaterialStockTransformationResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `organizationId` | `string(uuid)` | no |
+| `agencyId` | `string(uuid)` | no |
+| `referenceNumber` | `string` | no |
+| `status` | `string` | no |
+| `occurredAt` | `string(date-time)` | no |
+| `inputs` | `Line[]` | no |
+| `outputs` | `Line[]` | no |
+
+## MeasurementRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `characteristicId` | `string(uuid)` | yes |
+| `value` | `number` | yes |
+| `unitId` | `string(uuid)` | no |
+
+## MeasurementView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `characteristicId` | `string(uuid)` | no |
+| `numericValue` | `number` | no |
+| `passed` | `boolean` | no |
+
+## MediaRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `mediaType` | `string` | yes |
+| `uri` | `string` | yes |
+| `sortOrder` | `integer(int32)` | no |
 
 ## MediaResponse
 
@@ -9750,6 +10912,18 @@ Type: `object`
 |---|---|---|
 | `id` | `string(uuid)` | no |
 | `url` | `string` | no |
+
+## MediaView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `productId` | `string(uuid)` | no |
+| `mediaType` | `string` | no |
+| `uri` | `string` | no |
+| `altText` | `string` | no |
+| `sortOrder` | `integer(int32)` | no |
+| `primary` | `boolean` | no |
 
 ## MedicalCertificateResponse
 
@@ -9801,6 +10975,13 @@ Type: `object`
 | `prochaineEcheance` | `string(date)` | no |
 | `certificatFileId` | `string(uuid)` | no |
 
+## MfaExemptionRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `exempt` | `boolean` | yes |
+| `reason` | `string` | yes |
+
 ## MineBlockRequest
 
 | Field | Type | Required |
@@ -9826,6 +11007,17 @@ Type: `object`
 | `parentOrderId` | `string(uuid)` | no |
 | `decisionReason` | `string` | no |
 | `decidedAt` | `string(date-time)` | no |
+
+## MixLine
+
+| Field | Type | Required |
+|---|---|---|
+| `bomId` | `string(uuid)` | no |
+| `bomCode` | `string` | no |
+| `outputProductId` | `string(uuid)` | no |
+| `quantity` | `number` | no |
+| `materialCostPerUnit` | `number` | no |
+| `materialCost` | `number` | no |
 
 ## MontantRequest
 
@@ -9891,7 +11083,6 @@ Type: `object`
 | `state` | `string` | no |
 | `locality` | `string` | no |
 | `countryId` | `string(uuid)` | no |
-| `zipCode` | `string` | no |
 | `postalCode` | `string` | no |
 | `poBox` | `string` | no |
 | `isDefault` | `boolean` | no |
@@ -10001,6 +11192,8 @@ Type: `object`
 | `errorMessage` | `string` | no |
 | `requestedAt` | `string(date-time)` | no |
 | `sentAt` | `string(date-time)` | no |
+| `attempts` | `integer(int32)` | no |
+| `lastAttemptAt` | `string(date-time)` | no |
 
 ## NotificationPreference
 
@@ -10062,6 +11255,7 @@ Type: `object`
 | `subjectTemplate` | `string` | no |
 | `bodyTemplate` | `string` | no |
 | `active` | `boolean` | no |
+| `nature` | `string` | no |
 | `createdAt` | `string(date-time)` | no |
 | `updatedAt` | `string(date-time)` | no |
 
@@ -10094,6 +11288,15 @@ Type: `object`
 | `poids` | `number` | no |
 | `noteAtteinte` | `number` | no |
 | `commentaire` | `string` | no |
+
+## OfferingView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `organizationProductId` | `string(uuid)` | no |
+| `offeringCode` | `string` | no |
+| `salesStatus` | `string` | no |
 
 ## OnboardingFlow
 
@@ -10400,6 +11603,22 @@ Type: `object`
 | `inventory` | `GeneralizedInventoryViewSnapshot` | no |
 | `capabilities` | `string[]` | no |
 
+## OrgProductView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `organizationId` | `string(uuid)` | no |
+| `siteId` | `string(uuid)` | no |
+| `productVariantId` | `string(uuid)` | no |
+| `internalCode` | `string` | no |
+| `purchasable` | `boolean` | no |
+| `stockable` | `boolean` | no |
+| `manufacturable` | `boolean` | no |
+| `sellable` | `boolean` | no |
+| `catalogEligible` | `boolean` | no |
+| `status` | `string` | no |
+
 ## OrganizationActorResponse
 
 | Field | Type | Required |
@@ -10610,6 +11829,16 @@ Type: `object`
 | `recipient` | `string` | no |
 | `purpose` | `string` | no |
 
+## OutputRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `outputOrganizationProductId` | `string(uuid)` | yes |
+| `outputRole` | `string` | yes |
+| `sequenceNumber` | `integer(int32)` | no |
+| `expectedQuantity` | `number` | yes |
+| `uomId` | `string(uuid)` | yes |
+
 ## P2PTransferRequest
 
 | Field | Type | Required |
@@ -10686,6 +11915,21 @@ Type: `object`
 | `advances` | `number` | no |
 | `workedDaysOverride` | `integer(int32)` | no |
 | `locked` | `boolean` | no |
+
+## PaymentChallengeRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `amount` | `number` | no |
+| `reference` | `string` | no |
+
+## PaymentChallengeResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `challengeToken` | `string` | no |
+| `expiresInSeconds` | `integer(int64)` | no |
+| `codePreview` | `string` | no |
 
 ## PaymentOrderResponse
 
@@ -10951,6 +12195,12 @@ Type: `object`
 | `scheduledAt` | `string(date-time)` | yes |
 | `notes` | `string` | no |
 
+## PlanRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `steps` | `StepRequest[]` | yes |
+
 ## PlanResponse
 
 | Field | Type | Required |
@@ -11069,6 +12319,13 @@ Type: `object`
 | `expiryDays` | `integer(int32)` | no |
 | `reviewerResponsibilityType` | `string` | no |
 
+## PositionRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `latitude` | `number` | yes |
+| `longitude` | `number` | yes |
+
 ## Post
 
 | Field | Type | Required |
@@ -11104,28 +12361,24 @@ Type: `object`
 | `scheduledAt` | `string(date-time)` | yes |
 | `notes` | `string` | no |
 
-## ProductCategoryResponse
+## PriceListRequest
 
 | Field | Type | Required |
 |---|---|---|
-| `id` | `string(uuid)` | no |
-| `organizationId` | `string(uuid)` | no |
-| `code` | `string` | no |
-| `name` | `string` | no |
-| `parentCode` | `string` | no |
-| `description` | `string` | no |
-| `createdAt` | `string(date-time)` | no |
-| `updatedAt` | `string(date-time)` | no |
+| `organizationId` | `string(uuid)` | yes |
+| `code` | `string` | yes |
+| `name` | `string` | yes |
+| `currencyCode` | `string` | yes |
+| `priceListType` | `string` | yes |
+| `priority` | `integer(int32)` | no |
 
 ## ProductLocationResponse
 
 | Field | Type | Required |
 |---|---|---|
-| `agencyId` | `string(uuid)` | no |
 | `productId` | `string(uuid)` | no |
-| `binCode` | `string` | no |
-| `quantity` | `number` | no |
-| `note` | `string` | no |
+| `locationId` | `string(uuid)` | no |
+| `locationLabel` | `string` | no |
 | `updatedAt` | `string(date-time)` | no |
 
 ## ProductPositionSnapshot
@@ -11148,45 +12401,16 @@ Type: `object`
 | `variantLabel` | `string` | no |
 | `onHandQuantity` | `number` | no |
 
-## ProductPriceResponse
+## ProductReqRequest
 
 | Field | Type | Required |
 |---|---|---|
-| `id` | `string(uuid)` | no |
-| `productId` | `string(uuid)` | no |
-| `priceType` | `string` | no |
-| `amount` | `number` | no |
-| `currency` | `string` | no |
-| `effectiveFrom` | `string(date-time)` | no |
+| `requiredOrganizationProductId` | `string(uuid)` | yes |
+| `quantity` | `number` | yes |
+| `uomId` | `string(uuid)` | yes |
+| `usageType` | `string` | yes |
 
-## ProductResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `id` | `string(uuid)` | no |
-| `tenantId` | `string(uuid)` | no |
-| `organizationId` | `string(uuid)` | no |
-| `sku` | `string` | no |
-| `name` | `string` | no |
-| `familyCode` | `string` | no |
-| `categoryCode` | `string` | no |
-| `variantLabel` | `string` | no |
-| `barcode` | `string` | no |
-| `description` | `string` | no |
-| `minStockLevel` | `integer(int32)` | no |
-| `maxStockLevel` | `integer(int32)` | no |
-| `unitPrice` | `number` | no |
-| `currency` | `string` | no |
-| `status` | `string` | no |
-| `cost` | `number` | no |
-| `photo` | `string` | no |
-| `uom` | `string` | no |
-| `quantity` | `number` | no |
-| `allowedSaleSizes` | `SaleSize[]` | no |
-| `createdAt` | `string(date-time)` | no |
-| `updatedAt` | `string(date-time)` | no |
-
-## ProductSearchResponse
+## ProductSearchResult
 
 | Field | Type | Required |
 |---|---|---|
@@ -11202,18 +12426,6 @@ Type: `object`
 | `unitPrice` | `number` | no |
 | `currency` | `string` | no |
 | `status` | `string` | no |
-
-## ProductSpecResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `id` | `string(uuid)` | no |
-| `productId` | `string(uuid)` | no |
-| `weightKg` | `number` | no |
-| `lengthCm` | `number` | no |
-| `widthCm` | `number` | no |
-| `heightCm` | `number` | no |
-| `materials` | `string` | no |
 
 ## ProductSummaryView
 
@@ -11238,6 +12450,68 @@ Type: `object`
 | `targetQuantity` | `number` | no |
 | `status` | `string` | no |
 
+## ProductView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `globalCode` | `string` | no |
+| `name` | `string` | no |
+| `nature` | `string` | no |
+| `articleKind` | `string` | no |
+| `lifecycleStatus` | `string` | no |
+
+## ProductionCapacity
+
+| Field | Type | Required |
+|---|---|---|
+| `bomId` | `string(uuid)` | no |
+| `bomCode` | `string` | no |
+| `outputProductId` | `string(uuid)` | no |
+| `maxQuantity` | `number` | no |
+| `limitingComponentId` | `string(uuid)` | no |
+| `components` | `ComponentCapacity[]` | no |
+
+## ProductionFeasibility
+
+| Field | Type | Required |
+|---|---|---|
+| `bomId` | `string(uuid)` | no |
+| `outputProductId` | `string(uuid)` | no |
+| `requestedQuantity` | `number` | no |
+| `feasible` | `boolean` | no |
+| `components` | `ComponentRequirement[]` | no |
+
+## ProductionMix
+
+| Field | Type | Required |
+|---|---|---|
+| `strategy` | `string` | no |
+| `valuation` | `string` | no |
+| `lines` | `MixLine[]` | no |
+| `remaining` | `RemainingMaterial[]` | no |
+| `totalUnits` | `number` | no |
+| `totalMaterialCost` | `number` | no |
+| `note` | `string` | no |
+
+## ProductionOrderResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `organizationId` | `string(uuid)` | no |
+| `agencyId` | `string(uuid)` | no |
+| `bomId` | `string(uuid)` | no |
+| `outputProductId` | `string(uuid)` | no |
+| `referenceNumber` | `string` | no |
+| `plannedQuantity` | `number` | no |
+| `producedQuantity` | `number` | no |
+| `status` | `string` | no |
+| `materialCost` | `number` | no |
+| `conversionCost` | `number` | no |
+| `totalCost` | `number` | no |
+| `outputUnitCost` | `number` | no |
+
 ## ProposedActivityResponse
 
 | Field | Type | Required |
@@ -11257,6 +12531,29 @@ Type: `object`
 | `potential` | `string` | no |
 | `source` | `string` | no |
 | `converted` | `boolean` | no |
+
+## ProvisionSellableProductRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationId` | `string(uuid)` | yes |
+| `globalCode` | `string` | yes |
+| `name` | `string` | yes |
+| `shortDescription` | `string` | no |
+| `productNature` | `string` | no |
+| `uomCode` | `string` | no |
+| `variantName` | `string` | no |
+| `barcode` | `string` | no |
+| `imageUri` | `string` | no |
+| `unitPrice` | `number` | no |
+| `currency` | `string` | no |
+| `cost` | `number` | no |
+| `quantity` | `number` | no |
+| `familyCode` | `string` | no |
+| `categoryCode` | `string` | no |
+| `minStockLevel` | `integer(int32)` | no |
+| `maxStockLevel` | `integer(int32)` | no |
+| `allowedSaleSizes` | `SaleSize[]` | no |
 
 ## ProvisionedClientApplicationResponse
 
@@ -11339,6 +12636,13 @@ Type: `object`
 |---|---|---|
 | `organizationId` | `string(uuid)` | no |
 
+## QuestionRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `productOfferingId` | `string(uuid)` | yes |
+| `question` | `string` | yes |
+
 ## Ratings
 
 | Field | Type | Required |
@@ -11383,6 +12687,21 @@ Type: `object`
 | `receivedAt` | `string(date)` | no |
 | `note` | `string` | no |
 | `lines` | `LineItemResponse[]` | no |
+
+## ReceiveFromSupplierRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationId` | `string(uuid)` | yes |
+| `agencyId` | `string(uuid)` | yes |
+| `productId` | `string(uuid)` | yes |
+| `quantity` | `number` | yes |
+| `unitCost` | `number` | no |
+| `currency` | `string` | no |
+| `supplierThirdPartyId` | `string(uuid)` | no |
+| `referenceType` | `string` | no |
+| `referenceId` | `string(uuid)` | no |
+| `referenceNumber` | `string` | yes |
 
 ## ReconciliationMatchResponse
 
@@ -11480,6 +12799,22 @@ Type: `object`
 | `maintenanceType` | `string` | yes |
 | `description` | `string` | yes |
 | `status` | `string` | no |
+
+## RecordMovementRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationId` | `string(uuid)` | yes |
+| `agencyId` | `string(uuid)` | yes |
+| `productId` | `string(uuid)` | yes |
+| `movementType` | `string` | yes |
+| `quantity` | `number` | yes |
+| `unitCost` | `number` | no |
+| `currency` | `string` | no |
+| `thirdPartyId` | `string(uuid)` | no |
+| `referenceType` | `string` | no |
+| `referenceId` | `string(uuid)` | no |
+| `referenceNumber` | `string` | yes |
 
 ## RecordNetworkObservationRequest
 
@@ -11727,6 +13062,20 @@ Type: `object`
 | `ipAddress` | `string` | no |
 | `macAddress` | `string` | no |
 
+## RegisterRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationId` | `string(uuid)` | yes |
+| `supplierCode` | `string` | yes |
+
+## RegisterSalesReturnRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `lines` | `Line[]` | yes |
+| `reason` | `string` | no |
+
 ## RegisterTransactionTypeRequest
 
 | Field | Type | Required |
@@ -11796,6 +13145,47 @@ Type: `object`
 | Field | Type | Required |
 |---|---|---|
 | `reason` | `string` | no |
+
+## RelationRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `sourceProductId` | `string(uuid)` | yes |
+| `targetProductId` | `string(uuid)` | yes |
+| `relationType` | `string` | yes |
+
+## RelationView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `sourceProductId` | `string(uuid)` | no |
+| `targetProductId` | `string(uuid)` | no |
+| `relationType` | `string` | no |
+| `priority` | `integer(int32)` | no |
+
+## RemainingMaterial
+
+| Field | Type | Required |
+|---|---|---|
+| `componentProductId` | `string(uuid)` | no |
+| `remaining` | `number` | no |
+
+## RememberApplicationRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `code` | `string` | yes |
+| `name` | `string` | yes |
+| `url` | `string` | yes |
+| `organizationId` | `string(uuid)` | no |
+| `organizationName` | `string` | no |
+
+## RenameProductRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `name` | `string` | yes |
 
 ## RenewContractRequest
 
@@ -11873,6 +13263,15 @@ Type: `object`
 | `label` | `string` | no |
 | `balance` | `number` | no |
 
+## RequalifyArticleRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationId` | `string(uuid)` | yes |
+| `productId` | `string(uuid)` | yes |
+| `target` | `string` | yes |
+| `referenceNumber` | `string` | no |
+
 ## RequestLoanAdvanceRequest
 
 | Field | Type | Required |
@@ -11882,6 +13281,25 @@ Type: `object`
 | `nbEcheances` | `integer(int32)` | no |
 | `motif` | `string` | no |
 
+## RequestTransferRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationId` | `string(uuid)` | yes |
+| `sourceAgencyId` | `string(uuid)` | yes |
+| `targetAgencyId` | `string(uuid)` | yes |
+| `productId` | `string(uuid)` | yes |
+| `quantity` | `number` | yes |
+| `referenceNumber` | `string` | yes |
+
+## RequiredMaterial
+
+| Field | Type | Required |
+|---|---|---|
+| `inputOrganizationProductId` | `string(uuid)` | no |
+| `uomId` | `string(uuid)` | no |
+| `requiredQuantity` | `number` | no |
+
 ## ReserveMaterialResourceRequest
 
 | Field | Type | Required |
@@ -11890,12 +13308,44 @@ Type: `object`
 | `reserveeId` | `string(uuid)` | yes |
 | `reason` | `string` | yes |
 
+## ReserveStockRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationId` | `string(uuid)` | yes |
+| `agencyId` | `string(uuid)` | yes |
+| `productId` | `string(uuid)` | yes |
+| `reservationType` | `string` | yes |
+| `referenceType` | `string` | no |
+| `referenceId` | `string(uuid)` | no |
+| `quantity` | `number` | yes |
+| `expiresAt` | `string(date-time)` | no |
+
 ## ResetPasswordRequest
 
 | Field | Type | Required |
 |---|---|---|
 | `resetToken` | `string` | yes |
 | `newPassword` | `string` | yes |
+
+## ResolveRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationId` | `string(uuid)` | yes |
+| `productOfferingId` | `string(uuid)` | yes |
+| `quantity` | `number` | yes |
+| `segmentId` | `string(uuid)` | no |
+| `channelId` | `string(uuid)` | no |
+
+## ResolvedPriceView
+
+| Field | Type | Required |
+|---|---|---|
+| `priceRuleId` | `string(uuid)` | no |
+| `priceListId` | `string(uuid)` | no |
+| `unitPrice` | `number` | no |
+| `currency` | `string` | no |
 
 ## ResourceAssignmentResponse
 
@@ -11929,6 +13379,13 @@ Type: `object`
 | `macAddress` | `string` | no |
 | `observedAt` | `string(date-time)` | no |
 
+## ResourceReqRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `operationalResourceTypeId` | `string(uuid)` | yes |
+| `requiredQuantity` | `number` | yes |
+
 ## ResourceReservationResponse
 
 | Field | Type | Required |
@@ -11941,6 +13398,19 @@ Type: `object`
 | `reservedAt` | `string(date-time)` | no |
 | `status` | `string` | no |
 | `releasedAt` | `string(date-time)` | no |
+
+## ResourceView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `siteId` | `string(uuid)` | no |
+| `resourceCode` | `string` | no |
+| `name` | `string` | no |
+| `resourceType` | `string` | no |
+| `status` | `string` | no |
+| `latitude` | `number` | no |
+| `longitude` | `number` | no |
 
 ## RetireAssetRequest
 
@@ -11980,6 +13450,16 @@ Type: `object`
 |---|---|---|
 | `review` | `string` | yes |
 
+## ReviewRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `productOfferingId` | `string(uuid)` | yes |
+| `rating` | `integer(int32)` | no |
+| `title` | `string` | no |
+| `comment` | `string` | no |
+| `verifiedPurchase` | `boolean` | no |
+
 ## ReviewResponse
 
 | Field | Type | Required |
@@ -11994,6 +13474,15 @@ Type: `object`
 | `commentaires` | `string` | no |
 | `planAction` | `string` | no |
 | `status` | `string` | no |
+
+## ReviewView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `productOfferingId` | `string(uuid)` | no |
+| `rating` | `integer(int32)` | no |
+| `moderationStatus` | `string` | no |
 
 ## RhKpiSnapshotResponse
 
@@ -12040,11 +13529,40 @@ Type: `object`
 | `scopeType` | `string` | no |
 | `permissions` | `string[]` | no |
 
+## RoleView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `organizationProductId` | `string(uuid)` | no |
+| `siteId` | `string(uuid)` | no |
+| `roleType` | `string` | no |
+| `primary` | `boolean` | no |
+| `priority` | `integer(int32)` | no |
+| `status` | `string` | no |
+
 ## RotateClientApplicationSecretRequest
 
 | Field | Type | Required |
 |---|---|---|
 | `clientSecret` | `string` | no |
+
+## RoutingPlanRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `specificationId` | `string(uuid)` | yes |
+| `startAt` | `string(date-time)` | no |
+
+## RuleRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationId` | `string(uuid)` | yes |
+| `productOfferingId` | `string(uuid)` | yes |
+| `priceType` | `string` | yes |
+| `unitPrice` | `number` | yes |
+| `currency` | `string` | no |
 
 ## RunPayrollRequest
 
@@ -12120,6 +13638,21 @@ Type: `object`
 | `currency` | `string` | no |
 | `createdAt` | `string(date-time)` | no |
 | `updatedAt` | `string(date-time)` | no |
+
+## SalesReturnResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `salesOrderId` | `string(uuid)` | no |
+| `agencyId` | `string(uuid)` | no |
+| `customerThirdPartyId` | `string(uuid)` | no |
+| `currency` | `string` | no |
+| `totalQuantity` | `number` | no |
+| `creditAmount` | `number` | no |
+| `reason` | `string` | no |
+| `returnedAt` | `string(date-time)` | no |
+| `lines` | `Line[]` | no |
 
 ## SaveClientApplicationPlanRequest
 
@@ -12199,6 +13732,7 @@ Type: `object`
 | `subjectTemplate` | `string` | no |
 | `bodyTemplate` | `string` | yes |
 | `active` | `boolean` | no |
+| `nature` | `string` | no |
 
 ## ScheduleInterviewRequest
 
@@ -12210,6 +13744,15 @@ Type: `object`
 | `lieu` | `string` | no |
 | `interviewerPartyId` | `string(uuid)` | no |
 | `interviewerDisplayName` | `string` | no |
+
+## SectionRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `parentSectionId` | `string(uuid)` | no |
+| `code` | `string` | yes |
+| `name` | `string` | yes |
+| `displayOrder` | `integer(int32)` | no |
 
 ## SelectLoginContextRequest
 
@@ -12230,16 +13773,32 @@ Type: `object`
 | `organizationName` | `string` | no |
 | `organizationType` | `string` | no |
 
-## SellArtworkRequest
+## SellableProduct
 
 | Field | Type | Required |
 |---|---|---|
-| `customerThirdPartyId` | `string(uuid)` | yes |
-| `agencyId` | `string(uuid)` | no |
-| `quantity` | `number` | yes |
-| `unitPrice` | `number` | yes |
-| `currency` | `string` | yes |
-| `orderNumber` | `string` | yes |
+| `productId` | `string(uuid)` | no |
+| `tenantId` | `string(uuid)` | no |
+| `organizationId` | `string(uuid)` | no |
+| `globalCode` | `string` | no |
+| `name` | `string` | no |
+| `shortDescription` | `string` | no |
+| `variantName` | `string` | no |
+| `barcode` | `string` | no |
+| `familyCode` | `string` | no |
+| `categoryCode` | `string` | no |
+| `unitPrice` | `number` | no |
+| `currency` | `string` | no |
+| `cost` | `number` | no |
+| `quantity` | `number` | no |
+| `minStockLevel` | `integer(int32)` | no |
+| `maxStockLevel` | `integer(int32)` | no |
+| `imageUri` | `string` | no |
+| `uomCode` | `string` | no |
+| `allowedSaleSizes` | `SaleSize[]` | no |
+| `lifecycleStatus` | `string` | no |
+| `createdAt` | `string(date-time)` | no |
+| `updatedAt` | `string(date-time)` | no |
 
 ## SellerListItemResponse
 
@@ -12348,6 +13907,16 @@ Type: `object`
 | `amount` | `number` | no |
 | `currency` | `string` | no |
 
+## ServiceView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `serviceCode` | `string` | no |
+| `name` | `string` | no |
+| `serviceType` | `string` | no |
+| `composite` | `boolean` | no |
+
 ## ServiceWorkspaceView
 
 | Field | Type | Required |
@@ -12394,6 +13963,16 @@ Type: `object`
 | Field | Type | Required |
 |---|---|---|
 | `fileId` | `string(uuid)` | no |
+
+## SetProductLocationRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationId` | `string(uuid)` | yes |
+| `agencyId` | `string(uuid)` | yes |
+| `productId` | `string(uuid)` | yes |
+| `locationId` | `string(uuid)` | no |
+| `locationLabel` | `string` | yes |
 
 ## SetSaleConfigRequest
 
@@ -12472,11 +14051,35 @@ Type: `object`
 | `generatedAt` | `string(date-time)` | no |
 | `submittedAt` | `string(date-time)` | no |
 
+## SpecRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationProductId` | `string(uuid)` | yes |
+| `code` | `string` | yes |
+| `name` | `string` | yes |
+
+## SpecView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `code` | `string` | no |
+| `name` | `string` | no |
+| `status` | `string` | no |
+
 ## StartClosingRunRequest
 
 | Field | Type | Required |
 |---|---|---|
 | `periodLabel` | `string` | yes |
+
+## StartRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `latitude` | `number` | no |
+| `longitude` | `number` | no |
 
 ## StartSynchronizationJobRequest
 
@@ -12527,6 +14130,27 @@ Type: `object`
 | `linesImported` | `integer(int32)` | no |
 | `lines` | `StatementLineResponse[]` | no |
 
+## StepRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `sequence` | `integer(int32)` | no |
+| `label` | `string` | yes |
+| `plannedStart` | `string(date-time)` | no |
+| `plannedEnd` | `string(date-time)` | no |
+
+## StepView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `sequence` | `integer(int32)` | no |
+| `label` | `string` | no |
+| `plannedStart` | `string(date-time)` | no |
+| `plannedEnd` | `string(date-time)` | no |
+| `resourceId` | `string(uuid)` | no |
+| `status` | `string` | no |
+
 ## StockBalanceResponse
 
 | Field | Type | Required |
@@ -12535,6 +14159,17 @@ Type: `object`
 | `agencyId` | `string(uuid)` | no |
 | `productId` | `string(uuid)` | no |
 | `onHandQuantity` | `number` | no |
+| `reservedQuantity` | `number` | no |
+| `availableQuantity` | `number` | no |
+| `averageUnitCost` | `number` | no |
+| `currency` | `string` | no |
+
+## StockLevelsRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `minStockLevel` | `integer(int32)` | no |
+| `maxStockLevel` | `integer(int32)` | no |
 
 ## StockMovementPostingView
 
@@ -12553,17 +14188,62 @@ Type: `object`
 | Field | Type | Required |
 |---|---|---|
 | `id` | `string(uuid)` | no |
-| `tenantId` | `string(uuid)` | no |
 | `organizationId` | `string(uuid)` | no |
 | `agencyId` | `string(uuid)` | no |
 | `productId` | `string(uuid)` | no |
-| `thirdPartyId` | `string(uuid)` | no |
-| `referenceNumber` | `string` | no |
-| `sourceDocumentType` | `string` | no |
-| `sourceDocumentNumber` | `string` | no |
 | `movementType` | `string` | no |
 | `quantity` | `number` | no |
+| `unitCost` | `number` | no |
+| `currency` | `string` | no |
+| `thirdPartyId` | `string(uuid)` | no |
+| `counterpartyAgencyId` | `string(uuid)` | no |
+| `referenceType` | `string` | no |
+| `referenceId` | `string(uuid)` | no |
+| `referenceNumber` | `string` | no |
+| `occurredAt` | `string(date-time)` | no |
+
+## StockReservationResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `organizationId` | `string(uuid)` | no |
+| `agencyId` | `string(uuid)` | no |
+| `productId` | `string(uuid)` | no |
+| `reservationType` | `string` | no |
+| `referenceType` | `string` | no |
+| `referenceId` | `string(uuid)` | no |
+| `reservedQuantity` | `number` | no |
+| `consumedQuantity` | `number` | no |
+| `remainingQuantity` | `number` | no |
 | `status` | `string` | no |
+| `expiresAt` | `string(date-time)` | no |
+
+## StockTransferResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `organizationId` | `string(uuid)` | no |
+| `sourceAgencyId` | `string(uuid)` | no |
+| `targetAgencyId` | `string(uuid)` | no |
+| `productId` | `string(uuid)` | no |
+| `quantity` | `number` | no |
+| `referenceNumber` | `string` | no |
+| `status` | `string` | no |
+
+## StockTransformationResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `organizationId` | `string(uuid)` | no |
+| `agencyId` | `string(uuid)` | no |
+| `referenceNumber` | `string` | no |
+| `status` | `string` | no |
+| `occurredAt` | `string(date-time)` | no |
+| `inputs` | `Line[]` | no |
+| `outputs` | `Line[]` | no |
 
 ## StoredFile
 
@@ -12590,6 +14270,23 @@ Type: `object`
 | `analysisStatus` | `string` | no |
 | `analysisReason` | `string` | no |
 | `visibility` | `string` | no |
+
+## SubServiceRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `requiredServiceId` | `string(uuid)` | yes |
+| `quantity` | `integer(int32)` | no |
+| `executionMode` | `string` | yes |
+
+## SubServiceView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `requiredServiceId` | `string(uuid)` | no |
+| `quantity` | `integer(int32)` | no |
+| `executionMode` | `string` | no |
 
 ## SubmitCampaignRequest
 
@@ -12646,6 +14343,34 @@ Type: `object`
 |---|---|---|
 | `email` | `string(email)` | yes |
 
+## SubscriptionDetailsRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `billingPeriod` | `string` | yes |
+| `billingInterval` | `integer(int32)` | no |
+| `autoRenew` | `boolean` | no |
+| `trialPeriodSeconds` | `integer(int64)` | no |
+| `gracePeriodSeconds` | `integer(int64)` | no |
+| `seatLimit` | `integer(int32)` | no |
+| `usageQuota` | `number` | no |
+| `cancellationMode` | `string` | yes |
+
+## SubscriptionProductDetails
+
+| Field | Type | Required |
+|---|---|---|
+| `productId` | `string(uuid)` | no |
+| `billingPeriod` | `string` | no |
+| `billingInterval` | `integer(int32)` | no |
+| `autoRenew` | `boolean` | no |
+| `trialPeriodSeconds` | `integer(int64)` | no |
+| `gracePeriodSeconds` | `integer(int64)` | no |
+| `seatLimit` | `integer(int32)` | no |
+| `usageQuota` | `number` | no |
+| `cancellationMode` | `string` | no |
+| `seatLimited` | `boolean` | no |
+
 ## SubscriptionResponse
 
 | Field | Type | Required |
@@ -12664,6 +14389,24 @@ Type: `object`
 | `mainProductType` | `string` | no |
 | `deliveryLeadTime` | `string` | no |
 | `certification` | `string` | no |
+
+## SupplierView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `organizationId` | `string(uuid)` | no |
+| `supplierCode` | `string` | no |
+| `status` | `string` | no |
+| `leadTimeSeconds` | `integer(int64)` | no |
+
+## SupportPlanRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationId` | `string(uuid)` | yes |
+| `name` | `string` | yes |
+| `supportLevel` | `string` | yes |
 
 ## SuspendRequest
 
@@ -12733,6 +14476,41 @@ Type: `object`
 | `updatedAt` | `string(date-time)` | no |
 | `categoryId` | `string(uuid)` | no |
 | `tenantId` | `string(uuid)` | no |
+
+## TangibleDetails
+
+| Field | Type | Required |
+|---|---|---|
+| `productId` | `string(uuid)` | no |
+| `netWeight` | `number` | no |
+| `grossWeight` | `number` | no |
+| `weightUomId` | `string(uuid)` | no |
+| `length` | `number` | no |
+| `width` | `number` | no |
+| `height` | `number` | no |
+| `dimensionUomId` | `string(uuid)` | no |
+| `countryOfOrigin` | `string` | no |
+| `shelfLifeSeconds` | `integer(int64)` | no |
+| `perishabilityType` | `string` | no |
+| `hazardousMaterial` | `boolean` | no |
+| `recyclable` | `boolean` | no |
+
+## TangibleDetailsRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `netWeight` | `number` | no |
+| `grossWeight` | `number` | no |
+| `weightUomId` | `string(uuid)` | no |
+| `length` | `number` | no |
+| `width` | `number` | no |
+| `height` | `number` | no |
+| `dimensionUomId` | `string(uuid)` | no |
+| `countryOfOrigin` | `string` | no |
+| `shelfLifeSeconds` | `integer(int64)` | no |
+| `perishabilityType` | `string` | no |
+| `hazardousMaterial` | `boolean` | no |
+| `recyclable` | `boolean` | no |
 
 ## TargetView
 
@@ -12868,8 +14646,6 @@ Type: `object`
 | `notes` | `string` | no |
 | `fax` | `string` | no |
 | `contact` | `string` | no |
-| `nui` | `string` | no |
-| `formeJuridique` | `string` | no |
 | `address` | `string` | no |
 | `addressComplement` | `string` | no |
 | `postalCode` | `string` | no |
@@ -12877,6 +14653,7 @@ Type: `object`
 | `country` | `string` | no |
 | `linkedMemberId` | `string(uuid)` | no |
 | `linkedOrganizationId` | `string(uuid)` | no |
+| `qualificationManual` | `boolean` | no |
 | `internal` | `boolean` | no |
 
 ## ThirdPartyBankAccountRequest
@@ -13011,6 +14788,30 @@ Type: `object`
 | `enabled` | `boolean` | no |
 | `accountingAccount` | `string` | no |
 | `accountingAccountNumbers` | `string[]` | no |
+
+## TicketRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `channels` | `string[]` | no |
+
+## TicketResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `webSocketUrl` | `string` | no |
+| `ticketExpiresAt` | `string(date-time)` | no |
+| `connectionExpiresAt` | `string(date-time)` | no |
+| `channels` | `string[]` | no |
+
+## TicketView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `subject` | `string` | no |
+| `priority` | `string` | no |
+| `status` | `string` | no |
 
 ## TierDocument
 
@@ -13212,14 +15013,41 @@ Type: `object`
 | `inbound` | `boolean` | no |
 | `createdAt` | `string(date-time)` | no |
 
+## TransferChallengeRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `targetWalletId` | `string(uuid)` | no |
+| `amount` | `number` | no |
+| `reference` | `string` | no |
+
 ## TransferRequest
 
 | Field | Type | Required |
 |---|---|---|
-| `sourceAccountId` | `string(uuid)` | yes |
-| `targetAccountId` | `string(uuid)` | yes |
-| `amount` | `number` | yes |
-| `reference` | `string` | yes |
+| `targetWalletId` | `string(uuid)` | no |
+| `amount` | `number` | no |
+| `reference` | `string` | no |
+| `challengeToken` | `string` | no |
+| `code` | `string` | no |
+
+## TransformStockRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationId` | `string(uuid)` | yes |
+| `agencyId` | `string(uuid)` | yes |
+| `referenceNumber` | `string` | yes |
+| `inputs` | `TransformationLineRequest[]` | yes |
+| `outputs` | `TransformationLineRequest[]` | yes |
+
+## TransformationLineRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `productId` | `string(uuid)` | yes |
+| `quantity` | `number` | yes |
+| `costWeight` | `number` | no |
 
 ## TrialBalance
 
@@ -13359,6 +15187,18 @@ Type: `object`
 | `customDomain` | `string` | no |
 | `mediaIds` | `string(uuid)[]` | no |
 
+## UomView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `code` | `string` | no |
+| `name` | `string` | no |
+| `symbol` | `string` | no |
+| `dimension` | `string` | no |
+| `baseFactor` | `number` | no |
+| `base` | `boolean` | no |
+
 ## UpdateAccountRequest
 
 | Field | Type | Required |
@@ -13397,7 +15237,7 @@ Type: `object`
 | `negotiateSellingPrice` | `boolean` | no |
 | `sellingPriceIncludeVat` | `boolean` | no |
 | `authorizeExceptionalDiscount` | `boolean` | no |
-| `grantableDiscountRate` | `number(double)` | no |
+| `grantableDiscountRate` | `number` | no |
 | `printLogo` | `boolean` | no |
 | `paperFormat` | `string` | no |
 | `lengthOfVatInvoiceNumber` | `integer(int32)` | no |
@@ -13476,7 +15316,7 @@ Type: `object`
 | `negotiateSellingPrice` | `boolean` | no |
 | `sellingPriceIncludeVat` | `boolean` | no |
 | `authorizeExceptionalDiscount` | `boolean` | no |
-| `grantableDiscountRate` | `number(double)` | no |
+| `grantableDiscountRate` | `number` | no |
 | `printLogo` | `boolean` | no |
 | `paperFormat` | `string` | yes |
 | `lengthOfVatInvoiceNumber` | `integer(int32)` | no |
@@ -13488,26 +15328,6 @@ Type: `object`
 | `taxIdentifier` | `string` | no |
 | `requireSalesOrderApproval` | `boolean` | no |
 | `requireReturnApproval` | `boolean` | no |
-
-## UpdateArtistProfileRequest
-
-| Field | Type | Required |
-|---|---|---|
-| `displayName` | `string` | no |
-| `bannerFileId` | `string(uuid)` | no |
-| `biography` | `string` | no |
-| `location` | `string` | no |
-
-## UpdateArtworkRequest
-
-| Field | Type | Required |
-|---|---|---|
-| `title` | `string` | no |
-| `description` | `string` | no |
-| `technique` | `string` | no |
-| `style` | `string` | no |
-| `dimensions` | `string` | no |
-| `tags` | `string[]` | no |
 
 ## UpdateAvatarRequest
 
@@ -13712,37 +15532,6 @@ Type: `object`
 |---|---|---|
 | `plan` | `string` | yes |
 
-## UpdateProductCategoryRequest
-
-| Field | Type | Required |
-|---|---|---|
-| `name` | `string` | yes |
-| `parentCode` | `string` | no |
-| `description` | `string` | no |
-
-## UpdateProductRequest
-
-| Field | Type | Required |
-|---|---|---|
-| `organizationId` | `string(uuid)` | yes |
-| `sku` | `string` | yes |
-| `name` | `string` | yes |
-| `familyCode` | `string` | yes |
-| `categoryCode` | `string` | no |
-| `variantLabel` | `string` | yes |
-| `barcode` | `string` | no |
-| `description` | `string` | no |
-| `minStockLevel` | `integer(int32)` | no |
-| `maxStockLevel` | `integer(int32)` | no |
-| `unitPrice` | `number` | yes |
-| `currency` | `string` | yes |
-| `status` | `string` | yes |
-| `cost` | `number` | no |
-| `photo` | `string` | no |
-| `uom` | `string` | no |
-| `quantity` | `number` | no |
-| `allowedSaleSizes` | `SaleSize[]` | no |
-
 ## UpdateSalesPointRequest
 
 | Field | Type | Required |
@@ -13872,14 +15661,6 @@ Type: `object`
 | `maintenanceContractReference` | `string` | no |
 | `notes` | `string` | no |
 
-## UpsertCategoryTranslationRequest
-
-| Field | Type | Required |
-|---|---|---|
-| `locale` | `string` | yes |
-| `name` | `string` | yes |
-| `description` | `string` | no |
-
 ## UpsertDocumentSequenceRequest
 
 | Field | Type | Required |
@@ -14004,16 +15785,6 @@ Type: `object`
 | `quantity` | `number` | no |
 | `note` | `string` | no |
 
-## UpsertProductSpecRequest
-
-| Field | Type | Required |
-|---|---|---|
-| `weightKg` | `number` | no |
-| `lengthCm` | `number` | no |
-| `widthCm` | `number` | no |
-| `heightCm` | `number` | no |
-| `materials` | `string` | no |
-
 ## UpsertSettingRequest
 
 | Field | Type | Required |
@@ -14063,6 +15834,7 @@ Type: `object`
 | `organizationId` | `string(uuid)` | no |
 | `organizationCode` | `string` | no |
 | `organizationName` | `string` | no |
+| `organizationLogoUri` | `string` | no |
 | `roleCode` | `string` | no |
 | `roleName` | `string` | no |
 | `scopeType` | `string` | no |
@@ -14072,6 +15844,7 @@ Type: `object`
 
 | Field | Type | Required |
 |---|---|---|
+| `tenantId` | `string(uuid)` | no |
 | `organizationId` | `string(uuid)` | no |
 | `organizationCode` | `string` | no |
 | `shortName` | `string` | no |
@@ -14106,6 +15879,23 @@ Type: `object`
 | `scopeId` | `string(uuid)` | no |
 | `scope` | `string` | no |
 
+## UserWorkspaceResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `tenantId` | `string(uuid)` | no |
+| `organizationId` | `string(uuid)` | no |
+| `organizationCode` | `string` | no |
+| `organizationName` | `string` | no |
+| `organizationLogoUri` | `string` | no |
+| `roleCode` | `string` | no |
+| `roleName` | `string` | no |
+| `scopeType` | `string` | no |
+| `permissions` | `string[]` | no |
+| `serviceCode` | `string` | no |
+| `accessGranted` | `boolean` | no |
+| `accessDeniedReason` | `string` | no |
+
 ## UsernameMigrationChallengeRequest
 
 | Field | Type | Required |
@@ -14121,42 +15911,14 @@ Type: `object`
 | `code` | `string` | yes |
 | `username` | `string` | yes |
 
-## ValidateGalleryTicketRequest
-
-| Field | Type | Required |
-|---|---|---|
-| `qrCodeData` | `string` | yes |
-
-## VariantAttributeResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `id` | `string(uuid)` | no |
-| `variantId` | `string(uuid)` | no |
-| `attributeName` | `string` | no |
-| `attributeValue` | `string` | no |
-
-## VariantPriceResponse
-
-| Field | Type | Required |
-|---|---|---|
-| `id` | `string(uuid)` | no |
-| `variantId` | `string(uuid)` | no |
-| `priceType` | `string` | no |
-| `amount` | `number` | no |
-| `currency` | `string` | no |
-| `effectiveFrom` | `string(date-time)` | no |
-
-## VariantResponse
+## VariantView
 
 | Field | Type | Required |
 |---|---|---|
 | `id` | `string(uuid)` | no |
 | `productId` | `string(uuid)` | no |
 | `sku` | `string` | no |
-| `barcode` | `string` | no |
-| `label` | `string` | no |
-| `isDefault` | `boolean` | no |
+| `variantName` | `string` | no |
 | `status` | `string` | no |
 
 ## VerifyCaptchaRequest
@@ -14174,19 +15936,28 @@ Type: `object`
 | `code` | `string` | yes |
 | `purpose` | `string` | no |
 
-## WalletAccountView
+## VirtualCreditDetailsRequest
 
 | Field | Type | Required |
 |---|---|---|
-| `id` | `string(uuid)` | no |
-| `organizationId` | `string(uuid)` | no |
-| `ownerId` | `string(uuid)` | no |
-| `ownerName` | `string` | no |
-| `number` | `string` | no |
-| `balance` | `number` | no |
-| `currency` | `string` | no |
-| `type` | `string` | no |
-| `linkedThirdPartyId` | `string(uuid)` | no |
+| `issuerId` | `string(uuid)` | yes |
+| `denomination` | `string` | yes |
+| `faceValue` | `number` | no |
+| `transferable` | `boolean` | no |
+| `divisible` | `boolean` | no |
+| `expiryPolicy` | `string` | yes |
+
+## VirtualCreditProductDetails
+
+| Field | Type | Required |
+|---|---|---|
+| `productId` | `string(uuid)` | no |
+| `issuerId` | `string(uuid)` | no |
+| `denomination` | `string` | no |
+| `faceValue` | `number` | no |
+| `transferable` | `boolean` | no |
+| `divisible` | `boolean` | no |
+| `expiryPolicy` | `string` | no |
 
 ## WalletRechargeRequest
 
@@ -14222,6 +15993,7 @@ Type: `object`
 |---|---|---|
 | `id` | `string(uuid)` | no |
 | `ownerId` | `string(uuid)` | no |
+| `ownerType` | `string` | no |
 | `ownerName` | `string` | no |
 | `balance` | `number` | no |
 | `createdAt` | `string(date-time)` | no |
@@ -14274,6 +16046,28 @@ Type: `object`
 | `quantity` | `number` | no |
 | `status` | `string` | no |
 
+## WarehouseView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `siteId` | `string(uuid)` | no |
+| `code` | `string` | no |
+| `name` | `string` | no |
+| `warehouseType` | `string` | no |
+| `latitude` | `number` | no |
+| `longitude` | `number` | no |
+| `status` | `string` | no |
+
+## WarrantyRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationId` | `string(uuid)` | yes |
+| `name` | `string` | yes |
+| `warrantyType` | `string` | yes |
+| `durationSeconds` | `integer(int64)` | no |
+
 ## WithdrawRequest
 
 | Field | Type | Required |
@@ -14285,6 +16079,44 @@ Type: `object`
 | `registerId` | `string(uuid)` | no |
 | `counterpartyActorId` | `string(uuid)` | no |
 | `counterpartyThirdPartyId` | `string(uuid)` | no |
+
+## WithdrawalChallengeRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `amount` | `number` | no |
+| `phoneNumber` | `string` | no |
+
+## WithdrawalRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `amount` | `number` | no |
+| `currency` | `string` | no |
+| `phoneNumber` | `string` | no |
+| `method` | `string` | no |
+| `recipientName` | `string` | no |
+| `challengeToken` | `string` | no |
+| `code` | `string` | no |
+
+## WorkCenterRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationId` | `string(uuid)` | yes |
+| `siteId` | `string(uuid)` | yes |
+| `code` | `string` | yes |
+| `name` | `string` | yes |
+
+## WorkCenterView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `siteId` | `string(uuid)` | no |
+| `code` | `string` | no |
+| `name` | `string` | no |
+| `status` | `string` | no |
 
 ## WorkflowRequestResponse
 

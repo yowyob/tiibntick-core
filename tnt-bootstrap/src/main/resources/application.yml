@@ -110,6 +110,16 @@ management:
       exposure:
         include: health,info,metrics,prometheus,loggers,env,beans,tnt-modules,tnt-kernel
       base-path: /actuator
+  health:
+    # Spring Boot's Elasticsearch autoconfiguration has no built-in on/off switch of
+    # its own (spring.elasticsearch.enabled above is not a real Boot property), so the
+    # health contributor probes ELASTICSEARCH_URIS regardless of whether the app is
+    # actually using Elasticsearch (Go Freelancer search, disabled by default). Without
+    # this, an unreachable/default ES URI parks /actuator/health DOWN permanently.
+    # Toggle stays in lockstep with ELASTICSEARCH_ENABLED so re-enabling search also
+    # re-enables the check (confirmed with devops, 2026-09-08).
+    elasticsearch:
+      enabled: ${ELASTICSEARCH_ENABLED:false}
   endpoint:
     health:
       show-details: when-authorized

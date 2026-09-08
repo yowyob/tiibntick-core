@@ -116,11 +116,17 @@ public class YowyobKernelBridge {
     /**
      * Checks whether comops-auth-core (YowAuth0) is reachable.
      *
+     * <p>Targets {@code /.well-known/jwks.json} rather than {@code /auth/health} —
+     * the latter never existed on the Kernel's public surface (it 404s; the Kernel's
+     * actuator lives on its management port 8081, not publicly routed). The JWKS
+     * endpoint is the confirmed-working public probe for YowAuth0 reachability
+     * (confirmed by TSAFACK Savio, Kernel maintainer, 2026-09-08).
+     *
      * @return {@code true} if auth is reachable
      */
     public Mono<Boolean> checkYowAuthStatus() {
         return webClient.get()
-                .uri("/auth/health")
+                .uri("/.well-known/jwks.json")
                 .retrieve()
                 .bodyToMono(String.class)
                 .timeout(java.time.Duration.ofSeconds(5))
@@ -140,11 +146,18 @@ public class YowyobKernelBridge {
     /**
      * Checks whether the Kernel event bus (yow-event-kernel / Kafka topics) is reachable.
      *
+     * <p>Targets {@code /.well-known/jwks.json} rather than {@code /events/health} —
+     * the latter never existed on the Kernel's public surface (it 404s; the Kernel's
+     * actuator lives on its management port 8081, not publicly routed, and there is no
+     * public endpoint dedicated to event-bus reachability). The JWKS endpoint is the
+     * confirmed-working public probe used as a general Kernel-reachability signal here
+     * (confirmed by TSAFACK Savio, Kernel maintainer, 2026-09-08).
+     *
      * @return {@code true} if event bus is reachable
      */
     public Mono<Boolean> checkKernelEventBus() {
         return webClient.get()
-                .uri("/events/health")
+                .uri("/.well-known/jwks.json")
                 .retrieve()
                 .bodyToMono(String.class)
                 .timeout(java.time.Duration.ofSeconds(5))

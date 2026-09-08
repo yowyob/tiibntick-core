@@ -36,7 +36,7 @@ public final class DockerImageDescriptor {
     public static final List<String> REQUIRED_ENV_VARS = List.of(
             "DB_HOST", "DB_PASSWORD", "KAFKA_BOOTSTRAP",
             "REDIS_HOST", "MINIO_ENDPOINT", "MINIO_ACCESS_KEY",
-            "MINIO_SECRET_KEY", "JWT_ISSUER_URI", "QR_HMAC_SECRET"
+            "MINIO_SECRET_KEY", "QR_HMAC_SECRET"
     );
 
     /**

@@ -4,7 +4,7 @@ Auto-generated from `IWM Backend API` v0.1.0-SNAPSHOT OpenAPI spec (`openapi.jso
 
 **Do not edit by hand** — regenerate with `scripts/fetch-kernel-openapi.sh` (fetches spec) then `python3 scripts/gen_kernel_api_docs.py` (rebuilds this file + `schemas.md`).
 
-1872 operations across 1440 paths, 198 tags, 1237 schemas.
+2029 operations across 1579 paths, 234 tags, 1423 schemas.
 
 ## Tags (controllers)
 
@@ -39,25 +39,27 @@ Auto-generated from `IWM Backend API` v0.1.0-SNAPSHOT OpenAPI spec (`openapi.jso
 - [advanced-asset-management-controller](#advanced-asset-management-controller) (5 ops)
 - [agency-controller](#agency-controller) (6 ops)
 - [agency-schedule-controller](#agency-schedule-controller) (5 ops)
-- [artist-profile-controller](#artist-profile-controller) (4 ops)
-- [artwork-controller](#artwork-controller) (19 ops)
+- [article-requalification-controller](#article-requalification-controller) (1 ops)
 - [asset-portfolio-controller](#asset-portfolio-controller) (3 ops)
+- [attribute-definition-controller](#attribute-definition-controller) (2 ops)
 - [audit-log-controller](#audit-log-controller) (2 ops)
-- [auth-controller](#auth-controller) (31 ops)
+- [auth-controller](#auth-controller) (33 ops)
 - [auth-oidc-controller](#auth-oidc-controller) (6 ops)
 - [bank-account-check-controller](#bank-account-check-controller) (4 ops)
 - [bank-category-controller](#bank-category-controller) (8 ops)
 - [bank-controller](#bank-controller) (8 ops)
 - [bank-statement-controller](#bank-statement-controller) (16 ops)
 - [bank-transaction-controller](#bank-transaction-controller) (7 ops)
-- [billing-legacy-documents-controller](#billing-legacy-documents-controller) (64 ops)
+- [billing-legacy-documents-controller](#billing-legacy-documents-controller) (65 ops)
 - [billing-legacy-payments-controller](#billing-legacy-payments-controller) (7 ops)
 - [billing-sales-core](#billing-sales-core) (57 ops)
 - [blockchain-controller](#blockchain-controller) (11 ops)
 - [blog-controller](#blog-controller) (17 ops)
 - [budget-controller](#budget-controller) (7 ops)
+- [bundle-controller](#bundle-controller) (4 ops)
 - [business-domain-controller](#business-domain-controller) (2 ops)
 - [cashier-operations-controller](#cashier-operations-controller) (80 ops)
+- [catalog-controller](#catalog-controller) (6 ops)
 - [category-controller](#category-controller) (5 ops)
 - [chart-of-accounts-controller](#chart-of-accounts-controller) (6 ops)
 - [check-deposit-controller](#check-deposit-controller) (8 ops)
@@ -67,14 +69,16 @@ Auto-generated from `IWM Backend API` v0.1.0-SNAPSHOT OpenAPI spec (`openapi.jso
 - [client-controller](#client-controller) (24 ops)
 - [commentaire-controller](#commentaire-controller) (4 ops)
 - [commercial-plan-checkout-controller](#commercial-plan-checkout-controller) (5 ops)
+- [compliance-controller](#compliance-controller) (7 ops)
 - [contact-controller](#contact-controller) (3 ops)
 - [cool-pay-gateway-controller](#cool-pay-gateway-controller) (7 ops)
 - [course-controller](#course-controller) (25 ops)
 - [currency-controller](#currency-controller) (3 ops)
 - [customer-controller](#customer-controller) (27 ops)
+- [customer-experience-controller](#customer-experience-controller) (7 ops)
 - [declaration-controller](#declaration-controller) (2 ops)
 - [department-controller](#department-controller) (7 ops)
-- [discussion-group-controller](#discussion-group-controller) (15 ops)
+- [discussion-group-controller](#discussion-group-controller) (16 ops)
 - [document-governance-controller](#document-governance-controller) (6 ops)
 - [document-hub-controller](#document-hub-controller) (5 ops)
 - [domain-controller](#domain-controller) (1 ops)
@@ -92,7 +96,6 @@ Auto-generated from `IWM Backend API` v0.1.0-SNAPSHOT OpenAPI spec (`openapi.jso
 - [fiscal-year-controller](#fiscal-year-controller) (4 ops)
 - [fixed-asset-controller](#fixed-asset-controller) (7 ops)
 - [forum-categorie-controller](#forum-categorie-controller) (6 ops)
-- [gallery-event-controller](#gallery-event-controller) (6 ops)
 - [garnishment-controller](#garnishment-controller) (6 ops)
 - [gateway-forward-auth-controller](#gateway-forward-auth-controller) (1 ops)
 - [general-options-controller](#general-options-controller) (16 ops)
@@ -112,7 +115,19 @@ Auto-generated from `IWM Backend API` v0.1.0-SNAPSHOT OpenAPI spec (`openapi.jso
 - [legal-document-controller](#legal-document-controller) (3 ops)
 - [loan-advance-controller](#loan-advance-controller) (10 ops)
 - [lookup-table-admin-controller](#lookup-table-admin-controller) (5 ops)
+- [manufacturing-bom-controller](#manufacturing-bom-controller) (2 ops)
+- [manufacturing-configuration-controller](#manufacturing-configuration-controller) (4 ops)
+- [manufacturing-production-order-controller](#manufacturing-production-order-controller) (9 ops)
+- [manufacturing-resource-controller](#manufacturing-resource-controller) (2 ops)
+- [material-conversion-controller](#material-conversion-controller) (2 ops)
+- [material-product-location-controller](#material-product-location-controller) (2 ops)
 - [material-request-controller](#material-request-controller) (7 ops)
+- [material-stock-ledger-controller](#material-stock-ledger-controller) (4 ops)
+- [material-stock-reservation-controller](#material-stock-reservation-controller) (2 ops)
+- [material-stock-sales-controller](#material-stock-sales-controller) (1 ops)
+- [material-stock-supply-controller](#material-stock-supply-controller) (1 ops)
+- [material-stock-transfer-controller](#material-stock-transfer-controller) (5 ops)
+- [material-stock-transformation-controller](#material-stock-transformation-controller) (2 ops)
 - [media-controller](#media-controller) (4 ops)
 - [medical-controller](#medical-controller) (15 ops)
 - [medical-self-service-controller](#medical-self-service-controller) (1 ops)
@@ -120,25 +135,28 @@ Auto-generated from `IWM Backend API` v0.1.0-SNAPSHOT OpenAPI spec (`openapi.jso
 - [newsletter-abonnement-controller](#newsletter-abonnement-controller) (3 ops)
 - [newsletter-categorie-controller](#newsletter-categorie-controller) (6 ops)
 - [newsletter-content-controller](#newsletter-content-controller) (14 ops)
-- [newsletter-entity-controller](#newsletter-entity-controller) (9 ops)
+- [newsletter-entity-controller](#newsletter-entity-controller) (12 ops)
 - [newsletter-subscription-controller](#newsletter-subscription-controller) (4 ops)
 - [notification-controller](#notification-controller) (10 ops)
-- [observability-controller](#observability-controller) (5 ops)
+- [observability-controller](#observability-controller) (6 ops)
+- [offering-controller](#offering-controller) (6 ops)
 - [opening-hours-controller](#opening-hours-controller) (2 ops)
 - [operation-template-controller](#operation-template-controller) (4 ops)
 - [operational-excellence-controller](#operational-excellence-controller) (9 ops)
 - [operational-policy-controller](#operational-policy-controller) (4 ops)
+- [operational-resource-controller](#operational-resource-controller) (6 ops)
 - [operational-site-governance-controller](#operational-site-governance-controller) (5 ops)
 - [operational-workspace-controller](#operational-workspace-controller) (6 ops)
 - [org-content-controller](#org-content-controller) (1 ops)
 - [organization-address-book-controller](#organization-address-book-controller) (12 ops)
 - [organization-controller](#organization-controller) (12 ops)
 - [organization-delegation-controller](#organization-delegation-controller) (5 ops)
+- [organization-product-controller](#organization-product-controller) (6 ops)
 - [organization-service-controller](#organization-service-controller) (11 ops)
 - [organization-structure-controller](#organization-structure-controller) (12 ops)
 - [pay-element-admin-controller](#pay-element-admin-controller) (5 ops)
 - [pay-variable-controller](#pay-variable-controller) (3 ops)
-- [payment-controller](#payment-controller) (10 ops)
+- [payment-controller](#payment-controller) (17 ops)
 - [payment-gateway-controller](#payment-gateway-controller) (5 ops)
 - [payroll-document-controller](#payroll-document-controller) (6 ops)
 - [payroll-employee-controller](#payroll-employee-controller) (9 ops)
@@ -153,16 +171,21 @@ Auto-generated from `IWM Backend API` v0.1.0-SNAPSHOT OpenAPI spec (`openapi.jso
 - [podcast-controller](#podcast-controller) (15 ops)
 - [point-of-interest-controller](#point-of-interest-controller) (2 ops)
 - [post-controller](#post-controller) (9 ops)
-- [product-catalog-controller](#product-catalog-controller) (7 ops)
-- [product-controller](#product-controller) (6 ops)
-- [product-structure-controller](#product-structure-controller) (15 ops)
+- [pricing-controller](#pricing-controller) (4 ops)
+- [product-classification-controller](#product-classification-controller) (5 ops)
+- [product-definition-controller](#product-definition-controller) (17 ops)
+- [product-enrichment-controller](#product-enrichment-controller) (6 ops)
 - [product-transformation-controller](#product-transformation-controller) (3 ops)
+- [production-scheduling-controller](#production-scheduling-controller) (7 ops)
+- [production-specification-controller](#production-specification-controller) (8 ops)
 - [prospect-controller](#prospect-controller) (26 ops)
 - [public-file-controller](#public-file-controller) (1 ops)
 - [public-newsletter-subscription-controller](#public-newsletter-subscription-controller) (2 ops)
 - [public-newsletter-tracking-controller](#public-newsletter-tracking-controller) (1 ops)
 - [public-organization-branding-controller](#public-organization-branding-controller) (1 ops)
 - [purchase-order-controller](#purchase-order-controller) (5 ops)
+- [quality-controller](#quality-controller) (7 ops)
+- [realtime-ticket-controller](#realtime-ticket-controller) (1 ops)
 - [receipt-controller](#receipt-controller) (4 ops)
 - [reconciliation-match-controller](#reconciliation-match-controller) (12 ops)
 - [recruitment-controller](#recruitment-controller) (21 ops)
@@ -177,15 +200,25 @@ Auto-generated from `IWM Backend API` v0.1.0-SNAPSHOT OpenAPI spec (`openapi.jso
 - [rh-kpi-controller](#rh-kpi-controller) (3 ops)
 - [role-controller](#role-controller) (7 ops)
 - [sales-agent-controller](#sales-agent-controller) (24 ops)
-- [sales-controller](#sales-controller) (7 ops)
+- [sales-controller](#sales-controller) (8 ops)
 - [scoped-resource-controller](#scoped-resource-controller) (9 ops)
+- [sellable-product-controller](#sellable-product-controller) (4 ops)
 - [service-bundle-controller](#service-bundle-controller) (6 ops)
+- [service-composition-controller](#service-composition-controller) (5 ops)
+- [service-execution-controller](#service-execution-controller) (5 ops)
 - [session-tokens-controller](#session-tokens-controller) (2 ops)
 - [settings-controller](#settings-controller) (2 ops)
 - [skill-controller](#skill-controller) (7 ops)
 - [social-declaration-controller](#social-declaration-controller) (6 ops)
 - [statement-line-controller](#statement-line-controller) (2 ops)
-- [supplier-controller](#supplier-controller) (24 ops)
+- [stock-ledger-controller](#stock-ledger-controller) (4 ops)
+- [stock-product-location-controller](#stock-product-location-controller) (2 ops)
+- [stock-reservation-controller](#stock-reservation-controller) (2 ops)
+- [stock-sales-controller](#stock-sales-controller) (1 ops)
+- [stock-supply-controller](#stock-supply-controller) (1 ops)
+- [stock-transfer-controller](#stock-transfer-controller) (5 ops)
+- [stock-transformation-controller](#stock-transformation-controller) (2 ops)
+- [supplier-controller](#supplier-controller) (29 ops)
 - [system-audit-controller](#system-audit-controller) (4 ops)
 - [tag-controller](#tag-controller) (4 ops)
 - [tax-bracket-admin-controller](#tax-bracket-admin-controller) (5 ops)
@@ -193,14 +226,17 @@ Auto-generated from `IWM Backend API` v0.1.0-SNAPSHOT OpenAPI spec (`openapi.jso
 - [third-party-address-book-controller](#third-party-address-book-controller) (6 ops)
 - [third-party-controller](#third-party-controller) (10 ops)
 - [timesheet-controller](#timesheet-controller) (7 ops)
+- [traceability-controller](#traceability-controller) (6 ops)
 - [training-budget-controller](#training-budget-controller) (5 ops)
 - [training-controller](#training-controller) (16 ops)
 - [transaction-type-controller](#transaction-type-controller) (6 ops)
 - [treasury-controller](#treasury-controller) (11 ops)
-- [user-controller](#user-controller) (5 ops)
+- [unit-of-measure-controller](#unit-of-measure-controller) (3 ops)
+- [user-controller](#user-controller) (8 ops)
 - [user-follow-controller](#user-follow-controller) (5 ops)
 - [user-profile-controller](#user-profile-controller) (1 ops)
-- [warehouse-controller](#warehouse-controller) (4 ops)
+- [valuation-count-controller](#valuation-count-controller) (8 ops)
+- [warehouse-controller](#warehouse-controller) (10 ops)
 - [warehouse-layout-controller](#warehouse-layout-controller) (2 ops)
 - [warehouse-location-controller](#warehouse-location-controller) (3 ops)
 - [warehouse-transfer-controller](#warehouse-transfer-controller) (3 ops)
@@ -3535,183 +3571,12 @@ Se désabonner d'un contenu
 
 
 
-## artist-profile-controller
+## article-requalification-controller
 
-### POST `/api/yowpainter/artists`
-**Request body:** `application/json` → `CreateArtistProfileRequest` (required)
+### POST `/api/material-stock/requalifications`
+**Request body:** `application/json` → `RequalifyArticleRequest` (required)
 
-**Responses:** 200 → `ApiResponseArtistProfileResponse`
-
-
-### GET `/api/yowpainter/artists/by-slug/{slug}`
-**Parameters:**
-- `slug` (path, string, required)
-
-**Responses:** 200 → `ApiResponseArtistProfileResponse`
-
-
-### GET `/api/yowpainter/artists/{artistProfileId}`
-**Parameters:**
-- `artistProfileId` (path, string(uuid), required)
-
-**Responses:** 200 → `ApiResponseArtistProfileResponse`
-
-
-### PATCH `/api/yowpainter/artists/{artistProfileId}`
-**Parameters:**
-- `artistProfileId` (path, string(uuid), required)
-
-**Request body:** `application/json` → `UpdateArtistProfileRequest` (required)
-
-**Responses:** 200 → `ApiResponseArtistProfileResponse`
-
-
-
-## artwork-controller
-
-### GET `/api/yowpainter/artworks`
-**Parameters:**
-- `organizationId` (query, string(uuid), optional)
-- `artistProfileId` (query, string(uuid), optional)
-
-**Responses:** 200 → `ApiResponseListArtworkResponse`
-
-
-### POST `/api/yowpainter/artworks`
-**Request body:** `application/json` → `CreateArtworkRequest` (required)
-
-**Responses:** 200 → `ApiResponseArtworkResponse`
-
-
-### GET `/api/yowpainter/artworks/{artworkId}`
-**Parameters:**
-- `artworkId` (path, string(uuid), required)
-
-**Responses:** 200 → `ApiResponseArtworkResponse`
-
-
-### PATCH `/api/yowpainter/artworks/{artworkId}`
-**Parameters:**
-- `artworkId` (path, string(uuid), required)
-
-**Request body:** `application/json` → `UpdateArtworkRequest` (required)
-
-**Responses:** 200 → `ApiResponseArtworkResponse`
-
-
-### GET `/api/yowpainter/artworks/{artworkId}/comments`
-**Parameters:**
-- `artworkId` (path, string(uuid), required)
-
-**Responses:** 200 → `ApiResponseListArtworkCommentResponse`
-
-
-### POST `/api/yowpainter/artworks/{artworkId}/comments`
-**Parameters:**
-- `artworkId` (path, string(uuid), required)
-
-**Request body:** `application/json` → `CommentArtworkRequest` (required)
-
-**Responses:** 200 → `ApiResponseArtworkCommentResponse`
-
-
-### POST `/api/yowpainter/artworks/{artworkId}/commercialize`
-**Parameters:**
-- `artworkId` (path, string(uuid), required)
-
-**Request body:** `application/json` → `CommercializeArtworkRequest` (required)
-
-**Responses:** 200 → `ApiResponseArtworkProductLinkResponse`
-
-
-### POST `/api/yowpainter/artworks/{artworkId}/invoice`
-**Parameters:**
-- `artworkId` (path, string(uuid), required)
-
-**Request body:** `application/json` → `InvoiceArtworkSaleRequest` (required)
-
-**Responses:** 200 → `ApiResponseArtworkInvoiceLinkResponse`
-
-
-### GET `/api/yowpainter/artworks/{artworkId}/invoice-link`
-**Parameters:**
-- `artworkId` (path, string(uuid), required)
-
-**Responses:** 200 → `ApiResponseArtworkInvoiceLinkResponse`
-
-
-### POST `/api/yowpainter/artworks/{artworkId}/invoice/post`
-**Parameters:**
-- `artworkId` (path, string(uuid), required)
-
-**Responses:** 200 → `ApiResponseArtworkInvoiceLinkResponse`
-
-
-### GET `/api/yowpainter/artworks/{artworkId}/likes`
-**Parameters:**
-- `artworkId` (path, string(uuid), required)
-
-**Responses:** 200 → `ApiResponseListArtworkLikeResponse`
-
-
-### POST `/api/yowpainter/artworks/{artworkId}/likes`
-**Parameters:**
-- `artworkId` (path, string(uuid), required)
-
-**Responses:** 200 → `ApiResponseArtworkLikeResponse`
-
-
-### GET `/api/yowpainter/artworks/{artworkId}/media`
-**Parameters:**
-- `artworkId` (path, string(uuid), required)
-
-**Responses:** 200 → `ApiResponseListArtworkMediaResponse`
-
-
-### POST `/api/yowpainter/artworks/{artworkId}/media`
-**Parameters:**
-- `artworkId` (path, string(uuid), required)
-
-**Request body:** `application/json` → `AttachArtworkMediaRequest` (required)
-
-**Responses:** 200 → `ApiResponseArtworkMediaResponse`
-
-
-### GET `/api/yowpainter/artworks/{artworkId}/product-link`
-**Parameters:**
-- `artworkId` (path, string(uuid), required)
-
-**Responses:** 200 → `ApiResponseArtworkProductLinkResponse`
-
-
-### POST `/api/yowpainter/artworks/{artworkId}/publish`
-**Parameters:**
-- `artworkId` (path, string(uuid), required)
-
-**Responses:** 200 → `ApiResponseArtworkResponse`
-
-
-### GET `/api/yowpainter/artworks/{artworkId}/sale-link`
-**Parameters:**
-- `artworkId` (path, string(uuid), required)
-
-**Responses:** 200 → `ApiResponseArtworkSaleLinkResponse`
-
-
-### POST `/api/yowpainter/artworks/{artworkId}/sale/confirm`
-**Parameters:**
-- `artworkId` (path, string(uuid), required)
-
-**Responses:** 200 → `ApiResponseArtworkSaleLinkResponse`
-
-
-### POST `/api/yowpainter/artworks/{artworkId}/sell`
-**Parameters:**
-- `artworkId` (path, string(uuid), required)
-
-**Request body:** `application/json` → `SellArtworkRequest` (required)
-
-**Responses:** 200 → `ApiResponseArtworkSaleLinkResponse`
+**Responses:** 200 → `ApiResponseObject`
 
 
 
@@ -3737,6 +3602,19 @@ Se désabonner d'un contenu
 - `warehouseId` (path, string(uuid), required)
 
 **Responses:** 200 → `ApiResponseAssetPortfolioView`
+
+
+
+## attribute-definition-controller
+
+### GET `/api/product-core/attribute-definitions`
+**Responses:** 200 → `ApiResponseListAttributeDefinitionView`
+
+
+### POST `/api/product-core/attribute-definitions`
+**Request body:** `application/json` → `CreateRequest` (required)
+
+**Responses:** 200 → `ApiResponseAttributeDefinitionView`
 
 
 
@@ -3864,6 +3742,13 @@ Se désabonner d'un contenu
 **Responses:** 200 → `ApiResponseOtpChallengeResponse`
 
 
+### GET `/api/auth/me/workspaces`
+**Parameters:**
+- `serviceCode` (query, string, required)
+
+**Responses:** 200 → `ApiResponseListUserWorkspaceResponse`
+
+
 ### POST `/api/auth/mfa/confirm`
 **Request body:** `application/json` → `ConfirmMfaRequest` (required)
 
@@ -3925,13 +3810,22 @@ Se désabonner d'un contenu
 ### POST `/api/auth/select-context`
 **Request body:** `application/json` → `SelectLoginContextRequest` (required)
 
-**Responses:** 200 → `ApiResponseContextualLoginResponse`
+**Responses:** 200 → `ApiResponseObject`
 
 
 ### POST `/api/auth/sign-up`
 **Request body:** `application/json` → `PublicSignUpRequest` (required)
 
 **Responses:** 200 → `ApiResponseObject`
+
+
+### POST `/api/auth/users/{userId}/mfa-exemption`
+**Parameters:**
+- `userId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `MfaExemptionRequest` (required)
+
+**Responses:** 200 → `ApiResponseUserAccountResponse`
 
 
 ### POST `/api/auth/users/{userId}/reset-password`
@@ -4498,6 +4392,10 @@ Se désabonner d'un contenu
 **Responses:** 200 → `CommercialDocumentView`
 
 
+### GET `/api/documents-commerciaux/non-relies`
+**Responses:** 200 → `CommercialDocumentView[]`
+
+
 ### GET `/api/facture-fournisseurs`
 **Responses:** 200 → `CommercialDocumentView[]`
 
@@ -5036,10 +4934,11 @@ Enregistrer un paiement partiel ou total
 
 
 ### PUT `/api/factures/{id}/paye`
-Marquer une facture comme payée intégralement
+Solder une facture sans encaissement (ajustement motivé)
 
 **Parameters:**
 - `id` (path, string(uuid), required)
+- `motif` (query, string, required)
 
 **Responses:** 200 → `FactureResponse`
 
@@ -5610,6 +5509,38 @@ Soumettre un brouillon de blog pour validation par l'admin
 
 
 
+## bundle-controller
+
+### POST `/api/product-core/bundles`
+**Request body:** `application/json` → `CreateRequest` (required)
+
+**Responses:** 200 → `ApiResponseBundleView`
+
+
+### POST `/api/product-core/bundles/{id}/activate`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseBundleView`
+
+
+### GET `/api/product-core/bundles/{id}/items`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListItemView`
+
+
+### POST `/api/product-core/bundles/{id}/items`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `application/json` → `ItemRequest` (required)
+
+**Responses:** 200 → `ApiResponseUUID`
+
+
+
 ## business-domain-controller
 
 ### GET `/api/business-domains`
@@ -5628,23 +5559,23 @@ Soumettre un brouillon de blog pour validation par l'admin
 ### POST `/api/accounts/transfer`
 **Request body:** `application/json` → `TransferRequest` (required)
 
-**Responses:** 200 → `WalletAccountView`
+**Responses:** 200 → `CashDrawerAccountView`
 
 
 ### POST `/api/accounts/transfer-p2p`
 **Request body:** `application/json` → `P2PTransferRequest` (required)
 
-**Responses:** 200 → `WalletAccountView`
+**Responses:** 200 → `CashDrawerAccountView`
 
 
 ### POST `/api/accounts/withdraw`
 **Request body:** `application/json` → `WithdrawRequest` (required)
 
-**Responses:** 200 → `WalletAccountView`
+**Responses:** 200 → `CashDrawerAccountView`
 
 
 ### GET `/api/admin/accounts`
-**Responses:** 200 → `WalletAccountView[]`
+**Responses:** 200 → `CashDrawerAccountView[]`
 
 
 ### DELETE `/api/admin/assignments`
@@ -5773,7 +5704,7 @@ Soumettre un brouillon de blog pour validation par l'admin
 
 
 ### GET `/api/cashier/accounts`
-**Responses:** 200 → `WalletAccountView[]`
+**Responses:** 200 → `CashDrawerAccountView[]`
 
 
 ### GET `/api/cashier/bills`
@@ -6092,6 +6023,54 @@ Soumettre un brouillon de blog pour validation par l'admin
 - `principalEmail` (query, string, required)
 
 **Responses:** 200 → `CashierProfileView`
+
+
+
+## catalog-controller
+
+### POST `/api/product-core/catalogs`
+**Request body:** `application/json` → `CreateRequest` (required)
+
+**Responses:** 200 → `ApiResponseCatalogView`
+
+
+### POST `/api/product-core/catalogs/entries/{entryId}/publish`
+**Parameters:**
+- `entryId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseEntryView`
+
+
+### GET `/api/product-core/catalogs/{id}/entries`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListEntryView`
+
+
+### POST `/api/product-core/catalogs/{id}/entries`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `application/json` → `EntryRequest` (required)
+
+**Responses:** 200 → `ApiResponseEntryView`
+
+
+### POST `/api/product-core/catalogs/{id}/publish`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseCatalogView`
+
+
+### POST `/api/product-core/catalogs/{id}/sections`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `application/json` → `SectionRequest` (required)
+
+**Responses:** 200 → `ApiResponseUUID`
 
 
 
@@ -6690,6 +6669,54 @@ Mettre à jour une catégorie
 
 
 
+## compliance-controller
+
+### POST `/api/product-core/compliance/certifications`
+**Request body:** `application/json` → `CertificationRequest` (required)
+
+**Responses:** 200 → `ApiResponseUUID`
+
+
+### GET `/api/product-core/compliance/certifications/valid`
+**Parameters:**
+- `organizationProductId` (query, string(uuid), required)
+- `date` (query, string, optional)
+
+**Responses:** 200 → `ApiResponseListCertView`
+
+
+### POST `/api/product-core/compliance/entitlements`
+**Request body:** `application/json` → `EntitlementRequest` (required)
+
+**Responses:** 200 → `ApiResponseEntitlementView`
+
+
+### POST `/api/product-core/compliance/entitlements/{id}/activate`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseEntitlementView`
+
+
+### POST `/api/product-core/compliance/licenses`
+**Request body:** `application/json` → `LicenseRequest` (required)
+
+**Responses:** 200 → `ApiResponseUUID`
+
+
+### POST `/api/product-core/compliance/support-plans`
+**Request body:** `application/json` → `SupportPlanRequest` (required)
+
+**Responses:** 200 → `ApiResponseUUID`
+
+
+### POST `/api/product-core/compliance/warranties`
+**Request body:** `application/json` → `WarrantyRequest` (required)
+
+**Responses:** 200 → `ApiResponseUUID`
+
+
+
 ## contact-controller
 
 ### GET `/api/contacts`
@@ -7264,6 +7291,57 @@ Soumettre un brouillon de cours pour validation par l'admin
 
 
 
+## customer-experience-controller
+
+### POST `/api/product-core/cx/questions`
+**Request body:** `application/json` → `QuestionRequest` (required)
+
+**Responses:** 200 → `ApiResponseUUID`
+
+
+### POST `/api/product-core/cx/questions/{id}/answers`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `application/json` → `AnswerRequest` (required)
+
+**Responses:** 200 → `ApiResponseUUID`
+
+
+### GET `/api/product-core/cx/reviews`
+**Parameters:**
+- `productOfferingId` (query, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListReviewView`
+
+
+### POST `/api/product-core/cx/reviews`
+**Request body:** `application/json` → `ReviewRequest` (required)
+
+**Responses:** 200 → `ApiResponseReviewView`
+
+
+### POST `/api/product-core/cx/reviews/{id}/approve`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseReviewView`
+
+
+### POST `/api/product-core/cx/tickets`
+**Request body:** `application/json` → `TicketRequest` (required)
+
+**Responses:** 200 → `ApiResponseTicketView`
+
+
+### POST `/api/product-core/cx/tickets/{id}/resolve`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseTicketView`
+
+
+
 ## declaration-controller
 
 ### GET `/api/v1/payroll/declarations`
@@ -7421,6 +7499,13 @@ Soumettre un brouillon de cours pour validation par l'admin
 **Parameters:**
 - `groupId` (path, string(uuid), required)
 - `memberId` (query, string(uuid), required)
+
+**Responses:** 200 → `object`
+
+
+### DELETE `/api/v1/forum/groups/{groupId}/mine`
+**Parameters:**
+- `groupId` (path, string(uuid), required)
 
 **Responses:** 200 → `object`
 
@@ -8290,50 +8375,6 @@ Fil d'actualité des podcasts (personnalisé si abonnements)
 
 
 
-## gallery-event-controller
-
-### GET `/api/yowpainter/events`
-**Parameters:**
-- `organizationId` (query, string(uuid), optional)
-- `artistProfileId` (query, string(uuid), optional)
-
-**Responses:** 200 → `ApiResponseListGalleryEventResponse`
-
-
-### POST `/api/yowpainter/events`
-**Request body:** `application/json` → `CreateGalleryEventRequest` (required)
-
-**Responses:** 200 → `ApiResponseGalleryEventResponse`
-
-
-### POST `/api/yowpainter/events/tickets/validate`
-**Request body:** `application/json` → `ValidateGalleryTicketRequest` (required)
-
-**Responses:** 200 → `ApiResponseGalleryTicketResponse`
-
-
-### GET `/api/yowpainter/events/{eventId}`
-**Parameters:**
-- `eventId` (path, string(uuid), required)
-
-**Responses:** 200 → `ApiResponseGalleryEventResponse`
-
-
-### GET `/api/yowpainter/events/{eventId}/reservations`
-**Parameters:**
-- `eventId` (path, string(uuid), required)
-
-**Responses:** 200 → `ApiResponseListGalleryReservationResponse`
-
-
-### POST `/api/yowpainter/events/{eventId}/reservations`
-**Parameters:**
-- `eventId` (path, string(uuid), required)
-
-**Responses:** 200 → `ApiResponseGalleryReservationResponse`
-
-
-
 ## garnishment-controller
 
 ### GET `/api/v1/payroll/garnishments`
@@ -9188,6 +9229,189 @@ Fil d'actualité des podcasts (personnalisé si abonnements)
 
 
 
+## manufacturing-bom-controller
+
+### GET `/api/manufacturing/boms`
+**Parameters:**
+- `organizationId` (query, string(uuid), required)
+- `agencyId` (query, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListBomResponse`
+
+
+### POST `/api/manufacturing/boms`
+**Request body:** `application/json` → `CreateBomRequest` (required)
+
+**Responses:** 200 → `ApiResponseBomResponse`
+
+
+
+## manufacturing-configuration-controller
+
+### GET `/api/manufacturing/configuration/{type}`
+**Parameters:**
+- `type` (path, string, required)
+- `organizationId` (query, string(uuid), required)
+- `agencyId` (query, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListItemResponse`
+
+
+### POST `/api/manufacturing/configuration/{type}`
+**Parameters:**
+- `type` (path, string, required)
+
+**Request body:** `application/json` → `ItemRequest` (required)
+
+**Responses:** 200 → `ApiResponseItemResponse`
+
+
+### DELETE `/api/manufacturing/configuration/{type}/{id}`
+**Parameters:**
+- `type` (path, string, required)
+- `id` (path, string(uuid), required)
+- `organizationId` (query, string(uuid), required)
+- `agencyId` (query, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseVoid`
+
+
+### PUT `/api/manufacturing/configuration/{type}/{id}`
+**Parameters:**
+- `type` (path, string, required)
+- `id` (path, string(uuid), required)
+
+**Request body:** `application/json` → `ItemRequest` (required)
+
+**Responses:** 200 → `ApiResponseItemResponse`
+
+
+
+## manufacturing-production-order-controller
+
+### GET `/api/manufacturing/production-orders`
+**Parameters:**
+- `organizationId` (query, string(uuid), required)
+- `agencyId` (query, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListProductionOrderResponse`
+
+
+### POST `/api/manufacturing/production-orders`
+**Request body:** `application/json` → `CreateProductionOrderRequest` (required)
+
+**Responses:** 200 → `ApiResponseProductionOrderResponse`
+
+
+### GET `/api/manufacturing/production-orders/capacity`
+**Parameters:**
+- `organizationId` (query, string(uuid), required)
+- `agencyId` (query, string(uuid), required)
+- `bomId` (query, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseProductionCapacity`
+
+
+### GET `/api/manufacturing/production-orders/capacity/all`
+**Parameters:**
+- `organizationId` (query, string(uuid), required)
+- `agencyId` (query, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListProductionCapacity`
+
+
+### GET `/api/manufacturing/production-orders/feasibility`
+**Parameters:**
+- `organizationId` (query, string(uuid), required)
+- `agencyId` (query, string(uuid), required)
+- `bomId` (query, string(uuid), required)
+- `quantity` (query, number, required)
+
+**Responses:** 200 → `ApiResponseProductionFeasibility`
+
+
+### GET `/api/manufacturing/production-orders/production-mix`
+**Parameters:**
+- `organizationId` (query, string(uuid), required)
+- `agencyId` (query, string(uuid), required)
+- `strategy` (query, string, optional)
+- `valuation` (query, string, optional)
+
+**Responses:** 200 → `ApiResponseProductionMix`
+
+
+### POST `/api/manufacturing/production-orders/{orderId}/cancel`
+**Parameters:**
+- `orderId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseProductionOrderResponse`
+
+
+### POST `/api/manufacturing/production-orders/{orderId}/complete`
+**Parameters:**
+- `orderId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `CompleteProductionOrderRequest` (required)
+
+**Responses:** 200 → `ApiResponseProductionOrderResponse`
+
+
+### POST `/api/manufacturing/production-orders/{orderId}/release`
+**Parameters:**
+- `orderId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseProductionOrderResponse`
+
+
+
+## manufacturing-resource-controller
+
+### GET `/api/product-core/manufacturing-resources/work-centers`
+**Parameters:**
+- `siteId` (query, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListWorkCenterView`
+
+
+### POST `/api/product-core/manufacturing-resources/work-centers`
+**Request body:** `application/json` → `WorkCenterRequest` (required)
+
+**Responses:** 200 → `ApiResponseWorkCenterView`
+
+
+
+## material-conversion-controller
+
+### POST `/api/material-stock/conversions/to-finished`
+**Request body:** `application/json` → `ConvertMaterialRequest` (required)
+
+**Responses:** 200 → `ApiResponseObject`
+
+
+### POST `/api/material-stock/conversions/to-raw`
+**Request body:** `application/json` → `ConvertMaterialRequest` (required)
+
+**Responses:** 200 → `ApiResponseObject`
+
+
+
+## material-product-location-controller
+
+### GET `/api/material-stock/locations`
+**Parameters:**
+- `organizationId` (query, string(uuid), required)
+- `agencyId` (query, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListMaterialProductLocationResponse`
+
+
+### PUT `/api/material-stock/locations`
+**Request body:** `application/json` → `MaterialSetProductLocationRequest` (required)
+
+**Responses:** 200 → `ApiResponseMaterialProductLocationResponse`
+
+
+
 ## material-request-controller
 
 ### GET `/api/spare/material-requests`
@@ -9246,6 +9470,129 @@ Fil d'actualité des podcasts (personnalisé si abonnements)
 **Request body:** `application/json` → `MaterialActionRequest` (required)
 
 **Responses:** 200 → `ApiResponseMaterialRequestResponse`
+
+
+
+## material-stock-ledger-controller
+
+### GET `/api/material-stock/balances`
+**Parameters:**
+- `organizationId` (query, string(uuid), required)
+- `agencyId` (query, string(uuid), required)
+- `productId` (query, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseMaterialStockBalanceResponse`
+
+
+### GET `/api/material-stock/balances/agency`
+**Parameters:**
+- `organizationId` (query, string(uuid), required)
+- `agencyId` (query, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListMaterialStockBalanceResponse`
+
+
+### GET `/api/material-stock/movements`
+**Parameters:**
+- `organizationId` (query, string(uuid), required)
+- `agencyId` (query, string(uuid), required)
+- `productId` (query, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListMaterialStockMovementResponse`
+
+
+### POST `/api/material-stock/movements`
+**Request body:** `application/json` → `RecordMovementRequest` (required)
+
+**Responses:** 200 → `ApiResponseMaterialStockMovementResponse`
+
+
+
+## material-stock-reservation-controller
+
+### POST `/api/material-stock/reservations`
+**Request body:** `application/json` → `ReserveStockRequest` (required)
+
+**Responses:** 200 → `ApiResponseMaterialStockReservationResponse`
+
+
+### POST `/api/material-stock/reservations/{reservationId}/release`
+**Parameters:**
+- `reservationId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseMaterialStockReservationResponse`
+
+
+
+## material-stock-sales-controller
+
+### POST `/api/material-stock/issues`
+**Request body:** `application/json` → `IssueToCustomerRequest` (required)
+
+**Responses:** 200 → `ApiResponseMaterialStockMovementResponse`
+
+
+
+## material-stock-supply-controller
+
+### POST `/api/material-stock/receipts`
+**Request body:** `application/json` → `ReceiveFromSupplierRequest` (required)
+
+**Responses:** 200 → `ApiResponseMaterialStockMovementResponse`
+
+
+
+## material-stock-transfer-controller
+
+### GET `/api/material-stock/transfers`
+**Parameters:**
+- `organizationId` (query, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListMaterialStockTransferResponse`
+
+
+### POST `/api/material-stock/transfers`
+**Request body:** `application/json` → `RequestTransferRequest` (required)
+
+**Responses:** 200 → `ApiResponseMaterialStockTransferResponse`
+
+
+### POST `/api/material-stock/transfers/{transferId}/cancel`
+**Parameters:**
+- `transferId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseMaterialStockTransferResponse`
+
+
+### POST `/api/material-stock/transfers/{transferId}/receive`
+**Parameters:**
+- `transferId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseMaterialStockTransferResponse`
+
+
+### POST `/api/material-stock/transfers/{transferId}/ship`
+**Parameters:**
+- `transferId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseMaterialStockTransferResponse`
+
+
+
+## material-stock-transformation-controller
+
+### GET `/api/material-stock/transformations`
+**Parameters:**
+- `organizationId` (query, string(uuid), required)
+- `agencyId` (query, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListMaterialStockTransformationResponse`
+
+
+### POST `/api/material-stock/transformations`
+**Request body:** `application/json` → `TransformStockRequest` (required)
+
+**Responses:** 200 → `ApiResponseMaterialStockTransformationResponse`
 
 
 
@@ -9496,16 +9843,12 @@ Téléverser une image ou un fichier à inclure dans un contenu de newsletter
 ## newsletter-abonnement-controller
 
 ### GET `/api/v1/newsletter/abonnements/categories`
-**Parameters:**
-- `userId` (query, string(uuid), required)
-
 **Responses:** 200 → `CategorieResponse[]`
 
 
 ### DELETE `/api/v1/newsletter/abonnements/categories/{categorieId}`
 **Parameters:**
 - `categorieId` (path, string(uuid), required)
-- `userId` (query, string(uuid), required)
 
 **Responses:** 204
 
@@ -9513,7 +9856,6 @@ Téléverser une image ou un fichier à inclure dans un contenu de newsletter
 ### POST `/api/v1/newsletter/abonnements/categories/{categorieId}`
 **Parameters:**
 - `categorieId` (path, string(uuid), required)
-- `userId` (query, string(uuid), required)
 
 **Request body:** `application/json` → `SubscribeRequest` (required)
 
@@ -9573,9 +9915,6 @@ Téléverser une image ou un fichier à inclure dans un contenu de newsletter
 
 
 ### GET `/api/v1/newsletter/contents/mine`
-**Parameters:**
-- `userId` (query, string(uuid), required)
-
 **Responses:** 200 → `NewsletterContentResponse[]`
 
 
@@ -9596,7 +9935,6 @@ Téléverser une image ou un fichier à inclure dans un contenu de newsletter
 ### PUT `/api/v1/newsletter/contents/{id}`
 **Parameters:**
 - `id` (path, string(uuid), required)
-- `userId` (query, string(uuid), required)
 
 **Request body:** `application/json` → `NewsletterContentUpdateRequest` (required)
 
@@ -9629,7 +9967,6 @@ Téléverser une image ou un fichier à inclure dans un contenu de newsletter
 ### POST `/api/v1/newsletter/contents/{id}/publish`
 **Parameters:**
 - `id` (path, string(uuid), required)
-- `userId` (query, string(uuid), required)
 
 **Responses:** 200 → `NewsletterContentResponse`
 
@@ -9637,7 +9974,6 @@ Téléverser une image ou un fichier à inclure dans un contenu de newsletter
 ### POST `/api/v1/newsletter/contents/{id}/reject`
 **Parameters:**
 - `id` (path, string(uuid), required)
-- `userId` (query, string(uuid), required)
 
 **Responses:** 200 → `NewsletterContentResponse`
 
@@ -9645,7 +9981,6 @@ Téléverser une image ou un fichier à inclure dans un contenu de newsletter
 ### POST `/api/v1/newsletter/contents/{id}/submit`
 **Parameters:**
 - `id` (path, string(uuid), required)
-- `userId` (query, string(uuid), required)
 
 **Responses:** 200 → `NewsletterContentResponse`
 
@@ -9660,7 +9995,6 @@ Téléverser une image ou un fichier à inclure dans un contenu de newsletter
 ### POST `/api/v1/newsletter/newsletters/{newsletterId}/contents`
 **Parameters:**
 - `newsletterId` (path, string(uuid), required)
-- `userId` (query, string(uuid), required)
 
 **Request body:** `application/json` → `NewsletterContentCreateRequest` (required)
 
@@ -9706,10 +10040,14 @@ Téléverser une image ou un fichier à inclure dans un contenu de newsletter
 **Responses:** 200 → `NewsletterResponse`
 
 
-### POST `/api/v1/newsletter/newsletters`
+### GET `/api/v1/newsletter/admin/newsletters/{id}/subscribers`
 **Parameters:**
-- `userId` (query, string(uuid), required)
+- `id` (path, string(uuid), required)
 
+**Responses:** 200 → `string[]`
+
+
+### POST `/api/v1/newsletter/newsletters`
 **Request body:** `application/json` → `NewsletterCreateRequest` (required)
 
 **Responses:** 201 → `NewsletterResponse`
@@ -9717,10 +10055,16 @@ Téléverser une image ou un fichier à inclure dans un contenu de newsletter
 
 ### GET `/api/v1/newsletter/newsletters/mine`
 **Parameters:**
-- `userId` (query, string(uuid), required)
 - `scope` (query, string, optional)
 
 **Responses:** 200 → `NewsletterResponse[]`
+
+
+### DELETE `/api/v1/newsletter/newsletters/{id}`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 204
 
 
 ### GET `/api/v1/newsletter/newsletters/{id}`
@@ -9734,11 +10078,17 @@ Téléverser une image ou un fichier à inclure dans un contenu de newsletter
 ### PUT `/api/v1/newsletter/newsletters/{id}`
 **Parameters:**
 - `id` (path, string(uuid), required)
-- `userId` (query, string(uuid), required)
 
 **Request body:** `application/json` → `NewsletterCreateRequest` (required)
 
 **Responses:** 200 → `NewsletterResponse`
+
+
+### GET `/api/v1/newsletter/newsletters/{id}/subscribers`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `string[]`
 
 
 ### GET `/api/v1/newsletter/newsletters/{newsletterId}/open-rate`
@@ -9754,7 +10104,6 @@ Téléverser une image ou un fichier à inclure dans un contenu de newsletter
 ### POST `/api/v1/newsletter/newsletters/subscribe/{token}`
 **Parameters:**
 - `token` (path, string(uuid), required)
-- `userId` (query, string(uuid), required)
 
 **Request body:** `application/json` → `SubscribeRequest` (required)
 
@@ -9762,16 +10111,12 @@ Téléverser une image ou un fichier à inclure dans un contenu de newsletter
 
 
 ### GET `/api/v1/newsletter/newsletters/subscriptions`
-**Parameters:**
-- `userId` (query, string(uuid), required)
-
 **Responses:** 200 → `NewsletterResponse[]`
 
 
 ### DELETE `/api/v1/newsletter/newsletters/{newsletterId}/subscribe`
 **Parameters:**
 - `newsletterId` (path, string(uuid), required)
-- `userId` (query, string(uuid), required)
 
 **Responses:** 204
 
@@ -9779,7 +10124,6 @@ Téléverser une image ou un fichier à inclure dans un contenu de newsletter
 ### POST `/api/v1/newsletter/newsletters/{newsletterId}/subscribe`
 **Parameters:**
 - `newsletterId` (path, string(uuid), required)
-- `userId` (query, string(uuid), required)
 
 **Request body:** `application/json` → `SubscribeRequest` (required)
 
@@ -9845,6 +10189,15 @@ Téléverser une image ou un fichier à inclure dans un contenu de newsletter
 
 ## observability-controller
 
+### GET `/api/observability/aggregates/version`
+**Parameters:**
+- `tenantId` (query, string(uuid), required)
+- `aggregateType` (query, string, required)
+- `aggregateId` (query, string(uuid), required)
+
+**Responses:** 200 → `ApiResponse`
+
+
 ### GET `/api/observability/outbox/events`
 **Parameters:**
 - `tenantId` (query, string(uuid), required)
@@ -9879,6 +10232,50 @@ Téléverser une image ou un fichier à inclure dans un contenu de newsletter
 
 ### GET `/api/observability/runtime`
 **Responses:** 200 → `ApiResponse`
+
+
+
+## offering-controller
+
+### POST `/api/product-core/offerings`
+**Request body:** `application/json` → `CreateRequest` (required)
+
+**Responses:** 200 → `ApiResponseOfferingView`
+
+
+### POST `/api/product-core/offerings/delivery-options`
+**Request body:** `application/json` → `DeliveryRequest` (required)
+
+**Responses:** 200 → `ApiResponseDeliveryView`
+
+
+### GET `/api/product-core/offerings/delivery-options/serving`
+**Parameters:**
+- `longitude` (query, number, required)
+- `latitude` (query, number, required)
+
+**Responses:** 200 → `ApiResponseListDeliveryView`
+
+
+### POST `/api/product-core/offerings/markets`
+**Request body:** `application/json` → `MarketRequest` (required)
+
+**Responses:** 200 → `ApiResponseMarketView`
+
+
+### GET `/api/product-core/offerings/markets/serving`
+**Parameters:**
+- `longitude` (query, number, required)
+- `latitude` (query, number, required)
+
+**Responses:** 200 → `ApiResponseListMarketView`
+
+
+### POST `/api/product-core/offerings/{id}/enable-sales`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseOfferingView`
 
 
 
@@ -10044,6 +10441,60 @@ Téléverser une image ou un fichier à inclure dans un contenu de newsletter
 **Request body:** `application/json` → `UpsertOperationalPolicyRequest` (required)
 
 **Responses:** 200 → `ApiResponseOperationalPolicyResponse`
+
+
+
+## operational-resource-controller
+
+### POST `/api/product-core/operational-resources`
+**Request body:** `application/json` → `CreateRequest` (required)
+
+**Responses:** 200 → `ApiResponseResourceView`
+
+
+### GET `/api/product-core/operational-resources/near`
+**Parameters:**
+- `longitude` (query, number, required)
+- `latitude` (query, number, required)
+- `radiusMeters` (query, number(double), optional)
+
+**Responses:** 200 → `ApiResponseListResourceView`
+
+
+### PUT `/api/product-core/operational-resources/{id}/capacity-details`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `application/json` → `CapacityRequest` (required)
+
+**Responses:** 200 → `ApiResponseObject`
+
+
+### PUT `/api/product-core/operational-resources/{id}/facility-details`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `application/json` → `FacilityRequest` (required)
+
+**Responses:** 200 → `ApiResponseObject`
+
+
+### PUT `/api/product-core/operational-resources/{id}/human-details`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `application/json` → `HumanRequest` (required)
+
+**Responses:** 200 → `ApiResponseObject`
+
+
+### PUT `/api/product-core/operational-resources/{id}/position`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `application/json` → `PositionRequest` (required)
+
+**Responses:** 200 → `ApiResponseResourceView`
 
 
 
@@ -10393,6 +10844,55 @@ Lister les contenus d'éducation de mon organisation active
 
 
 
+## organization-product-controller
+
+### POST `/api/product-core/organization-products`
+**Request body:** `application/json` → `RegisterRequest` (required)
+
+**Responses:** 200 → `ApiResponseOrgProductView`
+
+
+### GET `/api/product-core/organization-products/{id}`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseOrgProductView`
+
+
+### POST `/api/product-core/organization-products/{id}/capabilities/{capability}`
+**Parameters:**
+- `id` (path, string(uuid), required)
+- `capability` (path, string, required)
+
+**Responses:** 200 → `ApiResponseOrgProductView`
+
+
+### GET `/api/product-core/organization-products/{id}/roles`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListRoleView`
+
+
+### POST `/api/product-core/organization-products/{id}/roles`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `application/json` → `AssignRoleRequest` (required)
+
+**Responses:** 200 → `ApiResponseRoleView`
+
+
+### PUT `/api/product-core/organization-products/{id}/stock-levels`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `application/json` → `StockLevelsRequest` (required)
+
+**Responses:** 200 → `ApiResponseOrgProductView`
+
+
+
 ## organization-service-controller
 
 ### GET `/api/organizations/commercial-subscriptions/catalog`
@@ -10642,6 +11142,16 @@ Lister les contenus d'éducation de mon organisation active
 **Responses:** 200 → `ApiResponseWalletResponse`
 
 
+### GET `/api/payments/wallets/mine`
+**Responses:** 200 → `ApiResponseWalletResponse`
+
+
+### POST `/api/payments/wallets/mine`
+**Request body:** `application/json` → `CreateWalletRequest` (optional)
+
+**Responses:** 200 → `ApiResponseWalletResponse`
+
+
 ### GET `/api/payments/wallets/owner/{ownerId}`
 **Parameters:**
 - `ownerId` (path, string(uuid), required)
@@ -10687,6 +11197,15 @@ Lister les contenus d'éducation de mon organisation active
 **Responses:** 200 → `ApiResponseTransactionResponse`
 
 
+### POST `/api/payments/wallets/{walletId}/pay/challenge`
+**Parameters:**
+- `walletId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `PaymentChallengeRequest` (required)
+
+**Responses:** 200 → `ApiResponsePaymentChallengeResponse`
+
+
 ### POST `/api/payments/wallets/{walletId}/recharge`
 **Parameters:**
 - `walletId` (path, string(uuid), required)
@@ -10709,6 +11228,42 @@ Lister les contenus d'éducation de mon organisation active
 - `walletId` (path, string(uuid), required)
 
 **Responses:** 200 → `ApiResponseListTransactionResponse`
+
+
+### POST `/api/payments/wallets/{walletId}/transfers`
+**Parameters:**
+- `walletId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `TransferRequest` (required)
+
+**Responses:** 200 → `ApiResponseTransactionResponse`
+
+
+### POST `/api/payments/wallets/{walletId}/transfers/challenge`
+**Parameters:**
+- `walletId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `TransferChallengeRequest` (required)
+
+**Responses:** 200 → `ApiResponsePaymentChallengeResponse`
+
+
+### POST `/api/payments/wallets/{walletId}/withdrawals`
+**Parameters:**
+- `walletId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `WithdrawalRequest` (required)
+
+**Responses:** 200 → `ApiResponseTransactionResponse`
+
+
+### POST `/api/payments/wallets/{walletId}/withdrawals/challenge`
+**Parameters:**
+- `walletId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `WithdrawalChallengeRequest` (required)
+
+**Responses:** 200 → `ApiResponsePaymentChallengeResponse`
 
 
 
@@ -11442,233 +11997,258 @@ Soumettre un brouillon de podcast pour validation par l'admin
 
 
 
-## product-catalog-controller
+## pricing-controller
 
-### GET `/api/product-categories`
+### POST `/api/product-core/pricing/price-lists`
+**Request body:** `application/json` → `PriceListRequest` (required)
+
+**Responses:** 200 → `ApiResponseUUID`
+
+
+### POST `/api/product-core/pricing/price-lists/{id}/activate`
 **Parameters:**
-- `organizationId` (query, string(uuid), required)
+- `id` (path, string(uuid), required)
 
-**Responses:** 200 → `ApiResponseListProductCategoryResponse`
-
-
-### POST `/api/product-categories`
-**Request body:** `application/json` → `CreateProductCategoryRequest` (required)
-
-**Responses:** 200 → `ApiResponseProductCategoryResponse`
+**Responses:** 200 → `ApiResponseUUID`
 
 
-### DELETE `/api/product-categories/{categoryId}`
+### POST `/api/product-core/pricing/price-lists/{id}/rules`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `application/json` → `RuleRequest` (required)
+
+**Responses:** 200 → `ApiResponseUUID`
+
+
+### POST `/api/product-core/pricing/resolve`
+**Request body:** `application/json` → `ResolveRequest` (required)
+
+**Responses:** 200 → `ApiResponseResolvedPriceView`
+
+
+
+## product-classification-controller
+
+### POST `/api/product-core/classification/brands`
+**Request body:** `application/json` → `BrandRequest` (required)
+
+**Responses:** 200 → `ApiResponseBrandView`
+
+
+### POST `/api/product-core/classification/categories`
+**Request body:** `application/json` → `CategoryRequest` (required)
+
+**Responses:** 200 → `ApiResponseCategoryView`
+
+
+### GET `/api/product-core/classification/categories/{categoryId}/subtree`
 **Parameters:**
 - `categoryId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListCategoryView`
+
+
+### GET `/api/product-core/classification/relations`
+**Parameters:**
+- `sourceProductId` (query, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListRelationView`
+
+
+### POST `/api/product-core/classification/relations`
+**Request body:** `application/json` → `RelationRequest` (required)
+
+**Responses:** 200 → `ApiResponseRelationView`
+
+
+
+## product-definition-controller
+
+### GET `/api/product-core/products`
+**Parameters:**
+- `kind` (query, string, optional)
+
+**Responses:** 200 → `ApiResponseListProductView`
+
+
+### POST `/api/product-core/products`
+**Request body:** `application/json` → `DefineProductRequest` (required)
+
+**Responses:** 200 → `ApiResponseProductView`
+
+
+### GET `/api/product-core/products/{productId}`
+**Parameters:**
+- `productId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseProductView`
+
+
+### PUT `/api/product-core/products/{productId}`
+**Parameters:**
+- `productId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `RenameProductRequest` (required)
+
+**Responses:** 200 → `ApiResponseProductView`
+
+
+### POST `/api/product-core/products/{productId}/activate`
+**Parameters:**
+- `productId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseProductView`
+
+
+### PUT `/api/product-core/products/{productId}/digital-details`
+**Parameters:**
+- `productId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `DigitalDetailsRequest` (required)
+
+**Responses:** 200 → `ApiResponseDigitalProductDetails`
+
+
+### GET `/api/product-core/products/{productId}/intangible-details`
+**Parameters:**
+- `productId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseIntangibleDetails`
+
+
+### PUT `/api/product-core/products/{productId}/intangible-details`
+**Parameters:**
+- `productId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `IntangibleDetailsRequest` (required)
+
+**Responses:** 200 → `ApiResponseIntangibleDetails`
+
+
+### POST `/api/product-core/products/{productId}/retire`
+**Parameters:**
+- `productId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseProductView`
+
+
+### PUT `/api/product-core/products/{productId}/subscription-details`
+**Parameters:**
+- `productId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `SubscriptionDetailsRequest` (required)
+
+**Responses:** 200 → `ApiResponseSubscriptionProductDetails`
+
+
+### POST `/api/product-core/products/{productId}/suspend`
+**Parameters:**
+- `productId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseProductView`
+
+
+### GET `/api/product-core/products/{productId}/tangible-details`
+**Parameters:**
+- `productId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseTangibleDetails`
+
+
+### PUT `/api/product-core/products/{productId}/tangible-details`
+**Parameters:**
+- `productId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `TangibleDetailsRequest` (required)
+
+**Responses:** 200 → `ApiResponseTangibleDetails`
+
+
+### GET `/api/product-core/products/{productId}/variants`
+**Parameters:**
+- `productId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListVariantView`
+
+
+### POST `/api/product-core/products/{productId}/variants`
+**Parameters:**
+- `productId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `AddVariantRequest` (required)
+
+**Responses:** 200 → `ApiResponseVariantView`
+
+
+### POST `/api/product-core/products/{productId}/variants/{variantId}/identifiers`
+**Parameters:**
+- `productId` (path, string(uuid), required)
+- `variantId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `AddIdentifierRequest` (required)
+
+**Responses:** 200 → `ApiResponseIdentifierView`
+
+
+### PUT `/api/product-core/products/{productId}/virtual-credit-details`
+**Parameters:**
+- `productId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `VirtualCreditDetailsRequest` (required)
+
+**Responses:** 200 → `ApiResponseVirtualCreditProductDetails`
+
+
+
+## product-enrichment-controller
+
+### GET `/api/product-core/products/{productId}/attributes`
+**Parameters:**
+- `productId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListAttributeView`
+
+
+### POST `/api/product-core/products/{productId}/attributes`
+**Parameters:**
+- `productId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `AttributeRequest` (required)
+
+**Responses:** 200 → `ApiResponseAttributeView`
+
+
+### GET `/api/product-core/products/{productId}/media`
+**Parameters:**
+- `productId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListMediaView`
+
+
+### POST `/api/product-core/products/{productId}/media`
+**Parameters:**
+- `productId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `MediaRequest` (required)
+
+**Responses:** 200 → `ApiResponseMediaView`
+
+
+### DELETE `/api/product-core/products/{productId}/media/{mediaId}`
+**Parameters:**
+- `productId` (path, string(uuid), required)
+- `mediaId` (path, string(uuid), required)
 
 **Responses:** 200 → `ApiResponseVoid`
 
 
-### PATCH `/api/product-categories/{categoryId}`
-**Parameters:**
-- `categoryId` (path, string(uuid), required)
-
-**Request body:** `application/json` → `UpdateProductCategoryRequest` (required)
-
-**Responses:** 200 → `ApiResponseProductCategoryResponse`
-
-
-### GET `/api/products/{productId}/prices`
+### POST `/api/product-core/products/{productId}/media/{mediaId}/make-primary`
 **Parameters:**
 - `productId` (path, string(uuid), required)
+- `mediaId` (path, string(uuid), required)
 
-**Responses:** 200 → `ApiResponseListProductPriceResponse`
-
-
-### POST `/api/products/{productId}/prices`
-**Parameters:**
-- `productId` (path, string(uuid), required)
-
-**Request body:** `application/json` → `DefineProductPriceRequest` (required)
-
-**Responses:** 200 → `ApiResponseProductPriceResponse`
-
-
-### GET `/api/products/{productId}/prices/effective`
-**Parameters:**
-- `productId` (path, string(uuid), required)
-- `priceType` (query, string, required)
-- `at` (query, string(date-time), optional)
-
-**Responses:** 200 → `ApiResponseProductPriceResponse`
-
-
-
-## product-controller
-
-### GET `/api/products`
-**Parameters:**
-- `organizationId` (query, string(uuid), required)
-- `familyCode` (query, string, optional)
-- `status` (query, string, optional)
-
-**Responses:** 200 → `ApiResponseListProductResponse`
-
-
-### POST `/api/products`
-**Request body:** `application/json` → `CreateProductRequest` (required)
-
-**Responses:** 200 → `ApiResponseProductResponse`
-
-
-### GET `/api/products/search`
-**Parameters:**
-- `organizationId` (query, string(uuid), required)
-- `q` (query, string, required)
-- `familyCode` (query, string, optional)
-- `status` (query, string, optional)
-
-**Responses:** 200 → `ApiResponseListProductSearchResponse`
-
-
-### DELETE `/api/products/{productId}`
-**Parameters:**
-- `productId` (path, string(uuid), required)
-
-**Responses:** 200 → `ApiResponseVoid`
-
-
-### GET `/api/products/{productId}`
-**Parameters:**
-- `productId` (path, string(uuid), required)
-
-**Responses:** 200 → `ApiResponseProductResponse`
-
-
-### PATCH `/api/products/{productId}`
-**Parameters:**
-- `productId` (path, string(uuid), required)
-
-**Request body:** `application/json` → `UpdateProductRequest` (required)
-
-**Responses:** 200 → `ApiResponseProductResponse`
-
-
-
-## product-structure-controller
-
-### GET `/api/media-assets`
-**Parameters:**
-- `targetType` (query, string, required)
-- `targetId` (query, string(uuid), required)
-
-**Responses:** 200 → `ApiResponseListMediaAssetResponse`
-
-
-### POST `/api/media-assets`
-**Request body:** `application/json` → `CreateMediaAssetRequest` (required)
-
-**Responses:** 200 → `ApiResponseMediaAssetResponse`
-
-
-### GET `/api/product-categories/{categoryId}/translations`
-**Parameters:**
-- `categoryId` (path, string(uuid), required)
-
-**Responses:** 200 → `ApiResponseListCategoryI18nResponse`
-
-
-### POST `/api/product-categories/{categoryId}/translations`
-**Parameters:**
-- `categoryId` (path, string(uuid), required)
-
-**Request body:** `application/json` → `UpsertCategoryTranslationRequest` (required)
-
-**Responses:** 200 → `ApiResponseCategoryI18nResponse`
-
-
-### GET `/api/products/{productId}/batches`
-**Parameters:**
-- `productId` (path, string(uuid), required)
-
-**Responses:** 200 → `ApiResponseListBatchResponse`
-
-
-### POST `/api/products/{productId}/batches`
-**Parameters:**
-- `productId` (path, string(uuid), required)
-
-**Request body:** `application/json` → `CreateBatchRequest` (required)
-
-**Responses:** 200 → `ApiResponseBatchResponse`
-
-
-### GET `/api/products/{productId}/spec`
-**Parameters:**
-- `productId` (path, string(uuid), required)
-
-**Responses:** 200 → `ApiResponseProductSpecResponse`
-
-
-### PUT `/api/products/{productId}/spec`
-**Parameters:**
-- `productId` (path, string(uuid), required)
-
-**Request body:** `application/json` → `UpsertProductSpecRequest` (required)
-
-**Responses:** 200 → `ApiResponseProductSpecResponse`
-
-
-### GET `/api/products/{productId}/variants`
-**Parameters:**
-- `productId` (path, string(uuid), required)
-
-**Responses:** 200 → `ApiResponseListVariantResponse`
-
-
-### POST `/api/products/{productId}/variants`
-**Parameters:**
-- `productId` (path, string(uuid), required)
-
-**Request body:** `application/json` → `CreateVariantRequest` (required)
-
-**Responses:** 200 → `ApiResponseVariantResponse`
-
-
-### GET `/api/variants/{variantId}/attributes`
-**Parameters:**
-- `variantId` (path, string(uuid), required)
-
-**Responses:** 200 → `ApiResponseListVariantAttributeResponse`
-
-
-### POST `/api/variants/{variantId}/attributes`
-**Parameters:**
-- `variantId` (path, string(uuid), required)
-
-**Request body:** `application/json` → `AddVariantAttributeRequest` (required)
-
-**Responses:** 200 → `ApiResponseVariantAttributeResponse`
-
-
-### GET `/api/variants/{variantId}/prices`
-**Parameters:**
-- `variantId` (path, string(uuid), required)
-
-**Responses:** 200 → `ApiResponseListVariantPriceResponse`
-
-
-### POST `/api/variants/{variantId}/prices`
-**Parameters:**
-- `variantId` (path, string(uuid), required)
-
-**Request body:** `application/json` → `DefineVariantPriceRequest` (required)
-
-**Responses:** 200 → `ApiResponseVariantPriceResponse`
-
-
-### GET `/api/variants/{variantId}/prices/effective`
-**Parameters:**
-- `variantId` (path, string(uuid), required)
-- `priceType` (query, string, required)
-- `at` (query, string(date-time), optional)
-
-**Responses:** 200 → `ApiResponseVariantPriceResponse`
+**Responses:** 200 → `ApiResponseMediaView`
 
 
 
@@ -11693,6 +12273,128 @@ Soumettre un brouillon de podcast pour validation par l'admin
 - `transformationId` (path, string(uuid), required)
 
 **Responses:** 200 → `ApiResponseProductTransformationResponse`
+
+
+
+## production-scheduling-controller
+
+### GET `/api/manufacturing/production-orders/resources`
+**Parameters:**
+- `organizationId` (query, string(uuid), required)
+- `agencyId` (query, string(uuid), required)
+- `category` (query, string, optional)
+
+**Responses:** 200 → `ApiResponseListResourceView`
+
+
+### POST `/api/manufacturing/production-orders/steps/{stepId}/finish`
+**Parameters:**
+- `stepId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseStepView`
+
+
+### POST `/api/manufacturing/production-orders/steps/{stepId}/resource/{resourceId}`
+**Parameters:**
+- `stepId` (path, string(uuid), required)
+- `resourceId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseStepView`
+
+
+### POST `/api/manufacturing/production-orders/steps/{stepId}/start`
+**Parameters:**
+- `stepId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseStepView`
+
+
+### GET `/api/manufacturing/production-orders/{orderId}/steps`
+**Parameters:**
+- `orderId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListStepView`
+
+
+### POST `/api/manufacturing/production-orders/{orderId}/steps`
+**Parameters:**
+- `orderId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `PlanRequest` (required)
+
+**Responses:** 200 → `ApiResponseListStepView`
+
+
+### POST `/api/manufacturing/production-orders/{orderId}/steps/from-routing`
+**Parameters:**
+- `orderId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `RoutingPlanRequest` (required)
+
+**Responses:** 200 → `ApiResponseListStepView`
+
+
+
+## production-specification-controller
+
+### GET `/api/product-core/production-specifications`
+**Parameters:**
+- `organizationId` (query, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListSpecView`
+
+
+### POST `/api/product-core/production-specifications`
+**Request body:** `application/json` → `CreateSpecRequest` (required)
+
+**Responses:** 200 → `ApiResponseSpecView`
+
+
+### GET `/api/product-core/production-specifications/{id}`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseSpecView`
+
+
+### POST `/api/product-core/production-specifications/{id}/activate`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseSpecView`
+
+
+### POST `/api/product-core/production-specifications/{id}/approve`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseSpecView`
+
+
+### GET `/api/product-core/production-specifications/{id}/explode`
+**Parameters:**
+- `id` (path, string(uuid), required)
+- `targetQuantity` (query, number, required)
+
+**Responses:** 200 → `ApiResponseListRequiredMaterial`
+
+
+### POST `/api/product-core/production-specifications/{id}/inputs`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `application/json` → `InputRequest` (required)
+
+**Responses:** 200 → `ApiResponseUUID`
+
+
+### POST `/api/product-core/production-specifications/{id}/outputs`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `application/json` → `OutputRequest` (required)
+
+**Responses:** 200 → `ApiResponseUUID`
 
 
 
@@ -11995,6 +12697,71 @@ Soumettre un brouillon de podcast pour validation par l'admin
 
 
 
+## quality-controller
+
+### POST `/api/product-core/quality/inspections`
+**Request body:** `application/json` → `InspectionRequest` (required)
+
+**Responses:** 200 → `ApiResponseInspectionView`
+
+
+### POST `/api/product-core/quality/inspections/{id}/complete`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `application/json` → `DecisionRequest` (required)
+
+**Responses:** 200 → `ApiResponseInspectionView`
+
+
+### GET `/api/product-core/quality/inspections/{id}/measurements`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListMeasurementView`
+
+
+### POST `/api/product-core/quality/inspections/{id}/measurements`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `application/json` → `MeasurementRequest` (required)
+
+**Responses:** 200 → `ApiResponseMeasurementView`
+
+
+### POST `/api/product-core/quality/inspections/{id}/start`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseInspectionView`
+
+
+### POST `/api/product-core/quality/specifications`
+**Request body:** `application/json` → `SpecRequest` (required)
+
+**Responses:** 200 → `ApiResponseSpecView`
+
+
+### POST `/api/product-core/quality/specifications/{id}/characteristics`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `application/json` → `CharacteristicRequest` (required)
+
+**Responses:** 200 → `ApiResponseUUID`
+
+
+
+## realtime-ticket-controller
+
+### POST `/api/realtime/tickets`
+**Request body:** `application/json` → `TicketRequest` (optional)
+
+**Responses:** 200 → `ApiResponseTicketResponse`
+
+
+
 ## receipt-controller
 
 ### GET `/api/spare/receipts`
@@ -12261,16 +13028,12 @@ Soumettre un brouillon de podcast pour validation par l'admin
 ## redacteur-abonnement-controller
 
 ### GET `/api/v1/newsletter/redacteurs/abonnements`
-**Parameters:**
-- `userId` (query, string(uuid), required)
-
 **Responses:** 200 → `RedacteurResponse[]`
 
 
 ### DELETE `/api/v1/newsletter/redacteurs/{redacteurId}/subscribe`
 **Parameters:**
 - `redacteurId` (path, string(uuid), required)
-- `userId` (query, string(uuid), required)
 
 **Responses:** 204
 
@@ -12278,7 +13041,6 @@ Soumettre un brouillon de podcast pour validation par l'admin
 ### POST `/api/v1/newsletter/redacteurs/{redacteurId}/subscribe`
 **Parameters:**
 - `redacteurId` (path, string(uuid), required)
-- `userId` (query, string(uuid), required)
 
 **Request body:** `application/json` → `SubscribeRequest` (required)
 
@@ -12289,9 +13051,6 @@ Soumettre un brouillon de podcast pour validation par l'admin
 ## redacteur-controller
 
 ### POST `/api/v1/newsletter/redacteurs`
-**Parameters:**
-- `userId` (query, string(uuid), required)
-
 **Request body:** `application/json` → `RedacteurCreationRequest` (required)
 
 **Responses:** 201 → `RedacteurRequestResponse`
@@ -12319,9 +13078,6 @@ Soumettre un brouillon de podcast pour validation par l'admin
 
 
 ### GET `/api/v1/newsletter/redacteurs/me`
-**Parameters:**
-- `userId` (query, string(uuid), required)
-
 **Responses:** 200 → `RedacteurRequestResponse`
 
 
@@ -13034,6 +13790,15 @@ Soumettre un brouillon de podcast pour validation par l'admin
 **Responses:** 200 → `ApiResponseSalesOrderResponse`
 
 
+### POST `/api/sales/orders/{orderId}/returns`
+**Parameters:**
+- `orderId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `RegisterSalesReturnRequest` (required)
+
+**Responses:** 200 → `ApiResponseSalesReturnResponse`
+
+
 
 ## scoped-resource-controller
 
@@ -13125,6 +13890,41 @@ Soumettre un brouillon de podcast pour validation par l'admin
 
 
 
+## sellable-product-controller
+
+### GET `/api/product-core/sellable-products`
+**Parameters:**
+- `organizationId` (query, string(uuid), optional)
+- `familyCode` (query, string, optional)
+- `status` (query, string, optional)
+
+**Responses:** 200 → `ApiResponseListSellableProduct`
+
+
+### POST `/api/product-core/sellable-products`
+**Request body:** `application/json` → `ProvisionSellableProductRequest` (required)
+
+**Responses:** 200 → `ApiResponseMapStringUUID`
+
+
+### GET `/api/product-core/sellable-products/search`
+**Parameters:**
+- `organizationId` (query, string(uuid), optional)
+- `q` (query, string, optional)
+- `familyCode` (query, string, optional)
+- `status` (query, string, optional)
+
+**Responses:** 200 → `ApiResponseListProductSearchResult`
+
+
+### GET `/api/product-core/sellable-products/{productId}`
+**Parameters:**
+- `productId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseSellableProduct`
+
+
+
 ## service-bundle-controller
 
 ### POST `/api/service-bundles/checkout`
@@ -13162,6 +13962,94 @@ Soumettre un brouillon de podcast pour validation par l'admin
 
 ### GET `/api/service-pricing`
 **Responses:** 200 → `ApiResponseListServicePriceResponse`
+
+
+
+## service-composition-controller
+
+### POST `/api/product-core/services`
+**Request body:** `application/json` → `CreateRequest` (required)
+
+**Responses:** 200 → `ApiResponseServiceView`
+
+
+### POST `/api/product-core/services/{id}/product-requirements`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `application/json` → `ProductReqRequest` (required)
+
+**Responses:** 200 → `ApiResponseUUID`
+
+
+### POST `/api/product-core/services/{id}/resource-requirements`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `application/json` → `ResourceReqRequest` (required)
+
+**Responses:** 200 → `ApiResponseUUID`
+
+
+### GET `/api/product-core/services/{id}/sub-services`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListSubServiceView`
+
+
+### POST `/api/product-core/services/{id}/sub-services`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `application/json` → `SubServiceRequest` (required)
+
+**Responses:** 200 → `ApiResponseUUID`
+
+
+
+## service-execution-controller
+
+### POST `/api/product-core/service-executions`
+**Request body:** `application/json` → `CreateRequest` (required)
+
+**Responses:** 200 → `ApiResponseExecutionView`
+
+
+### POST `/api/product-core/service-executions/{id}/allocations`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `application/json` → `AllocateRequest` (required)
+
+**Responses:** 200 → `ApiResponseUUID`
+
+
+### POST `/api/product-core/service-executions/{id}/complete`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `application/json` → `CompleteRequest` (required)
+
+**Responses:** 200 → `ApiResponseExecutionView`
+
+
+### POST `/api/product-core/service-executions/{id}/consumptions`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `application/json` → `ConsumptionRequest` (required)
+
+**Responses:** 200 → `ApiResponseUUID`
+
+
+### POST `/api/product-core/service-executions/{id}/start`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `application/json` → `StartRequest` (required)
+
+**Responses:** 200 → `ApiResponseExecutionView`
 
 
 
@@ -13314,7 +14202,183 @@ Soumettre un brouillon de podcast pour validation par l'admin
 
 
 
+## stock-ledger-controller
+
+### GET `/api/stock/balances`
+**Parameters:**
+- `organizationId` (query, string(uuid), required)
+- `agencyId` (query, string(uuid), required)
+- `productId` (query, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseStockBalanceResponse`
+
+
+### GET `/api/stock/balances/agency`
+**Parameters:**
+- `organizationId` (query, string(uuid), required)
+- `agencyId` (query, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListStockBalanceResponse`
+
+
+### GET `/api/stock/movements`
+**Parameters:**
+- `organizationId` (query, string(uuid), required)
+- `agencyId` (query, string(uuid), required)
+- `productId` (query, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListStockMovementResponse`
+
+
+### POST `/api/stock/movements`
+**Request body:** `application/json` → `RecordMovementRequest` (required)
+
+**Responses:** 200 → `ApiResponseStockMovementResponse`
+
+
+
+## stock-product-location-controller
+
+### GET `/api/stock/locations`
+**Parameters:**
+- `organizationId` (query, string(uuid), required)
+- `agencyId` (query, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListProductLocationResponse`
+
+
+### PUT `/api/stock/locations`
+**Request body:** `application/json` → `SetProductLocationRequest` (required)
+
+**Responses:** 200 → `ApiResponseProductLocationResponse`
+
+
+
+## stock-reservation-controller
+
+### POST `/api/stock/reservations`
+**Request body:** `application/json` → `ReserveStockRequest` (required)
+
+**Responses:** 200 → `ApiResponseStockReservationResponse`
+
+
+### POST `/api/stock/reservations/{reservationId}/release`
+**Parameters:**
+- `reservationId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseStockReservationResponse`
+
+
+
+## stock-sales-controller
+
+### POST `/api/stock/issues`
+**Request body:** `application/json` → `IssueToCustomerRequest` (required)
+
+**Responses:** 200 → `ApiResponseStockMovementResponse`
+
+
+
+## stock-supply-controller
+
+### POST `/api/stock/receipts`
+**Request body:** `application/json` → `ReceiveFromSupplierRequest` (required)
+
+**Responses:** 200 → `ApiResponseStockMovementResponse`
+
+
+
+## stock-transfer-controller
+
+### GET `/api/stock/transfers`
+**Parameters:**
+- `organizationId` (query, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListStockTransferResponse`
+
+
+### POST `/api/stock/transfers`
+**Request body:** `application/json` → `RequestTransferRequest` (required)
+
+**Responses:** 200 → `ApiResponseStockTransferResponse`
+
+
+### POST `/api/stock/transfers/{transferId}/cancel`
+**Parameters:**
+- `transferId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseStockTransferResponse`
+
+
+### POST `/api/stock/transfers/{transferId}/receive`
+**Parameters:**
+- `transferId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseStockTransferResponse`
+
+
+### POST `/api/stock/transfers/{transferId}/ship`
+**Parameters:**
+- `transferId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseStockTransferResponse`
+
+
+
+## stock-transformation-controller
+
+### GET `/api/stock/transformations`
+**Parameters:**
+- `organizationId` (query, string(uuid), required)
+- `agencyId` (query, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListStockTransformationResponse`
+
+
+### POST `/api/stock/transformations`
+**Request body:** `application/json` → `TransformStockRequest` (required)
+
+**Responses:** 200 → `ApiResponseStockTransformationResponse`
+
+
+
 ## supplier-controller
+
+### GET `/api/product-core/suppliers`
+**Parameters:**
+- `organizationId` (query, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListSupplierView`
+
+
+### POST `/api/product-core/suppliers`
+**Request body:** `application/json` → `RegisterRequest` (required)
+
+**Responses:** 200 → `ApiResponseSupplierView`
+
+
+### POST `/api/product-core/suppliers/{supplierId}/approve`
+**Parameters:**
+- `supplierId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseSupplierView`
+
+
+### PUT `/api/product-core/suppliers/{supplierId}/lead-time`
+**Parameters:**
+- `supplierId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `LeadTimeRequest` (required)
+
+**Responses:** 200 → `ApiResponseSupplierView`
+
+
+### POST `/api/product-core/suppliers/{supplierId}/suspend`
+**Parameters:**
+- `supplierId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseSupplierView`
+
 
 ### GET `/api/suppliers`
 **Parameters:**
@@ -13847,6 +14911,49 @@ Mettre à jour un tag existant
 
 
 
+## traceability-controller
+
+### POST `/api/product-core/traceability/genealogy`
+**Request body:** `application/json` → `GenealogyRequest` (required)
+
+**Responses:** 200 → `ApiResponseUUID`
+
+
+### POST `/api/product-core/traceability/lots`
+**Request body:** `application/json` → `LotRequest` (required)
+
+**Responses:** 200 → `ApiResponseLotView`
+
+
+### POST `/api/product-core/traceability/lots/{lotId}/quarantine`
+**Parameters:**
+- `lotId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseLotView`
+
+
+### POST `/api/product-core/traceability/lots/{lotId}/release`
+**Parameters:**
+- `lotId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseLotView`
+
+
+### GET `/api/product-core/traceability/lots/{lotId}/trace-backward`
+**Parameters:**
+- `lotId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListGenealogyView`
+
+
+### GET `/api/product-core/traceability/lots/{lotId}/trace-forward`
+**Parameters:**
+- `lotId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListGenealogyView`
+
+
+
 ## training-budget-controller
 
 ### GET `/api/v1/hrm/training-budgets`
@@ -14132,10 +15239,51 @@ Mettre à jour un tag existant
 
 
 
+## unit-of-measure-controller
+
+### GET `/api/product-core/units`
+**Parameters:**
+- `dimension` (query, string, optional)
+
+**Responses:** 200 → `ApiResponseListUomView`
+
+
+### POST `/api/product-core/units`
+**Request body:** `application/json` → `CreateUomRequest` (required)
+
+**Responses:** 200 → `ApiResponseUomView`
+
+
+### GET `/api/product-core/units/{id}`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseUomView`
+
+
+
 ## user-controller
 
 ### GET `/api/users/me`
 **Responses:** 200 → `ApiResponseUserAccountResponse`
+
+
+### GET `/api/users/me/applications`
+**Responses:** 200 → `ApiResponseListApplicationVisitResponse`
+
+
+### POST `/api/users/me/applications`
+**Request body:** `application/json` → `RememberApplicationRequest` (required)
+
+**Responses:** 200 → `ApiResponseApplicationVisitResponse`
+
+
+### DELETE `/api/users/me/applications/{code}`
+**Parameters:**
+- `code` (path, string, required)
+- `organizationId` (query, string(uuid), optional)
+
+**Responses:** 200 → `ApiResponseVoid`
 
 
 ### PUT `/api/users/me/avatar`
@@ -14215,7 +15363,113 @@ Mettre à jour un tag existant
 
 
 
+## valuation-count-controller
+
+### POST `/api/product-core/valuation/consume`
+**Request body:** `application/json` → `ConsumeRequest` (required)
+
+**Responses:** 200 → `ApiResponseBigDecimal`
+
+
+### POST `/api/product-core/valuation/count-lines/{lineId}/record`
+**Parameters:**
+- `lineId` (path, string(uuid), required)
+- `countedQuantity` (query, number, required)
+
+**Responses:** 200 → `ApiResponseLineView`
+
+
+### POST `/api/product-core/valuation/counts`
+**Request body:** `application/json` → `CountRequest` (required)
+
+**Responses:** 200 → `ApiResponseCountView`
+
+
+### POST `/api/product-core/valuation/counts/{countId}/approve`
+**Parameters:**
+- `countId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseCountView`
+
+
+### GET `/api/product-core/valuation/counts/{countId}/lines`
+**Parameters:**
+- `countId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListLineView`
+
+
+### POST `/api/product-core/valuation/counts/{countId}/lines`
+**Parameters:**
+- `countId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `LineRequest` (required)
+
+**Responses:** 200 → `ApiResponseLineView`
+
+
+### POST `/api/product-core/valuation/counts/{countId}/start`
+**Parameters:**
+- `countId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseCountView`
+
+
+### POST `/api/product-core/valuation/layers`
+**Request body:** `application/json` → `LayerRequest` (required)
+
+**Responses:** 200 → `ApiResponseUUID`
+
+
+
 ## warehouse-controller
+
+### GET `/api/product-core/warehouses`
+**Parameters:**
+- `organizationId` (query, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListWarehouseView`
+
+
+### POST `/api/product-core/warehouses`
+**Request body:** `application/json` → `CreateRequest` (required)
+
+**Responses:** 200 → `ApiResponseWarehouseView`
+
+
+### GET `/api/product-core/warehouses/near`
+**Parameters:**
+- `longitude` (query, number, required)
+- `latitude` (query, number, required)
+- `radiusMeters` (query, number(double), optional)
+
+**Responses:** 200 → `ApiResponseListWarehouseView`
+
+
+### PUT `/api/product-core/warehouses/{id}/location`
+**Parameters:**
+- `id` (path, string(uuid), required)
+
+**Request body:** `application/json` → `GeoRequest` (required)
+
+**Responses:** 200 → `ApiResponseWarehouseView`
+
+
+### GET `/api/product-core/warehouses/{warehouseId}/locations`
+**Parameters:**
+- `warehouseId` (path, string(uuid), required)
+
+**Responses:** 200 → `ApiResponseListLocationView`
+
+
+### POST `/api/product-core/warehouses/{warehouseId}/locations`
+**Parameters:**
+- `warehouseId` (path, string(uuid), required)
+
+**Request body:** `application/json` → `LocationRequest` (required)
+
+**Responses:** 200 → `ApiResponseLocationView`
+
 
 ### GET `/api/warehouses`
 **Responses:** 200 → `ApiResponseListAgencyResponse`

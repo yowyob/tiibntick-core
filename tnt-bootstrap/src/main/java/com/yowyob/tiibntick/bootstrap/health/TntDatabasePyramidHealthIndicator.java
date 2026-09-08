@@ -54,11 +54,13 @@ public class TntDatabasePyramidHealthIndicator implements ReactiveHealthIndicato
     }
 
     private Mono<Boolean> checkCoreDb() {
-        return Mono.from(connectionFactory.create())
-                .flatMap(conn ->
-                        Mono.from(conn.createStatement("SELECT 1").execute())
-                                .flatMap(result -> Mono.from(result.getRowsUpdated()))
-                                .doFinally(s -> conn.close())
+        return Mono.usingWhen(
+                        connectionFactory.create(),
+                        conn -> Mono.from(conn.createStatement("SELECT 1").execute())
+                                .flatMap(result -> Mono.from(result.getRowsUpdated())),
+                        conn -> Mono.from(conn.close()),
+                        (conn, ex) -> Mono.from(conn.close()),
+                        conn -> Mono.from(conn.close())
                 )
                 .map(rows -> true)
                 .onErrorReturn(false);
