@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.response;
 
+import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.AddressDTO;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.deliveryNeed.DeliveryNeedStatus;
 import java.time.Instant;
 import java.util.UUID;
@@ -18,6 +19,8 @@ public class DeliveryNeedResponseDTO {
     private UUID packetId;
     private UUID pickupAddressId;
     private UUID deliveryAddressId;
+    private AddressDTO pickupAddress;
+    private AddressDTO deliveryAddress;
     private String title;
     private String description;
     private DeliveryNeedStatus status;

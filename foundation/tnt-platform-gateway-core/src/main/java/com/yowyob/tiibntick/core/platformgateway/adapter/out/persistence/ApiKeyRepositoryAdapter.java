@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.core.platformgateway.adapter.out.persistence;
 
+import com.yowyob.tiibntick.core.platformgateway.adapter.out.persistence.entity.ApiKeyEntity;
 import com.yowyob.tiibntick.core.platformgateway.adapter.out.persistence.mapper.PlatformClientPersistenceMapper;
 import com.yowyob.tiibntick.core.platformgateway.application.port.out.IApiKeyRepository;
 import com.yowyob.tiibntick.core.platformgateway.domain.model.ApiKey;
@@ -24,7 +25,14 @@ public class ApiKeyRepositoryAdapter implements IApiKeyRepository {
 
     @Override
     public Mono<ApiKey> save(ApiKey apiKey) {
-        return repository.save(PlatformClientPersistenceMapper.toEntity(apiKey))
+        ApiKeyEntity entity = PlatformClientPersistenceMapper.toEntity(apiKey);
+        return repository.existsById(entity.getId())
+                .flatMap(exists -> {
+                    if (exists) {
+                        entity.markNotNew();
+                    }
+                    return repository.save(entity);
+                })
                 .map(PlatformClientPersistenceMapper::toDomain);
     }
 

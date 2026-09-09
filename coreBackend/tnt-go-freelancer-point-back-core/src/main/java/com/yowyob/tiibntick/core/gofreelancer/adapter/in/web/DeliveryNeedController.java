@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web;
 
+import com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.DeliveryNeedUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.DeliveryNeedRequestDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.response.DeliveryNeedResponseDTO;
@@ -8,6 +9,7 @@ import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.AssignFreel
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -23,7 +25,14 @@ public class DeliveryNeedController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public Mono<DeliveryNeedResponseDTO> createDeliveryNeed(@RequestBody DeliveryNeedRequestDTO request) {
+    public Mono<DeliveryNeedResponseDTO> createDeliveryNeed(
+            @RequestBody DeliveryNeedRequestDTO request,
+            @AuthenticationPrincipal TntSecurityContext securityContext) {
+        if (securityContext == null || securityContext.userId() == null) {
+            return Mono.error(new IllegalArgumentException(
+                    "Authenticated user context is required to create a delivery need"));
+        }
+        request.setUserId(securityContext.userId());
         return deliveryNeedUseCase.createDeliveryNeed(request);
     }
 

@@ -38,7 +38,14 @@ public class PlatformClientRepositoryAdapter implements IPlatformClientRepositor
 
     @Override
     public Mono<PlatformClient> save(PlatformClient client) {
-        return repository.save(PlatformClientPersistenceMapper.toEntity(client))
+        PlatformClientEntity entity = PlatformClientPersistenceMapper.toEntity(client);
+        return repository.existsById(entity.getId())
+                .flatMap(exists -> {
+                    if (exists) {
+                        entity.markNotNew();
+                    }
+                    return repository.save(entity);
+                })
                 .map(PlatformClientPersistenceMapper::toDomain);
     }
 

@@ -20,6 +20,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -88,7 +89,7 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
                     log.info("Creating DeliveryNeed {} for user {}", need.getId(), need.getUserId());
                     return deliveryNeedRepository.save(need);
                 })
-                .map(this::mapToResponse);
+                .flatMap(this::mapToResponse);
     }
 
     /**
@@ -126,19 +127,19 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
 
     @Override
     public Flux<DeliveryNeedResponseDTO> getAllDeliveryNeeds() {
-        return deliveryNeedRepository.findAll().map(this::mapToResponse);
+        return deliveryNeedRepository.findAll().flatMap(this::mapToResponse);
     }
 
     @Override
     public Mono<DeliveryNeedResponseDTO> getDeliveryNeed(UUID id) {
         return deliveryNeedRepository.findById(id)
-                .map(this::mapToResponse)
+                .flatMap(this::mapToResponse)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("DeliveryNeed not found: " + id)));
     }
 
     @Override
     public Flux<DeliveryNeedResponseDTO> getDeliveryNeedsByUserId(UUID userId) {
-        return deliveryNeedRepository.findAllByUserId(userId).map(this::mapToResponse);
+        return deliveryNeedRepository.findAllByUserId(userId).flatMap(this::mapToResponse);
     }
 
     @Override
@@ -179,7 +180,7 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
 
                     return saveNeed;
                 })
-                .map(this::mapToResponse);
+                .flatMap(this::mapToResponse);
     }
 
     @Override
@@ -208,8 +209,16 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
                         .build());
     }
 
-    private DeliveryNeedResponseDTO mapToResponse(DeliveryNeed need) {
-        return DeliveryNeedResponseDTO.builder()
+    /**
+     * Re-serializes pickup/delivery as full {@link AddressDTO} objects (not just their
+     * IDs) so BFF clients get usable addresses straight from list/get without a second
+     * round-trip. Tolerant of a missing/erroring address lookup — falls back to {@code null}
+     * for that side rather than failing the whole response.
+     *
+     * @author MANFOUO Braun
+     */
+    private Mono<DeliveryNeedResponseDTO> mapToResponse(DeliveryNeed need) {
+        DeliveryNeedResponseDTO.DeliveryNeedResponseDTOBuilder builder = DeliveryNeedResponseDTO.builder()
                 .id(need.getId())
                 .userId(need.getUserId())
                 .packetId(need.getPacketId())
@@ -226,7 +235,28 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
                 .deliveryId(need.getDeliveryId())
                 .createdAt(need.getCreatedAt())
                 .updatedAt(need.getUpdatedAt())
-                .pickupDeadline(need.getPickupDeadline())
-                .build();
+                .pickupDeadline(need.getPickupDeadline());
+
+        Mono<Optional<AddressDTO>> pickupMono = fetchAddress(need.getPickupAddressId());
+        Mono<Optional<AddressDTO>> deliveryMono = fetchAddress(need.getDeliveryAddressId());
+
+        return Mono.zip(pickupMono, deliveryMono)
+                .map(addresses -> builder
+                        .pickupAddress(addresses.getT1().orElse(null))
+                        .deliveryAddress(addresses.getT2().orElse(null))
+                        .build());
+    }
+
+    private Mono<Optional<AddressDTO>> fetchAddress(UUID addressId) {
+        if (addressId == null) {
+            return Mono.just(Optional.empty());
+        }
+        return addressUseCase.getAddressById(addressId)
+                .map(Optional::of)
+                .onErrorResume(ex -> {
+                    log.warn("Failed to enrich address {}: {}", addressId, ex.getMessage());
+                    return Mono.just(Optional.empty());
+                })
+                .defaultIfEmpty(Optional.empty());
     }
 }
