@@ -155,7 +155,7 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
         return deliveryNeedRepository.findById(deliveryNeedId)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("DeliveryNeed not found: " + deliveryNeedId)))
                 .flatMap(need -> {
-                    need.setDeliveryId(freelancerId);
+                    need.setAssignedFreelancerId(freelancerId);
                     need.setStatus(DeliveryNeedStatus.ASSIGNED);
                     need.setUpdatedAt(Instant.now());
 
@@ -255,6 +255,7 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
                 .transportMethod(need.getTransportMethod())
                 .distance(need.getDistance())
                 .deliveryId(need.getDeliveryId())
+                .assignedFreelancerId(need.getAssignedFreelancerId())
                 .createdAt(need.getCreatedAt())
                 .updatedAt(need.getUpdatedAt())
                 .pickupDeadline(need.getPickupDeadline());

@@ -407,4 +407,10 @@
                  splitStatements="false"/>
     </changeSet>
 
+    <changeSet id="069-add-assigned-freelancer-to-delivery-needs" author="TiiBnTickTeam">
+        <validCheckSum>ANY</validCheckSum>
+        <sqlFile path="db/changelog/20260910_add_assigned_freelancer_to_delivery_needs.sql"
+                 relativeToChangelogFile="false"/>
+    </changeSet>
+
 </databaseChangeLog>

@@ -30,6 +30,8 @@ public class DeliveryNeedResponseDTO {
     private String transportMethod;
     private Double distance;
     private UUID deliveryId;
+    /** Freelancer retenu par le client (null tant que le besoin est PENDING). */
+    private UUID assignedFreelancerId;
     private Instant createdAt;
     private Instant updatedAt;
     private java.time.LocalDateTime pickupDeadline;

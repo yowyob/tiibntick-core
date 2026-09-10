@@ -119,8 +119,16 @@ public class DeliveryNeed implements Persistable<UUID>, TntPersistableEntity {
     @Column("distance")
     private Double distance;
 
+    /** FK {@code deliveries(id)} — set once an actual delivery record exists. */
     @Column("delivery_id")
     private UUID deliveryId;
+
+    /**
+     * Freelancer picked by the client. Distinct from {@link #deliveryId}, which FKs
+     * {@code deliveries(id)} and therefore cannot hold a freelancer identity.
+     */
+    @Column("assigned_freelancer_id")
+    private UUID assignedFreelancerId;
 
     @Column("created_at")
     private Instant createdAt;
