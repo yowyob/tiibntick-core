@@ -12,6 +12,7 @@ import com.yowyob.tiibntick.core.gofreelancer.application.port.in.AdminRelayPoin
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.DeliveryNeedUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpUserRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.PushNotificationPort;
+import com.yowyob.tiibntick.core.gofreelancer.application.usecase.TopsisRankingUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.r2dbc.core.DatabaseClient;
@@ -188,25 +189,46 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
         return deliveryNeedRepository.findById(deliveryNeedId)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("Delivery need not found: " + deliveryNeedId)))
                 .flatMapMany(need -> {
-                    double pickupLat = 0.0;
-                    double pickupLon = 0.0;
-                    double deliveryLat = 0.0;
-                    double deliveryLon = 0.0;
-                    double packetVolumeM3 = 0.0;
+                    Mono<Optional<AddressDTO>> pickupMono = fetchAddress(need.getPickupAddressId());
+                    Mono<Optional<AddressDTO>> deliveryMono = fetchAddress(need.getDeliveryAddressId());
 
-                    return matchingUseCase.processMatchingForDeliveryNeed(
-                            need.getId(), pickupLat, pickupLon, deliveryLat, deliveryLon,
-                            packetVolumeM3, need.getPickupDeadline()
-                    ).flatMapMany(Flux::fromIterable);
-                })
-                .map(candidate -> FreelancerCandidateDTO.builder()
-                        .freelancerId(candidate.getFreelancerId())
-                        .firstName("À définir")
-                        .lastName("À définir")
-                        .rating(candidate.getRating())
-                        .estimatedPrice(0.0)
-                        .priceBreakdown("Base: 0, Distance: 0")
-                        .build());
+                    return Mono.zip(pickupMono, deliveryMono).flatMapMany(addresses -> {
+                        double pickupLat  = extractLat(addresses.getT1().orElse(null));
+                        double pickupLon  = extractLon(addresses.getT1().orElse(null));
+                        double deliveryLat = extractLat(addresses.getT2().orElse(null));
+                        double deliveryLon = extractLon(addresses.getT2().orElse(null));
+                        double packetVolumeM3 = 0.0;
+
+                        double distanceKm  = TopsisRankingUseCase.haversine(
+                                pickupLat, pickupLon, deliveryLat, deliveryLon);
+                        double distancePrice = distanceKm * 200.0;
+                        double estimatedPrice = 500.0 + distancePrice;
+                        String priceBreakdown = "Base: 500, Distance: " + Math.round(distancePrice);
+
+                        return matchingUseCase.processMatchingForDeliveryNeed(
+                                need.getId(), pickupLat, pickupLon, deliveryLat, deliveryLon,
+                                packetVolumeM3, need.getPickupDeadline()
+                        ).flatMapMany(Flux::fromIterable)
+                        .map(candidate -> FreelancerCandidateDTO.builder()
+                                .freelancerId(candidate.getFreelancerId())
+                                .firstName("À définir")
+                                .lastName("À définir")
+                                .rating(candidate.getRating())
+                                .estimatedPrice(estimatedPrice)
+                                .priceBreakdown(priceBreakdown)
+                                .build());
+                    });
+                });
+    }
+
+    private double extractLat(AddressDTO dto) {
+        if (dto == null || dto.getAddress() == null) return 0.0;
+        return dto.getAddress().getCoordinates().map(c -> c.getLatitude()).orElse(0.0);
+    }
+
+    private double extractLon(AddressDTO dto) {
+        if (dto == null || dto.getAddress() == null) return 0.0;
+        return dto.getAddress().getCoordinates().map(c -> c.getLongitude()).orElse(0.0);
     }
 
     /**
