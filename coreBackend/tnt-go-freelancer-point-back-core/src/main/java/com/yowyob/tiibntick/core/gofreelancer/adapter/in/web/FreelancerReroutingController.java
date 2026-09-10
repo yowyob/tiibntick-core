@@ -7,7 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser;
 import com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext;
 
 import java.util.UUID;
@@ -35,7 +35,7 @@ public class FreelancerReroutingController {
     public Mono<ResponseEntity<Void>> rerouteDelivery(
             @PathVariable UUID deliveryId,
             @RequestBody ManualRerouteRequestDTO request,
-            @AuthenticationPrincipal TntSecurityContext securityContext) {
+            @CurrentUser TntSecurityContext securityContext) {
 
         return reroutingService.rerouteDelivery(
                         deliveryId,

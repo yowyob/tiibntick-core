@@ -7,7 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser;
 import com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext;
 
 import java.util.UUID;
@@ -30,7 +30,7 @@ public class FreelancerLocationController {
     public Mono<ResponseEntity<Void>> updateLocation(
             @PathVariable UUID id,
             @Valid @RequestBody FreelancerLocationUpdateRequest request,
-            @AuthenticationPrincipal TntSecurityContext securityContext) {
+            @CurrentUser TntSecurityContext securityContext) {
         if (securityContext == null || securityContext.tenantId() == null) {
             return Mono.error(new IllegalArgumentException(
                     "Authenticated tenant context is required to update freelancer location"));
