@@ -26,7 +26,6 @@ import com.yowyob.kernel.event.application.service.DeadLetterService;
 import com.yowyob.kernel.event.application.service.EventPublisherService;
 import com.yowyob.kernel.event.application.service.EventQueryService;
 import com.yowyob.kernel.event.application.service.EventStatsService;
-import com.yowyob.kernel.event.application.service.OutboxPollerService;
 import com.yowyob.kernel.event.application.service.ReplayEventService;
 import com.yowyob.kernel.event.application.service.SchemaRegistryService;
 import com.yowyob.kernel.event.application.port.out.EventMetricsPort;
@@ -82,16 +81,18 @@ public class YowEventKernelAutoConfiguration {
     @ConditionalOnMissingBean(PublishEventUseCase.class)
     public PublishEventUseCase publishEventUseCase(
             final EventEnvelopeRepository envelopeRepo,
-            final OutboxEntryRepository outboxRepo) {
-        return new EventPublisherService(envelopeRepo, outboxRepo);
+            final KafkaPublisherPort kafkaPublisher,
+            final EventMetricsPort metrics) {
+        return new EventPublisherService(envelopeRepo, kafkaPublisher, metrics);
     }
 
     @Bean
     @ConditionalOnMissingBean(PublishEventBatchUseCase.class)
     public PublishEventBatchUseCase publishEventBatchUseCase(
             final EventEnvelopeRepository envelopeRepo,
-            final OutboxEntryRepository outboxRepo) {
-        return new EventPublisherService(envelopeRepo, outboxRepo);
+            final KafkaPublisherPort kafkaPublisher,
+            final EventMetricsPort metrics) {
+        return new EventPublisherService(envelopeRepo, kafkaPublisher, metrics);
     }
 
     @Bean
@@ -134,16 +135,12 @@ public class YowEventKernelAutoConfiguration {
         return new ReplayEventService(envelopeRepo, kafkaPublisher, idempotencyStore);
     }
 
-    // ── Outbox poller (scheduled) ────────────────────────────────────────────
-
-    @Bean
-    @ConditionalOnMissingBean(OutboxPollerService.class)
-    public OutboxPollerService outboxPollerService(
-            final EventEnvelopeRepository envelopeRepo,
-            final OutboxEntryRepository outboxRepo,
-            final DeadLetterRepository dlqRepo,
-            final KafkaPublisherPort kafkaPublisher,
-            final EventMetricsPort metrics) {
-        return new OutboxPollerService(envelopeRepo, outboxRepo, dlqRepo, kafkaPublisher, metrics);
-    }
+    // ── Outbox poller — decommissioned 2026-09-18 ────────────────────────────
+    // OutboxPollerService is intentionally not registered as a bean anymore:
+    // EventPublisherService now publishes to Kafka directly (see its Javadoc),
+    // so nothing writes to outbox_entries anymore and the poller would just be
+    // an eternally-empty no-op scheduled every few seconds forever. The class
+    // itself is left in the module (harmless, still unit-tested) in case the
+    // outbox delivery guarantee is ever reinstated — only its Spring wiring
+    // was removed.
 }
