@@ -268,6 +268,7 @@
         <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
         <jacoco-maven-plugin.version>0.8.12</jacoco-maven-plugin.version>
         <maven-enforcer-plugin.version>3.5.0</maven-enforcer-plugin.version>
+        <git-commit-id-maven-plugin.version>9.0.1</git-commit-id-maven-plugin.version>
 
         <!-- ── GitLab CI — project ID pour le Package Registry ── -->
         <!-- Remplacer par les vrais IDs de projet GitLab après création -->
@@ -1480,6 +1481,22 @@
                         <changeLogFile>db/changelog/db.changelog-master.yaml</changeLogFile>
                         <driver>org.postgresql.Driver</driver>
                         <promptOnNonLocalDatabase>false</promptOnNonLocalDatabase>
+                    </configuration>
+                </plugin>
+
+                <!-- ── Git Commit ID — génère git.properties dans les classes compilées.
+                     Activé uniquement dans tnt-bootstrap (seul module exécutable).
+                     Spring Boot le découvre via GitInfoContributor → /actuator/info.
+                     failOnNoGitDirectory=false : l'autre équipe reconstruit depuis la
+                     source sur une infra que nous ne contrôlons pas ; mieux vaut un
+                     binaire sans métadonnée git qu'un pipeline bloqué. ── -->
+                <plugin>
+                    <groupId>io.github.git-commit-id</groupId>
+                    <artifactId>git-commit-id-maven-plugin</artifactId>
+                    <version>${git-commit-id-maven-plugin.version}</version>
+                    <configuration>
+                        <failOnNoGitDirectory>false</failOnNoGitDirectory>
+                        <generateGitPropertiesFile>true</generateGitPropertiesFile>
                     </configuration>
                 </plugin>
 
