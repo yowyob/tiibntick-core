@@ -270,6 +270,15 @@
         <maven-enforcer-plugin.version>3.5.0</maven-enforcer-plugin.version>
         <git-commit-id-maven-plugin.version>9.0.1</git-commit-id-maven-plugin.version>
 
+        <!-- 2026-09-22 build-time fix: JaCoCo's prepare-agent bytecode-instruments every
+             test JVM on every `mvn test`/`install` even though its coverage gate (jacoco:check)
+             is not enforced (see gitlab-ci profile below, haltOnFailure=false) — pure overhead
+             for local/day-to-day builds. Measured cost: ~2m of a ~6m full `mvn clean install`
+             (parallel, 39 modules). Default OFF locally; the gitlab-ci profile turns it back on
+             so CI coverage reporting is unaffected. Run `mvn verify -Djacoco.skip=false` (or
+             `-Pgitlab-ci`) locally when you actually want a coverage report. -->
+        <jacoco.skip>true</jacoco.skip>
+
         <!-- ── GitLab CI — project ID pour le Package Registry ── -->
         <!-- Remplacer par les vrais IDs de projet GitLab après création -->
         <gitlab.project.id.core>${env.CI_PROJECT_ID}</gitlab.project.id.core>
@@ -1575,6 +1584,9 @@
             </repositories>
             <properties>
                 <jacoco.check.haltOnFailure>false</jacoco.check.haltOnFailure>
+                <!-- Re-enable JaCoCo in CI — the root property above turns it off by default
+                     for local builds only; coverage reporting must stay live in the pipeline. -->
+                <jacoco.skip>false</jacoco.skip>
             </properties>
         </profile>
 
