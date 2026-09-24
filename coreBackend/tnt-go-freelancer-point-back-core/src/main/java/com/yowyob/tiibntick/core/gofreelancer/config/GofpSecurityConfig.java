@@ -38,9 +38,8 @@ import org.springframework.security.web.server.util.matcher.ServerWebExchangeMat
 public class GofpSecurityConfig {
 
     private static final String[] GOFP_PUBLIC_PATHS = {
-            // Auth — credential endpoints (no token needed to log in or register)
+            // Auth — credential endpoints (no token needed to log in or refresh)
             "/api/auth/login",
-            "/api/auth/register",
             "/api/auth/refresh",
             "/api/auth/setup-password",
             "/api/auth/request-password-reset",

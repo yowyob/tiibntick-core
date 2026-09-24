@@ -413,4 +413,9 @@
                  relativeToChangelogFile="false"/>
     </changeSet>
 
+    <changeSet id="070-fk-assigned-freelancer-to-gofp-freelancers" author="TiiBnTickTeam">
+        <sqlFile path="db/changelog/20260805_fk_assigned_freelancer_to_gofp_freelancers.sql"
+                 relativeToChangelogFile="false"/>
+    </changeSet>
+
 </databaseChangeLog>

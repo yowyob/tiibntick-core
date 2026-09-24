@@ -6,6 +6,7 @@ import com.yowyob.tiibntick.core.delivery.domain.exception.AnnouncementNotFoundE
 import com.yowyob.tiibntick.core.delivery.domain.exception.DeliveryDomainException;
 import com.yowyob.tiibntick.core.delivery.domain.exception.DeliveryNotFoundException;
 import com.yowyob.tiibntick.core.gofreelancer.domain.exception.DuplicateResourceException;
+import com.yowyob.tiibntick.core.gofreelancer.domain.exception.FreelancerNotFoundException;
 import com.yowyob.tiibntick.core.gofreelancer.domain.exception.InvalidCredentialsException;
 import com.yowyob.tiibntick.core.gofreelancer.domain.exception.InvalidTokenException;
 import com.yowyob.tiibntick.core.gofreelancer.domain.exception.ResourceNotFoundException;
@@ -40,7 +41,8 @@ public class GlobalExceptionHandler {
             ResourceNotFoundException.class,
             AnnouncementNotFoundException.class,
             DeliveryNotFoundException.class,
-            DelivererNotFoundException.class
+            DelivererNotFoundException.class,
+            FreelancerNotFoundException.class
     })
     public Mono<ResponseEntity<ErrorResponse>> handleResourceNotFoundException(
             RuntimeException ex, ServerWebExchange exchange) {

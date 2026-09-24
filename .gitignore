@@ -281,3 +281,4 @@ artifacts/
 docs/diagrams/
 docs/images/
 tnt-bootstrap/uploads/
+tnt-bootstrap/docker-compose.override.yml

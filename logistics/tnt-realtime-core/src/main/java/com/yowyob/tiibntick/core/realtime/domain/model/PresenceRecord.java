@@ -39,6 +39,35 @@ public class PresenceRecord {
         this.status = PresenceStatus.ONLINE_AVAILABLE;
     }
 
+    // Private constructor for reconstituting from persistence — bypasses now() defaults.
+    private PresenceRecord(String userId, String tenantId, DeviceInfo deviceInfo,
+                           PresenceStatus status, GeoCoordinates currentCoordinates,
+                           String activeMissionId,
+                           LocalDateTime firstSeenAt, LocalDateTime lastSeenAt) {
+        this.userId = Objects.requireNonNull(userId, "userId must not be null");
+        this.tenantId = Objects.requireNonNull(tenantId, "tenantId must not be null");
+        this.deviceInfo = deviceInfo;
+        this.status = Objects.requireNonNull(status, "status must not be null");
+        this.currentCoordinates = currentCoordinates;
+        this.activeMissionId = activeMissionId;
+        this.firstSeenAt = Objects.requireNonNull(firstSeenAt, "firstSeenAt must not be null");
+        this.lastSeenAt = Objects.requireNonNull(lastSeenAt, "lastSeenAt must not be null");
+    }
+
+    /**
+     * Restores a {@link PresenceRecord} from persisted state (e.g., Redis).
+     * Use this factory instead of the public constructor when reading back a record:
+     * the public constructor sets both timestamps to now(), which would silently
+     * discard the stored lastSeenAt and break isStale() / freelancerPositionAt propagation.
+     */
+    public static PresenceRecord reconstitute(String userId, String tenantId, DeviceInfo deviceInfo,
+                                              PresenceStatus status, GeoCoordinates currentCoordinates,
+                                              String activeMissionId,
+                                              LocalDateTime firstSeenAt, LocalDateTime lastSeenAt) {
+        return new PresenceRecord(userId, tenantId, deviceInfo,
+                status, currentCoordinates, activeMissionId, firstSeenAt, lastSeenAt);
+    }
+
     /**
      * Updates the actor's known GPS coordinates.
      * Also refreshes the lastSeenAt timestamp.

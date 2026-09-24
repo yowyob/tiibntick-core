@@ -1,8 +1,11 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web;
 
+import com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser;
+import com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpFreelancer;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.freelancer.FreelancerStatus;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.GofpFreelancerUseCase;
+import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -27,7 +30,13 @@ public class GofpFreelancerProfileController {
     private final GofpFreelancerUseCase freelancerUseCase;
 
     @PostMapping
-    public Mono<ResponseEntity<GofpFreelancer>> createOrUpdate(@RequestBody GofpFreelancer freelancer) {
+    public Mono<ResponseEntity<GofpFreelancer>> createOrUpdate(
+            @RequestBody GofpFreelancer freelancer,
+            @CurrentUser TntSecurityContext securityContext) {
+        if (securityContext == null || securityContext.userId() == null) {
+            return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
+        }
+        freelancer.setCoreUserId(securityContext.userId());
         return freelancerUseCase.createOrUpdate(freelancer)
                 .map(saved -> ResponseEntity.status(HttpStatus.CREATED).body(saved))
                 .onErrorResume(IllegalArgumentException.class,
@@ -74,6 +83,7 @@ public class GofpFreelancerProfileController {
     }
 
     @PatchMapping("/{id}/status")
+    @RequirePermission(resource = "gofp-admin", action = "manage")
     public Mono<ResponseEntity<GofpFreelancer>> updateStatus(
             @PathVariable UUID id,
             @RequestParam FreelancerStatus status) {
@@ -84,6 +94,7 @@ public class GofpFreelancerProfileController {
     }
 
     @PatchMapping("/{id}/active")
+    @RequirePermission(resource = "gofp-admin", action = "manage")
     public Mono<ResponseEntity<GofpFreelancer>> setActive(
             @PathVariable UUID id,
             @RequestParam Boolean active) {

@@ -18,5 +18,12 @@ public enum DeviceType {
     PWA_BROWSER,
 
     /** Desktop browser or Electron app. */
-    DESKTOP
+    DESKTOP,
+
+    /**
+     * Synthetic device type assigned when a presence record is auto-created
+     * by an HTTP GPS ping (PATCH /location) rather than a WebSocket CONNECT.
+     * The mobile app sent no STOMP handshake, so no real device metadata is available.
+     */
+    HTTP_POLLING
 }

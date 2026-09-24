@@ -18,7 +18,7 @@ public class PresenceProperties {
      * If no keepalive arrives within this duration, Redis expires the record
      * and the actor is considered offline. Default: 30 seconds.
      */
-    private int ttlSeconds = 30;
+    private int ttlSeconds = 90;
 
     /**
      * Duration without an update before an actor is considered stale

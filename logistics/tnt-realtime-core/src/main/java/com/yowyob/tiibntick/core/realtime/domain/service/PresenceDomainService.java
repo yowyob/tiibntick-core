@@ -6,6 +6,7 @@ import com.yowyob.tiibntick.core.realtime.domain.model.BroadcastTopic;
 import com.yowyob.tiibntick.core.realtime.domain.model.DeviceInfo;
 import com.yowyob.tiibntick.core.realtime.domain.model.GeoCoordinates;
 import com.yowyob.tiibntick.core.realtime.domain.model.PresenceRecord;
+import com.yowyob.tiibntick.core.realtime.domain.model.enums.DeviceType;
 import com.yowyob.tiibntick.core.realtime.domain.model.enums.PresenceStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,22 +77,42 @@ public class PresenceDomainService {
     }
 
     /**
-     * Updates an actor's GPS coordinates in their presence record.
-     * Also refreshes the Redis TTL.
+     * Updates an actor's GPS coordinates in their presence record (upsert).
      *
-     * @param userId      the actor's user identifier
+     * <p>If no record exists (actor never connected via WebSocket), a new one is
+     * created with {@link DeviceType#HTTP_POLLING} so that GPS pings from a mobile
+     * app without a STOMP session are not silently dropped. The record is saved and
+     * the presence board is broadcast exactly once on creation; subsequent coordinate
+     * updates on an existing record are saved without re-broadcasting.</p>
+     *
+     * <p>Implementation note: {@code switchIfEmpty} must be applied to the upstream
+     * {@code Mono<PresenceRecord>}, not after {@code flatMap}, because {@code Mono<Void>}
+     * is inherently empty and would trigger the fallback even when a record exists.</p>
+     *
+     * @param userId      the actor's user identifier (must equal JWT sub — enforced upstream)
      * @param tenantId    the tenant context
      * @param coordinates the new GPS coordinates
-     * @return Mono completing after persistence
+     * @return Mono completing after persistence (and broadcast on first creation)
      */
     public Mono<Void> updateCoordinates(String userId, String tenantId, GeoCoordinates coordinates) {
         return presenceRepository.findByUserAndTenant(userId, tenantId)
+                .switchIfEmpty(Mono.defer(() -> {
+                    PresenceRecord created = new PresenceRecord(
+                            userId, tenantId,
+                            DeviceInfo.of(DeviceType.HTTP_POLLING, "n/a", "n/a"));
+                    created.updateLocation(coordinates);
+                    // Save and broadcast, then return empty so the downstream flatMap is skipped.
+                    return presenceRepository.save(created)
+                            .then(broadcastPresenceChange(created))
+                            .doOnSuccess(v -> log.info(
+                                    "Presence auto-created via HTTP GPS ping for actor {} (tenant {})",
+                                    userId, tenantId))
+                            .then(Mono.<PresenceRecord>empty());
+                }))
                 .flatMap(record -> {
                     record.updateLocation(coordinates);
                     return presenceRepository.save(record);
-                })
-                .switchIfEmpty(Mono.empty())
-                .then();
+                });
     }
 
     /**

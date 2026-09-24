@@ -1,5 +1,7 @@
 package com.yowyob.tiibntick.core.gofreelancer.application.service;
 
+import com.yowyob.tiibntick.core.gofreelancer.domain.exception.FreelancerNotFoundException;
+import com.yowyob.tiibntick.core.gofreelancer.domain.exception.InvalidFreelancerStatusTransitionException;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpFreelancer;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.freelancer.FreelancerStatus;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.GofpFreelancerUseCase;
@@ -72,13 +74,21 @@ public class GofpFreelancerService implements GofpFreelancerUseCase {
     @Override
     public Mono<GofpFreelancer> updateStatus(UUID id, FreelancerStatus status) {
         return freelancerRepository.findById(id)
-                .switchIfEmpty(Mono.error(new IllegalArgumentException("GofpFreelancer not found: " + id)))
+                .switchIfEmpty(Mono.error(new FreelancerNotFoundException("GofpFreelancer not found: " + id)))
                 .flatMap(f -> {
+                    if (f.getStatus() == status) {
+                        // Idempotent: same state, skip save
+                        return Mono.just(f);
+                    }
+                    if (!FreelancerStatus.isAllowed(f.getStatus(), status)) {
+                        return Mono.error(new InvalidFreelancerStatusTransitionException(f.getStatus(), status));
+                    }
+                    FreelancerStatus previous = f.getStatus();
                     f.setStatus(status);
-                    // Automatically deactivate on suspension/rejection/revocation
+                    // Deactivate on suspension/rejection/revocation
                     if (status != FreelancerStatus.APPROVED) f.setIsActive(false);
                     f.setUpdatedAt(Instant.now());
-                    log.info("GofpFreelancer {} status → {}", id, status);
+                    log.info("GofpFreelancer {} status {} → {}", id, previous, status);
                     return freelancerRepository.save(f);
                 })
                 .flatMap(this::hydrate);

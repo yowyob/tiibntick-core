@@ -1,15 +1,18 @@
 package com.yowyob.tiibntick.core.gofreelancer.application.service;
 
-import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.AddressDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.response.DeliveryNeedResponseDTO;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.AddressUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.AdminRelayPointUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.FreelancerPricingPolicyUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpFreelancerRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpUserRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryNeedRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.PushNotificationPort;
 import com.yowyob.tiibntick.core.gofreelancer.application.usecase.MatchingUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.DeliveryNeed;
+import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpFreelancer;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.deliveryNeed.DeliveryNeedStatus;
+import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.freelancer.FreelancerStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,9 +34,6 @@ import static org.mockito.Mockito.when;
 /**
  * Prouve que assignFreelancer() écrit dans assigned_freelancer_id (pas delivery_id),
  * laisse delivery_id à null et positionne le statut à ASSIGNED.
- *
- * Ce test ÉCHOUE sur github/main (where need.setDeliveryId(freelancerId) génère une violation FK)
- * et PASSE sur cette branche (need.setAssignedFreelancerId(freelancerId)).
  */
 @ExtendWith(MockitoExtension.class)
 class DeliveryNeedAssignFreelancerTest {
@@ -50,6 +50,8 @@ class DeliveryNeedAssignFreelancerTest {
     @Mock private MatchingUseCase matchingUseCase;
     @Mock private AddressUseCase addressUseCase;
     @Mock private GofpUserRepository gofpUserRepository;
+    @Mock private GofpFreelancerRepository gofpFreelancerRepository;
+    @Mock private FreelancerPricingPolicyUseCase freelancerPricingPolicyUseCase;
     @Mock private DatabaseClient databaseClient;
 
     private DeliveryNeedApplicationService service;
@@ -58,7 +60,8 @@ class DeliveryNeedAssignFreelancerTest {
     void setUp() {
         service = new DeliveryNeedApplicationService(
                 deliveryNeedRepository, adminRelayPointUseCase, pushNotificationPort,
-                matchingUseCase, addressUseCase, gofpUserRepository, databaseClient);
+                matchingUseCase, addressUseCase, gofpUserRepository,
+                gofpFreelancerRepository, freelancerPricingPolicyUseCase, databaseClient);
     }
 
     @Test
@@ -73,7 +76,14 @@ class DeliveryNeedAssignFreelancerTest {
                 .createdAt(Instant.now())
                 .build();
 
+        GofpFreelancer approvedFreelancer = GofpFreelancer.builder()
+                .id(FREELANCER_ID)
+                .status(FreelancerStatus.APPROVED)
+                .isActive(true)
+                .build();
+
         when(deliveryNeedRepository.findById(NEED_ID)).thenReturn(Mono.just(pendingNeed));
+        when(gofpFreelancerRepository.findById(FREELANCER_ID)).thenReturn(Mono.just(approvedFreelancer));
 
         ArgumentCaptor<DeliveryNeed> savedCaptor = ArgumentCaptor.forClass(DeliveryNeed.class);
         when(deliveryNeedRepository.save(savedCaptor.capture()))
@@ -81,7 +91,9 @@ class DeliveryNeedAssignFreelancerTest {
 
         when(addressUseCase.getAddressById(any())).thenReturn(Mono.error(new RuntimeException("not found")));
 
-        Mono<DeliveryNeedResponseDTO> result = service.assignFreelancer(NEED_ID, FREELANCER_ID);
+        // USER_ID is the owner — ownership guard is inactive (ownershipGuardEnabled defaults
+        // to false in unit tests since @Value is not processed without a Spring context)
+        Mono<DeliveryNeedResponseDTO> result = service.assignFreelancer(NEED_ID, FREELANCER_ID, USER_ID);
 
         StepVerifier.create(result)
                 .assertNext(dto -> {

@@ -4,6 +4,8 @@ import com.yowyob.tiibntick.core.gofreelancer.application.port.in.FreelancerLoca
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.FreelancerLocationUpdateRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
@@ -19,6 +21,7 @@ import java.util.UUID;
  *
  * @author François-Charles ATANGA
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/freelancers")
 @RequiredArgsConstructor
@@ -34,6 +37,11 @@ public class FreelancerLocationController {
         if (securityContext == null || securityContext.tenantId() == null) {
             return Mono.error(new IllegalArgumentException(
                     "Authenticated tenant context is required to update freelancer location"));
+        }
+        if (!id.equals(securityContext.userId())) {
+            log.warn("Position spoofing attempt: caller {} tried to write position for {} (tenant {})",
+                    securityContext.userId(), id, securityContext.tenantId());
+            return Mono.just(ResponseEntity.status(HttpStatus.FORBIDDEN).<Void>build());
         }
         return locationUseCase.updateLocation(
                         id,

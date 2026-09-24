@@ -3,6 +3,7 @@ package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryStatus;
 import lombok.Data;
 
+import java.time.Instant;
 import java.util.UUID;
 
 /**
@@ -21,6 +22,8 @@ public class DeliveryTrackingDTO {
     
     private Float freelancerLatitude;
     private Float freelancerLongitude;
+    /** ISO 8601 timestamp of the last GPS ping received from the deliverer. Null when presence is absent. */
+    private Instant freelancerPositionAt;
     
     private Double pickupLatitude;
     private Double pickupLongitude;

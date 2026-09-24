@@ -117,7 +117,25 @@ public class TntPermissionEvaluator implements CheckPermissionUseCase {
                             .collect(Collectors.toUnmodifiableSet());
                     Set<String> expanded = expandWithRolePermissions(rawAuthorities);
                     UUID agencyId = extractSyntheticUuid(rawAuthorities, "AGENCY_");
-                    return Mono.just(matches(expanded, resource, action, agencyId));
+
+                    if (matches(expanded, resource, action, agencyId)) {
+                        return Mono.just(true);
+                    }
+
+                    // JWT fast-path denied — fall back to DB-backed resolver for users
+                    // whose roles are stored in tnt_user_role_assignments rather than
+                    // embedded in the JWT (e.g. local dev admin accounts, E2E test users).
+                    UUID tenantId = extractSyntheticUuid(rawAuthorities, "TENANT_");
+                    if (tenantId == null) return Mono.just(false);
+                    String principalName = auth.getName();
+                    try {
+                        UUID userId = UUID.fromString(principalName);
+                        return kernelPermissionResolver.resolvePermissions(tenantId, userId)
+                                .map(dbPerms -> matches(dbPerms, resource, action, agencyId))
+                                .onErrorReturn(false);
+                    } catch (IllegalArgumentException e) {
+                        return Mono.just(false);
+                    }
                 })
                 .defaultIfEmpty(false);
     }

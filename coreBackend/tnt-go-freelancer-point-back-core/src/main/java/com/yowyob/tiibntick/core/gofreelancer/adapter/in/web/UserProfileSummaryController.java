@@ -5,7 +5,11 @@ import com.yowyob.tiibntick.core.gofreelancer.application.port.in.GofpClientUseC
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.GofpFreelancerUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.GofpRelayPointUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.GofpUserUseCase;
+import com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser;
+import com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -20,6 +24,7 @@ import java.util.UUID;
  * This is particularly useful for the frontend to know what profiles the user already has,
  * to skip registration steps for existing data.
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/gofp/users")
 @RequiredArgsConstructor
@@ -31,7 +36,16 @@ public class UserProfileSummaryController {
     private final GofpRelayPointUseCase relayPointUseCase;
 
     @GetMapping("/{coreUserId}/profiles-summary")
-    public Mono<ResponseEntity<UserProfileSummaryDTO>> getProfilesSummary(@PathVariable UUID coreUserId) {
+    public Mono<ResponseEntity<UserProfileSummaryDTO>> getProfilesSummary(
+            @PathVariable UUID coreUserId,
+            @CurrentUser TntSecurityContext securityContext) {
+        if (securityContext == null || !coreUserId.equals(securityContext.userId())) {
+            log.warn("Profile summary access denied: caller {} tried to access profile for {} (tenant {})",
+                    securityContext != null ? securityContext.userId() : "unauthenticated",
+                    coreUserId,
+                    securityContext != null ? securityContext.tenantId() : null);
+            return Mono.just(ResponseEntity.status(HttpStatus.FORBIDDEN).build());
+        }
         return userUseCase.findByCoreUserId(coreUserId)
                 .flatMap(user -> {
                     UserProfileSummaryDTO summary = UserProfileSummaryDTO.builder()

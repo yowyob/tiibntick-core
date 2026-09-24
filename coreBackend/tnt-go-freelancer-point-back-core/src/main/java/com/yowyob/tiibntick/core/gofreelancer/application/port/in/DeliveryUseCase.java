@@ -22,7 +22,15 @@ public interface DeliveryUseCase {
     Mono<DeliveryResponseDTO> cancelDelivery(UUID id);
     Mono<DeliveryTrackingDTO> trackDelivery(UUID announcementId);
     Flux<DeliveryTrackingDTO> trackDeliveryStream(UUID announcementId);
-    Mono<DeliveryTrackingDTO> trackDeliveryByNeed(UUID deliveryNeedId);
-    Flux<DeliveryTrackingDTO> trackDeliveryByNeedStream(UUID deliveryNeedId);
+    Mono<DeliveryTrackingDTO> trackDeliveryByNeed(UUID deliveryNeedId, UUID callerId);
+    Flux<DeliveryTrackingDTO> trackDeliveryByNeedStream(UUID deliveryNeedId, UUID callerId);
+    /**
+     * Checks ownership for a delivery-need without loading tracking data.
+     * Used by the SSE controller to fail-fast before committing the 200 headers.
+     *
+     * @throws AccessDeniedException    if callerId is null or does not own the need
+     * @throws IllegalArgumentException if the need does not exist (message contains "not found")
+     */
+    Mono<Void> checkTrackingOwnership(UUID deliveryNeedId, UUID callerId);
     Mono<DeliveryAssistanceDTO> getDeliveryAssistance(UUID id);
 }

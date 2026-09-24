@@ -6,8 +6,6 @@ import com.yowyob.tiibntick.core.auth.domain.model.TntUserIdentity;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.AuthUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.AuthRequestDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.AuthResponseDTO;
-import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.UserRegistrationDTO;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,7 +18,7 @@ import java.util.Map;
  * Inbound REST adapter for authentication.
  *
  * <p>Public endpoints (no JWT required):
- * POST /api/auth/login, POST /api/auth/register, POST /api/auth/refresh
+ * POST /api/auth/login, POST /api/auth/refresh
  *
  * <p>Protected endpoints (JWT required):
  * POST /api/auth/logout, GET /api/auth/me
@@ -37,14 +35,6 @@ public class AuthController {
     @PostMapping("/login")
     public Mono<AuthResponseDTO> login(@RequestBody AuthRequestDTO request) {
         return authUseCase.login(request);
-    }
-
-    @PostMapping("/register")
-    public Mono<ResponseEntity<AuthResponseDTO>> register(@Valid @RequestBody UserRegistrationDTO request) {
-        return authUseCase.register(request)
-                .map(resp -> ResponseEntity.status(HttpStatus.CREATED).body(resp))
-                .onErrorResume(IllegalArgumentException.class,
-                        e -> Mono.just(ResponseEntity.badRequest().build()));
     }
 
     @PostMapping("/refresh")

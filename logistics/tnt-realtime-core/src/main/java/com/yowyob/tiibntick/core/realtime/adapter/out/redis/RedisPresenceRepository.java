@@ -43,7 +43,7 @@ public class RedisPresenceRepository implements IPresenceRepository {
     private final ReactiveStringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
 
-    @Value("${tnt.realtime.presence.ttl-seconds:30}")
+    @Value("${tnt.realtime.presence.ttl-seconds:90}")
     private int presenceTtlSeconds;
 
     public RedisPresenceRepository(@Qualifier("realtimeRedisTemplate") ReactiveStringRedisTemplate redisTemplate,
@@ -178,16 +178,17 @@ public class RedisPresenceRepository implements IPresenceRepository {
                             appVersion, "unknown", pushToken)
                     : null;
 
-            PresenceRecord record = new PresenceRecord(userId, tenantId, deviceInfo);
-            record.setStatus(PresenceStatus.valueOf(status));
+            GeoCoordinates coords = (latitude != null && longitude != null)
+                    ? GeoCoordinates.of(latitude, longitude) : null;
 
-            if (latitude != null && longitude != null) {
-                record.updateLocation(GeoCoordinates.of(latitude, longitude));
-            }
-            if (activeMissionId != null) {
-                record.assignMission(activeMissionId);
-            }
-            return record;
+            java.time.LocalDateTime restoredFirst = firstSeenAt != null
+                    ? java.time.LocalDateTime.parse(firstSeenAt) : java.time.LocalDateTime.now();
+            java.time.LocalDateTime restoredLast = lastSeenAt != null
+                    ? java.time.LocalDateTime.parse(lastSeenAt) : java.time.LocalDateTime.now();
+
+            return PresenceRecord.reconstitute(userId, tenantId, deviceInfo,
+                    PresenceStatus.valueOf(status), coords, activeMissionId,
+                    restoredFirst, restoredLast);
         }
     }
 }

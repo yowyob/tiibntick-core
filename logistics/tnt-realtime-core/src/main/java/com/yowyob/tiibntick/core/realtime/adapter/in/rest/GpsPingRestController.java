@@ -6,14 +6,14 @@ import com.yowyob.tiibntick.core.realtime.application.port.in.IProcessGpsPingUse
 import com.yowyob.tiibntick.core.realtime.domain.model.GPSStreamEntry;
 import com.yowyob.tiibntick.core.realtime.domain.model.GeoCoordinates;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 
@@ -28,6 +28,8 @@ import java.time.ZoneId;
 @RequestMapping("/api/v1/realtime/gps")
 public class GpsPingRestController {
 
+    private static final Logger log = LoggerFactory.getLogger(GpsPingRestController.class);
+
     private final IProcessGpsPingUseCase processGpsPing;
 
     public GpsPingRestController(IProcessGpsPingUseCase processGpsPing) {
@@ -35,12 +37,20 @@ public class GpsPingRestController {
     }
 
     @PostMapping("/ping")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public Mono<Void> ping(
+    public Mono<ResponseEntity<Void>> ping(
             @io.swagger.v3.oas.annotations.Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @Valid @RequestBody GpsPingRestRequest body) {
+
+        String subjectId = currentUser.userId().toString();
+
+        if (body.delivererId() != null && !body.delivererId().equals(subjectId)) {
+            log.warn("GPS ping spoofing attempt: caller {} tried to write position for {} (tenant {})",
+                    subjectId, body.delivererId(), currentUser.tenantId());
+            return Mono.just(ResponseEntity.status(HttpStatus.FORBIDDEN).<Void>build());
+        }
+
         GPSStreamEntry entry = new GPSStreamEntry(
-                body.delivererId(),
+                subjectId,
                 body.missionId(),
                 currentUser.tenantId().toString(),
                 GeoCoordinates.of(body.latitude(), body.longitude(), null, null),
@@ -51,11 +61,12 @@ public class GpsPingRestController {
                 LocalDateTime.ofInstant(Instant.now(), ZoneId.systemDefault()),
                 null
         );
-        return processGpsPing.processGpsPing(entry);
+        return processGpsPing.processGpsPing(entry)
+                .then(Mono.just(ResponseEntity.noContent().<Void>build()));
     }
 
     public record GpsPingRestRequest(
-            @NotBlank String delivererId,
+            String delivererId,      // optional; if present must equal JWT sub, else 403
             String missionId,
             @NotNull Double latitude,
             @NotNull Double longitude,

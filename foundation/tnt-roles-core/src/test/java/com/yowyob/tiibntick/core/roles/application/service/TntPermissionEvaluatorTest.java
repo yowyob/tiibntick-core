@@ -22,6 +22,9 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -240,5 +243,125 @@ class TntPermissionEvaluatorTest {
         )
         .expectError(TntRoleException.class)
         .verify();
+    }
+
+    // ─── canFromCurrentContext() — DB fallback path ───────────────────────────
+
+    @Test
+    void canFromCurrentContext_jwtHasPermission_dbResolverNotCalled() {
+        // JWT fast-path grants — resolver must NOT be called (performance invariant)
+        var auth = new UsernamePasswordAuthenticationToken(
+                USER_ID.toString(), "pass",
+                List.of(new SimpleGrantedAuthority(TntPermission.REPORT_EXPORT),
+                        new SimpleGrantedAuthority("TENANT_" + TENANT_ID))
+        );
+        var secCtx = Mono.just(new SecurityContextImpl(auth));
+
+        StepVerifier.create(
+                evaluator.canFromCurrentContext("report", "export")
+                        .contextWrite(ReactiveSecurityContextHolder.withSecurityContext(secCtx))
+        )
+        .expectNext(true)
+        .verifyComplete();
+
+        verify(permissionResolver, never()).resolvePermissions(any(), any());
+    }
+
+    @Test
+    void canFromCurrentContext_jwtMissingPermission_dbAssignmentPresent_returnsTrue() {
+        // JWT has no matching permission → fall back to DB; DB grants it
+        var auth = new UsernamePasswordAuthenticationToken(
+                USER_ID.toString(), "pass",
+                List.of(new SimpleGrantedAuthority("TENANT_" + TENANT_ID))
+        );
+        var secCtx = Mono.just(new SecurityContextImpl(auth));
+
+        when(permissionResolver.resolvePermissions(eq(TENANT_ID), eq(USER_ID)))
+                .thenReturn(Mono.just(Set.of("gofp-admin:manage")));
+
+        StepVerifier.create(
+                evaluator.canFromCurrentContext("gofp-admin", "manage")
+                        .contextWrite(ReactiveSecurityContextHolder.withSecurityContext(secCtx))
+        )
+        .expectNext(true)
+        .verifyComplete();
+    }
+
+    @Test
+    void canFromCurrentContext_jwtMissingPermission_noDbAssignment_returnsFalse() {
+        // JWT has no matching permission → fall back to DB; DB returns empty set
+        var auth = new UsernamePasswordAuthenticationToken(
+                USER_ID.toString(), "pass",
+                List.of(new SimpleGrantedAuthority("TENANT_" + TENANT_ID))
+        );
+        var secCtx = Mono.just(new SecurityContextImpl(auth));
+
+        when(permissionResolver.resolvePermissions(eq(TENANT_ID), eq(USER_ID)))
+                .thenReturn(Mono.just(Set.of()));
+
+        StepVerifier.create(
+                evaluator.canFromCurrentContext("gofp-admin", "manage")
+                        .contextWrite(ReactiveSecurityContextHolder.withSecurityContext(secCtx))
+        )
+        .expectNext(false)
+        .verifyComplete();
+    }
+
+    @Test
+    void canFromCurrentContext_noTenantAuthority_returnsFalseWithoutDbCall() {
+        // No TENANT_ authority → guard fires, DB must not be touched
+        var auth = new UsernamePasswordAuthenticationToken(
+                USER_ID.toString(), "pass",
+                List.of(new SimpleGrantedAuthority("SOME_OTHER_AUTHORITY"))
+        );
+        var secCtx = Mono.just(new SecurityContextImpl(auth));
+
+        StepVerifier.create(
+                evaluator.canFromCurrentContext("gofp-admin", "manage")
+                        .contextWrite(ReactiveSecurityContextHolder.withSecurityContext(secCtx))
+        )
+        .expectNext(false)
+        .verifyComplete();
+
+        verify(permissionResolver, never()).resolvePermissions(any(), any());
+    }
+
+    @Test
+    void canFromCurrentContext_principalNameNotUuid_returnsFalseWithoutException() {
+        // auth.getName() is not a valid UUID → IllegalArgumentException caught internally
+        var auth = new UsernamePasswordAuthenticationToken(
+                "not-a-uuid", "pass",
+                List.of(new SimpleGrantedAuthority("TENANT_" + TENANT_ID))
+        );
+        var secCtx = Mono.just(new SecurityContextImpl(auth));
+
+        StepVerifier.create(
+                evaluator.canFromCurrentContext("gofp-admin", "manage")
+                        .contextWrite(ReactiveSecurityContextHolder.withSecurityContext(secCtx))
+        )
+        .expectNext(false)
+        .verifyComplete();
+
+        verify(permissionResolver, never()).resolvePermissions(any(), any());
+    }
+
+    @Test
+    void canFromCurrentContext_dbResolverError_returnsFalseNotException() {
+        // DB resolver throws → onErrorReturn(false); no 500 propagated to caller
+        var auth = new UsernamePasswordAuthenticationToken(
+                USER_ID.toString(), "pass",
+                List.of(new SimpleGrantedAuthority("TENANT_" + TENANT_ID))
+        );
+        var secCtx = Mono.just(new SecurityContextImpl(auth));
+
+        when(permissionResolver.resolvePermissions(eq(TENANT_ID), eq(USER_ID)))
+                .thenReturn(Mono.error(new RuntimeException("DB unavailable")));
+
+        StepVerifier.create(
+                evaluator.canFromCurrentContext("gofp-admin", "manage")
+                        .contextWrite(ReactiveSecurityContextHolder.withSecurityContext(secCtx))
+        )
+        .expectNext(false)
+        .verifyComplete();
     }
 }

@@ -1,5 +1,7 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web;
 
+import com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser;
+import com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext;
 import com.yowyob.tiibntick.core.gofreelancer.application.service.DeliveryStatusApplicationService;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.DeliveryStatusUpdateDTO;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery;
@@ -12,6 +14,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -28,6 +31,21 @@ import reactor.core.publisher.Mono;
 public class GofpDeliveryController {
 
     private final DeliveryUseCase deliveryUseCase;
+
+    /**
+     * Identité de l'appelant, ou {@code null} si le contexte est absent.
+     *
+     * <p>{@code required = false} sur les paramètres {@code @CurrentUser} de ce contrôleur n'est
+     * pas une porte dérobée : la chaîne de sécurité ({@code TntSecurityConfig @Order(20)}) refuse
+     * les requêtes non authentifiées sur {@code /api/**} avant que le contrôleur soit atteint.
+     * Un {@code null} passé ici est refusé par {@code requireTrackingOwnership} via
+     * {@code Mono.error(AccessDeniedException)} depuis le lot 25.1. La valeur de
+     * {@code required = false} est de rendre le chemin d'échec explicite et auditable dans le
+     * service plutôt que d'émettre un 401 opaque depuis le résolveur Spring.
+     */
+    private static UUID callerId(TntSecurityContext ctx) {
+        return ctx != null ? ctx.userId() : null;
+    }
     /** Handles status transitions with automatic RelayDeposit creation. */
     private final DeliveryStatusApplicationService deliveryStatusApplicationService;
 
@@ -104,19 +122,46 @@ public class GofpDeliveryController {
         return ResponseEntity.ok().contentType(MediaType.TEXT_EVENT_STREAM).body(body);
     }
     @GetMapping("/tracking/delivery-need/{deliveryNeedId}")
-    public Mono<ResponseEntity<DeliveryTrackingDTO>> trackDeliveryByNeed(@PathVariable UUID deliveryNeedId) {
-        return deliveryUseCase.trackDeliveryByNeed(deliveryNeedId).map(ResponseEntity::ok).defaultIfEmpty(ResponseEntity.notFound().build());
+    public Mono<ResponseEntity<DeliveryTrackingDTO>> trackDeliveryByNeed(
+            @PathVariable UUID deliveryNeedId,
+            @CurrentUser(required = false) TntSecurityContext ctx) {
+        return deliveryUseCase.trackDeliveryByNeed(deliveryNeedId, callerId(ctx))
+                .map(ResponseEntity::ok)
+                .defaultIfEmpty(ResponseEntity.notFound().build());
+        // No onErrorResume: GlobalExceptionHandler handles both
+        // IllegalArgumentException("not found" → 404) and AccessDeniedException (→ 403).
     }
-    @GetMapping("/tracking/stream/delivery-need/{deliveryNeedId}")
-    public ResponseEntity<Flux<org.springframework.http.codec.ServerSentEvent<DeliveryTrackingDTO>>> trackDeliveryByNeedStream(
-            @PathVariable UUID deliveryNeedId) {
-        Flux<org.springframework.http.codec.ServerSentEvent<DeliveryTrackingDTO>> body =
-                deliveryUseCase.trackDeliveryByNeedStream(deliveryNeedId)
-                        .map(dto -> org.springframework.http.codec.ServerSentEvent
-                                .<DeliveryTrackingDTO>builder(dto)
-                                .event("tracking")
-                                .build());
-        return ResponseEntity.ok().contentType(MediaType.TEXT_EVENT_STREAM).body(body);
+
+    /**
+     * SSE tracking stream for a delivery-need.
+     *
+     * <p><strong>Refus avant ouverture de la connexion.</strong>
+     * {@link DeliveryUseCase#checkTrackingOwnership} est résolu comme un {@code Mono} AVANT
+     * que la {@code ResponseEntity} soit construite. Si la garde échoue (403 ou 404), le
+     * {@code GlobalExceptionHandler} renvoie le statut correct sans aucun frame SSE.
+     * L'ancienne signature {@code Mono.just(ResponseEntity.ok().body(body))} construisait
+     * la réponse immédiatement (200 commité avant la souscription du flux) — la garde
+     * n'avait d'effet que dans {@code MockServerHttpResponse}, pas sur une socket réelle.
+     * {@code trackDeliveryByNeedStream} n'est appelé que si le check passe, via
+     * {@code Mono.fromSupplier} (évaluation paresseuse après {@code then}).
+     */
+    @GetMapping(value = "/tracking/stream/delivery-need/{deliveryNeedId}",
+                produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Mono<ResponseEntity<Flux<ServerSentEvent<DeliveryTrackingDTO>>>> trackDeliveryByNeedStream(
+            @PathVariable UUID deliveryNeedId,
+            @CurrentUser(required = false) TntSecurityContext ctx) {
+        UUID caller = callerId(ctx);
+        return deliveryUseCase.checkTrackingOwnership(deliveryNeedId, caller)
+                .then(Mono.fromSupplier(() -> {
+                    Flux<ServerSentEvent<DeliveryTrackingDTO>> body =
+                            deliveryUseCase.trackDeliveryByNeedStream(deliveryNeedId, caller)
+                                    .map(dto -> ServerSentEvent.<DeliveryTrackingDTO>builder(dto)
+                                            .event("tracking")
+                                            .build());
+                    return ResponseEntity.ok()
+                            .<Flux<ServerSentEvent<DeliveryTrackingDTO>>>contentType(MediaType.TEXT_EVENT_STREAM)
+                            .body(body);
+                }));
     }
     @GetMapping("/{id}/assistance")
     public Mono<ResponseEntity<com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.DeliveryAssistanceDTO>> getDeliveryAssistance(@PathVariable UUID id) {

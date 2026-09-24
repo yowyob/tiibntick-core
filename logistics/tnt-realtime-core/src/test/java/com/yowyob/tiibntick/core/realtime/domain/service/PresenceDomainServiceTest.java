@@ -18,9 +18,11 @@ import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import java.time.Duration;
+import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -168,5 +170,61 @@ class PresenceDomainServiceTest {
     void presenceRecordIsStaleAfterSilence() throws InterruptedException {
         PresenceRecord record = new PresenceRecord(USER_ID, TENANT_ID, DEVICE_INFO);
         assertThat(record.isStale(Duration.ZERO)).isTrue();
+    }
+
+    // ── lot 14 — updateCoordinates upsert ─────────────────────────────────────
+
+    @Test
+    @DisplayName("updateCoordinates() creates presence record when none exists (upsert)")
+    void updateCoordinatesCreatesRecordWhenAbsent() {
+        GeoCoordinates coords = GeoCoordinates.of(3.848, 11.502);
+        when(presenceRepository.findByUserAndTenant(USER_ID, TENANT_ID)).thenReturn(Mono.empty());
+        when(presenceRepository.save(any())).thenReturn(Mono.empty());
+        when(broadcaster.broadcast(any(), any())).thenReturn(Mono.empty());
+
+        ArgumentCaptor<PresenceRecord> captor = ArgumentCaptor.forClass(PresenceRecord.class);
+
+        StepVerifier.create(presenceService.updateCoordinates(USER_ID, TENANT_ID, coords))
+                .verifyComplete();
+
+        verify(presenceRepository).save(captor.capture());
+        PresenceRecord saved = captor.getValue();
+        assertThat(saved.getUserId()).isEqualTo(USER_ID);
+        assertThat(saved.getTenantId()).isEqualTo(TENANT_ID);
+        assertThat(saved.getCurrentCoordinates()).isEqualTo(coords);
+        assertThat(saved.getStatus()).isEqualTo(PresenceStatus.ONLINE_AVAILABLE);
+        assertThat(saved.isOnline()).isTrue();
+    }
+
+    @Test
+    @DisplayName("updateCoordinates() broadcasts presence when auto-creating via HTTP GPS ping")
+    void updateCoordinatesBroadcastsOnCreation() {
+        GeoCoordinates coords = GeoCoordinates.of(3.848, 11.502);
+        when(presenceRepository.findByUserAndTenant(USER_ID, TENANT_ID)).thenReturn(Mono.empty());
+        when(presenceRepository.save(any())).thenReturn(Mono.empty());
+        when(broadcaster.broadcast(any(), any())).thenReturn(Mono.empty());
+
+        StepVerifier.create(presenceService.updateCoordinates(USER_ID, TENANT_ID, coords))
+                .verifyComplete();
+
+        verify(broadcaster).broadcast(any(), any());
+    }
+
+    @Test
+    @DisplayName("updateCoordinates() preserves firstSeenAt and does NOT broadcast on existing record")
+    void updateCoordinatesPreservesFirstSeenAtAndDoesNotBroadcastOnExistingRecord() {
+        PresenceRecord existing = new PresenceRecord(USER_ID, TENANT_ID, DEVICE_INFO);
+        LocalDateTime originalFirstSeen = existing.getFirstSeenAt();
+
+        GeoCoordinates coords = GeoCoordinates.of(3.848, 11.502);
+        when(presenceRepository.findByUserAndTenant(USER_ID, TENANT_ID)).thenReturn(Mono.just(existing));
+        when(presenceRepository.save(any())).thenReturn(Mono.empty());
+
+        StepVerifier.create(presenceService.updateCoordinates(USER_ID, TENANT_ID, coords))
+                .verifyComplete();
+
+        assertThat(existing.getFirstSeenAt()).isEqualTo(originalFirstSeen);
+        assertThat(existing.getCurrentCoordinates()).isEqualTo(coords);
+        verify(broadcaster, never()).broadcast(any(), any());
     }
 }

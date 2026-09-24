@@ -9,6 +9,7 @@ import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.DeliveryTra
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.DeliveryUpdateDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.persistence.entity.AddressEntity;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.persistence.repository.AddressReactiveRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpFreelancerRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IAnnouncementRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryNeedRepository;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Announcement;
@@ -20,11 +21,15 @@ import com.yowyob.tiibntick.core.gofreelancer.application.port.out.CachePort;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.UUID;
 
 /**
@@ -50,8 +55,12 @@ public class DeliveryApplicationService implements DeliveryUseCase {
     private final AddressReactiveRepository addressRepository;
     private final IGetPresenceUseCase getPresenceUseCase;
     private final CachePort cachePort;
+    private final TenantContextHolder tenantContextHolder;
+    private final GofpFreelancerRepository gofpFreelancerRepository;
 
-    private static final String TENANT_ID_DEFAULT = "00000000-0000-0000-0000-000000000001";
+    @Value("${tnt.gofp.ownership-guard.enabled:true}")
+    private boolean ownershipGuardEnabled = true;
+
     private static final Duration TRACKING_CACHE_TTL = Duration.ofSeconds(5);
 
     // ══════════════════════════════════════════════════════════════════════
@@ -144,40 +153,62 @@ public class DeliveryApplicationService implements DeliveryUseCase {
 
     @Override
     public Mono<DeliveryTrackingDTO> trackDelivery(UUID announcementId) {
-        String cacheKey = "tracking:announcement:" + announcementId;
-        return cachePort.get(cacheKey, DeliveryTrackingDTO.class)
-                .switchIfEmpty(buildTrackingDTOByAnnouncementId(announcementId)
-                        .flatMap(dto -> cachePort.set(cacheKey, dto, TRACKING_CACHE_TTL).thenReturn(dto)));
+        return tenantContextHolder.currentTenantId()
+                .flatMap(tenantId -> {
+                    String cacheKey = "tracking:announcement:" + tenantId + ":" + announcementId;
+                    return cachePort.get(cacheKey, DeliveryTrackingDTO.class)
+                            .switchIfEmpty(buildTrackingDTOByAnnouncementId(announcementId, tenantId)
+                                    .flatMap(dto -> cachePort.set(cacheKey, dto, TRACKING_CACHE_TTL).thenReturn(dto)));
+                });
     }
 
     @Override
     public Flux<DeliveryTrackingDTO> trackDeliveryStream(UUID announcementId) {
-        return Flux.interval(Duration.ofSeconds(5))
-                .flatMap(tick -> buildTrackingDTOByAnnouncementId(announcementId)
-                        .onErrorResume(e -> {
-                            log.warn("Tracking error for announcement {}: {}", announcementId, e.getMessage());
-                            return Mono.empty();
-                        }))
-                .distinctUntilChanged();
+        // Tenant resolved once at subscription time and captured in the closure;
+        // this avoids any uncertainty about context propagation through Flux.interval's
+        // parallel scheduler across ticks.
+        return tenantContextHolder.currentTenantId()
+                .flatMapMany(tenantId ->
+                        Flux.interval(Duration.ofSeconds(5))
+                                .flatMap(tick -> buildTrackingDTOByAnnouncementId(announcementId, tenantId)
+                                        .onErrorResume(e -> {
+                                            log.warn("Tracking error for announcement {} (tenant {}): {}",
+                                                    announcementId, tenantId, e.getMessage());
+                                            return Mono.empty();
+                                        }))
+                                .distinctUntilChanged());
     }
 
     @Override
-    public Mono<DeliveryTrackingDTO> trackDeliveryByNeed(UUID deliveryNeedId) {
-        String cacheKey = "tracking:need:" + deliveryNeedId;
-        return cachePort.get(cacheKey, DeliveryTrackingDTO.class)
-                .switchIfEmpty(buildTrackingDTOByDeliveryNeedId(deliveryNeedId)
-                        .flatMap(dto -> cachePort.set(cacheKey, dto, TRACKING_CACHE_TTL).thenReturn(dto)));
+    public Mono<DeliveryTrackingDTO> trackDeliveryByNeed(UUID deliveryNeedId, UUID callerId) {
+        return requireTrackingOwnership(deliveryNeedId, callerId)
+                .flatMap(need -> tenantContextHolder.currentTenantId()
+                        .flatMap(tenantId -> {
+                            String cacheKey = "tracking:need:" + tenantId + ":" + deliveryNeedId;
+                            return cachePort.get(cacheKey, DeliveryTrackingDTO.class)
+                                    .switchIfEmpty(buildTrackingDTOByDeliveryNeedId(deliveryNeedId, tenantId)
+                                            .flatMap(dto -> cachePort.set(cacheKey, dto, TRACKING_CACHE_TTL).thenReturn(dto)));
+                        }));
     }
 
     @Override
-    public Flux<DeliveryTrackingDTO> trackDeliveryByNeedStream(UUID deliveryNeedId) {
-        return Flux.interval(Duration.ofSeconds(5))
-                .flatMap(tick -> buildTrackingDTOByDeliveryNeedId(deliveryNeedId)
-                        .onErrorResume(e -> {
-                            log.warn("Tracking error for delivery need {}: {}", deliveryNeedId, e.getMessage());
-                            return Mono.empty();
-                        }))
-                .distinctUntilChanged();
+    public Mono<Void> checkTrackingOwnership(UUID deliveryNeedId, UUID callerId) {
+        return requireTrackingOwnership(deliveryNeedId, callerId).then();
+    }
+
+    @Override
+    public Flux<DeliveryTrackingDTO> trackDeliveryByNeedStream(UUID deliveryNeedId, UUID callerId) {
+        return requireTrackingOwnership(deliveryNeedId, callerId)
+                .flatMapMany(need -> tenantContextHolder.currentTenantId()
+                        .flatMapMany(tenantId ->
+                                Flux.interval(Duration.ofSeconds(5))
+                                        .flatMap(tick -> buildTrackingDTOByDeliveryNeedId(deliveryNeedId, tenantId)
+                                                .onErrorResume(e -> {
+                                                    log.warn("Tracking error for delivery need {} (tenant {}): {}",
+                                                            deliveryNeedId, tenantId, e.getMessage());
+                                                    return Mono.empty();
+                                                }))
+                                        .distinctUntilChanged()));
     }
 
     /**
@@ -188,77 +219,91 @@ public class DeliveryApplicationService implements DeliveryUseCase {
      */
     @Override
     public Mono<DeliveryAssistanceDTO> getDeliveryAssistance(UUID id) {
-        return deliveryRepository.findById(id)
-                .switchIfEmpty(Mono.error(new IllegalArgumentException("Delivery not found: " + id)))
-                .flatMap(delivery -> {
-                    if (delivery.getDeliveryNeedId() == null) {
-                        return Mono.just(DeliveryAssistanceDTO.builder()
-                                .deliveryId(delivery.getId())
-                                .currentStatus(delivery.getStatus())
-                                .stepDescription(stepDescription(delivery.getStatus()))
-                                .build());
+        return tenantContextHolder.currentTenantId()
+                .flatMap(tenantId -> {
+                    if (TenantContextHolder.SYSTEM_TENANT.equals(tenantId)) {
+                        log.warn("getDeliveryAssistance called without HTTP security context for delivery {} — " +
+                                "presence lookup will use SYSTEM_TENANT and likely return empty", id);
                     }
-                    return deliveryNeedRepository.findById(delivery.getDeliveryNeedId())
-                            .switchIfEmpty(Mono.error(new IllegalArgumentException(
-                                    "DeliveryNeed not found: " + delivery.getDeliveryNeedId())))
-                            .flatMap(need -> {
-                                Mono<AddressEntity> pickup = addressRepository.findById(need.getPickupAddressId())
-                                        .defaultIfEmpty(new AddressEntity());
-                                Mono<AddressEntity> dest = addressRepository.findById(need.getDeliveryAddressId())
-                                        .defaultIfEmpty(new AddressEntity());
-                                Mono<PresenceRecord> presence = delivery.getFreelancerId() != null
-                                        ? getPresenceUseCase.getPresence(
-                                                        delivery.getFreelancerId().toString(), TENANT_ID_DEFAULT)
-                                                .onErrorResume(e -> {
-                                                    log.warn("Assistance presence lookup failed for {}: {}",
-                                                            delivery.getFreelancerId(), e.getMessage());
-                                                    return Mono.empty();
-                                                })
-                                        : Mono.empty();
+                    return deliveryRepository.findById(id)
+                            .switchIfEmpty(Mono.error(new IllegalArgumentException("Delivery not found: " + id)))
+                            .flatMap(delivery -> {
+                                if (delivery.getDeliveryNeedId() == null) {
+                                    return Mono.just(DeliveryAssistanceDTO.builder()
+                                            .deliveryId(delivery.getId())
+                                            .currentStatus(delivery.getStatus())
+                                            .stepDescription(stepDescription(delivery.getStatus()))
+                                            .build());
+                                }
+                                return deliveryNeedRepository.findById(delivery.getDeliveryNeedId())
+                                        .switchIfEmpty(Mono.error(new IllegalArgumentException(
+                                                "DeliveryNeed not found: " + delivery.getDeliveryNeedId())))
+                                        .flatMap(need -> {
+                                            Mono<AddressEntity> pickup = addressRepository.findById(need.getPickupAddressId())
+                                                    .defaultIfEmpty(new AddressEntity());
+                                            Mono<AddressEntity> dest = addressRepository.findById(need.getDeliveryAddressId())
+                                                    .defaultIfEmpty(new AddressEntity());
+                                            Mono<PresenceRecord> presence = delivery.getFreelancerId() != null
+                                                    ? resolvePresenceUserId(delivery.getFreelancerId())
+                                                            .flatMap(userId -> getPresenceUseCase.getPresence(
+                                                                            userId, tenantId.toString())
+                                                                    .onErrorResume(e -> {
+                                                                        log.warn("Assistance presence lookup failed for" +
+                                                                                " freelancer {} (tenant {}): {}",
+                                                                                delivery.getFreelancerId(), tenantId,
+                                                                                e.getMessage());
+                                                                        return Mono.empty();
+                                                                    }))
+                                                    : Mono.empty();
 
-                                return Mono.zip(pickup, dest)
-                                        .flatMap(tuple -> {
-                                            AddressEntity pickupAddr = tuple.getT1();
-                                            AddressEntity deliveryAddr = tuple.getT2();
-                                            boolean toPickup = delivery.getStatus() == DeliveryStatus.CREATED;
+                                            return Mono.zip(pickup, dest)
+                                                    .flatMap(tuple -> {
+                                                        AddressEntity pickupAddr = tuple.getT1();
+                                                        AddressEntity deliveryAddr = tuple.getT2();
+                                                        boolean toPickup = delivery.getStatus() == DeliveryStatus.CREATED;
 
-                                            Double targetLat = toPickup
-                                                    ? pickupAddr.getLatitude() : deliveryAddr.getLatitude();
-                                            Double targetLon = toPickup
-                                                    ? pickupAddr.getLongitude() : deliveryAddr.getLongitude();
+                                                        Double targetLat = toPickup
+                                                                ? pickupAddr.getLatitude() : deliveryAddr.getLatitude();
+                                                        Double targetLon = toPickup
+                                                                ? pickupAddr.getLongitude() : deliveryAddr.getLongitude();
 
-                                            return presence
-                                                    .map(p -> {
-                                                        Double curLat = p.getCurrentCoordinates() != null
-                                                                ? (double) p.getCurrentCoordinates().latitude()
-                                                                : null;
-                                                        Double curLon = p.getCurrentCoordinates() != null
-                                                                ? (double) p.getCurrentCoordinates().longitude()
-                                                                : null;
-                                                        Double distanceKm = haversineKm(
-                                                                curLat, curLon, targetLat, targetLon);
-                                                        Integer eta = distanceKm != null
-                                                                ? (int) Math.ceil(distanceKm / 0.4)
-                                                                : null;
-                                                        return DeliveryAssistanceDTO.builder()
-                                                                .deliveryId(delivery.getId())
-                                                                .currentStatus(delivery.getStatus())
-                                                                .stepDescription(stepDescription(delivery.getStatus()))
-                                                                .currentLatitude(curLat)
-                                                                .currentLongitude(curLon)
-                                                                .targetLatitude(targetLat)
-                                                                .targetLongitude(targetLon)
-                                                                .distanceKm(distanceKm)
-                                                                .estimatedTimeMinutes(eta)
-                                                                .build();
-                                                    })
-                                                    .defaultIfEmpty(DeliveryAssistanceDTO.builder()
-                                                            .deliveryId(delivery.getId())
-                                                            .currentStatus(delivery.getStatus())
-                                                            .stepDescription(stepDescription(delivery.getStatus()))
-                                                            .targetLatitude(targetLat)
-                                                            .targetLongitude(targetLon)
-                                                            .build());
+                                                        return presence
+                                                                .map(p -> {
+                                                                    Double curLat = p.getCurrentCoordinates() != null
+                                                                            ? (double) p.getCurrentCoordinates().latitude()
+                                                                            : null;
+                                                                    Double curLon = p.getCurrentCoordinates() != null
+                                                                            ? (double) p.getCurrentCoordinates().longitude()
+                                                                            : null;
+                                                                    Double distanceKm = haversineKm(
+                                                                            curLat, curLon, targetLat, targetLon);
+                                                                    Integer eta = distanceKm != null
+                                                                            ? (int) Math.ceil(distanceKm / 0.4)
+                                                                            : null;
+                                                                    Instant posAt = p.getLastSeenAt() != null
+                                                                            ? p.getLastSeenAt().atZone(ZoneId.systemDefault()).toInstant()
+                                                                            : null;
+                                                                    return DeliveryAssistanceDTO.builder()
+                                                                            .deliveryId(delivery.getId())
+                                                                            .currentStatus(delivery.getStatus())
+                                                                            .stepDescription(stepDescription(delivery.getStatus()))
+                                                                            .currentLatitude(curLat)
+                                                                            .currentLongitude(curLon)
+                                                                            .targetLatitude(targetLat)
+                                                                            .targetLongitude(targetLon)
+                                                                            .distanceKm(distanceKm)
+                                                                            .estimatedTimeMinutes(eta)
+                                                                            .freelancerPositionAt(posAt)
+                                                                            .build();
+                                                                })
+                                                                .defaultIfEmpty(DeliveryAssistanceDTO.builder()
+                                                                        .deliveryId(delivery.getId())
+                                                                        .currentStatus(delivery.getStatus())
+                                                                        .stepDescription(stepDescription(delivery.getStatus()))
+                                                                        .targetLatitude(targetLat)
+                                                                        .targetLongitude(targetLon)
+                                                                        .build());
+                                                    });
                                         });
                             });
                 });
@@ -300,7 +345,7 @@ public class DeliveryApplicationService implements DeliveryUseCase {
      * PICKED_UP/IN_TRANSIT → freelancer position + delivery coordinates
      * Terminal → coordinates only, no live freelancer position
      */
-    private Mono<DeliveryTrackingDTO> buildTrackingDTOByAnnouncementId(UUID announcementId) {
+    private Mono<DeliveryTrackingDTO> buildTrackingDTOByAnnouncementId(UUID announcementId, UUID tenantId) {
         return announcementRepository.findById(announcementId)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException(
                         "Announcement not found: " + announcementId)))
@@ -313,27 +358,64 @@ public class DeliveryApplicationService implements DeliveryUseCase {
                                                 .switchIfEmpty(Mono.error(new IllegalArgumentException(
                                                         "DeliveryNeed not found: " + delivery.getDeliveryNeedId())))
                                                 .flatMap(deliveryNeed ->
-                                                        buildTrackingDTO(announcement, deliveryNeed, delivery))));
+                                                        buildTrackingDTO(announcement, deliveryNeed, delivery, tenantId))));
     }
 
-    private Mono<DeliveryTrackingDTO> buildTrackingDTOByDeliveryNeedId(UUID deliveryNeedId) {
+    /**
+     * Ownership guard for tracking routes.
+     * Pattern identical to {@code DeliveryNeedApplicationService#requireOwnership}: resolve the
+     * need first (404 if absent), then check ownership (403 if mismatch). Never the reverse —
+     * returning 403 on an absent need would confirm its existence.
+     *
+     * <p>{@code callerId == null} is refused, not silently accepted. A non-null authenticated
+     * caller whose JWT {@code sub} does not parse as a UUID (platform-client token, API-key) would
+     * previously bypass the guard; post-25.1 it gets 403 instead of silent 200.
+     */
+    private Mono<com.yowyob.tiibntick.core.gofreelancer.domain.model.DeliveryNeed>
+            requireTrackingOwnership(UUID deliveryNeedId, UUID callerId) {
+        return deliveryNeedRepository.findById(deliveryNeedId)
+                .switchIfEmpty(Mono.error(new IllegalArgumentException(
+                        "DeliveryNeed not found: " + deliveryNeedId)))
+                .flatMap(need -> {
+                    if (!ownershipGuardEnabled) return Mono.just(need);
+                    if (callerId == null) {
+                        return Mono.error(new AccessDeniedException(
+                                "[ownership] trackDeliveryByNeed(" + deliveryNeedId + ") requires "
+                                + "an authenticated identity (callerId is null — likely a "
+                                + "platform-client token with a non-UUID sub)"));
+                    }
+                    if (!callerId.equals(need.getUserId())) {
+                        return Mono.error(new AccessDeniedException(
+                                "This delivery need belongs to another user"));
+                    }
+                    return Mono.just(need);
+                });
+    }
+
+    private Mono<DeliveryTrackingDTO> buildTrackingDTOByDeliveryNeedId(UUID deliveryNeedId, UUID tenantId) {
         return deliveryNeedRepository.findById(deliveryNeedId)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException(
                         "DeliveryNeed not found: " + deliveryNeedId)))
                 .flatMap(deliveryNeed -> {
                     if (deliveryNeed.getDeliveryId() == null) {
-                        return Mono.error(new IllegalStateException(
-                                "DeliveryNeed has no associated delivery yet: " + deliveryNeedId));
+                        // Delivery not yet created (freelancer assigned but no delivery row yet).
+                        // Return a partial DTO with addresses and live position — no delivery status.
+                        return buildTrackingDTOFromDeliveryNeed(deliveryNeed, null, tenantId);
                     }
                     return deliveryRepository.findById(deliveryNeed.getDeliveryId())
                             .switchIfEmpty(Mono.error(new IllegalArgumentException(
                                     "Delivery not found: " + deliveryNeed.getDeliveryId())))
-                            .flatMap(delivery -> buildTrackingDTOFromDeliveryNeed(deliveryNeed, delivery));
+                            .flatMap(delivery -> buildTrackingDTOFromDeliveryNeed(deliveryNeed, delivery, tenantId));
                 });
     }
 
     private Mono<DeliveryTrackingDTO> buildTrackingDTO(
-            Announcement announcement, DeliveryNeed deliveryNeed, Delivery delivery) {
+            Announcement announcement, DeliveryNeed deliveryNeed, Delivery delivery, UUID tenantId) {
+
+        if (TenantContextHolder.SYSTEM_TENANT.equals(tenantId)) {
+            log.warn("buildTrackingDTO called without HTTP security context for announcement {} — " +
+                    "presence lookup will use SYSTEM_TENANT and likely return empty", announcement.getId());
+        }
 
         DeliveryTrackingDTO dto = new DeliveryTrackingDTO();
         dto.setDeliveryId(delivery.getId());
@@ -346,13 +428,13 @@ public class DeliveryApplicationService implements DeliveryUseCase {
         Mono<AddressEntity> deliveryAddress = addressRepository.findById(deliveryNeed.getDeliveryAddressId());
 
         Mono<PresenceRecord> freelancerPresence = announcement.getAssignedFreelancerId() != null
-                ? getPresenceUseCase.getPresence(
-                        announcement.getAssignedFreelancerId().toString(), TENANT_ID_DEFAULT)
-                        .onErrorResume(e -> {
-                            log.warn("Could not fetch presence for freelancer {}: {}",
-                                    announcement.getAssignedFreelancerId(), e.getMessage());
-                            return Mono.empty();
-                        })
+                ? resolvePresenceUserId(announcement.getAssignedFreelancerId())
+                        .flatMap(userId -> getPresenceUseCase.getPresence(userId, tenantId.toString())
+                                .onErrorResume(e -> {
+                                    log.warn("Could not fetch presence for freelancer {} (tenant {}): {}",
+                                            announcement.getAssignedFreelancerId(), tenantId, e.getMessage());
+                                    return Mono.empty();
+                                }))
                 : Mono.empty();
 
         return Mono.zip(pickupAddress, deliveryAddress)
@@ -372,30 +454,77 @@ public class DeliveryApplicationService implements DeliveryUseCase {
                                             dto.getFreelancerLatitude(), dto.getFreelancerLongitude(),
                                             delivery.getStatus() == DeliveryStatus.CREATED ? "pickup" : "delivery");
                                 }
+                                if (presence.getLastSeenAt() != null) {
+                                    dto.setFreelancerPositionAt(presence.getLastSeenAt().atZone(ZoneId.systemDefault()).toInstant());
+                                }
                             })
                             .then(Mono.just(dto));
                 });
     }
 
+    /**
+     * @param delivery null when no delivery row exists yet (freelancer assigned but trip not started)
+     */
     private Mono<DeliveryTrackingDTO> buildTrackingDTOFromDeliveryNeed(
-            DeliveryNeed deliveryNeed, Delivery delivery) {
+            DeliveryNeed deliveryNeed, Delivery delivery, UUID tenantId) {
+
+        if (TenantContextHolder.SYSTEM_TENANT.equals(tenantId)) {
+            log.warn("buildTrackingDTOFromDeliveryNeed called without HTTP security context for need {} — " +
+                    "presence lookup will use SYSTEM_TENANT and likely return empty", deliveryNeed.getId());
+        }
 
         DeliveryTrackingDTO dto = new DeliveryTrackingDTO();
-        dto.setDeliveryId(delivery.getId());
+        if (delivery != null) {
+            dto.setDeliveryId(delivery.getId());
+            dto.setStatus(delivery.getStatus());
+        }
         dto.setDeliveryNeedId(deliveryNeed.getId());
-        dto.setStatus(delivery.getStatus());
+        dto.setFreelancerId(deliveryNeed.getAssignedFreelancerId());
 
         Mono<AddressEntity> pickupAddress = addressRepository.findById(deliveryNeed.getPickupAddressId());
         Mono<AddressEntity> deliveryAddress = addressRepository.findById(deliveryNeed.getDeliveryAddressId());
 
+        Mono<PresenceRecord> freelancerPresence = resolvePresenceUserId(deliveryNeed.getAssignedFreelancerId())
+                .flatMap(userId -> getPresenceUseCase.getPresence(userId, tenantId.toString())
+                        .onErrorResume(e -> {
+                            log.warn("Could not fetch presence for need {} (tenant {}): {}",
+                                    deliveryNeed.getId(), tenantId, e.getMessage());
+                            return Mono.empty();
+                        }));
+
         return Mono.zip(pickupAddress, deliveryAddress)
-                .map(tuple -> {
+                .flatMap(tuple -> {
                     dto.setPickupLatitude(tuple.getT1().getLatitude());
                     dto.setPickupLongitude(tuple.getT1().getLongitude());
                     dto.setDeliveryLatitude(tuple.getT2().getLatitude());
                     dto.setDeliveryLongitude(tuple.getT2().getLongitude());
-                    return dto;
+
+                    return freelancerPresence
+                            .doOnNext(presence -> {
+                                if (presence.getCurrentCoordinates() != null) {
+                                    dto.setFreelancerLatitude((float) presence.getCurrentCoordinates().latitude());
+                                    dto.setFreelancerLongitude((float) presence.getCurrentCoordinates().longitude());
+                                }
+                                if (presence.getLastSeenAt() != null) {
+                                    dto.setFreelancerPositionAt(presence.getLastSeenAt().atZone(ZoneId.systemDefault()).toInstant());
+                                }
+                            })
+                            .then(Mono.just(dto));
                 });
+    }
+
+    /**
+     * Resolves the presence userId (= ATANGA coreUserId / JWT sub) from an assignedFreelancerId,
+     * which may be either the gofp-local UUID or the coreFreelancerId (tnt-actor-core PK).
+     * Returns empty when the local GofpFreelancer mirror does not exist.
+     */
+    private Mono<String> resolvePresenceUserId(UUID assignedFreelancerId) {
+        if (assignedFreelancerId == null) {
+            return Mono.empty();
+        }
+        return gofpFreelancerRepository.findById(assignedFreelancerId)
+                .switchIfEmpty(gofpFreelancerRepository.findByCoreFreelancerId(assignedFreelancerId))
+                .map(gofp -> gofp.getCoreUserId().toString());
     }
 
     // ══════════════════════════════════════════════════════════════════════
