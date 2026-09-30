@@ -45,6 +45,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.yowyob.tiibntick.common.api.ApiResponse;
+import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -132,7 +133,7 @@ public class FreelancerController {
     }
 
     @GetMapping("/me")
-    @PreAuthorize("hasRole('FREELANCER')")
+    @RequirePermission(resource = "freelancer", action = "read")
     @Operation(summary = "Get the freelancer profile of the authenticated freelancer")
     public Mono<ResponseEntity<ApiResponse<FreelancerProfileResponse>>> getMyProfile(
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {

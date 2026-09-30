@@ -75,32 +75,48 @@ public class GofpDeliveryController {
      * Updates the delivery status.
      * If status == DELIVERED and relayPointId is provided, automatically creates a RelayDeposit.
      * If status == PICKED_UP or DELIVERED (direct), a confirmationCode is required.
+     *
+     * <p>Ownership: the caller's JWT actorId must match the delivery person's actorId
+     * resolved from the assigned profile. A mismatch returns 403 even when the caller
+     * knows the OTP — the OTP proves knowledge of the code, not assignment.</p>
      */
     @PatchMapping("/{id}/status")
-    public Mono<ResponseEntity<Delivery>> updateStatus(@PathVariable UUID id,
-                                                       @RequestBody DeliveryStatusUpdateDTO dto) {
-        return deliveryStatusApplicationService.updateStatus(id, dto)
+    public Mono<ResponseEntity<Delivery>> updateStatus(
+            @PathVariable UUID id,
+            @RequestBody DeliveryStatusUpdateDTO dto,
+            @CurrentUser(required = false) TntSecurityContext ctx) {
+        UUID callerActorId = callerId(ctx);
+        if (callerActorId == null) {
+            return Mono.error(new org.springframework.security.access.AccessDeniedException(
+                    "Authentication required to update delivery status"));
+        }
+        return deliveryStatusApplicationService.assertCallerIsAssignedDeliveryPerson(id, callerActorId)
+                .then(Mono.defer(() -> deliveryStatusApplicationService.updateStatus(id, dto)))
                 .map(ResponseEntity::ok)
                 .onErrorResume(IllegalArgumentException.class,
                         e -> Mono.just(ResponseEntity.badRequest().<Delivery>build()));
     }
 
     /**
-     * Initialises OTP codes for a delivery (idempotent — no-op if already set).
-     * Sends the pickup code to the shipper and the delivery code to the recipient.
-     * Should be called once the delivery is created and the freelancer assigned.
+     * Cancels a delivery.
+     *
+     * <p>Ownership: either the assigned delivery person or the original sender
+     * (announcement's {@code clientId}) may cancel. See
+     * {@link com.yowyob.tiibntick.core.gofreelancer.application.service.DeliveryStatusApplicationService#assertCallerCanCancelDelivery}
+     * for the authorisation decision.</p>
      */
-    @PostMapping("/{id}/init-otp")
-    public Mono<ResponseEntity<Void>> initOtp(@PathVariable UUID id) {
-        return deliveryUseCase.getDeliveryById(id)
-                .flatMap(dto -> deliveryStatusApplicationService.initOtpForDelivery(id))
-                .map(d -> ResponseEntity.ok().<Void>build())
-                .onErrorResume(IllegalArgumentException.class,
-                        e -> Mono.just(ResponseEntity.notFound().<Void>build()));
-    }
     @PatchMapping("/{id}/cancel")
-    public Mono<ResponseEntity<DeliveryResponseDTO>> cancelDelivery(@PathVariable UUID id) {
-        return deliveryUseCase.cancelDelivery(id).map(ResponseEntity::ok);
+    public Mono<ResponseEntity<DeliveryResponseDTO>> cancelDelivery(
+            @PathVariable UUID id,
+            @CurrentUser(required = false) TntSecurityContext ctx) {
+        UUID callerActorId = callerId(ctx);
+        if (callerActorId == null) {
+            return Mono.error(new org.springframework.security.access.AccessDeniedException(
+                    "Authentication required to cancel a delivery"));
+        }
+        return deliveryStatusApplicationService.assertCallerCanCancelDelivery(id, callerActorId)
+                .then(Mono.defer(() -> deliveryUseCase.cancelDelivery(id)))
+                .map(ResponseEntity::ok);
     }
     @GetMapping("/delivery-need/{deliveryNeedId}")
     public Mono<ResponseEntity<DeliveryResponseDTO>> getDeliveryByDeliveryNeedId(@PathVariable UUID deliveryNeedId) {

@@ -23,3 +23,6 @@ databaseChangeLog:
   - include:
       file: db/changelog/008-add-announcement-pricing-mode.yaml
       relativeToChangelogFile: false
+  - include:
+      file: db/changelog/009-add-response-dedup-index.yaml
+      relativeToChangelogFile: false

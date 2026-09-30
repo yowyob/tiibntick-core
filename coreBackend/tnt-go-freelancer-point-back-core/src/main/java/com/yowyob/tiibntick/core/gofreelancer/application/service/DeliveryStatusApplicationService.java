@@ -6,6 +6,7 @@ import com.yowyob.tiibntick.core.delivery.application.port.in.command.DepositAtR
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.DeliveryStatusUpdateDTO;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpRelayPointRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IAnnouncementRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryNeedRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.PushNotificationPort;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery;
@@ -18,6 +19,7 @@ import com.yowyob.tiibntick.core.trust.domain.model.enums.CustodyTransferType;
 import com.yowyob.tiibntick.core.trust.domain.model.valueobject.CustodyTransferRecord;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
@@ -43,6 +45,7 @@ public class DeliveryStatusApplicationService {
     private final GofpRelayPointRepository gofpRelayPointRepository;
     private final PushNotificationPort pushNotificationPort;
     private final IDeliveryNeedRepository deliveryNeedRepository;
+    private final IAnnouncementRepository announcementRepository;
 
     // ── OTP ────────────────────────────────────────────────────────────────
     private final OtpService otpService;
@@ -59,6 +62,9 @@ public class DeliveryStatusApplicationService {
     // ── Core Logistics (tnt-delivery-core) ─────────────────────────────
     private final com.yowyob.tiibntick.core.delivery.application.port.in.DeliveryQueryUseCase deliveryQueryUseCase;
     private final com.yowyob.tiibntick.core.delivery.application.port.in.DeliveryLifecycleUseCase deliveryLifecycleUseCase;
+
+    // ── Tenant resolution ──────────────────────────────────────────────
+    private final TenantContextHolder tenantContextHolder;
 
     /**
      * Updates the status of a delivery and triggers side-effects based on the new status.
@@ -77,7 +83,9 @@ public class DeliveryStatusApplicationService {
      * @return the updated Delivery
      */
     public Mono<Delivery> updateStatus(UUID deliveryId, DeliveryStatusUpdateDTO dto) {
-        return deliveryRepository.findById(deliveryId)
+        return tenantContextHolder.currentTenantId()
+                .defaultIfEmpty(TenantContextHolder.SYSTEM_TENANT)
+                .flatMap(tenantId -> deliveryRepository.findById(deliveryId)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("Delivery not found: " + deliveryId)))
                 // ── Lazy OTP init: generate and send codes if not yet done ──────────
                 .flatMap(deliveryOtpService::initOtpIfAbsent)
@@ -153,8 +161,6 @@ public class DeliveryStatusApplicationService {
 
                     log.info("Updating delivery {} status to {} via core port", deliveryId, dto.getStatus());
 
-                    UUID tenantId = TenantContextHolder.SYSTEM_TENANT;
-
                     // Apply local status early (relay deposit → AT_RELAY_POINT to align with delivery-core)
                     boolean isRelayDeposit = dto.getRelayPointId() != null
                             && (DeliveryStatus.DELIVERED.equals(dto.getStatus())
@@ -203,7 +209,7 @@ public class DeliveryStatusApplicationService {
                                 if (DeliveryStatus.DELIVERED.equals(dto.getStatus())
                                         || DeliveryStatus.AT_RELAY_POINT.equals(dto.getStatus())) {
 
-                                    Mono<Void> processPayment = processDeliveryPayment(delivery, freelancerId);
+                                    Mono<Void> processPayment = processDeliveryPayment(delivery, freelancerId, tenantId);
 
                                     Mono<Void> blockchainMissionCompleted = missionUseCase.recordCompleted(
                                                     deliveryId.toString(),
@@ -290,7 +296,7 @@ public class DeliveryStatusApplicationService {
 
                                 return saveDelivery;
                             });
-                });
+                }));
     }
 
     private Mono<UUID> resolveHubId(UUID relayPointId) {
@@ -343,24 +349,111 @@ public class DeliveryStatusApplicationService {
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    // OTP initialisation (public, callable from controller)
+    // Ownership guard
     // ══════════════════════════════════════════════════════════════════════
 
     /**
-     * Explicitly initialises OTP codes for the given delivery.
-     * Idempotent: if codes already exist, returns the delivery unchanged.
+     * Verifies that {@code callerActorId} is the actorId of the delivery person
+     * assigned to {@code deliveryId}. Emits empty on success; signals
+     * {@link AccessDeniedException} on mismatch. Signals
+     * {@link IllegalArgumentException} when the delivery or person is not found.
+     *
+     * <p>The delivery's {@code freelancerId} is a profile ID
+     * ({@code tnt_delivery_persons.id}), not a kernel actorId.
+     * {@link com.yowyob.tiibntick.core.delivery.application.port.in.DeliveryQueryUseCase#resolveActorIdForDeliveryPerson}
+     * bridges the two so we compare the right identifiers.</p>
      */
-    public Mono<Delivery> initOtpForDelivery(UUID deliveryId) {
-        return deliveryRepository.findById(deliveryId)
-                .switchIfEmpty(Mono.error(new IllegalArgumentException("Delivery not found: " + deliveryId)))
-                .flatMap(deliveryOtpService::initOtpIfAbsent);
+    public Mono<Void> assertCallerIsAssignedDeliveryPerson(UUID deliveryId, UUID callerActorId) {
+        return tenantContextHolder.currentTenantId()
+                .defaultIfEmpty(TenantContextHolder.SYSTEM_TENANT)
+                .flatMap(tenantId -> deliveryRepository.findById(deliveryId)
+                        .switchIfEmpty(Mono.error(new IllegalArgumentException(
+                                "Delivery not found: " + deliveryId)))
+                        .flatMap(delivery -> {
+                            UUID profileId = delivery.getFreelancerId();
+                            if (profileId == null) {
+                                return Mono.error(new AccessDeniedException(
+                                        "Delivery " + deliveryId + " has no assigned delivery person"));
+                            }
+                            return deliveryQueryUseCase
+                                    .resolveActorIdForDeliveryPerson(tenantId, profileId)
+                                    .flatMap(resolvedActorId -> {
+                                        if (!resolvedActorId.equals(callerActorId)) {
+                                            return Mono.error(new AccessDeniedException(
+                                                    "Caller " + callerActorId
+                                                    + " is not the delivery person assigned to delivery "
+                                                    + deliveryId));
+                                        }
+                                        return Mono.empty();
+                                    });
+                        }));
+    }
+
+    /**
+     * Guards {@code PATCH /{id}/cancel}: the assigned delivery person OR the
+     * original sender (announcement's {@code clientId}) may cancel.
+     *
+     * <p><strong>Authorisation decision (Lot C-12):</strong> both parties have a
+     * legitimate reason to cancel — the delivery person if the pickup is
+     * impossible, the sender if they no longer need the delivery. Neither party
+     * should be able to cancel the other's delivery without consent.</p>
+     *
+     * <p>If the delivery has no {@code announcementId} (e.g. created from a
+     * {@code DeliveryNeed} with no linked announcement), only the assigned
+     * delivery person is checked; the sender identity is not resolvable and
+     * access is restricted to the livreur.</p>
+     */
+    public Mono<Void> assertCallerCanCancelDelivery(UUID deliveryId, UUID callerActorId) {
+        return tenantContextHolder.currentTenantId()
+                .defaultIfEmpty(TenantContextHolder.SYSTEM_TENANT)
+                .flatMap(tenantId -> deliveryRepository.findById(deliveryId)
+                        .switchIfEmpty(Mono.error(new IllegalArgumentException(
+                                "Delivery not found: " + deliveryId)))
+                        .flatMap(delivery -> {
+                            // Check 1: is the caller the assigned delivery person?
+                            UUID profileId = delivery.getFreelancerId();
+                            Mono<Boolean> isDeliveryPerson = (profileId != null)
+                                    ? deliveryQueryUseCase
+                                            .resolveActorIdForDeliveryPerson(tenantId, profileId)
+                                            .map(resolvedId -> resolvedId.equals(callerActorId))
+                                            .doOnError(e -> log.warn(
+                                                    "cancel: cannot resolve actorId for profile={} "
+                                                    + "(delivery={}, caller={}) — treating as non-match: {}",
+                                                    profileId, deliveryId, callerActorId, e.getMessage()))
+                                            .onErrorReturn(false)
+                                    : Mono.just(false);
+
+                            // Check 2: is the caller the sender (announcement clientId)?
+                            UUID annId = delivery.getAnnouncementId();
+                            Mono<Boolean> isSender = (annId != null)
+                                    ? announcementRepository.findById(annId)
+                                            .map(ann -> callerActorId.equals(ann.getClientId()))
+                                            .defaultIfEmpty(false)
+                                            .doOnError(e -> log.warn(
+                                                    "cancel: cannot fetch announcement={} "
+                                                    + "(delivery={}, caller={}) — treating as non-sender: {}",
+                                                    annId, deliveryId, callerActorId, e.getMessage()))
+                                            .onErrorReturn(false)
+                                    : Mono.just(false);
+
+                            return Mono.zip(isDeliveryPerson, isSender)
+                                    .flatMap(tuple -> {
+                                        if (tuple.getT1() || tuple.getT2()) {
+                                            return Mono.empty();
+                                        }
+                                        return Mono.error(new AccessDeniedException(
+                                                "Caller " + callerActorId
+                                                + " is neither the assigned delivery person"
+                                                + " nor the sender of delivery " + deliveryId));
+                                    });
+                        }));
     }
 
     // ══════════════════════════════════════════════════════════════════════
     // Private helpers
     // ══════════════════════════════════════════════════════════════════════
 
-    private Mono<Void> processDeliveryPayment(Delivery delivery, UUID freelancerId) {
+    private Mono<Void> processDeliveryPayment(Delivery delivery, UUID freelancerId, UUID tenantId) {
         if (delivery.getTarif() == null || delivery.getTarif() <= 0) {
             log.warn("Delivery {} has no tarif set — skipping payment processing", delivery.getId());
             return Mono.empty();
@@ -368,54 +461,62 @@ public class DeliveryStatusApplicationService {
 
         log.info("Processing payment for delivery {} — amount: {} XAF", delivery.getId(), delivery.getTarif());
 
+        // Resolve the kernel actorId from the delivery-person profile ID.
+        // freelancerId is tnt_delivery_persons.id (profile ID); wallets are keyed on
+        // tnt_delivery_persons.actor_id (kernel actorId). Using the wrong ID causes
+        // WalletNotFoundException when the wallet is looked up by owner_id.
+        return deliveryQueryUseCase.resolveActorIdForDeliveryPerson(tenantId, freelancerId)
+                .doOnNext(actorId -> log.debug("Resolved actorId={} for freelancerId={} (delivery {})",
+                        actorId, freelancerId, delivery.getId()))
+                .flatMap(actorId -> processDeliveryPaymentWithActor(delivery, actorId, tenantId));
+    }
+
+    private Mono<Void> processDeliveryPaymentWithActor(Delivery delivery, UUID actorId, UUID tenantId) {
         // 1. Retrieve the payment method from DeliveryNeed or Announcement
-        Mono<String> paymentMethodMono = Mono.empty();
+        Mono<String> paymentMethodMono;
         if (delivery.getDeliveryNeedId() != null) {
             paymentMethodMono = deliveryNeedRepository.findById(delivery.getDeliveryNeedId())
                     .map(need -> need.getPaymentMethod() != null ? need.getPaymentMethod() : "UNKNOWN");
         } else if (delivery.getAnnouncementId() != null) {
-            // Note: If you have an AnnouncementRepository injected, use it here.
-            // For now, we default to digital if we can't find it.
-            paymentMethodMono = Mono.just("ORANGE_MONEY"); 
+            paymentMethodMono = Mono.just("ORANGE_MONEY");
         } else {
             paymentMethodMono = Mono.just("UNKNOWN");
         }
 
         return paymentMethodMono.flatMap(paymentMethod -> {
             log.info("Payment method for delivery {} is {}", delivery.getId(), paymentMethod);
-            
+
             Mono<Void> walletAction;
             double platformCommissionAmount = delivery.getTarif() * 0.05; // 5% commission
 
             if ("CASH".equalsIgnoreCase(paymentMethod)) {
-                // Freelancer collected physical cash. We must DEBIT their wallet for the platform commission.
+                // Freelancer collected physical cash. DEBIT their wallet for the platform commission.
                 walletAction = walletUseCase.debitWallet(
                         new com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.DebitWalletCommand(
-                                freelancerId,
-                                TenantContextHolder.SYSTEM_TENANT,
+                                actorId,
+                                tenantId,
                                 com.yowyob.tiibntick.core.billing.wallet.domain.model.Money.of(java.math.BigDecimal.valueOf(platformCommissionAmount), "XAF"),
                                 delivery.getId().toString(),
                                 com.yowyob.tiibntick.core.billing.wallet.domain.enums.PaymentChannel.CASH_ON_DELIVERY,
                                 "Commission logicielle (5%) pour la course payée en espèces : " + delivery.getId(),
                                 "cash-commission:" + delivery.getId()
                         )
-                ).doOnSuccess(tx -> log.info("Debited commission {} from freelancer {} for CASH delivery", 
-                        platformCommissionAmount, freelancerId)).then();
+                ).doOnSuccess(tx -> log.info("Debited commission {} from actorId={} for CASH delivery",
+                        platformCommissionAmount, actorId)).then();
             } else {
                 // Digital payments (ORANGE_MONEY, MTN_MOBILE_MONEY, CARD, etc.)
-                // The platform holds the funds, so we split the revenue and credit the freelancer.
                 walletAction = walletUseCase.splitMissionRevenue(
                                 new SplitMissionRevenueCommand(
                                         delivery.getId().toString(),
                                         java.math.BigDecimal.valueOf(delivery.getTarif()),
-                                        freelancerId.toString(),
-                                        TenantContextHolder.SYSTEM_TENANT,
+                                        actorId.toString(),
+                                        tenantId,
                                         null,
                                         0.05,
                                         0.0
                                 )
                         )
-                        .doOnSuccess(split -> log.info("Revenue split executed for delivery {} (Method: {}) — platform: {}, org: {}",
+                        .doOnSuccess(split -> log.info("Revenue split for delivery {} (Method: {}) — platform: {}, org: {}",
                                 delivery.getId(), paymentMethod, split.platformCommission(), split.orgRevenue()))
                         .then();
             }
@@ -423,8 +524,8 @@ public class DeliveryStatusApplicationService {
             // Record the payment action on the blockchain for traceability
             Mono<Void> anchorPayment = paymentUseCase.record(
                             delivery.getId().toString(),
-                            freelancerId.toString(),
-                            freelancerId.toString(),
+                            actorId.toString(),
+                            actorId.toString(),
                             "default",
                             "CASH".equalsIgnoreCase(paymentMethod) ? "CASH_COLLECTED_COMMISSION_DEBITED" : "DIGITAL_WALLET_SPLIT",
                             delivery.getId().toString(),
@@ -440,9 +541,10 @@ public class DeliveryStatusApplicationService {
                     .onErrorResume(e -> Mono.empty())
                     .then();
 
-            // walletAction is NOT best-effort: a real wallet failure (insufficient funds, wallet
-            // service down) must surface to the caller rather than being silently swallowed —
-            // only blockchain trust-anchoring (anchorPayment, above) is ADR-018 best-effort.
+            // walletAction is NOT best-effort: a real wallet failure (insufficient funds,
+            // wallet service down) must surface to the caller rather than being silently
+            // swallowed — only blockchain trust-anchoring (anchorPayment, above) is
+            // ADR-018 best-effort.
             return Mono.when(walletAction, anchorPayment)
                     .doOnError(e -> log.error(
                             "Payment processing failed for delivery {} — propagating",

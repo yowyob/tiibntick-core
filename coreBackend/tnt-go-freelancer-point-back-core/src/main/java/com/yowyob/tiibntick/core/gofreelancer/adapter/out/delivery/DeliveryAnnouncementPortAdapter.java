@@ -114,6 +114,11 @@ public class DeliveryAnnouncementPortAdapter implements IDeliveryAnnouncementPor
         return deliveryQueryUseCase.findAnnouncementsByClient(tenantId, clientId).map(this::toSnapshot);
     }
 
+    @Override
+    public Mono<Boolean> hasResponse(UUID announcementId, UUID freelancerId) {
+        return deliveryQueryUseCase.hasFreelancerResponded(announcementId, freelancerId);
+    }
+
     // ── gofp command -> tnt-delivery-core command ───────────────────────
 
     private CreateDeliveryAnnouncementCommand toCreateCommand(PublishAnnouncementPortCommand cmd) {

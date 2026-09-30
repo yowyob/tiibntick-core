@@ -74,8 +74,15 @@ public class WalletService implements IWalletUseCase {
     @Override
     @RequirePermission(resource = "wallet", action = "read")
     public Mono<Money> getBalance(UUID userId, UUID tenantId) {
-        return getOrCreateWallet(userId, tenantId)
-                .map(Wallet::availableBalance);
+        return walletRepository.findByUserId(userId, tenantId)
+                .map(Wallet::availableBalance)
+                .switchIfEmpty(Mono.error(new WalletNotFoundException(userId)));
+    }
+
+    @Override
+    @RequirePermission(resource = "wallet", action = "read")
+    public Mono<Wallet> findWallet(UUID userId, UUID tenantId) {
+        return walletRepository.findByUserId(userId, tenantId);
     }
 
     @Override
@@ -109,7 +116,6 @@ public class WalletService implements IWalletUseCase {
 
     @Override
     @Transactional
-    @RequirePermission(resource = "payment", action = "process")
     public Mono<WalletTransaction> creditCommission(CreditCommissionCommand command) {
         return getOrCreateWallet(command.delivererId(), command.tenantId())
                 .flatMap(wallet -> {
@@ -127,7 +133,6 @@ public class WalletService implements IWalletUseCase {
 
     @Override
     @Transactional
-    @RequirePermission(resource = "payment", action = "process")
     public Mono<PaymentIntent> initiatePayment(InitiatePaymentCommand command) {
         String idempotencyKey = PaymentRequest.buildIdempotencyKey(command.invoiceId(), command.channel());
 
@@ -146,9 +151,19 @@ public class WalletService implements IWalletUseCase {
                 );
     }
 
+    /**
+     * Applies a payment-provider callback to the matching {@code PaymentIntent}.
+     *
+     * <p><strong>Authorization note (Lot C-9 / ADR-022):</strong> this method has no
+     * {@code @RequirePermission} — none was added when the annotation was removed from the
+     * service layer. It currently has no caller in {@code src/main} (no web adapter, no Kafka
+     * consumer). When this is eventually exposed (typically as a provider webhook callback),
+     * the correct guard on the inbound adapter is <strong>webhook signature verification</strong>
+     * (HMAC on the request body), not RBAC. RBAC ({@code payment:process}) must also be placed
+     * on any human-facing controller endpoint that can trigger this path.
+     */
     @Override
     @Transactional
-    @RequirePermission(resource = "payment", action = "process")
     public Mono<PaymentIntent> handlePaymentCallback(ConfirmPaymentCommand command) {
         return paymentIntentRepository.findByExternalRef(command.externalRef())
                 .switchIfEmpty(Mono.error(new PaymentIntentNotFoundException(command.externalRef())))
@@ -179,9 +194,18 @@ public class WalletService implements IWalletUseCase {
         }
     }
 
+    /**
+     * Issues a refund against a previously confirmed {@code PaymentIntent}.
+     *
+     * <p><strong>Authorization note (Lot C-9 / ADR-022):</strong> this method has no
+     * {@code @RequirePermission} — none was added when the annotation was removed from the
+     * service layer. It currently has no caller in {@code src/main}. When a refund controller
+     * endpoint is added, place {@code @RequirePermission(resource = "payment", action = "refund")}
+     * on that controller method (not here). For a customer-initiated refund, also verify
+     * ownership of the original PaymentIntent before allowing the refund.
+     */
     @Override
     @Transactional
-    @RequirePermission(resource = "payment", action = "refund")
     public Mono<WalletTransaction> refundPayment(RefundPaymentCommand command) {
         return paymentIntentRepository.findById(PaymentIntentId.of(command.paymentIntentId()))
                 .switchIfEmpty(Mono.error(new PaymentIntentNotFoundException(command.paymentIntentId().toString())))
@@ -259,7 +283,6 @@ public class WalletService implements IWalletUseCase {
 
     @Override
     @Transactional
-    @RequirePermission(resource = "payment", action = "process")
     public Mono<PaymentSplitResult> splitMissionRevenue(SplitMissionRevenueCommand command) {
         log.info("Splitting mission revenue — missionId={} total={} org={} sub={}",
                 command.missionId(), command.totalAmount(), 
@@ -283,24 +306,29 @@ public class WalletService implements IWalletUseCase {
                     
                     BigDecimal ownerShare = orgRevenue.subtract(subDelivererShare);
                     
-                    // Credit org wallet with owner share
-                    orgWallet.credit(
+                    // Credit org wallet with owner share — capture the returned transaction
+                    // so it can be persisted in wallet_transactions (audit trail).
+                    WalletTransaction orgTx = orgWallet.credit(
                             Money.of(ownerShare, DEFAULT_CURRENCY.getCurrencyCode()),
                             "MISSION-" + command.missionId(),
                             "Mission revenue split — owner share");
-                    
-                    Mono<Void> creditOrgMono = walletRepository.save(orgWallet).then();
-                    
+
+                    Mono<Void> creditOrgMono = walletRepository.save(orgWallet)
+                            .then(walletRepository.saveTransaction(orgTx))
+                            .then();
+
                     // If sub-deliverer exists, credit their personal wallet
                     Mono<Void> creditSubMono = command.subDelivererId() != null && subDelivererShare.compareTo(BigDecimal.ZERO) > 0
                             ? walletRepository.findByOwnerId(command.subDelivererId(), command.tenantId())
                                     .switchIfEmpty(Mono.error(new WalletNotFoundException(command.subDelivererId())))
                                     .flatMap(subWallet -> {
-                                        subWallet.credit(
+                                        WalletTransaction subTx = subWallet.credit(
                                                 Money.of(subDelivererShare, DEFAULT_CURRENCY.getCurrencyCode()),
                                                 "MISSION-" + command.missionId(),
                                                 "Sub-deliverer commission split");
-                                        return walletRepository.save(subWallet).then();
+                                        return walletRepository.save(subWallet)
+                                                .then(walletRepository.saveTransaction(subTx))
+                                                .then();
                                     })
                             : Mono.empty();
                     
@@ -326,7 +354,6 @@ public class WalletService implements IWalletUseCase {
 
     @Override
     @Transactional
-    @RequirePermission(resource = "payment", action = "process")
     public Mono<WalletTransaction> transferSubDelivererCommission(
             TransferSubDelivererCommissionCommand command) {
         log.info("Transferring sub-deliverer commission — orgId={} subId={} amount={}",
@@ -345,15 +372,17 @@ public class WalletService implements IWalletUseCase {
                                     "Sub-deliverer commission transfer",
                                     UUID.randomUUID().toString());
                             
-                            // Credit to sub-deliverer wallet
-                            subWallet.credit(
+                            // Credit to sub-deliverer wallet — capture the returned transaction
+                            // so it can be persisted (same pattern as splitMissionRevenue).
+                            WalletTransaction creditTx = subWallet.credit(
                                     Money.of(command.amount(), DEFAULT_CURRENCY.getCurrencyCode()),
                                     "SUB-TRANSFER-" + command.missionId(),
                                     "Commission received from org");
-                            
+
                             return walletRepository.save(orgWallet)
                                     .then(walletRepository.save(subWallet))
                                     .then(walletRepository.saveTransaction(debitTx))
+                                    .then(walletRepository.saveTransaction(creditTx))
                                     .doOnSuccess(tx -> log.info("Commission transferred: sub={} amount={}",
                                             command.subDelivererId(), command.amount()))
                                     .thenReturn(debitTx);

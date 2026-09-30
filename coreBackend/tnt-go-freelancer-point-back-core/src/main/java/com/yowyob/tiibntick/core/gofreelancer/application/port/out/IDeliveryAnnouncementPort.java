@@ -63,4 +63,14 @@ public interface IDeliveryAnnouncementPort {
     Mono<AnnouncementSnapshot> findById(UUID tenantId, UUID announcementId);
 
     Flux<AnnouncementSnapshot> findByClient(UUID tenantId, UUID clientId);
+
+    /**
+     * Returns {@code true} if {@code freelancerId} already has a response on the
+     * announcement, without loading the full announcement aggregate or its response list.
+     * Used by {@code AnnouncementApplicationService.respondToAnnouncement} to gate
+     * idempotently without the over-fetch of {@code findById}.
+     * tenantId is omitted: announcementId is a globally-unique UUID PK, so no
+     * additional filtering is needed.
+     */
+    Mono<Boolean> hasResponse(UUID announcementId, UUID freelancerId);
 }

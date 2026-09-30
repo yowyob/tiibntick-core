@@ -2,6 +2,7 @@ package com.yowyob.tiibntick.core.delivery.application.service;
 
 import com.yowyob.tiibntick.core.delivery.application.port.in.DeliveryQueryUseCase;
 import com.yowyob.tiibntick.core.delivery.application.port.out.DeliveryAnnouncementRepository;
+import com.yowyob.tiibntick.core.delivery.application.port.out.DeliveryPersonRepository;
 import com.yowyob.tiibntick.core.delivery.application.port.out.DeliveryRepository;
 import com.yowyob.tiibntick.core.delivery.domain.exception.AnnouncementNotFoundException;
 import com.yowyob.tiibntick.core.delivery.domain.exception.DeliveryNotFoundException;
@@ -29,6 +30,7 @@ public class DeliveryQueryService implements DeliveryQueryUseCase {
 
     private final DeliveryRepository deliveryRepository;
     private final DeliveryAnnouncementRepository announcementRepository;
+    private final DeliveryPersonRepository deliveryPersonRepository;
 
     @Override
     public Mono<Delivery> findDeliveryById(UUID tenantId, UUID deliveryId) {
@@ -85,8 +87,30 @@ public class DeliveryQueryService implements DeliveryQueryUseCase {
     }
 
     @Override
+    public Mono<Boolean> hasFreelancerResponded(UUID announcementId, UUID freelancerId) {
+        return announcementRepository.hasResponse(announcementId, freelancerId);
+    }
+
+    @Override
     public Flux<Delivery> listByFreelancerOrgId(String freelancerOrgId) {
         log.debug("Listing deliveries for FreelancerOrg={}", freelancerOrgId);
         return deliveryRepository.findByFreelancerOrgId(freelancerOrgId);
+    }
+
+    @Override
+    public Mono<UUID> resolveActorIdForDeliveryPerson(UUID tenantId, UUID deliveryPersonId) {
+        return deliveryPersonRepository.findById(tenantId, deliveryPersonId)
+                .switchIfEmpty(Mono.error(new DeliveryNotFoundException(
+                        "DeliveryPerson not found: " + deliveryPersonId
+                        + " — cannot resolve actorId for wallet lookup")))
+                .flatMap(dp -> {
+                    if (dp.getActorId() == null) {
+                        return Mono.error(new DeliveryNotFoundException(
+                                "DeliveryPerson " + deliveryPersonId
+                                + " has no actor_id — row exists but actor_id column is NULL;"
+                                + " wallet lookup requires a non-null actor_id"));
+                    }
+                    return Mono.just(dp.getActorId());
+                });
     }
 }

@@ -150,9 +150,10 @@ management:
       endpoint: ${ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}
   info:
     git:
-      # simple = branch + commit.id.abbrev + commit.time.
-      # full exposerait remote.origin.url et les emails des auteurs — endpoint public, pas souhaitable.
-      mode: simple
+      # full : expose toutes les propriétés générées par git-commit-id-maven-plugin.
+      # Aucun risque car includeOnlyProperties dans le pom.xml limite la génération
+      # à : commit.id.abbrev, branch, dirty, commit.time — pas d'URL ni d'email.
+      mode: full
 
 # ── SpringDoc / Swagger UI ─────────────────────────────────────────────────
 springdoc:
@@ -383,6 +384,10 @@ tnt:
       enabled: ${TNT_SENTIMENT_ENABLED:true}
       model-name: ${TNT_SENTIMENT_MODEL_NAME:nlptown/bert-base-multilingual-uncased-sentiment}
       cache-dir: ${TNT_SENTIMENT_CACHE_DIR:/app/.djl.ai}
+    delivery-otp:
+      # PREVIEW ONLY — never true in production. When true, the plain delivery OTP
+      # (deliveryConfirmationCode) is returned in the assign response for E2E testing.
+      preview-mode: ${TNT_GOFP_DELIVERY_OTP_PREVIEW:false}
 
   # ── Agency ERP (Layer 6 back-core) ─────────────────────────────────────────
   agency:

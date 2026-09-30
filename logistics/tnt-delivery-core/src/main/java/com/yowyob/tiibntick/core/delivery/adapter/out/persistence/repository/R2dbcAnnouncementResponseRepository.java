@@ -17,4 +17,7 @@ public interface R2dbcAnnouncementResponseRepository
 
     @Query("SELECT * FROM tnt_announcement_responses WHERE announcement_id = :announcementId ORDER BY created_at ASC")
     Flux<AnnouncementResponseEntity> findByAnnouncementId(UUID announcementId);
+
+    @Query("SELECT EXISTS(SELECT 1 FROM tnt_announcement_responses WHERE announcement_id = :announcementId AND delivery_person_id = :deliveryPersonId)")
+    reactor.core.publisher.Mono<Boolean> existsByAnnouncementIdAndDeliveryPersonId(UUID announcementId, UUID deliveryPersonId);
 }

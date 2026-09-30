@@ -55,6 +55,7 @@ public class GofpClientService implements GofpClientUseCase {
         return clientRepository.findByCoreClientId(client.getCoreClientId())
                 .flatMap(existing -> {
                     client.setId(existing.getId());
+                    client.markNotNew();
                     client.setCreatedAt(existing.getCreatedAt());
                     client.setUpdatedAt(Instant.now());
                     log.info("Updating GofpClient coreClientId={}", client.getCoreClientId());

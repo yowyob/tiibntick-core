@@ -282,3 +282,4 @@ docs/diagrams/
 docs/images/
 tnt-bootstrap/uploads/
 tnt-bootstrap/docker-compose.override.yml
+.e2e-refresh-token.local

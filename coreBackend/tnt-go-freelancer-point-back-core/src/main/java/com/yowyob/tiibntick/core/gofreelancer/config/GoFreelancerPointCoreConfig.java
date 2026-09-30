@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
@@ -35,6 +36,7 @@ import java.util.Arrays;
 @EnableR2dbcRepositories(
         basePackages = "com.yowyob.tiibntick.core.gofreelancer.adapter.out.persistence.repository"
 )
+@EnableConfigurationProperties(GofpDeliveryOtpProperties.class)
 public class GoFreelancerPointCoreConfig {
 
     @Autowired

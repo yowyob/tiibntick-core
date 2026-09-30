@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.AddressDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.PacketDTO;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.announcement.AnnouncementStatus;
@@ -18,6 +19,7 @@ import lombok.Data;
  *       correctly.
  */
 @Data
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class AnnouncementResponseDTO {
     private UUID id;
     private UUID clientId;
@@ -71,6 +73,19 @@ public class AnnouncementResponseDTO {
      * Null on subsequent GETs — only the BCrypt hash is persisted.
      */
     private String confirmationCode;
+
+    /**
+     * Plain delivery OTP, present ONLY when {@code tnt.gofp.delivery-otp.preview-mode=true}.
+     * Never set in production. Distinct name from {@code confirmationCode} so no existing
+     * BFF or client mapping accidentally relays it.
+     */
+    private String deliveryConfirmationCode;
+
+    /**
+     * {@code "PREVIEW_ONLY"} when {@code deliveryConfirmationCode} is set; absent otherwise.
+     * Mirrors the kernel's delivery-mode convention for OTP exposure.
+     */
+    private String deliveryOtpDeliveryMode;
 
     public void setPickupAddress(AddressDTO pickupAddress) {
         this.pickupAddress = pickupAddress;

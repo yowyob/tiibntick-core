@@ -318,6 +318,8 @@ services:
       TNT_SENTIMENT_ENABLED: ${TNT_SENTIMENT_ENABLED:-true}
       TNT_SENTIMENT_MODEL_NAME: ${TNT_SENTIMENT_MODEL_NAME:-nlptown/bert-base-multilingual-uncased-sentiment}
       TNT_SENTIMENT_CACHE_DIR: /app/.djl.ai
+      # OTP preview mode for e2e testing (PREVIEW_ONLY — never enable in production)
+      TNT_GOFP_DELIVERY_OTP_PREVIEW: ${TNT_GOFP_DELIVERY_OTP_PREVIEW:-false}
     volumes:
       - djl-model-cache:/app/.djl.ai   # persists BERT model (~400 MB) across restarts
     depends_on:

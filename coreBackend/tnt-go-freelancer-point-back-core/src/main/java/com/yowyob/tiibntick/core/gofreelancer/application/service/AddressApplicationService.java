@@ -53,7 +53,8 @@ public class AddressApplicationService implements AddressUseCase {
         return addressRepository.findById(id)
                 .flatMap(existing -> {
                     AddressEntity updated = toEntity(dto);
-                    updated.setId(existing.getId()); // on conserve l'ID existant
+                    updated.setId(existing.getId());
+                    updated.markNotNew();
                     return addressRepository.save(updated);
                 })
                 .map(this::toDto);

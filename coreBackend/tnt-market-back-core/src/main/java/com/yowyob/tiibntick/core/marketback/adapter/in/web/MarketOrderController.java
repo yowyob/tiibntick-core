@@ -27,6 +27,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
+import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
 import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
@@ -74,6 +75,7 @@ public class MarketOrderController {
     @Operation(summary = "Process payment for a MarketOrder")
     @PostMapping("/{id}/payment")
     @PreAuthorize("isAuthenticated()")
+    @RequirePermission(resource = "payment", action = "process")
     public Mono<MarketOrderResponse> processPayment(
             @PathVariable UUID id,
             @Valid @RequestBody ProcessPaymentCommand command,

@@ -52,6 +52,7 @@ public class GofpRelayPointService implements GofpRelayPointUseCase {
         return relayPointRepository.findByCoreRelayPointId(rp.getCoreRelayPointId())
                 .flatMap(existing -> {
                     rp.setId(existing.getId());
+                    rp.markNotNew();
                     rp.setCreatedAt(existing.getCreatedAt());
                     rp.setUpdatedAt(Instant.now());
                     log.info("Updating GofpRelayPoint coreRelayPointId={}", rp.getCoreRelayPointId());

@@ -23,4 +23,10 @@ public interface DeliveryAnnouncementRepository {
     Flux<DeliveryAnnouncement> findByStatus(UUID tenantId, AnnouncementStatus status);
 
     Flux<DeliveryAnnouncement> findOpenAnnouncements(UUID tenantId);
+
+    /**
+     * Returns {@code true} if {@code freelancerId} already has a response on
+     * {@code announcementId}, without loading the full announcement aggregate.
+     */
+    Mono<Boolean> hasResponse(UUID announcementId, UUID freelancerId);
 }

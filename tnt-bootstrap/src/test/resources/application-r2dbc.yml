@@ -1,4 +1,11 @@
 # src/test/resources/application-r2dbc.yml
+# LiquibaseConfig.ensureDatabaseExists tente par défaut le port 5433 (DB_PORT:5433).
+# En local le conteneur PostgreSQL expose 5432 (interne) sur 5433 (hôte).
+# DB_AUTO_CREATE_DATABASE=false désactive le bloc auto-create.
+# spring.liquibase.url pointe sur le port hôte 5433 (pas le défaut 5432).
+# Justification : la base tiibntick_core est déjà provisionnée par la stack Docker ;
+# les tests de sécurité n'ont pas besoin de créer le schéma, juste de vérifier les routes.
+DB_AUTO_CREATE_DATABASE: "false"
 spring:
   r2dbc:
     url: r2dbc:h2:mem:///testdb;DB_CLOSE_DELAY=-1
@@ -7,3 +14,7 @@ spring:
   sql:
     init:
       mode: embedded
+  liquibase:
+    url: jdbc:postgresql://localhost:5433/tiibntick_core
+    user: tiibntick
+    password: tiibntick_pass

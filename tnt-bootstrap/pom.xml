@@ -496,7 +496,7 @@
                     </execution>
                 </executions>
             </plugin>
-            <!-- ⭐ Génère git.properties → /actuator/info expose git.commit.id -->
+            <!-- ⭐ Génère git.properties → /actuator/info expose git.commit.id + git.dirty -->
             <plugin>
                 <groupId>io.github.git-commit-id</groupId>
                 <artifactId>git-commit-id-maven-plugin</artifactId>
@@ -507,6 +507,16 @@
                         </goals>
                     </execution>
                 </executions>
+                <configuration>
+                    <!-- Limit generated properties to safe non-sensitive values only.
+                         Excludes: remote.origin.url, build.user.email, etc. -->
+                    <includeOnlyProperties>
+                        <includeOnlyProperty>git\.commit\.id\.abbrev</includeOnlyProperty>
+                        <includeOnlyProperty>git\.branch</includeOnlyProperty>
+                        <includeOnlyProperty>git\.dirty</includeOnlyProperty>
+                        <includeOnlyProperty>git\.commit\.time</includeOnlyProperty>
+                    </includeOnlyProperties>
+                </configuration>
             </plugin>
         </plugins>
     </build>

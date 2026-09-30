@@ -56,6 +56,7 @@ public class GofpFreelancerService implements GofpFreelancerUseCase {
         return freelancerRepository.findByCoreFreelancerId(freelancer.getCoreFreelancerId())
                 .flatMap(existing -> {
                     freelancer.setId(existing.getId());
+                    freelancer.markNotNew();
                     freelancer.setCreatedAt(existing.getCreatedAt());
                     freelancer.setUpdatedAt(Instant.now());
                     log.info("Updating GofpFreelancer coreFreelancerId={}", freelancer.getCoreFreelancerId());

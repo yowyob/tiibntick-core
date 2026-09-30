@@ -77,6 +77,12 @@ public class DeliveryAnnouncementRepositoryAdapter implements DeliveryAnnounceme
     }
 
     @Override
+    public Mono<Boolean> hasResponse(UUID announcementId, UUID freelancerId) {
+        return responseRepo.existsByAnnouncementIdAndDeliveryPersonId(announcementId, freelancerId)
+                .defaultIfEmpty(false);
+    }
+
+    @Override
     public Flux<DeliveryAnnouncement> findByClientId(UUID tenantId, UUID clientId) {
         return announcementRepo.findByTenantIdAndClientId(tenantId, clientId)
                 .flatMap(e -> hydrateFromEntity(e));

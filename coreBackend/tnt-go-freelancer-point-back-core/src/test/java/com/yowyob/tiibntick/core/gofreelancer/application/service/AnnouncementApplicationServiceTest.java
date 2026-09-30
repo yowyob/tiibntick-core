@@ -10,6 +10,7 @@ import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryAnno
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.INegotiationChatPort;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.AnnouncementSubscriptionRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.AnnouncementResponseSnapshot;
+import com.yowyob.tiibntick.core.gofreelancer.config.GofpDeliveryOtpProperties;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.AnnouncementSnapshot;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.PublishAnnouncementPortCommand;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.announcement.AnnouncementStatus;
@@ -59,6 +60,7 @@ class AnnouncementApplicationServiceTest {
     @Mock private com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpUserRepository gofpUserRepository;
     @Mock private com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepository deliveryRepository;
     @Mock private DeliveryOtpService deliveryOtpService;
+    @Mock private GofpDeliveryOtpProperties deliveryOtpProperties;
 
     private AnnouncementApplicationService service;
 
@@ -72,7 +74,8 @@ class AnnouncementApplicationServiceTest {
         service = new AnnouncementApplicationService(
                 deliveryAnnouncementPort, tenantContextHolder, freelancerQuotaService,
                 walletUseCase, negotiationChatPort, announcementRepository, subscriptionRepository,
-                gofpFreelancerRepository, gofpUserRepository, deliveryRepository, deliveryOtpService);
+                gofpFreelancerRepository, gofpUserRepository, deliveryRepository, deliveryOtpService,
+                deliveryOtpProperties);
         lenient().when(announcementRepository.findById(any())).thenReturn(Mono.empty());
         lenient().when(deliveryRepository.findById(any())).thenReturn(Mono.empty());
         lenient().when(gofpFreelancerRepository.findById(any())).thenReturn(Mono.empty());
@@ -193,6 +196,52 @@ class AnnouncementApplicationServiceTest {
                 .verify();
 
         verify(deliveryAnnouncementPort, never()).respond(any());
+    }
+
+    @Test
+    void respondToAnnouncement_idempotent_secondCallDoesNotInvokeRespond() {
+        AnnouncementSnapshot current = snapshot(
+                AnnouncementSnapshot.PRICING_MODE_FIXED_PRICE, null, "XAF", List.of());
+
+        var request = new com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.RespondAnnouncementRequestDTO();
+        request.setFreelancerId(freelancerId);
+
+        when(freelancerQuotaService.hasRemainingQuota(freelancerId)).thenReturn(Mono.just(true));
+        when(tenantContextHolder.currentTenantId()).thenReturn(Mono.just(tenantId));
+        // hasResponse — the targeted point query — returns true (already responded).
+        when(deliveryAnnouncementPort.hasResponse(announcementId, freelancerId))
+                .thenReturn(Mono.just(true));
+        // findById is used only on the idempotent return path to build the DTO.
+        when(deliveryAnnouncementPort.findById(tenantId, announcementId)).thenReturn(Mono.just(current));
+
+        StepVerifier.create(service.respondToAnnouncement(announcementId, request))
+                .expectNextMatches(dto -> announcementId.equals(dto.getId()))
+                .verifyComplete();
+
+        // Core must not create a second candidature.
+        verify(deliveryAnnouncementPort, never()).respond(any());
+        // Core must not open a second negotiation thread.
+        verify(negotiationChatPort, never()).openNegotiationThread(any(), any(), any());
+    }
+
+    @Test
+    void respondToAnnouncement_idempotent_returnsExistingCandidatureNotError() {
+        AnnouncementSnapshot current = snapshot(
+                AnnouncementSnapshot.PRICING_MODE_QUOTE_REQUEST, null, "XAF", List.of());
+
+        var request = new com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.RespondAnnouncementRequestDTO();
+        request.setFreelancerId(freelancerId);
+
+        when(freelancerQuotaService.hasRemainingQuota(freelancerId)).thenReturn(Mono.just(true));
+        when(tenantContextHolder.currentTenantId()).thenReturn(Mono.just(tenantId));
+        when(deliveryAnnouncementPort.hasResponse(announcementId, freelancerId))
+                .thenReturn(Mono.just(true));
+        when(deliveryAnnouncementPort.findById(tenantId, announcementId)).thenReturn(Mono.just(current));
+
+        // Must complete with the existing announcement data, not throw.
+        StepVerifier.create(service.respondToAnnouncement(announcementId, request))
+                .expectNextCount(1)
+                .verifyComplete();
     }
 
     private AnnouncementSnapshot snapshot(

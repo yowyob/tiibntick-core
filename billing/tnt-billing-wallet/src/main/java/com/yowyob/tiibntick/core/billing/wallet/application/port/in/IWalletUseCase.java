@@ -30,13 +30,24 @@ public interface IWalletUseCase {
     Mono<Wallet> getOrCreateWallet(UUID userId, UUID tenantId);
 
     /**
-     * Returns the current available balance.
+     * Returns the current available balance. Read-only — never creates a wallet.
+     * Signals {@code WalletNotFoundException} if no wallet exists for the user.
      *
      * @param userId   user identifier
      * @param tenantId tenant context
      * @return available Money balance
      */
     Mono<Money> getBalance(UUID userId, UUID tenantId);
+
+    /**
+     * Read-only wallet lookup. Returns empty Mono if no wallet exists for the user.
+     * Never creates a wallet, unlike {@link #getOrCreateWallet}.
+     *
+     * @param userId   user identifier
+     * @param tenantId tenant context
+     * @return Wallet if found, empty Mono otherwise
+     */
+    Mono<Wallet> findWallet(UUID userId, UUID tenantId);
 
     /**
      * Credits the wallet (top-up, refund credit, admin credit).

@@ -2,8 +2,13 @@ package com.yowyob.tiibntick.core.billing.wallet.application.service;
 
 import com.yowyob.tiibntick.core.billing.wallet.adapter.out.kernel.dto.KernelPaymentOrderDto;
 import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.ConfirmPaymentCommand;
+import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.CreditCommissionCommand;
 import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.CreditWalletCommand;
+import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.DebitWalletCommand;
 import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.InitiatePaymentCommand;
+import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.SplitMissionRevenueCommand;
+import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.TransferSubDelivererCommissionCommand;
+import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.RefundPaymentCommand;
 import com.yowyob.tiibntick.core.billing.wallet.application.port.out.*;
 import com.yowyob.tiibntick.core.billing.wallet.domain.enums.PaymentChannel;
 import com.yowyob.tiibntick.core.billing.wallet.domain.enums.PaymentIntentStatus;
@@ -322,6 +327,7 @@ class WalletServiceTest {
         when(walletRepository.findByOwnerId(freelancerOrgId, TENANT_ID)).thenReturn(Mono.just(orgWallet));
         when(walletRepository.findByOwnerId(subDelivererId, TENANT_ID)).thenReturn(Mono.just(subWallet));
         when(walletRepository.save(any(Wallet.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(walletRepository.saveTransaction(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
         when(eventPublisher.publish(any(
                 com.yowyob.tiibntick.core.billing.wallet.domain.event.WalletSplitExecuted.class)))
                 .thenReturn(Mono.empty());
@@ -342,5 +348,189 @@ class WalletServiceTest {
         assertThat(captor.getValue().freelancerOrgId()).isEqualTo(freelancerOrgId);
         assertThat(captor.getValue().subDelivererId()).isEqualTo(subDelivererId);
         assertThat(captor.getValue().tenantId()).isEqualTo(TENANT_ID);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Lot C-11 — invariant: saveTransaction count == wallet save count
+    // ══════════════════════════════════════════════════════════════════════
+
+    @Test
+    @DisplayName("debitWallet saves one transaction for one balance movement")
+    void debitWalletSavesOneTransaction() {
+        Wallet wallet = Wallet.createNew(USER_ID, TENANT_ID, XAF);
+        wallet.credit(Money.ofXAF(10000), "SEED", "test seed"); // give the wallet money
+        when(walletRepository.findByUserId(USER_ID, TENANT_ID)).thenReturn(Mono.just(wallet));
+        when(walletRepository.save(any(Wallet.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(walletRepository.saveTransaction(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(eventPublisher.publish(any(
+                com.yowyob.tiibntick.core.billing.wallet.domain.event.WalletDebited.class)))
+                .thenReturn(Mono.empty());
+
+        DebitWalletCommand cmd = new DebitWalletCommand(
+                USER_ID, TENANT_ID, Money.ofXAF(500), "REF-DEBIT", PaymentChannel.WALLET,
+                "Test debit", "idem-001");
+
+        StepVerifier.create(walletService.debitWallet(cmd))
+                .expectNextCount(1)
+                .verifyComplete();
+
+        verify(walletRepository, times(1)).save(any());
+        verify(walletRepository, times(1)).saveTransaction(any());
+    }
+
+    @Test
+    @DisplayName("creditCommission saves one transaction for one balance movement")
+    void creditCommissionSavesOneTransaction() {
+        UUID delivererId = UUID.randomUUID();
+        Wallet wallet = Wallet.createNew(delivererId, TENANT_ID, XAF);
+        when(walletRepository.findByUserId(delivererId, TENANT_ID)).thenReturn(Mono.just(wallet));
+        when(walletRepository.save(any(Wallet.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(walletRepository.saveTransaction(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(eventPublisher.publish(any(
+                com.yowyob.tiibntick.core.billing.wallet.domain.event.CommissionCalculated.class)))
+                .thenReturn(Mono.empty());
+
+        CreditCommissionCommand cmd = new CreditCommissionCommand(
+                delivererId, TENANT_ID, Money.ofXAF(1000), "MISSION-CC", "INV-CC");
+
+        StepVerifier.create(walletService.creditCommission(cmd))
+                .expectNextCount(1)
+                .verifyComplete();
+
+        verify(walletRepository, times(1)).save(any());
+        verify(walletRepository, times(1)).saveTransaction(any());
+    }
+
+    @Test
+    @DisplayName("splitMissionRevenue saves two transactions when a sub-deliverer is present — one per wallet movement")
+    void splitMissionRevenueSavesTwoTransactionsForTwoMovements() {
+        String orgId = "org-split";
+        String subId = "sub-split";
+        Wallet orgWallet = Wallet.createForOrg(
+                com.yowyob.tiibntick.core.billing.wallet.domain.enums.WalletOwnerType.FREELANCER_ORG,
+                orgId, TENANT_ID, XAF);
+        Wallet subWallet = Wallet.createForOrg(
+                com.yowyob.tiibntick.core.billing.wallet.domain.enums.WalletOwnerType.FREELANCER_ORG,
+                subId, TENANT_ID, XAF);
+
+        when(walletRepository.findByOwnerId(orgId, TENANT_ID)).thenReturn(Mono.just(orgWallet));
+        when(walletRepository.findByOwnerId(subId, TENANT_ID)).thenReturn(Mono.just(subWallet));
+        when(walletRepository.save(any(Wallet.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(walletRepository.saveTransaction(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(eventPublisher.publish(any(
+                com.yowyob.tiibntick.core.billing.wallet.domain.event.WalletSplitExecuted.class)))
+                .thenReturn(Mono.empty());
+
+        SplitMissionRevenueCommand cmd = new SplitMissionRevenueCommand(
+                "MISSION-SPLIT", new java.math.BigDecimal("6000"), orgId, TENANT_ID,
+                subId, 0.05, 0.20);
+
+        StepVerifier.create(walletService.splitMissionRevenue(cmd))
+                .expectNextCount(1)
+                .verifyComplete();
+
+        // 2 wallet saves (org + sub), 2 saveTransaction calls (one per wallet movement)
+        verify(walletRepository, times(2)).save(any());
+        verify(walletRepository, times(2)).saveTransaction(any());
+    }
+
+    @Test
+    @DisplayName("splitMissionRevenue saves one transaction when there is no sub-deliverer")
+    void splitMissionRevenueSavesOneTransactionWithoutSubDeliverer() {
+        String orgId = "org-solo";
+        Wallet orgWallet = Wallet.createForOrg(
+                com.yowyob.tiibntick.core.billing.wallet.domain.enums.WalletOwnerType.FREELANCER_ORG,
+                orgId, TENANT_ID, XAF);
+
+        when(walletRepository.findByOwnerId(orgId, TENANT_ID)).thenReturn(Mono.just(orgWallet));
+        when(walletRepository.save(any(Wallet.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(walletRepository.saveTransaction(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(eventPublisher.publish(any(
+                com.yowyob.tiibntick.core.billing.wallet.domain.event.WalletSplitExecuted.class)))
+                .thenReturn(Mono.empty());
+
+        SplitMissionRevenueCommand cmd = new SplitMissionRevenueCommand(
+                "MISSION-SOLO", new java.math.BigDecimal("5000"), orgId, TENANT_ID,
+                null, 0.05, 0.0);
+
+        StepVerifier.create(walletService.splitMissionRevenue(cmd))
+                .expectNextCount(1)
+                .verifyComplete();
+
+        verify(walletRepository, times(1)).save(any());
+        verify(walletRepository, times(1)).saveTransaction(any());
+    }
+
+    @Test
+    @DisplayName("transferSubDelivererCommission saves two transactions — one debit (org) and one credit (sub)")
+    void transferSubDelivererCommissionSavesTwoTransactions() {
+        String orgId = "org-transfer";
+        String subId = "sub-transfer";
+        Wallet orgWallet = Wallet.createForOrg(
+                com.yowyob.tiibntick.core.billing.wallet.domain.enums.WalletOwnerType.FREELANCER_ORG,
+                orgId, TENANT_ID, XAF);
+        // Give org wallet enough funds to debit
+        orgWallet.credit(Money.ofXAF(5000), "SEED", "initial");
+        Wallet subWallet = Wallet.createForOrg(
+                com.yowyob.tiibntick.core.billing.wallet.domain.enums.WalletOwnerType.FREELANCER_ORG,
+                subId, TENANT_ID, XAF);
+
+        when(walletRepository.findByOwnerId(orgId, TENANT_ID)).thenReturn(Mono.just(orgWallet));
+        when(walletRepository.findByOwnerId(subId, TENANT_ID)).thenReturn(Mono.just(subWallet));
+        when(walletRepository.save(any(Wallet.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(walletRepository.saveTransaction(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+
+        TransferSubDelivererCommissionCommand cmd = new TransferSubDelivererCommissionCommand(
+                orgId, subId, new java.math.BigDecimal("1000"), "MISSION-T", TENANT_ID);
+
+        StepVerifier.create(walletService.transferSubDelivererCommission(cmd))
+                .expectNextCount(1)
+                .verifyComplete();
+
+        // 2 wallet saves, 2 saveTransaction calls (debit org + credit sub)
+        verify(walletRepository, times(2)).save(any());
+        verify(walletRepository, times(2)).saveTransaction(any());
+    }
+
+    @Test
+    @DisplayName("refundPayment saves one transaction for one balance movement (the refund credit)")
+    void refundPaymentSavesOneTransaction() {
+        Wallet wallet = Wallet.createNew(USER_ID, TENANT_ID, XAF);
+        // Seed balance so the debit does not throw InsufficientBalance
+        wallet.credit(Money.ofXAF(5000), "SEED-R", "initial");
+        // wallet.debit() produces a CONFIRMED transaction directly — no need to confirm manually
+        WalletTransaction debitTx = wallet.debit(
+                Money.ofXAF(3000), "INVOICE-R", PaymentChannel.WALLET,
+                "Original payment", "idem-refund");
+
+        // Intent must be PENDING — cancel() throws on CONFIRMED/REFUNDED.
+        // The debit transaction (created by wallet.debit) is already CONFIRMED,
+        // which is what refundPayment's filter requires.
+        PaymentIntent intent = PaymentIntent.builder()
+                .id(PaymentIntentId.generate())
+                .walletId(wallet.getId())
+                .amount(Money.ofXAF(3000))
+                .channel(PaymentChannel.WALLET)
+                .status(PaymentIntentStatus.PENDING)
+                .idempotencyKey("idem-refund")
+                .externalRef("EXT-TX-R")
+                .createdAt(java.time.LocalDateTime.now())
+                .build();
+
+        when(paymentIntentRepository.findById(intent.getId())).thenReturn(Mono.just(intent));
+        when(walletRepository.findById(wallet.getId())).thenReturn(Mono.just(wallet));
+        when(walletRepository.save(any(Wallet.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(walletRepository.saveTransaction(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(paymentIntentRepository.save(any())).thenReturn(Mono.just(intent));
+
+        RefundPaymentCommand cmd = new RefundPaymentCommand(intent.getId().value(), TENANT_ID, "Test refund");
+
+        StepVerifier.create(walletService.refundPayment(cmd))
+                .expectNextCount(1)
+                .verifyComplete();
+
+        // 1 wallet save, 1 saveTransaction (the refund credit)
+        verify(walletRepository, times(1)).save(any());
+        verify(walletRepository, times(1)).saveTransaction(any());
     }
 }

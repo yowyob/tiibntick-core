@@ -29,6 +29,7 @@ import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpFreelancer;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpUser;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.announcement.AnnouncementStatus;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryStatus;
+import com.yowyob.tiibntick.core.gofreelancer.config.GofpDeliveryOtpProperties;
 import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -68,6 +69,7 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
     private final GofpUserRepository gofpUserRepository;
     private final DeliveryRepository deliveryRepository;
     private final DeliveryOtpService deliveryOtpService;
+    private final GofpDeliveryOtpProperties deliveryOtpProperties;
 
     @Override
     @RequirePermission(resource = "announcement", action = "create")
@@ -175,19 +177,32 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
                                 "Freelancer has no remaining delivery quota: " + freelancerId));
                     }
                     return tenantContextHolder.currentTenantId()
-                            .flatMap(tenantId -> deliveryAnnouncementPort.respond(
-                                    new RespondToAnnouncementPortCommand(
-                                            tenantId,
-                                            announcementId,
-                                            freelancerId,
-                                            eta,
-                                            request.getNote(),
-                                            request.getProposedPrice(),
-                                            request.getProposedCurrency())))
-                            .flatMap(saved -> negotiationChatPort
-                                    .openNegotiationThread(announcementId, saved.clientId(), freelancerId)
-                                    .onErrorResume(e -> Mono.empty())
-                                    .thenReturn(toCandidateDTO(saved, freelancerId)))
+                            .flatMap(tenantId -> deliveryAnnouncementPort
+                                    .hasResponse(announcementId, freelancerId)
+                                    .flatMap(alreadyResponded -> {
+                                        if (Boolean.TRUE.equals(alreadyResponded)) {
+                                            log.info("Freelancer {} already responded to announcement {} — idempotent return",
+                                                    freelancerId, announcementId);
+                                            return deliveryAnnouncementPort
+                                                    .findById(tenantId, announcementId)
+                                                    .switchIfEmpty(Mono.error(new IllegalArgumentException(
+                                                            "Announcement not found: " + announcementId)));
+                                        }
+                                        return deliveryAnnouncementPort.respond(
+                                                new RespondToAnnouncementPortCommand(
+                                                        tenantId,
+                                                        announcementId,
+                                                        freelancerId,
+                                                        eta,
+                                                        request.getNote(),
+                                                        request.getProposedPrice(),
+                                                        request.getProposedCurrency()))
+                                                .flatMap(saved -> negotiationChatPort
+                                                        .openNegotiationThread(announcementId, saved.clientId(), freelancerId)
+                                                        .onErrorResume(e -> Mono.empty())
+                                                        .thenReturn(saved));
+                                    }))
+                            .map(saved -> toCandidateDTO(saved, freelancerId))
                             .flatMap(this::enrichFromLocalMirror);
                 });
     }
@@ -426,6 +441,10 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
         dto.setTrackingCode(assigned.trackingCode());
         if (otpResult != null && otpResult.newlyInitialized()) {
             dto.setConfirmationCode(otpResult.pickupOtp());
+            if (deliveryOtpProperties.isPreviewMode() && otpResult.deliveryOtp() != null) {
+                dto.setDeliveryConfirmationCode(otpResult.deliveryOtp());
+                dto.setDeliveryOtpDeliveryMode("PREVIEW_ONLY");
+            }
         }
         return enrichFromLocalMirror(dto).flatMap(this::enrichAssignedFreelancerProfile);
     }

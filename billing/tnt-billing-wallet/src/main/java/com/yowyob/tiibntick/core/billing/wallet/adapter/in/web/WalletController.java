@@ -10,10 +10,12 @@ import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.Cred
 import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.*;
 import com.yowyob.tiibntick.core.billing.wallet.domain.model.PaymentSplitResult;
 import com.yowyob.tiibntick.core.billing.wallet.domain.model.*;
+import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -38,20 +40,22 @@ public class WalletController {
     /**
      * GET /billing/wallet/{userId}/balance?tenantId={tenantId}
      * Returns the available balance for a user's wallet.
+     * Returns 404 when no wallet exists — read-only, never creates.
      */
     @GetMapping("/{userId}/balance")
-    public Mono<WalletBalanceResponse> getBalance(
+    public Mono<ResponseEntity<WalletBalanceResponse>> getBalance(
             @PathVariable UUID userId,
             @RequestParam UUID tenantId) {
         log.debug("GET balance userId={}", userId);
-        return walletUseCase.getOrCreateWallet(userId, tenantId)
-                .map(wallet -> new WalletBalanceResponse(
+        return walletUseCase.findWallet(userId, tenantId)
+                .map(wallet -> ResponseEntity.ok(new WalletBalanceResponse(
                         wallet.getId().value(),
                         wallet.getUserId(),
                         wallet.getBalance().amount(),
                         wallet.getReservedBalance().amount(),
                         wallet.getCurrency().getCurrencyCode(),
-                        wallet.getStatus().name()));
+                        wallet.getStatus().name())))
+                .switchIfEmpty(Mono.just(ResponseEntity.notFound().<WalletBalanceResponse>build()));
     }
 
     /**
@@ -79,6 +83,7 @@ public class WalletController {
      */
     @PostMapping("/pay")
     @ResponseStatus(HttpStatus.ACCEPTED)
+    @RequirePermission(resource = "payment", action = "process")
     public Mono<PaymentIntentResponse> initiatePayment(
             @RequestParam UUID userId,
             @RequestParam UUID tenantId,
@@ -197,6 +202,7 @@ public class WalletController {
      * Splits mission revenue between platform, FreelancerOrg, and optional sub-deliverer.
      */
     @PostMapping("/split-revenue")
+    @RequirePermission(resource = "payment", action = "process")
     public Mono<PaymentSplitResult> splitMissionRevenue(
             @RequestBody SplitRevenueRequest request) {
         log.info("POST /billing/wallet/split-revenue missionId={}", request.missionId());
@@ -212,6 +218,7 @@ public class WalletController {
      * Transfers sub-deliverer commission from org wallet to sub-deliverer personal wallet.
      */
     @PostMapping("/transfer-commission")
+    @RequirePermission(resource = "payment", action = "process")
     public Mono<WalletTransactionResponse> transferSubDelivererCommission(
             @RequestParam String freelancerOrgId,
             @RequestParam String subDelivererId,

@@ -36,8 +36,8 @@ public class GofpUserService implements GofpUserUseCase {
         }
         return userRepository.findByCoreUserId(user.getCoreUserId())
                 .flatMap(existing -> {
-                    // Update existing record — preserve id
                     user.setId(existing.getId());
+                    user.markNotNew();
                     user.setCreatedAt(existing.getCreatedAt());
                     user.setUpdatedAt(Instant.now());
                     log.info("Updating GofpUser for coreUserId={}", user.getCoreUserId());

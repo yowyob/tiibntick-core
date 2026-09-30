@@ -11,6 +11,7 @@ import com.yowyob.tiibntick.core.gofreelancer.domain.exception.InvalidCredential
 import com.yowyob.tiibntick.core.gofreelancer.domain.exception.InvalidTokenException;
 import com.yowyob.tiibntick.core.gofreelancer.domain.exception.ResourceNotFoundException;
 import com.yowyob.tiibntick.core.gofreelancer.domain.exception.ValidationException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.codec.DecodingException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
@@ -34,6 +35,7 @@ import java.time.LocalDateTime;
  *
  * @author MANFOUO BRAUN
  */
+@Slf4j
 @RestControllerAdvice(basePackages = "com.yowyob.tiibntick.core.gofreelancer")
 public class GlobalExceptionHandler {
 
@@ -74,6 +76,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DuplicateKeyException.class)
     public Mono<ResponseEntity<ErrorResponse>> handleDuplicateKeyException(
             DuplicateKeyException ex, ServerWebExchange exchange) {
+        log.warn("[DuplicateKey] constraint violation on {}: {}", exchange.getRequest().getPath().value(), ex.getMessage());
         String message = "A resource with this information already exists";
         if (ex.getMessage() != null) {
             if (ex.getMessage().contains("persons_email_key")) {

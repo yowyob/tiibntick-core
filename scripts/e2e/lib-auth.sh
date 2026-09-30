@@ -109,10 +109,46 @@ tnt_otp_flow() {
   verify_status=$(echo "$verify_body" | jq -r '.status // empty' 2>/dev/null || echo "")
 
   if [ "$verify_status" = "SIGNUP_REQUIRED" ]; then
-    echo "" >&2
-    echo "ERREUR : SIGNUP_REQUIRED — le compte $E2E_PHONE n'existe pas dans le Kernel." >&2
-    echo "Créez le compte via le flux signup avant de relancer." >&2
-    return 1
+    # En mode mock, le store in-memory est vide à chaque démarrage du BFF.
+    # On auto-complète le signup avec des données E2E fictives pour obtenir
+    # un JWT mock valide — le harnais peut alors exercer les assertions métier.
+    if [ "${BFF_ADAPTER:-unknown}" = "mock" ]; then
+      local signup_token
+      signup_token=$(echo "$verify_body" | jq -r '.signupToken // empty' 2>/dev/null || echo "")
+      if [ -z "$signup_token" ]; then
+        echo "ERREUR : SIGNUP_REQUIRED sans signupToken (BFF mock)." >&2
+        return 1
+      fi
+      echo "  SIGNUP_REQUIRED (mock) — inscription auto E2E (données fictives)"
+      local su_http su_body su_status
+      su_http=$(curl -s -o /tmp/tnt_e2e_signup.json -w "%{http_code}" --max-time 10 \
+          -X POST "${BFF_URL}/v1/auth/signup" \
+          -H "Content-Type: application/json" \
+          -d "{\"signupToken\":\"${signup_token}\",\"email\":\"e2e-harness@tnt.local\",\"firstName\":\"E2E\",\"lastName\":\"Harness\"}" \
+          2>/dev/null || echo "000")
+      su_body=$(cat /tmp/tnt_e2e_signup.json 2>/dev/null || echo "{}")
+      su_status=$(echo "$su_body" | jq -r '.status // empty' 2>/dev/null || echo "")
+      if [ "$su_http" != "200" ] || [ "$su_status" != "EMAIL_VERIFICATION_PENDING" ]; then
+        echo "ERREUR : signup mock échoué (HTTP $su_http, status='$su_status')" >&2
+        echo "Corps : $su_body" >&2
+        return 1
+      fi
+      local comp_http comp_body
+      comp_http=$(curl -s -o /tmp/tnt_e2e_signup_complete.json -w "%{http_code}" --max-time 10 \
+          -X POST "${BFF_URL}/v1/auth/signup/complete" \
+          -H "Content-Type: application/json" \
+          -d "{\"signupToken\":\"${signup_token}\"}" \
+          2>/dev/null || echo "000")
+      comp_body=$(cat /tmp/tnt_e2e_signup_complete.json 2>/dev/null || echo "{}")
+      # Réutilise les variables verify_* : le code suivant extrait accessToken de verify_body
+      verify_http="$comp_http"
+      verify_body="$comp_body"
+    else
+      echo "" >&2
+      echo "ERREUR : SIGNUP_REQUIRED — le compte $E2E_PHONE n'existe pas dans le Kernel." >&2
+      echo "Créez le compte via le flux signup avant de relancer." >&2
+      return 1
+    fi
   fi
 
   if [ "$verify_http" != "200" ]; then
