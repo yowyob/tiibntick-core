@@ -66,6 +66,17 @@ public class DeliveryStatusApplicationService {
     // ── Tenant resolution ──────────────────────────────────────────────
     private final TenantContextHolder tenantContextHolder;
 
+    private final io.micrometer.core.instrument.MeterRegistry meterRegistry;
+
+    private io.micrometer.core.instrument.Counter paymentFailures;
+
+    @jakarta.annotation.PostConstruct
+    void initMetrics() {
+        paymentFailures = io.micrometer.core.instrument.Counter.builder("gofp.delivery.payment.failures")
+                .description("Deliveries saved as DELIVERED/AT_RELAY_POINT whose payment then failed (unpaid)")
+                .register(meterRegistry);
+    }
+
     /**
      * Updates the status of a delivery and triggers side-effects based on the new status.
      *
@@ -468,7 +479,25 @@ public class DeliveryStatusApplicationService {
         return deliveryQueryUseCase.resolveActorIdForDeliveryPerson(tenantId, freelancerId)
                 .doOnNext(actorId -> log.debug("Resolved actorId={} for freelancerId={} (delivery {})",
                         actorId, freelancerId, delivery.getId()))
-                .flatMap(actorId -> processDeliveryPaymentWithActor(delivery, actorId, tenantId));
+                .flatMap(actorId -> processDeliveryPaymentWithActor(delivery, actorId, tenantId))
+                .doOnError(e -> reportUnpaidDelivered(delivery, freelancerId, e));
+    }
+
+    /**
+     * Lot C-20.3 — the DELIVERED status is persisted BEFORE the payment runs (no transaction
+     * spans both, and none should: the parcel was handed over and the recipient's OTP was
+     * verified — that fact must not be rolled back). A payment failure therefore leaves a
+     * delivered-but-unpaid delivery. The error still propagates to the caller (HTTP 5xx), but
+     * that alone is invisible to operations once the client gives up, so it is also counted
+     * ({@code gofp.delivery.payment.failures}) and logged with a greppable
+     * {@code UNPAID_DELIVERED} marker carrying everything needed to pay it by hand.
+     */
+    private void reportUnpaidDelivered(Delivery delivery, UUID freelancerId, Throwable e) {
+        paymentFailures.increment();
+        log.error("UNPAID_DELIVERED delivery={} freelancerProfile={} tarif={} — status DELIVERED is saved "
+                        + "but the payment failed ({}: {}); no compensation runs, pay or retry manually",
+                delivery.getId(), freelancerId, delivery.getTarif(),
+                e.getClass().getSimpleName(), e.getMessage());
     }
 
     private Mono<Void> processDeliveryPaymentWithActor(Delivery delivery, UUID actorId, UUID tenantId) {
@@ -505,7 +534,14 @@ public class DeliveryStatusApplicationService {
                         platformCommissionAmount, actorId)).then();
             } else {
                 // Digital payments (ORANGE_MONEY, MTN_MOBILE_MONEY, CARD, etc.)
-                walletAction = walletUseCase.splitMissionRevenue(
+                // splitMissionRevenue only looks the beneficiary wallet up (findByOwnerId) and
+                // fails with WalletNotFoundException when absent: a freelancer's first paid
+                // delivery must therefore create it first (lot C-19.2 — the fresh-account run
+                // got HTTP 500 here). getOrCreateWallet creates the ACTOR wallet keyed on
+                // actorId, the same key the split looks up; the CASH branch above already goes
+                // through it via debitWallet.
+                walletAction = walletUseCase.getOrCreateWallet(actorId, tenantId)
+                        .then(Mono.defer(() -> walletUseCase.splitMissionRevenue(
                                 new SplitMissionRevenueCommand(
                                         delivery.getId().toString(),
                                         java.math.BigDecimal.valueOf(delivery.getTarif()),
@@ -515,7 +551,7 @@ public class DeliveryStatusApplicationService {
                                         0.05,
                                         0.0
                                 )
-                        )
+                        )))
                         .doOnSuccess(split -> log.info("Revenue split for delivery {} (Method: {}) — platform: {}, org: {}",
                                 delivery.getId(), paymentMethod, split.platformCommission(), split.orgRevenue()))
                         .then();

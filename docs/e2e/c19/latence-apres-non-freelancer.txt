@@ -1,0 +1,30 @@
+═══ measure-cold-latency — APRÈS C-19.1 (3b41505) — compte vierge, pas encore freelancer ═══
+date (UTC)   : 2026-10-02T01:56:32Z
+core         : {"commit":"3b41505","dirty":"false"}
+route        : GET /api/delivery-needs/user/ab57d86b-bb7a-4bd0-aa76-b7c041dadb06
+sub          : ab57d86b-bb7a-4bd0-aa76-b7c041dadb06
+jeton expire : 02:09:43Z
+
+── Mesure 1 : première requête authentifiée après redémarrage, puis 30 à chaud ──
+  conteneur prêt (liveness UP) après 38.9 s
+  froid #1   : 200 1.104227
+  froid #2   : 200 0.088214
+  codes HTTP à chaud : 30 200
+  n=30  min=12.0 ms  médiane=17.6 ms  p95=46.0 ms  max=83.5 ms
+
+── Mesure 2 : 5 requêtes concurrentes, première rafale après redémarrage ──
+  conteneur prêt (liveness UP) après 40.1 s
+  froid concurrent #4 : 200 1.683225
+  froid concurrent #2 : 200 1.685392
+  froid concurrent #3 : 200 1.667545
+  froid concurrent #5 : 200 1.676413
+  froid concurrent #1 : 200 1.715674
+
+── Journal core pendant la mesure 2 (provisioning / projection / erreurs) ──
+2026-10-02 01:56:30.512 [main] INFO  [] [] c.y.t.bootstrap.startup.StartupStep - [5/9] Starting: RoleRegistration — Provision 9 canonical TntRole definitions via tnt-roles-core (TntRoleInitializationService, idempotent, system tenant)
+2026-10-02 01:56:30.516 [main] INFO  [] [] c.y.t.b.registry.TntRoleRegistrar - TiiBnTick role provisioning completed via tnt-roles-core — 9 roles provisioned for system tenant [00000000-0000-0000-0000-000000000001]
+2026-10-02 01:57:22.218 [main] INFO  [] [] c.y.t.bootstrap.startup.StartupStep - [5/9] Starting: RoleRegistration — Provision 9 canonical TntRole definitions via tnt-roles-core (TntRoleInitializationService, idempotent, system tenant)
+2026-10-02 01:57:22.225 [main] INFO  [] [] c.y.t.b.registry.TntRoleRegistrar - TiiBnTick role provisioning completed via tnt-roles-core — 9 roles provisioned for system tenant [00000000-0000-0000-0000-000000000001]
+2026-10-02 01:58:15.215 [main] INFO  [] [] c.y.t.bootstrap.startup.StartupStep - [5/9] Starting: RoleRegistration — Provision 9 canonical TntRole definitions via tnt-roles-core (TntRoleInitializationService, idempotent, system tenant)
+2026-10-02 01:58:15.219 [main] INFO  [] [] c.y.t.b.registry.TntRoleRegistrar - TiiBnTick role provisioning completed via tnt-roles-core — 9 roles provisioned for system tenant [00000000-0000-0000-0000-000000000001]
+═══ fin ═══

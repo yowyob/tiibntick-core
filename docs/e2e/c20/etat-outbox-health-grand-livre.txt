@@ -1,0 +1,48 @@
+# état au 2026-10-02T02:50:59Z, binaire 246d2ce dirty=false
+   operation    |   status    | count |       premier       |       dernier       
+----------------+-------------+-------+---------------------+---------------------
+ ASSIGN_ROLE    | DEAD        |     5 | 2026-10-01 20:28:17 | 2026-10-02 02:08:11
+ PROVISION_ROLE | DEAD        |    10 | 2026-08-05 14:15:08 | 2026-08-05 14:15:08
+ UPDATE_ROLE    | PROVISIONED |     2 | 2026-10-01 20:23:14 | 2026-10-01 20:23:14
+(3 rows)
+
+   operation    |   status    | attempt_count |     created_at      |                                                              last_error                                                               
+----------------+-------------+---------------+---------------------+---------------------------------------------------------------------------------------------------------------------------------------
+ PROVISION_ROLE | DEAD        |            10 | 2026-08-05 14:15:08 | Failed to provision TiiBnTick role 'CLIENT': 403 Forbidden from POST https://kernel-core.yowyob.com/kernel-api/api/roles
+ PROVISION_ROLE | DEAD        |            10 | 2026-08-05 14:15:08 | Failed to provision TiiBnTick role 'BRANCH_MANAGER': 403 Forbidden from POST https://kernel-core.yowyob.com/kernel-api/api/roles
+ PROVISION_ROLE | DEAD        |            10 | 2026-08-05 14:15:08 | Failed to provision TiiBnTick role 'PERMANENT_DELIVERER': 403 Forbidden from POST https://kernel-core.yowyob.com/kernel-api/api/roles
+ PROVISION_ROLE | DEAD        |            10 | 2026-08-05 14:15:08 | Failed to provision TiiBnTick role 'TNT_ADMIN': 403 Forbidden from POST https://kernel-core.yowyob.com/kernel-api/api/roles
+ PROVISION_ROLE | DEAD        |            10 | 2026-08-05 14:15:08 | Failed to provision TiiBnTick role 'ORG_ADMIN': 403 Forbidden from POST https://kernel-core.yowyob.com/kernel-api/api/roles
+ PROVISION_ROLE | DEAD        |            10 | 2026-08-05 14:15:08 | Failed to provision TiiBnTick role 'AGENCY_MANAGER': 403 Forbidden from POST https://kernel-core.yowyob.com/kernel-api/api/roles
+ PROVISION_ROLE | DEAD        |            10 | 2026-08-05 14:15:08 | Failed to provision TiiBnTick role 'FREELANCER': 403 Forbidden from POST https://kernel-core.yowyob.com/kernel-api/api/roles
+ PROVISION_ROLE | DEAD        |            10 | 2026-08-05 14:15:08 | Failed to provision TiiBnTick role 'SUPPORT_AGENT': 403 Forbidden from POST https://kernel-core.yowyob.com/kernel-api/api/roles
+ PROVISION_ROLE | DEAD        |            10 | 2026-08-05 14:15:08 | Failed to provision TiiBnTick role 'RELAY_OPERATOR': 403 Forbidden from POST https://kernel-core.yowyob.com/kernel-api/api/roles
+ PROVISION_ROLE | DEAD        |            10 | 2026-08-05 14:15:08 | Failed to provision TiiBnTick role 'AGENCY_HUB_OPERATOR': 403 Forbidden from POST https://kernel-core.yowyob.com/kernel-api/api/roles
+ UPDATE_ROLE    | PROVISIONED |             1 | 2026-10-01 20:23:14 | 
+ UPDATE_ROLE    | PROVISIONED |             1 | 2026-10-01 20:23:14 | 
+ ASSIGN_ROLE    | DEAD        |            10 | 2026-10-01 20:28:17 | Role 'FREELANCER' is not provisioned in the Kernel's system tenant yet.
+ ASSIGN_ROLE    | DEAD        |            10 | 2026-10-01 20:37:18 | Role 'FREELANCER' is not provisioned in the Kernel's system tenant yet.
+ ASSIGN_ROLE    | DEAD        |            10 | 2026-10-01 20:46:15 | Role 'FREELANCER' is not provisioned in the Kernel's system tenant yet.
+ ASSIGN_ROLE    | DEAD        |            10 | 2026-10-02 02:00:21 | Role 'FREELANCER' is not provisioned in the Kernel's system tenant yet.
+ ASSIGN_ROLE    | DEAD        |            10 | 2026-10-02 02:08:11 | Role 'FREELANCER' is not provisioned in the Kernel's system tenant yet.
+(17 rows)
+
+## /actuator/health (anonyme)
+{"description":"Kernel role-sync outbox holds DEAD entries — see details.dead_by_operation","status":"DEGRADED","groups":["liveness","readiness"]}  → HTTP 200
+## /actuator/prometheus
+gofp_delivery_payment_failures_total{application="tiibntick-core",solution="TNT"} 0.0
+tnt_roles_sync_outbox_entries{application="tiibntick-core",solution="TNT",status="DEAD"} 15.0
+tnt_roles_sync_outbox_entries{application="tiibntick-core",solution="TNT",status="PENDING"} 0.0
+tnt_roles_sync_outbox_entries{application="tiibntick-core",solution="TNT",status="RETRYING"} 0.0
+## grand livre
+                  id                  |               owner_id               | balance  | tx |  somme   
+--------------------------------------+--------------------------------------+----------+----+----------
+ db432caa-eaaf-44dc-8ad2-851d86481a64 | f69444e3-ec21-4fee-bd84-20c435c567ae | 22800.00 |  8 | 22800.00
+ 34728a32-0d56-4f27-8bf7-b7d801daed40 | 61aab2d1-1477-414e-b1b0-4cf9d291b084 |  5700.00 |  2 |  5700.00
+(2 rows)
+
+ tx_total | somme_totale 
+----------+--------------
+       10 |     28500.00
+(1 row)
+

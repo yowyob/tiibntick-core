@@ -1,7 +1,7 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.out.notification;
 
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.NotificationStreamPort;
-import com.yowyob.tiibntick.core.gofreelancer.adapter.out.kafka.event.MatchingNotificationEvent;
+import com.yowyob.tiibntick.core.gofreelancer.domain.model.MatchingNotification;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
@@ -19,10 +19,10 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class NotificationStreamAdapter implements NotificationStreamPort {
 
-    private final Map<UUID, Sinks.Many<MatchingNotificationEvent>> userSinks = new ConcurrentHashMap<>();
+    private final Map<UUID, Sinks.Many<MatchingNotification>> userSinks = new ConcurrentHashMap<>();
 
     @Override
-    public Flux<MatchingNotificationEvent> getNotificationStream(UUID freelancerId) {
+    public Flux<MatchingNotification> getNotificationStream(UUID freelancerId) {
         log.info("Client connected to notification stream: {}", freelancerId);
         return userSinks.computeIfAbsent(freelancerId,
                 id -> Sinks.many().multicast().onBackpressureBuffer())
@@ -30,13 +30,13 @@ public class NotificationStreamAdapter implements NotificationStreamPort {
     }
 
     @Override
-    public void pushNotification(MatchingNotificationEvent event) {
-        Sinks.Many<MatchingNotificationEvent> sink = userSinks.get(event.getFreelancerId());
+    public void pushNotification(MatchingNotification event) {
+        Sinks.Many<MatchingNotification> sink = userSinks.get(event.freelancerId());
         if (sink != null) {
-            log.info("Pushing real-time notification to client: {}", event.getFreelancerId());
+            log.info("Pushing real-time notification to client: {}", event.freelancerId());
             sink.emitNext(event, Sinks.EmitFailureHandler.FAIL_FAST);
         } else {
-            log.debug("No active stream for delivery person: {}", event.getFreelancerId());
+            log.debug("No active stream for delivery person: {}", event.freelancerId());
         }
     }
 }

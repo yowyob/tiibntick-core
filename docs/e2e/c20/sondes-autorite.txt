@@ -1,0 +1,19 @@
+# C-20.1 — sondes d'autorité, 2026-10-02T02:51:14Z
+# compte de test B (61aab2d1-1477-414e-b1b0-4cf9d291b084), FREELANCER dans tnt_roles du core LOCAL seulement ; aucun rôle côté Kernel (PROVISION_ROLE DEAD)
+
+## Claims du jeton Kernel (payload décodé, signature et jti omis)
+{"actor":"8b4db5c5-c69d-4f88-94e3-bcf86c69ec8f","sub":"61aab2d1-1477-414e-b1b0-4cf9d291b084","aud":"iwm-api","iss":"kernel-core","mfa":false,"adm":false,"exp":1790909939,"iat":1790909039,"tid":"dbae6615-8f7e-4ef5-9e58-23a6179acf22"}
+
+## Même jeton, deux cores (GET uniquement)
+### http://localhost:8080 — {"commit":"246d2ce","dirty":"false"}
+GET /billing/wallet/61aab2d1-1477-414e-b1b0-4cf9d291b084/balance?tenantId=dbae6615-8f7e-4ef5-9e58-23a6179acf22 → 200  {"walletId":"34728a32-0d56-4f27-8bf7-b7d801daed40","userId":"61aab2d1-1477-414e-b1b0-4cf9d291b084","availableBalance":5700.00,"reservedBalance":0.00,"
+GET /billing/wallet/61aab2d1-1477-414e-b1b0-4cf9d291b084/transactions?tenantId=dbae6615-8f7e-4ef5-9e58-23a6179acf22 → 200  [{"transactionId":"ebd203b1-9365-4fc4-aa2a-2a16a820461a","type":"CREDIT","amount":2850.00,"balanceAfter":5700.00,"currency":"XAF","channel":"WALLET","
+GET /api/v1/freelancers/me → 403  {"status":"ERROR","data":null,"error":{"code":"ROLE_FORBIDDEN","message":"Access denied: permission 'freelancer:read' is required.","violations":[],"p
+### https://tiibntick-core.yowyob.com — {"commit":"689fabf","dirty":"false"}
+GET /billing/wallet/61aab2d1-1477-414e-b1b0-4cf9d291b084/balance?tenantId=dbae6615-8f7e-4ef5-9e58-23a6179acf22 → 403  {"status":"ERROR","data":null,"error":{"code":"ROLE_FORBIDDEN","message":"Access denied: permission 'wallet:read' is required.","violations":[],"path"
+GET /billing/wallet/61aab2d1-1477-414e-b1b0-4cf9d291b084/transactions?tenantId=dbae6615-8f7e-4ef5-9e58-23a6179acf22 → 403  {"status":"ERROR","data":null,"error":{"code":"ROLE_FORBIDDEN","message":"Access denied: permission 'wallet:read' is required.","violations":[],"path"
+GET /api/v1/freelancers/me → 403  {"status":"ERROR","data":null,"error":{"code":"ROLE_FORBIDDEN","message":"Access denied: permission 'freelancer:read' is required.","violations":[],"p
+
+## Gardes @PreAuthorize(hasRole('FREELANCER')) — core LOCAL uniquement (écritures interdites en prod)
+PATCH /api/v1/freelancers/me/location → 403  
+POST /api/v1/freelancers/me/agencies/00000000-0000-0000-0000-0000000000aa → 403  

@@ -1,0 +1,44 @@
+# Lot C-21.2 — flux SSE /api/notifications/stream/{id}, conteneur en vol, même jeton compte B, même événement Kafka
+# script : scripts/e2e/c21-sse-golden.sh (publie {freelancerId,announcementId,title:"Annonce C-21 été",message:null} sur gofp.matching.notifications)
+
+## sse-AVANT-246d2ce.raw — 12 octets, sha256 2ccb08f887be26001f4b9309d5eb9a77ea569c57949a39b88c56b2a701609a0e
+   HTTP/1.1 200 OK
+   transfer-encoding: chunked
+   Vary: Origin
+   Vary: Access-Control-Request-Method
+   Vary: Access-Control-Request-Headers
+   Content-Type: text/event-stream;charset=UTF-8
+   Cache-Control: no-cache, no-store, max-age=0, must-revalidate
+   Pragma: no-cache
+   Expires: 0
+   X-Content-Type-Options: nosniff
+   X-Frame-Options: DENY
+   X-XSS-Protection: 0
+   Referrer-Policy: no-referrer
+   
+## sse-APRES-e25403e.raw — 12 octets, sha256 2ccb08f887be26001f4b9309d5eb9a77ea569c57949a39b88c56b2a701609a0e
+   HTTP/1.1 200 OK
+   transfer-encoding: chunked
+   Vary: Origin
+   Vary: Access-Control-Request-Method
+   Vary: Access-Control-Request-Headers
+   Content-Type: text/event-stream;charset=UTF-8
+   Cache-Control: no-cache, no-store, max-age=0, must-revalidate
+   Pragma: no-cache
+   Expires: 0
+   X-Content-Type-Options: nosniff
+   X-Frame-Options: DENY
+   X-XSS-Protection: 0
+   Referrer-Policy: no-referrer
+   
+
+cmp sse-AVANT-246d2ce.raw sse-APRES-e25403e.raw → identiques (code 0)
+
+## Pourquoi aucune trame data: dans les deux cas — défaut PRÉEXISTANT, hors périmètre du refactor
+Le consommateur MatchingNotificationConsumer est servi par la fabrique Kafka par défaut (value-deserializer ByteArrayDeserializer,
+application.yml l.54) sans convertisseur JSON : chaque message échoue avant d'atteindre le flux. Journal du conteneur, sur les deux binaires :
+  246d2ce 03:45:16 ERROR DefaultErrorHandler ... Cannot convert from [[B] to [...MatchingNotificationEvent] ... gofp.matching.notifications-0@0
+  e25403e 03:59:09 ERROR DefaultErrorHandler ... Cannot convert from [[B] to [...MatchingNotificationEvent] — même erreur (MessageConversionException), compte dans le journal : 1
+Le publieur applicatif (KafkaEventPublisher.publishMatchingNotification) passe en plus par l'outbox avec une enveloppe DomainEventEnvelope,
+dont la forme n'est pas celle de MatchingNotificationEvent. Aujourd'hui, en local comme (vraisemblablement) en prod, le mobile ne reçoit
+donc que le commentaire ':connected'. Le contrat des trames data: est prouvé par NotificationStreamControllerSseContractTest, pas par le run.

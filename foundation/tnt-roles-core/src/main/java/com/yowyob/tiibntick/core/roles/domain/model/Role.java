@@ -18,14 +18,21 @@ public record Role(
         String code,
         String name,
         RoleScopeType scopeType,
-        Set<String> permissions
+        Set<String> permissions,
+        boolean editable
 ) {
 
     public Role {
         permissions = permissions == null ? Set.of() : Set.copyOf(permissions);
     }
 
+    /** Creates a new system role (editable=false). */
     public static Role create(UUID tenantId, String code, String name, RoleScopeType scopeType, Set<String> permissions) {
-        return new Role(UUID.randomUUID(), tenantId, code, name, scopeType, permissions);
+        return new Role(UUID.randomUUID(), tenantId, code, name, scopeType, permissions, false);
+    }
+
+    /** Creates a new role with an explicit editable flag. */
+    public static Role create(UUID tenantId, String code, String name, RoleScopeType scopeType, Set<String> permissions, boolean editable) {
+        return new Role(UUID.randomUUID(), tenantId, code, name, scopeType, permissions, editable);
     }
 }

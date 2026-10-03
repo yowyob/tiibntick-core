@@ -5,6 +5,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.yowyob.tiibntick.core.gofreelancer.application.service.GofpUserProvisioningService;
+import com.yowyob.tiibntick.core.gofreelancer.config.GofpProvisioningProperties;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpUser;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.AfterEach;
@@ -32,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -55,7 +57,8 @@ class GofpUserProvisioningFilterTest {
     @BeforeEach
     void setUp() {
         registry = new SimpleMeterRegistry();
-        filter = new GofpUserProvisioningFilter(provisioningService, registry);
+        filter = new GofpUserProvisioningFilter(provisioningService, registry,
+                new GofpProvisioningProperties());
         filter.init();
         when(chain.filter(exchange)).thenReturn(Mono.empty());
     }
@@ -118,6 +121,25 @@ class GofpUserProvisioningFilterTest {
 
         verify(provisioningService).provisionIfAbsent(sub);
         verify(chain).filter(exchange);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Test 3b — lot C-19: a provisioned user costs no further database read
+    // ══════════════════════════════════════════════════════════════════════
+
+    @Test
+    void filter_provisionedUser_subsequentRequestsServedFromCache() {
+        UUID sub = UUID.randomUUID();
+        Authentication auth = mockAuth(true, sub.toString());
+        when(provisioningService.provisionIfAbsent(sub)).thenReturn(Mono.just(mock(GofpUser.class)));
+
+        for (int i = 0; i < 3; i++) {
+            StepVerifier.create(filter.filter(exchange, chain).contextWrite(securityCtx(auth)))
+                    .verifyComplete();
+        }
+
+        verify(provisioningService, times(1)).provisionIfAbsent(sub);
+        verify(chain, times(3)).filter(exchange);
     }
 
     // ══════════════════════════════════════════════════════════════════════

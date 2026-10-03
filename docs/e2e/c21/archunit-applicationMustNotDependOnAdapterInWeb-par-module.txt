@@ -1,0 +1,12 @@
+# Lot C-21.2 — LayeringArchitectureTest.applicationMustNotDependOnAdapterInWeb
+# violations NON gelées (absentes de tnt-bootstrap/archunit_store, store non modifié), arbre du lot C-21
+# source : tnt-bootstrap/target/surefire-reports/...LayeringArchitectureTest.txt ; total ArchUnit = 993, lignes comptées = 993
+# module = module Maven de la classe SOURCE (côté application) ; colonnes : violations | classes sources distinctes | module
+  927 |   39 | coreBackend/tnt-go-freelancer-point-back-core
+   22 |    9 | logistics/tnt-incident-core
+   20 |    3 | logistics/tnt-dispute-core
+   14 |    4 | coreBackend/tnt-agency-back-core/tnt-agency-org-core
+    7 |    1 | coreBackend/tnt-agency-back-core/tnt-agency-staff-core
+    1 |    1 | coreBackend/tnt-agency-back-core/tnt-agency-workforce-core
+    1 |    1 | billing/tnt-billing-wallet
+    1 |    1 | logistics/tnt-delivery-core

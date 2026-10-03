@@ -134,6 +134,12 @@ class TntRolesAutoConfigurationTest {
             }
 
             @Override
+            public reactor.core.publisher.Mono<com.yowyob.tiibntick.core.roles.domain.model.Role> findByCode(
+                    java.util.UUID tenantId, String code) {
+                return reactor.core.publisher.Mono.empty();
+            }
+
+            @Override
             public reactor.core.publisher.Mono<com.yowyob.tiibntick.core.roles.domain.model.Role> findById(
                     java.util.UUID tenantId, java.util.UUID roleId) {
                 return reactor.core.publisher.Mono.empty();
@@ -142,6 +148,12 @@ class TntRolesAutoConfigurationTest {
             @Override
             public reactor.core.publisher.Flux<com.yowyob.tiibntick.core.roles.domain.model.Role> findByTenantId(
                     java.util.UUID tenantId) {
+                return reactor.core.publisher.Flux.empty();
+            }
+
+            @Override
+            public reactor.core.publisher.Flux<com.yowyob.tiibntick.core.roles.domain.model.Role> findAllByCode(
+                    String code) {
                 return reactor.core.publisher.Flux.empty();
             }
 

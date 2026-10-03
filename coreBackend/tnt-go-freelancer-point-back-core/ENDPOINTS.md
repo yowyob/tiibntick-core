@@ -250,43 +250,11 @@ Met à jour un profil client (mêmes champs que la création, tous optionnels).
 
 ## 4. Livreurs (Freelancers)
 
-### `POST /api/freelancers/register`
-Inscription d'un livreur. Requête `multipart/form-data`.
-
-| Part | Type | Obligatoire | Description |
-|------|------|-------------|-------------|
-| `data` | JSON (texte) | ✅ | Champs de `FreelancerRegistrationRequest` |
-| `photoCard` | fichier | ❌ | Photo d'identité |
-| `cniRecto` / `cniVerso` | fichier | ❌ | Recto / verso CNI |
-| `nuiPhoto` | fichier | ❌ | Photo du NIU |
-| `frontPhoto` / `backPhoto` | fichier | ❌ | Photos avant / arrière du véhicule |
-| `storefrontPhoto` | fichier | ❌ | Photo de la devanture (si point relais) |
-
-**Champs du JSON `data`**
-
-| Champ | Obligatoire | Description |
-|-------|-------------|-------------|
-| `lastName` / `firstName` | ✅ | Identité |
-| `phone` / `email` | ✅ | Coordonnées |
-| `password` | ✅ | Mot de passe |
-| `nationalId` | ❌ | Numéro CNI |
-| `nui` | ❌ | Numéro d'Identification Unique |
-| `plateNumber` | ❌ | Immatriculation du véhicule |
-| `logisticsType` | ❌ | Type de véhicule (`BIKE`, `MOTORBIKE`, `CAR`, `VAN`, `TRUCK`…) |
-| `logisticsClass` | ❌ | Classe logistique |
-| `color` | ❌ | Couleur du véhicule |
-| `length` / `width` / `height` / `unit` | ❌ | Dimensions de coffre |
-| `commercialName` / `commercialRegister` | ❌ | Infos entreprise |
-| `siret` | ❌ | Numéro SIRET |
-| `street` / `city` / `district` / `country` | ❌ | Adresse |
-| `openingHours` | ❌ | Horaires d'ouverture (tableau) |
-
-**Réponse `201 Created`**
-```json
-{ "freelancerId": "uuid", "status": "PENDING" }
-```
-
----
+### ~~`POST /api/freelancers/register`~~ — supprimé (lot C-19.3)
+Retiré : aucun appelant (BFF, mobile, core), et il créait des `gofp_freelancers` avec
+`remaining_deliveries = 0` et un `core_user_id` provisoire — des profils qui ne pouvaient
+jamais accepter de course. La seule porte d'entrée est `POST /api/v1/freelancers`
+(tnt-actor-core) ; la projection GOFP est créée par `GofpFreelancerProjectionService`.
 
 ### `GET /api/freelancers/{id}`
 Récupère le profil complet d'un livreur.

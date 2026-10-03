@@ -55,7 +55,7 @@ public class TntRoleManagementService implements ManageTntRoleUseCase {
             return Mono.error(TntRoleException.roleCodeReserved(code));
         }
 
-        Role role = Role.create(tenantId, code, name, scopeType, permissions);
+        Role role = Role.create(tenantId, code, name, scopeType, permissions, true);
         String payload = RoleSyncPayloads.toJson(objectMapper,
                 new RoleSyncPayloads.ProvisionRolePayload(tenantId, role.code(), role.name(), role.scopeType().name(), role.permissions()));
         RoleSyncOutboxEntry outboxEntry = RoleSyncOutboxEntry.pending(
@@ -75,7 +75,7 @@ public class TntRoleManagementService implements ManageTntRoleUseCase {
                     if (TntRole.isKnownRole(existing.code())) {
                         return Mono.error(TntRoleException.systemRoleNotEditable(existing.code()));
                     }
-                    Role updated = new Role(existing.id(), existing.tenantId(), existing.code(), name, existing.scopeType(), permissions);
+                    Role updated = new Role(existing.id(), existing.tenantId(), existing.code(), name, existing.scopeType(), permissions, existing.editable());
                     return roleRepository.save(updated);
                 });
     }

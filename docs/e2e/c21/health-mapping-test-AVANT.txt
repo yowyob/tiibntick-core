@@ -1,0 +1,8 @@
+# HealthStatusHttpMappingTest sur application.yml de C-20.2 (avant correctif) — attendu ROUGE
+Tests run: 2, Failures: 2, Errors: 0, Skipped: 0, Time elapsed: 8.837 s <<< FAILURE! -- in com.yowyob.tiibntick.bootstrap.health.HealthStatusHttpMappingTest
+[DOWN] 
+expected: 503
+ but was: 200
+[DOWN] 
+expected: 503
+ but was: 200

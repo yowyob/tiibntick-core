@@ -114,6 +114,12 @@
             <artifactId>micrometer-core</artifactId>
         </dependency>
 
+        <!-- Bounded in-process cache for the provisioning web filters (lot C-19) -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+
         <!-- Tests -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

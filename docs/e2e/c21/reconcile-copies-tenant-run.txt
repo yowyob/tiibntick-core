@@ -1,0 +1,22 @@
+# C-21.3 — reconcileTenantCopies en run (base de test tiibntick_c21_prod, profil prod)
+# Copie FREELANCER semée le 2026-10-02T04:04Z dans le tenant c21c21c2-…aaaa SANS freelancer:read (permissions système moins freelancer:read), + 1 assignation
+## avant le premier redémarrage (relevé 2026-10-03T10:02Z) : tenant | a freelancer:read
+   00000000-0000-0000-0000-000000000001|t
+   c21c21c2-0000-0000-0000-00000000aaaa|f
+## après redémarrage (e25403e puis 7fc45b3)
+              tenant_id               |    code    | has_freelancer_read |          updated_at           
+--------------------------------------+------------+---------------------+-------------------------------
+ 00000000-0000-0000-0000-000000000001 | FREELANCER | t                   | 2026-10-02 04:00:48.363172+00
+ c21c21c2-0000-0000-0000-00000000aaaa | FREELANCER | t                   | 2026-10-03 10:07:17.811681+00
+(2 rows)
+
+  operation  |   status    |              tenant_id               |          created_at           
+-------------+-------------+--------------------------------------+-------------------------------
+ UPDATE_ROLE | PROVISIONED | c21c21c2-0000-0000-0000-00000000aaaa | 2026-10-03 10:07:17.474516+00
+ UPDATE_ROLE | PROVISIONED | c21c21c2-0000-0000-0000-00000000aaaa | 2026-10-03 10:07:17.607397+00
+(2 rows)
+
+## journal du démarrage de 10:03Z : perdu (conteneur recréé à 10:21Z pour 7fc45b3) — la preuve est updated_at=10:07:17Z de la copie
+##   et les 2 UPDATE_ROLE du tenant c21c21c2-…aaaa créés à la même seconde (2 = provisioning lancé deux fois au démarrage, défaut préexistant)
+## résolution des permissions de l'utilisateur assigné à la copie (SQL, chemin du LocalReactivePermissionResolver : assignation → rôle)
+c21c21c2-0000-0000-0000-0000000000b1|c21c21c2-0000-0000-0000-00000000aaaa|t

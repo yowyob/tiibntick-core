@@ -65,10 +65,11 @@ class TntRoleAssignmentServiceTest {
                 SYSTEM_TENANT_ID, permissionChangeNotifier);
         lenient().when(transactionalOperator.transactional(any(Mono.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(assignmentRepository.findByTenantIdAndUserId(any(), any())).thenReturn(Flux.empty());
     }
 
     private Role canonicalRole(String code, RoleScopeType scopeType) {
-        return new Role(UUID.randomUUID(), SYSTEM_TENANT_ID, code, code, scopeType, Set.of("some:permission"));
+        return new Role(UUID.randomUUID(), SYSTEM_TENANT_ID, code, code, scopeType, Set.of("some:permission"), false);
     }
 
     @Test
@@ -156,6 +157,44 @@ class TntRoleAssignmentServiceTest {
         assertThat(payload.get("scopeId").asText()).isEqualTo(SCOPE_ID.toString());
 
         verify(transactionalOperator).transactional(any(Mono.class));
+    }
+
+    @Test
+    void assignRole_alreadyAssigned_isIdempotent_noInsertNoOutboxEntry() {
+        // Lot C-20: re-assigning FREELANCER to a returning freelancer used to hit the unique
+        // constraint and poison the caller's transaction (HTTP 500 on POST /api/v1/freelancers).
+        Role localRole = canonicalRole("FREELANCER", RoleScopeType.TENANT);
+        when(roleRepository.findByTenantId(SYSTEM_TENANT_ID)).thenReturn(Flux.just(localRole));
+        UserRoleAssignment existing = UserRoleAssignment.assign(
+                TENANT_ID, TARGET_USER_ID, localRole.id(), RoleScopeType.TENANT, TENANT_ID);
+        when(assignmentRepository.findByTenantIdAndUserId(TENANT_ID, TARGET_USER_ID))
+                .thenReturn(Flux.just(existing));
+
+        StepVerifier.create(service.assignRole(TENANT_ID, TARGET_USER_ID, "FREELANCER", TENANT_ID))
+                .assertNext(result -> {
+                    assertThat(result.assignmentId()).isEqualTo(existing.id());
+                    assertThat(result.roleCode()).isEqualTo("FREELANCER");
+                })
+                .verifyComplete();
+
+        verify(assignmentRepository, org.mockito.Mockito.never()).save(any());
+        verify(outboxRepository, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
+    void assignRole_sameRoleDifferentScope_stillInserts() {
+        Role localRole = canonicalRole("AGENCY_MANAGER", RoleScopeType.AGENCY);
+        when(roleRepository.findByTenantId(SYSTEM_TENANT_ID)).thenReturn(Flux.just(localRole));
+        when(assignmentRepository.findByTenantIdAndUserId(TENANT_ID, TARGET_USER_ID)).thenReturn(Flux.just(
+                UserRoleAssignment.assign(TENANT_ID, TARGET_USER_ID, localRole.id(), RoleScopeType.AGENCY, UUID.randomUUID())));
+        when(assignmentRepository.save(any())).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
+        when(outboxRepository.save(any())).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
+
+        StepVerifier.create(service.assignRole(TENANT_ID, TARGET_USER_ID, "AGENCY_MANAGER", SCOPE_ID))
+                .assertNext(result -> assertThat(result.scopeId()).isEqualTo(SCOPE_ID))
+                .verifyComplete();
+
+        verify(assignmentRepository).save(any());
     }
 
     @Test

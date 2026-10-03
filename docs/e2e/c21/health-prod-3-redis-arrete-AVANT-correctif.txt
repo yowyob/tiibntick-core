@@ -1,0 +1,8 @@
+# Redis du conteneur prod-test ARRÊTÉ (docker stop tnt-c21-redis) — binaire e25403e, config C-20.2 telle quelle
+# 2026-10-03T10:10:10Z — http://localhost:18080
+# binaire : {"commit":"e25403e","dirty":"false"}
+# conteneur tnt-c21-prod : profil prod, démarré 2026-10-03T10:03:01Z, redémarrages 0
+# tnt_role_sync_outbox (tiibntick_c21_prod) : DEAD=10 PROVISIONED=2
+/actuator/health             → HTTP 200  {"status":"DOWN"}
+/actuator/health/liveness    → HTTP 200  {"status":"UP"}
+/actuator/health/readiness   → HTTP 200  {"status":"DOWN"}

@@ -1,0 +1,7 @@
+# 2026-10-02T04:01:26Z — http://localhost:8080
+# binaire : {"commit":"e25403e","dirty":"false"}
+# conteneur tnt-core : profil dev, démarré 2026-10-02T03:58:03Z, redémarrages 0
+# tnt_role_sync_outbox (tiibntick_core) : DEAD=15 PENDING=2 PROVISIONED=2
+/actuator/health             → HTTP 200  {"status":"DEGRADED"}
+/actuator/health/liveness    → HTTP 200  {"status":"UP"}
+/actuator/health/readiness   → HTTP 200  {"status":"UP"}

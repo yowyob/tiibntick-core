@@ -119,7 +119,7 @@ class TntRoleManagementServiceTest {
     @Test
     void updateRole_systemRole_shouldErrorAndNeverSave() {
         UUID roleId = UUID.randomUUID();
-        Role systemRole = new Role(roleId, TENANT_ID, "AGENCY_MANAGER", "Agency Manager", RoleScopeType.AGENCY, Set.of("mission:read"));
+        Role systemRole = new Role(roleId, TENANT_ID, "AGENCY_MANAGER", "Agency Manager", RoleScopeType.AGENCY, Set.of("mission:read"), false);
         when(roleRepository.findById(TENANT_ID, roleId)).thenReturn(Mono.just(systemRole));
 
         StepVerifier.create(service.updateRole(TENANT_ID, roleId, "New name", Set.of("mission:read")))
@@ -135,7 +135,7 @@ class TntRoleManagementServiceTest {
     @Test
     void updateRole_customRole_shouldSaveLocallyAndNeverTouchOutbox() {
         UUID roleId = UUID.randomUUID();
-        Role existing = new Role(roleId, TENANT_ID, "CUSTOM_DISPATCHER", "Old name", RoleScopeType.TENANT, Set.of("mission:read"));
+        Role existing = new Role(roleId, TENANT_ID, "CUSTOM_DISPATCHER", "Old name", RoleScopeType.TENANT, Set.of("mission:read"), true);
         when(roleRepository.findById(TENANT_ID, roleId)).thenReturn(Mono.just(existing));
         when(roleRepository.save(any())).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
 
@@ -169,7 +169,7 @@ class TntRoleManagementServiceTest {
     @Test
     void deleteRole_systemRole_shouldErrorAndNeverDelete() {
         UUID roleId = UUID.randomUUID();
-        Role systemRole = new Role(roleId, TENANT_ID, "AGENCY_MANAGER", "Agency Manager", RoleScopeType.AGENCY, Set.of());
+        Role systemRole = new Role(roleId, TENANT_ID, "AGENCY_MANAGER", "Agency Manager", RoleScopeType.AGENCY, Set.of(), false);
         when(roleRepository.findById(TENANT_ID, roleId)).thenReturn(Mono.just(systemRole));
 
         StepVerifier.create(service.deleteRole(TENANT_ID, roleId))
@@ -185,7 +185,7 @@ class TntRoleManagementServiceTest {
     @Test
     void deleteRole_neverSyncedToKernel_shouldDeleteLocallyAndNeverTouchOutbox() {
         UUID roleId = UUID.randomUUID();
-        Role existing = new Role(roleId, TENANT_ID, "CUSTOM_DISPATCHER", "Custom Dispatcher", RoleScopeType.TENANT, Set.of());
+        Role existing = new Role(roleId, TENANT_ID, "CUSTOM_DISPATCHER", "Custom Dispatcher", RoleScopeType.TENANT, Set.of(), true);
         when(roleRepository.findById(TENANT_ID, roleId)).thenReturn(Mono.just(existing));
         when(roleRepository.findKernelRoleId(TENANT_ID, roleId)).thenReturn(Mono.empty());
         when(roleRepository.deleteById(TENANT_ID, roleId)).thenReturn(Mono.empty());
@@ -201,7 +201,7 @@ class TntRoleManagementServiceTest {
     void deleteRole_alreadySyncedToKernel_shouldEnqueueDeleteRoleOutboxEntryThenDelete() throws Exception {
         UUID roleId = UUID.randomUUID();
         UUID kernelRoleId = UUID.randomUUID();
-        Role existing = new Role(roleId, TENANT_ID, "CUSTOM_DISPATCHER", "Custom Dispatcher", RoleScopeType.TENANT, Set.of());
+        Role existing = new Role(roleId, TENANT_ID, "CUSTOM_DISPATCHER", "Custom Dispatcher", RoleScopeType.TENANT, Set.of(), true);
         when(roleRepository.findById(TENANT_ID, roleId)).thenReturn(Mono.just(existing));
         when(roleRepository.findKernelRoleId(TENANT_ID, roleId)).thenReturn(Mono.just(kernelRoleId));
 
@@ -229,7 +229,7 @@ class TntRoleManagementServiceTest {
 
     @Test
     void listRoles_shouldDelegateToRoleRepository() {
-        Role role = new Role(UUID.randomUUID(), TENANT_ID, "CUSTOM_DISPATCHER", "Custom Dispatcher", RoleScopeType.TENANT, Set.of());
+        Role role = new Role(UUID.randomUUID(), TENANT_ID, "CUSTOM_DISPATCHER", "Custom Dispatcher", RoleScopeType.TENANT, Set.of(), true);
         when(roleRepository.findByTenantId(TENANT_ID)).thenReturn(Flux.just(role));
 
         StepVerifier.create(service.listRoles(TENANT_ID))

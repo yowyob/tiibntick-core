@@ -33,7 +33,8 @@ public final class RolePersistenceMapper {
                 e.getCode(),
                 e.getName(),
                 RoleScopeType.valueOf(e.getScopeType()),
-                splitPermissions(e.getPermissions()));
+                splitPermissions(e.getPermissions()),
+                e.isEditable());
     }
 
     /**
@@ -46,8 +47,8 @@ public final class RolePersistenceMapper {
         e.markNew();
         e.setId(d.id());
         applyDomainFields(e, d);
-        e.setSystemRole(false);
-        e.setEditable(true);
+        e.setSystemRole(!d.editable());
+        e.setEditable(d.editable());
         e.setKernelRoleId(null);
         java.time.Instant now = java.time.Instant.now();
         e.setCreatedAt(now);

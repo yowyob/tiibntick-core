@@ -1,0 +1,160 @@
+02:00:06 
+02:00:06 ──── SELF-TEST garde isolation ────
+02:00:06 [SELF-TEST] liste vide + mission_b_ok=false → TENANT_SCOPING_PROVEN non modifié ✓
+02:00:06 [SELF-TEST] PASS — liste vide n'élève PAS TENANT_SCOPING_PROVEN (reste 'unknown')
+02:00:06 
+02:00:06 ──── C0 — EMPREINTE DU BINAIRE ────
+02:00:06 [PASS] C0 : /actuator/info → HTTP 200, git.commit.id = 3b41505, git.dirty=false
+02:00:06 
+02:00:06 ──── PRÉFLIGHT — santé BFF + OTP unique ────
+02:00:06 [INFO] Préflight : BFF=http://localhost:3001 (coreAdapter=real)
+02:00:06 [INFO] Préflight : flux OTP unique pour +237600184095
+02:00:07   Mode PREVIEW_ONLY — code OTP : 527736
+02:00:14   Jeton obtenu via BFF (eyJraWQiOiJr…, longueur 769)
+02:00:14 [INFO] Préflight OTP : TOKEN obtenu (eyJraWQiOiJr…)
+02:00:14 
+02:00:14 ──── C1 — AUTHENTIFICATION FREELANCER ────
+02:00:14 [INFO] BFF : http://localhost:3001 (coreAdapter=real)
+02:00:14 [INFO] C1 : jeton déjà obtenu par le préflight OTP (eyJraWQiOiJr…, longueur 769)
+02:00:14 [PASS] C1 JWT sub (FREELANCER_USER_ID) non vide  (valeur : 'ab57d86b-bb7a-4bd0-aa76-b7c041dadb06')
+02:00:19 [INFO] Purge RBAC pré-C0b : cache invalidé pour ab57d86b…
+02:00:19 
+02:00:19 ──── ONBOARD — POST /v1/kyc/freelancer/submit (chemin mobile) ────
+02:00:21 [PASS] ONBOARD BFF /v1/kyc/freelancer/submit → HTTP 201
+02:00:22 [PASS] ONBOARD : tnt_actor.freelancer_profiles créé par POST /api/v1/freelancers  (valeur : '1fa0f91f-4d04-49a7-b37d-c5e9a2b197f3')
+02:00:22 [PASS] ONBOARD : rôle canonique FREELANCER assigné (rôles : FREELANCER)
+02:00:27 
+02:00:27 ──── C0b — MODE D'AUTHENTIFICATION DU CORE ────
+02:00:27 [INFO] C0b probe-a (sans auth)       → HTTP 401
+02:00:27 [INFO] C0b probe-b (Bearer invalide)  → HTTP 401
+02:00:27 [INFO] C0b probe-c (jeton valide)     → HTTP 403
+02:00:27 [PASS] C0b : chaîne JWT réelle — 401 sans token, 403 avec jeton (run propre)
+02:00:27 
+02:00:27   ┌──────────────────────────────────────────────────────────────────────┐
+02:00:27   │ RAPPORT E2E — Lot C-bis : boucle coursier freelancer                  │
+02:00:27   │ CORE_URL (SHA)          : http://localhost:8080                       │
+02:00:27   │ BFF_URL                 : http://localhost:3001                       │
+02:00:27   │ CORE_DIRECT_URL         : http://localhost:8080                       │
+02:00:27   │ git.commit.id           : 3b41505                                     │
+02:00:27   │ AUTH_MODE               : jwt-reel                                    │
+02:00:27   │ JWT_TENANT (tid)        : dbae6615-8f7e-4ef5-9e58-23a6179acf22        │
+02:00:27   │ CORE_EFFECTIVE_TENANT   : dbae6615-8f7e-4ef5-9e58-23a6179acf22        │
+02:00:27   │ AUTH_CHAIN_ACTIVE       : true                                        │
+02:00:27   │ TENANT_SCOPING_PROVEN   : unknown                                     │
+02:00:27   │ Horodatage              : 2026-10-02T02:00:27Z                        │
+02:00:27   └──────────────────────────────────────────────────────────────────────┘
+02:00:27 
+02:00:27 
+02:00:27 ──── SETUP RBAC — vérification rôle FREELANCER canonique (C-16/C-17) ────
+02:00:27 [PASS] SETUP RBAC : rôle FREELANCER assigné automatiquement par FreelancerService (C-16)  (valeur : 'FREELANCER')
+02:00:28 [SETUP] SETUP RBAC : FREELANCER.permissions contient announcement:respond + announcement:elect (C-17)
+02:00:32 [SETUP] SETUP RBAC : rôle FREELANCER vérifié + cache invalidé
+02:00:32 
+02:00:32 ──── SEED — deux missions E2E ────
+02:00:38 [SETUP] SEED C10 livraison sender semée (freelancer_id=NULL, clientId=FREELANCER)
+02:00:38 [SETUP] SEED C11 livraison tiers semée (clientId étranger)
+02:00:39 [SETUP] SEED isolation : annonce e2ec4000… dans tenant 43427172… semée
+02:00:39 [PASS] SEED psql : missions B et A à PUBLISHED, tenant=dbae6615…
+02:00:39 [INFO] Mission B (C3/C8) : e2ebb000-0000-0000-0000-e2ebb0000099
+02:00:39 [INFO] Mission A (SETUP/C4) : e2ebb000-0000-0000-0000-e2ebb0000004
+02:00:39 
+02:00:39 ──── C2 — GET /v1/freelancer/jobs/available ────
+02:00:39 [PASS] C2 GET /v1/freelancer/jobs/available → HTTP 200
+02:00:39 [PASS] C2 réponse est un tableau JSON  (valeur : 'yes')
+02:00:39 [INFO] C2 : 2 mission(s) disponible(s)
+02:00:39 [PASS] C2 : mission B (e2ebb000…) présente dans la liste
+02:00:39 [PASS] C2 isolation : annonce du tenant 43427172… absente — cloisonnement prouvé
+02:00:39 
+02:00:39 ──── SETUP-PICKUP — assignation directe Mission A, capture pickupOtp ────
+02:00:40 [SETUP] SETUP subscribe Mission A → HTTP 202
+02:00:41 [PASS] C-18 projection : gofp_freelancers (id=core_freelancer_id=profileId, core_user_id, APPROVED, actif) — non écrit par le script  (valeur : '1fa0f91f-4d04-49a7-b37d-c5e9a2b197f3|1fa0f91f-4d04-49a7-b37d-c5e9a2b197f3|ab57d86b-bb7a-4bd0-aa76-b7c041dadb06|APPROVED|true')
+02:00:41 [SETUP] C-18 projection : gofp_freelancers.remaining_deliveries=100 (> 0)
+02:00:41 [PASS] C-18 projection : tnt_delivery_persons (id=profileId, actor_id=user, APPROVED) — non écrit par le script  (valeur : '1fa0f91f-4d04-49a7-b37d-c5e9a2b197f3|ab57d86b-bb7a-4bd0-aa76-b7c041dadb06|APPROVED')
+02:00:43 [SETUP] SETUP assign → HTTP 200, pickupOtp capturé (833***)
+02:00:43 [SETUP] SETUP deliveryOtp capturé (PREVIEW_ONLY — 861***)
+02:00:43 [SETUP] SETUP deliveryId : 62315e15-d15b-47…
+02:00:43 [SETUP] Pré-C3 : subscribe direct Mission B → HTTP 202 (réponse en base)
+02:00:43 
+02:00:43 ──── C9 — IDEMPOTENCE subscribe (deux appels, une seule candidature) ────
+02:00:43 [PASS] C9 : second subscribe → HTTP 202 (idempotent, pas d'erreur)
+02:00:44 [PASS] C9 : SELECT COUNT(*) tnt_announcement_responses = 1 — une seule candidature pour deux subscribes
+02:00:44 
+02:00:44 ──── C10 — PATCH cancel par l'expéditeur (isSender → 200) ────
+02:00:44 [PASS] C10 PATCH /deliveries/e2ec1000…/cancel (expéditeur) → HTTP 200
+02:00:44 
+02:00:44 ──── C11 — PATCH cancel par un tiers → 403 ────
+02:00:44 [PASS] C11 PATCH /deliveries/e2ec1100…/cancel (tiers → 403) → HTTP 403
+02:00:44 
+02:00:44 ──── C3 — POST /v1/freelancer/jobs/e2ebb000…/accept (BFF, Mission B) ────
+02:00:45 [PASS] C3 POST /v1/freelancer/jobs/:id/accept → HTTP 200
+02:00:45 [PASS] C3 response.status == 'accepted'  (valeur : 'accepted')
+02:00:45 
+02:00:45 ──── C4 — POST /v1/freelancer/jobs/:id/pickup (Mission A) ────
+02:00:45 [PASS] C4 POST /v1/freelancer/jobs/:id/pickup → HTTP 200
+02:00:45 [PASS] C4 response.status == 'picked_up'  (valeur : 'picked_up')
+02:00:45 [PASS] C4 vérification indépendante : GET /deliveries/{id} → status=PICKED_UP
+02:00:45 [INFO] DEBUG avant C5 : 1 livraisons pour GOFP_FL_ID=1fa0f91f…
+02:00:45 [INFO] DEBUG livraisons : [{"id":"62315e15-d15b-4705-aeca-21c809ec721d","status":"PICKED_UP","annId":"e2ebb000-0000-0000-0000-e2ebb0000004","needId":null}]
+02:00:45 
+02:00:45 ──── C5 — POST /v1/freelancer/jobs/:id/deliver ────
+02:00:46 [INFO] C5 (avant livraison) : AUCUN wallet pour ab57d86b… (compte vierge) — solde de départ 0
+02:00:46 [FAIL] C5 POST /v1/freelancer/jobs/:id/deliver (PREVIEW_ONLY OTP) → attendu HTTP 200, obtenu HTTP 500
+02:00:46 [FAIL] C5 response.status == 'delivered'  attendu='delivered'  obtenu=''
+02:00:46 [WARN] Corps C5 : {"error":{"code":"INTERNAL","message":"core Freelancer transitionDelivery:patch a échoué (HTTP 500)"}}
+02:00:46 
+02:00:46 ──── C6 — GET /v1/freelancer/wallet ────
+02:00:46 [PASS] C6 GET /v1/freelancer/wallet → HTTP 200
+02:00:46 [PASS] C6 withdraw_available PRÉSENT (champ défini, pas undefined)  (valeur : 'true')
+02:00:46 [PASS] C6 withdraw_available == false  (valeur : 'false')
+02:00:46 [PASS] C6 wallet.balance présent  (valeur : '0')
+02:00:46 [PASS] C6 wallet.currency présent  (valeur : 'XAF')
+02:00:46 [INFO] C6 wallet : balance=0 XAF, withdraw_available=false
+02:00:47 [FAIL] C6 balance BFF(0) != DB() — le BFF affiche un solde erroné — identifiant BFF=ab57d86b…, wallet owner_id=…
+02:00:47 
+02:00:47 ──── C7 — POST /v1/freelancer/wallet/withdraw ────
+02:00:47 [PASS] C7 POST /v1/freelancer/wallet/withdraw → 503 → HTTP 503
+02:00:47 [PASS] C7 error.code == FEATURE_UNAVAILABLE  (valeur : 'FEATURE_UNAVAILABLE')
+02:00:47 
+02:00:47 ──── C8 — double POST /v1/freelancer/jobs/:id/accept (Mission B, garde anti-retry) ────
+02:00:47 [PASS] C8 2ème accept → 409 (transition interdite) → HTTP 409
+02:00:47 [PASS] C8 error.code == INVALID_STATE  (valeur : 'INVALID_STATE')
+02:00:47 
+02:00:47 ════════════════════════════════════════════════════════════════════════
+02:00:47   RÉCAPITULATIF — Lot C-bis : boucle coursier freelancer
+02:00:47   git.commit.id          : 3b41505
+02:00:47   AUTH_MODE              : jwt-reel
+02:00:47   JWT_TENANT (tid)       : dbae6615-8f7e-4ef5-9e58-23a6179acf22
+02:00:47   CORE_EFFECTIVE_TENANT  : dbae6615-8f7e-4ef5-9e58-23a6179acf22
+02:00:47   AUTH_CHAIN_ACTIVE      : true
+02:00:47   TENANT_SCOPING_PROVEN  : true
+02:00:47   API via BFF            : http://localhost:3001 (adapter=real)
+02:00:47   Setup direct           : http://localhost:8080
+02:00:47 ════════════════════════════════════════════════════════════════════════
+02:00:47   ÉT.   DESCRIPTION                                    RÉSULTAT
+02:00:47   ─────  ─────────────────────────────────────────────  ────────────────────────────────────
+02:00:47   C0     Empreinte binaire (git.commit.id)              ✅ PASS — commit 3b41505
+02:00:47   C0b    Mode d'authentification du core                ✅ PASS — AUTH_MODE=jwt-reel, probe-c=403
+02:00:47   C1     Auth freelancer (OTP BFF)                      ✅ PASS — userId ab57d86b…
+02:00:47   C2     Missions disponibles (mission B trouvée)      ✅ PASS (2 missions, mission B trouvée, isolation prouvée)
+02:00:47   C3     Accepter via BFF (Mission B)                   ✅ PASS (status=accepted)
+02:00:47   SETUP  Assign direct Mission A, capture pickupOtp     ✅ SETUP — pickupOtp capturé, deliveryId=62315e15…
+02:00:47   C4     Pickup (BCrypt vérifié par core)             ✅ PASS (status=picked_up, OTP BCrypt vérifié par le core)
+02:00:47   C5     Deliver (deliveryOtp)                          ❌ FAIL (HTTP 500, status='')
+02:00:47   C6     Wallet (withdraw_available présent)           ✅ PASS (withdraw_available présent, balance=0 XAF)
+02:00:47   C7     Retrait → 503 FEATURE_UNAVAILABLE            ✅ PASS (503 FEATURE_UNAVAILABLE)
+02:00:47   C8     Double accept → 409 INVALID_STATE            ✅ PASS (409 INVALID_STATE — garde anti-retry active)
+02:00:47   C9     Idempotence subscribe (2 appels, 1 candidature)  ✅ PASS (idempotence prouvée — 1 candidature après 2 subscribes)
+02:00:47   C10    Cancel expéditeur (isSender) → 200          ✅ PASS — expéditeur autorisé (isSender=true), HTTP 200
+02:00:47   C11    Cancel tiers → 403 (garde propriété)       ✅ PASS — tiers refusé (garde active), HTTP 403
+02:00:47 ════════════════════════════════════════════════════════════════════════
+02:00:47 
+02:00:47 ──── ASSERTION TRANSVERSALE : logs core (depuis 2026-10-02T02:00:06Z) ────
+02:00:47 [PASS] LOGS : aucune erreur avalée dans les logs core (best-effort|side-effect failed|Access denied)
+02:00:47   BILAN : 3 assertion(s) échouée(s)
+02:00:47   ✗ C5 POST /v1/freelancer/jobs/:id/deliver (PREVIEW_ONLY OTP) → attendu HTTP 200, obtenu HTTP 500
+02:00:47   ✗ C5 response.status == 'delivered'  attendu='delivered'  obtenu=''
+02:00:48   ✗ C6 balance BFF(0) != DB() — le BFF affiche un solde erroné — identifiant BFF=ab57d86b…, wallet owner_id=…
+02:00:48 
+02:00:48 
+02:00:48 ──── NETTOYAGE ────
+02:00:52 Annonces + colis psql supprimés.

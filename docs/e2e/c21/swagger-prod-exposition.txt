@@ -1,0 +1,10 @@
+# Lot C-21.2 — exposition Swagger / OpenAPI sur la production, SANS authentification (aucun en-tête Authorization/X-Api-Key envoyé)
+# 2026-10-02T03:55:20Z — https://tiibntick-core.yowyob.com — binaire : {"dirty":"false","commit":{"id":{"abbrev":"689fabf"},"time":"2026-09-30T01:05:13Z"},"branch":"main"}
+# application.yml : springdoc.swagger-ui.path=/swagger-ui.html (l.168), api-docs.path=/v3/api-docs (l.177), profil prod l.624-627 : enabled: true
+curl -s -o /dev/null -w %{http_code} https://tiibntick-core.yowyob.com/swagger-ui.html → 302  (0 octets, )
+curl -s -o /dev/null -w %{http_code} https://tiibntick-core.yowyob.com/swagger-ui/index.html → 200  (734 octets, text/html)
+curl -s -o /dev/null -w %{http_code} https://tiibntick-core.yowyob.com/v3/api-docs → 200  (726914 octets, application/json)
+curl -s -o /dev/null -w %{http_code} https://tiibntick-core.yowyob.com/v3/api-docs/swagger-config → 200  (2261 octets, application/json)
+# contenu de /v3/api-docs (comptage seulement, rien d'autre n'est recopié) :
+{"openapi":"3.1.0","paths":863,"operations":987,"securitySchemes":["ApiKeyAuth","ClientIdAuth","bearerAuth","oauth2"],"servers":["https://tiibntick-core.yowyob.com","http://localhost:8080"]}
+# chemins contenant /admin ou /internal : 45

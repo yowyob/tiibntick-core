@@ -85,7 +85,28 @@ public class TntRoleAssignmentService implements AssignTntRoleUseCase {
                 .filter(localRole -> localRole.code().equalsIgnoreCase(role.code()))
                 .next()
                 .switchIfEmpty(Mono.error(TntRoleException.roleNotSeeded(role.code())))
-                .flatMap(localRole -> saveAssignmentAndEnqueue(resolvedTenantId, targetUserId, localRole.id(), role, scopeType, resolvedScopeId));
+                .flatMap(localRole -> existingAssignment(resolvedTenantId, targetUserId, localRole.id(), scopeType, resolvedScopeId)
+                        .map(existing -> new TntRoleAssignmentResult(
+                                existing.id(), targetUserId, role.code(), scopeType.name(), resolvedScopeId))
+                        .switchIfEmpty(Mono.defer(() -> saveAssignmentAndEnqueue(
+                                resolvedTenantId, targetUserId, localRole.id(), role, scopeType, resolvedScopeId))));
+    }
+
+    /**
+     * Lot C-20 — assigning a role the user already holds (same tenant, user, role, scope:
+     * the columns of the table's unique constraint) is a no-op returning the existing
+     * assignment, with no new Kernel outbox entry. Before, the INSERT hit the unique
+     * constraint; a caller that swallowed the error inside its own transaction (e.g.
+     * {@code FreelancerService.createFreelancerProfile} on an existing profile) then failed
+     * at commit with "The database returned ROLLBACK" → HTTP 500 for every returning freelancer.
+     */
+    private Mono<UserRoleAssignment> existingAssignment(UUID tenantId, UUID userId, UUID roleId,
+            RoleScopeType scopeType, UUID scopeId) {
+        return assignmentRepository.findByTenantIdAndUserId(tenantId, userId)
+                .filter(a -> roleId.equals(a.roleId())
+                        && scopeType == a.scopeType()
+                        && java.util.Objects.equals(scopeId, a.scopeId()))
+                .next();
     }
 
     private Mono<TntRoleAssignmentResult> saveAssignmentAndEnqueue(UUID resolvedTenantId, UUID targetUserId, UUID localRoleId,

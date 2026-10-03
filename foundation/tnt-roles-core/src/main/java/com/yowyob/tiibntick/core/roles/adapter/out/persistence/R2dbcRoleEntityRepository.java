@@ -26,5 +26,9 @@ public interface R2dbcRoleEntityRepository extends ReactiveCrudRepository<RoleEn
 
     Mono<Boolean> existsByTenantIdAndCodeIgnoreCase(UUID tenantId, String code);
 
+    Mono<RoleEntity> findByTenantIdAndCodeIgnoreCase(UUID tenantId, String code);
+
+    Flux<RoleEntity> findByCodeIgnoreCase(String code);
+
     Mono<Long> deleteByIdAndTenantId(UUID id, UUID tenantId);
 }

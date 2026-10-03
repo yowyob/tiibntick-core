@@ -1,0 +1,7 @@
+# C-21.2 — NotificationStreamControllerSseContractTest sur le contrôleur AVANT refactor (HEAD fd5e4f1 + test seul, contrôleur inchangé)
+# 2026-10-02T03:46:59Z — git diff --stat du code principal gofp :
+# (vide = contrôleur d'origine)
+-------------------------------------------------------------------------------
+Test set: com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.NotificationStreamControllerSseContractTest
+-------------------------------------------------------------------------------
+Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 5.398 s -- in com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.NotificationStreamControllerSseContractTest

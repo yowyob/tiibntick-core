@@ -321,7 +321,8 @@ public class TntRolesAutoConfiguration {
             @Qualifier("kernelWebClient") WebClient kernelWebClient) {
 
         LocalReactivePermissionResolver local =
-                new LocalReactivePermissionResolver(assignmentRepository, roleRepository, registry);
+                new LocalReactivePermissionResolver(assignmentRepository, roleRepository, registry,
+                        properties.getSystemTenantId());
         RemoteReactivePermissionResolver remote = new RemoteReactivePermissionResolver(kernelWebClient);
 
         ReactivePermissionResolver delegate = switch (properties.getPermission().getMode()) {

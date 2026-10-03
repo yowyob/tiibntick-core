@@ -22,7 +22,11 @@ import java.util.UUID;
  * nothing for callers):
  * <ol>
  *   <li>Look up the user's role assignments via {@link UserRoleAssignmentRepository}.</li>
- *   <li>For each assignment, resolve the {@link Role} via {@link RoleRepository} and take its
+ *   <li>For each assignment, resolve the {@link Role} via {@link RoleRepository} — first in the
+ *       assignment's tenant, then in the system tenant where the canonical roles are
+ *       provisioned (the system-tenant fallback only accepts a role whose code
+ *       {@link TntRoleDefinitionRegistry} recognises as canonical: a custom role that merely
+ *       happens to live under the system tenant is not lent to other tenants) — and take its
  *       persisted permission set — this is the tenant-customized source of truth once roles
  *       are actually provisioned into this repository.</li>
  *   <li>If a role can't be found there yet (nothing has provisioned it locally), fall back to
@@ -47,14 +51,24 @@ public class LocalReactivePermissionResolver implements ReactivePermissionResolv
     private final UserRoleAssignmentRepository assignmentRepository;
     private final RoleRepository roleRepository;
     private final TntRoleDefinitionRegistry registry;
+    private final UUID systemTenantId;
 
+    /**
+     * @param systemTenantId tenant under which the canonical role definitions are provisioned
+     *                       ({@code tnt.roles.system-tenant-id}). {@code TntRoleAssignmentService}
+     *                       assigns those system-tenant roles to users of <em>any</em> tenant, so
+     *                       a role lookup that only searched the assignment's tenant resolved
+     *                       every canonical assignment (e.g. FREELANCER) to zero permissions.
+     */
     public LocalReactivePermissionResolver(
             UserRoleAssignmentRepository assignmentRepository,
             RoleRepository roleRepository,
-            TntRoleDefinitionRegistry registry) {
+            TntRoleDefinitionRegistry registry,
+            UUID systemTenantId) {
         this.assignmentRepository = assignmentRepository;
         this.roleRepository = roleRepository;
         this.registry = registry;
+        this.systemTenantId = systemTenantId;
     }
 
     @Override
@@ -70,6 +84,11 @@ public class LocalReactivePermissionResolver implements ReactivePermissionResolv
 
     private Flux<Set<String>> resolveAssignment(UUID tenantId, UserRoleAssignment assignment) {
         return roleRepository.findById(tenantId, assignment.roleId())
+                // Canonical roles live under the system tenant (see TntRoleAssignmentService#assignRole).
+                .switchIfEmpty(Mono.defer(() -> systemTenantId == null || systemTenantId.equals(tenantId)
+                        ? Mono.empty()
+                        : roleRepository.findById(systemTenantId, assignment.roleId())
+                                .filter(role -> isCanonical(role, tenantId))))
                 .map(role -> scoped(permissionsOf(role), assignment))
                 .switchIfEmpty(Mono.fromSupplier(() -> {
                     log.debug("No Role found locally for roleId={} — nothing to resolve without a role code.",
@@ -77,6 +96,18 @@ public class LocalReactivePermissionResolver implements ReactivePermissionResolv
                     return Set.<String>of();
                 }))
                 .flux();
+    }
+
+    /**
+     * Only the canonical TiiBnTick roles are shared from the system tenant with every tenant;
+     * any other system-tenant role stays private to the system tenant (deny-by-default).
+     */
+    private boolean isCanonical(Role role, UUID assignmentTenantId) {
+        if (registry.isKnownRole(role.code())) return true;
+        log.warn("Role {} ({}) exists only under the system tenant and is not canonical — "
+                        + "not resolved for an assignment in tenant {}",
+                role.code(), role.id(), assignmentTenantId);
+        return false;
     }
 
     /**

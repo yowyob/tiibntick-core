@@ -127,8 +127,9 @@ public enum TntRole {
             Set.of(
                     MISSION_READ, MISSION_START, MISSION_COMPLETE,
                     DELIVERY_READ, DELIVERY_TRACK, DELIVERY_CONFIRM, DELIVERY_PROOF,
-                    ANNOUNCEMENT_READ, ANNOUNCEMENT_RESPOND,
+                    ANNOUNCEMENT_READ, ANNOUNCEMENT_RESPOND, ANNOUNCEMENT_ELECT,
                     ACTOR_READ,
+                    FREELANCER_READ,
                     WALLET_READ, WALLET_WRITE,
                     PAYMENT_PROCESS,
                     TRUST_READ, TRUST_VERIFY,

@@ -36,6 +36,12 @@ public class RoleRepositoryAdapter implements RoleRepository {
     }
 
     @Override
+    public Mono<Role> findByCode(UUID tenantId, String code) {
+        return repository.findByTenantIdAndCodeIgnoreCase(tenantId, code)
+                .map(RolePersistenceMapper::toDomain);
+    }
+
+    @Override
     public Mono<Role> findById(UUID tenantId, UUID roleId) {
         return repository.findByIdAndTenantId(roleId, tenantId)
                 .map(RolePersistenceMapper::toDomain);
@@ -44,6 +50,12 @@ public class RoleRepositoryAdapter implements RoleRepository {
     @Override
     public Flux<Role> findByTenantId(UUID tenantId) {
         return repository.findByTenantId(tenantId)
+                .map(RolePersistenceMapper::toDomain);
+    }
+
+    @Override
+    public Flux<Role> findAllByCode(String code) {
+        return repository.findByCodeIgnoreCase(code)
                 .map(RolePersistenceMapper::toDomain);
     }
 

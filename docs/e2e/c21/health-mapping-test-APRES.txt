@@ -1,0 +1,2 @@
+# HealthStatusHttpMappingTest après correctif
+Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 7.520 s -- in com.yowyob.tiibntick.bootstrap.health.HealthStatusHttpMappingTest

@@ -19,6 +19,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Mono;
@@ -30,6 +31,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -80,7 +82,9 @@ class DeliveryStatusPaymentActorResolutionTest {
                 walletUseCase,
                 custodyTransferUseCase, missionUseCase, paymentUseCase,
                 deliveryQueryUseCase, deliveryLifecycleUseCase,
-                tenantContextHolder);
+                tenantContextHolder,
+                new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
+        service.initMetrics();
     }
 
     @Test
@@ -119,7 +123,11 @@ class DeliveryStatusPaymentActorResolutionTest {
         when(deliveryQueryUseCase.resolveActorIdForDeliveryPerson(tenantId, freelancerProfileId))
                 .thenReturn(Mono.just(freelancerActorId));
 
-        // ORANGE_MONEY path → splitMissionRevenue (no deliveryNeedId → paymentMethod = ORANGE_MONEY)
+        // ORANGE_MONEY path → getOrCreateWallet then splitMissionRevenue
+        // (no deliveryNeedId → paymentMethod = ORANGE_MONEY)
+        when(walletUseCase.getOrCreateWallet(freelancerActorId, tenantId)).thenReturn(Mono.just(
+                com.yowyob.tiibntick.core.billing.wallet.domain.model.Wallet.createNew(
+                        freelancerActorId, tenantId, java.util.Currency.getInstance("XAF"))));
         when(walletUseCase.splitMissionRevenue(any())).thenReturn(Mono.just(
                 new PaymentSplitResult(UUID.randomUUID(), deliveryId.toString(),
                         BigDecimal.valueOf(5000), "XAF",
@@ -142,7 +150,11 @@ class DeliveryStatusPaymentActorResolutionTest {
 
         ArgumentCaptor<SplitMissionRevenueCommand> captor =
                 ArgumentCaptor.forClass(SplitMissionRevenueCommand.class);
-        verify(walletUseCase).splitMissionRevenue(captor.capture());
+        // Lot C-19.2: the beneficiary wallet is ensured (created on a first paid delivery)
+        // for the resolved actorId BEFORE the split, which only looks it up.
+        InOrder inOrder = inOrder(walletUseCase);
+        inOrder.verify(walletUseCase).getOrCreateWallet(freelancerActorId, tenantId);
+        inOrder.verify(walletUseCase).splitMissionRevenue(captor.capture());
 
         SplitMissionRevenueCommand cmd = captor.getValue();
         assertThat(cmd.freelancerOrgId())

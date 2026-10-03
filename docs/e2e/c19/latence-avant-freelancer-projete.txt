@@ -1,0 +1,28 @@
+═══ measure-cold-latency — AVANT C-19 (f23fabb) — compte freelancer déjà projeté ═══
+date (UTC)   : 2026-10-02T01:36:42Z
+core         : {"commit":"f23fabb","dirty":"false"}
+route        : GET /api/delivery-needs/user/f69444e3-ec21-4fee-bd84-20c435c567ae
+sub          : f69444e3-ec21-4fee-bd84-20c435c567ae
+jeton expire : 01:49:05Z
+
+── Mesure 1 : première requête authentifiée après redémarrage, puis 30 à chaud ──
+  conteneur prêt (liveness UP) après 33.9 s
+  froid #1   : 200 1.143775
+  froid #2   : 200 0.052160
+  codes HTTP à chaud : 30 200
+  n=30  min=30.5 ms  médiane=43.0 ms  p95=80.9 ms  max=105.3 ms
+
+── Mesure 2 : 5 requêtes concurrentes, première rafale après redémarrage ──
+  conteneur prêt (liveness UP) après 33.8 s
+  froid concurrent #3 : 200 0.919413
+  froid concurrent #2 : 200 0.930190
+  froid concurrent #1 : 200 0.963119
+  froid concurrent #5 : 200 1.047542
+  froid concurrent #4 : 200 1.065878
+
+── Journal core pendant la mesure 2 (provisioning / projection / erreurs) ──
+2026-10-02 01:37:27.862 [main] INFO  [] [] c.y.t.bootstrap.startup.StartupStep - [5/9] Starting: RoleRegistration — Provision 9 canonical TntRole definitions via tnt-roles-core (TntRoleInitializationService, idempotent, system tenant)
+2026-10-02 01:37:27.866 [main] INFO  [] [] c.y.t.b.registry.TntRoleRegistrar - TiiBnTick role provisioning completed via tnt-roles-core — 9 roles provisioned for system tenant [00000000-0000-0000-0000-000000000001]
+2026-10-02 01:38:15.712 [main] INFO  [] [] c.y.t.bootstrap.startup.StartupStep - [5/9] Starting: RoleRegistration — Provision 9 canonical TntRole definitions via tnt-roles-core (TntRoleInitializationService, idempotent, system tenant)
+2026-10-02 01:38:15.716 [main] INFO  [] [] c.y.t.b.registry.TntRoleRegistrar - TiiBnTick role provisioning completed via tnt-roles-core — 9 roles provisioned for system tenant [00000000-0000-0000-0000-000000000001]
+═══ fin ═══

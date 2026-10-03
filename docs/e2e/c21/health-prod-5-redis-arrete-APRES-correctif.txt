@@ -1,0 +1,12 @@
+# Redis du conteneur prod-test ARRÊTÉ — binaire 7fc45b3 (correctif http-mapping)
+# 2026-10-03T10:25:22Z — http://localhost:18080
+# binaire : {"commit":"7fc45b3","dirty":"false"}
+# conteneur tnt-c21-prod : profil prod, démarré 2026-10-03T10:21:36Z, redémarrages 0
+# tnt_role_sync_outbox (tiibntick_c21_prod) : DEAD=10 PROVISIONED=2
+/actuator/health             → HTTP 503  {"status":"DOWN"}
+/actuator/health/liveness    → HTTP 200  {"status":"UP"}
+/actuator/health/readiness   → HTTP 503  {"status":"DOWN"}
+# Redis redémarré :
+/actuator/health             → HTTP 200  {"status":"DEGRADED"}
+/actuator/health/liveness    → HTTP 200  {"status":"UP"}
+/actuator/health/readiness   → HTTP 200  {"status":"UP"}

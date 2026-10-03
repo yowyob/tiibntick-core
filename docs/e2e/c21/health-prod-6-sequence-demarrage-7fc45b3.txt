@@ -1,0 +1,5 @@
+# Séquence de démarrage (docker restart tnt-c21-prod, 7fc45b3, profil prod, 10 DEAD) — une ligne par changement d'état, sondé chaque seconde
+10:29:05 health=000/ liveness=000 readiness=000/
+10:31:54 health=000/ liveness=503 readiness=000/
+10:31:57 health=503/DOWN liveness=200 readiness=503/OUT_OF_SERVICE
+10:31:59 health=200/DEGRADED liveness=200 readiness=200/UP

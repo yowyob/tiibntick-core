@@ -1,0 +1,13 @@
+# 2026-10-03T10:40:09Z — http://localhost:8080
+# binaire en vol : {"commit":"7fc45b3","dirty":"false"}
+# sub du jeton  : 61aab2d1-1477-414e-b1b0-4cf9d291b084
+GET /api/v1/freelancers/me → 200
+{"status":"SUCCESS","error":null,"data":{"id":"47fa0b91-91a2-4f0d-b365-fd6eb9009a95","actorId":"61aab2d1-1477-414e-b1b0-4cf9d291b084","status":null}}
+
+# 2026-10-03T10:40:11Z — http://localhost:8080
+# binaire : {"commit":"7fc45b3","dirty":"false"}
+# conteneur tnt-core : profil dev, démarré 2026-10-03T10:36:44Z, redémarrages 0
+# tnt_role_sync_outbox (tiibntick_core) : DEAD=15 PROVISIONED=4
+/actuator/health             → HTTP 200  {"status":"DEGRADED"}
+/actuator/health/liveness    → HTTP 200  {"status":"UP"}
+/actuator/health/readiness   → HTTP 200  {"status":"UP"}

@@ -1,0 +1,9 @@
+# Base de TEST tiibntick_c21_prod uniquement : DELETE FROM tnt_role_sync_outbox WHERE status='DEAD' puis docker restart tnt-c21-prod
+DELETE 10
+# 2026-10-03T10:36:17Z — http://localhost:18080
+# binaire : {"commit":"7fc45b3","dirty":"false"}
+# conteneur tnt-c21-prod : profil prod, démarré 2026-10-03T10:33:03Z, redémarrages 0
+# tnt_role_sync_outbox (tiibntick_c21_prod) : PROVISIONED=2
+/actuator/health             → HTTP 200  {"status":"UP"}
+/actuator/health/liveness    → HTTP 200  {"status":"UP"}
+/actuator/health/readiness   → HTTP 200  {"status":"UP"}

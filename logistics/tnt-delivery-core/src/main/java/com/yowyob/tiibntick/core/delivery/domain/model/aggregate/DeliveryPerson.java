@@ -90,6 +90,44 @@ public class DeliveryPerson {
     }
 
     /**
+     * Projection factory — creates a {@code DeliveryPerson} whose id is imposed by the caller.
+     *
+     * <p>Use ONLY from projection services that need to mirror an already-validated
+     * freelancer profile ({@code tnt_actor.freelancer_profiles}) into the logistics layer.
+     * Unlike {@link #register}, this factory:
+     * <ul>
+     *   <li>Uses the supplied {@code id} (must equal {@code freelancer_profiles.id})</li>
+     *   <li>Sets {@code status = APPROVED} immediately (no vetting is performed anywhere today)</li>
+     *   <li>Uses placeholder vehicle data {@code MOTORBIKE / STANDARD / tank 5.0} — the same
+     *       values the E2E harness used to seed by hand; the freelancer profile carries no
+     *       vehicle information to project from</li>
+     * </ul>
+     *
+     * <p>TODO (business decision deferred): APPROVED bypasses any platform-side logistics
+     * vetting (identity/KYC, insurance, vehicle registration). The business must decide
+     * whether projection should create {@code PENDING} rows and require {@link #approve()}.
+     */
+    public static DeliveryPerson projection(UUID id, UUID tenantId, UUID actorId,
+                                             int remainingDeliveries) {
+        return DeliveryPerson.builder()
+                .id(id)
+                .tenantId(tenantId)
+                .actorId(actorId)
+                .logisticsType(LogisticsType.MOTORBIKE)
+                .logisticsClass(LogisticsClass.STANDARD)
+                .tankCapacity(5.0)
+                .grossFloor(0.0)
+                .totalSeatNumber(2)
+                .remainingDeliveries(remainingDeliveries)
+                .failedDeliveries(0)
+                .totalDeliveries(0)
+                .status(DeliveryPersonStatus.APPROVED)
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+    }
+
+    /**
      * Updates the real-time GPS position of the delivery person.
      */
     public void updateLocation(GeoCoordinates location) {

@@ -1,0 +1,32 @@
+# 2026-10-02T03:58:46Z — http://localhost:8080
+# binaire en vol : {"commit":"e25403e","dirty":"false"}
+# sub du jeton  : 61aab2d1-1477-414e-b1b0-4cf9d291b084
+GET /api/v1/freelancers/me → 200
+{"status":"SUCCESS","error":null,"data":{"id":"47fa0b91-91a2-4f0d-b365-fd6eb9009a95","actorId":"61aab2d1-1477-414e-b1b0-4cf9d291b084","status":null}}
+
+## Rôle FREELANCER et porteurs (même requête qu'avant)
+               user_id                |          assignment_tenant           |             role_tenant              |    code    | has_freelancer_read 
+--------------------------------------+--------------------------------------+--------------------------------------+------------+---------------------
+ 61aab2d1-1477-414e-b1b0-4cf9d291b084 | dbae6615-8f7e-4ef5-9e58-23a6179acf22 | 00000000-0000-0000-0000-000000000001 | FREELANCER | t
+ ab57d86b-bb7a-4bd0-aa76-b7c041dadb06 | dbae6615-8f7e-4ef5-9e58-23a6179acf22 | 00000000-0000-0000-0000-000000000001 | FREELANCER | t
+ f69444e3-ec21-4fee-bd84-20c435c567ae | dbae6615-8f7e-4ef5-9e58-23a6179acf22 | 00000000-0000-0000-0000-000000000001 | FREELANCER | t
+(3 rows)
+
+## Copies de rôles canoniques hors tenant système (cible de reconcileTenantCopies)
+ tenant_id | code | has_freelancer_read 
+-----------+------+---------------------
+(0 rows)
+
+## Journal de démarrage (réconciliation)
+2026-10-02 03:58:35.744 [reactor-tcp-epoll-3] INFO  [] [] c.y.t.c.r.a.s.TntRoleInitializationService - Reconciling permissions for system role FREELANCER (tenant 00000000-0000-0000-0000-000000000001): added=[freelancer:read], removed=[]
+2026-10-02 03:58:35.765 [reactor-tcp-epoll-1] INFO  [] [] c.y.t.c.r.a.s.TntRoleInitializationService - Reconciling permissions for system role FREELANCER (tenant 00000000-0000-0000-0000-000000000001): added=[freelancer:read], removed=[]
+2026-10-02 03:58:35.985 [reactor-tcp-epoll-1] INFO  [] [] c.y.t.c.r.a.s.TntRoleInitializationService - TntRoleInitializationService: reconciliation complete.
+2026-10-02 03:58:36.008 [reactor-tcp-epoll-1] INFO  [] [] c.y.t.c.r.a.s.TntRoleInitializationService - TntRoleInitializationService: reconciliation complete.
+## Outbox de synchro Kernel (avant redémarrage → après)
+avant  ASSIGN_ROLE|DEAD|5
+avant  PROVISION_ROLE|DEAD|10
+avant  UPDATE_ROLE|PROVISIONED|2
+après  ASSIGN_ROLE|DEAD|5
+après  PROVISION_ROLE|DEAD|10
+après  UPDATE_ROLE|PENDING|2
+après  UPDATE_ROLE|PROVISIONED|2

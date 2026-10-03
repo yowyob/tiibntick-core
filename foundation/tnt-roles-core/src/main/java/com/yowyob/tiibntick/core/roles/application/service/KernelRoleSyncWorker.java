@@ -139,6 +139,10 @@ public class KernelRoleSyncWorker {
     private Mono<Void> dispatch(RoleSyncOutboxEntry entry) {
         return switch (entry.operation()) {
             case PROVISION_ROLE -> handleProvisionRole(entry);
+            // UPDATE_ROLE is local-only: the Kernel exposes no PUT/PATCH for roles.
+            // Mark PROVISIONED immediately so the entry leaves PROCESSING and doesn't
+            // accumulate as a zombie (processedAt stamped, kernelRefId stays null).
+            case UPDATE_ROLE -> outboxRepository.save(entry.asProvisioned(entry.kernelRefId())).then();
             case DELETE_ROLE -> handleDeleteRole(entry);
             case ASSIGN_ROLE -> handleAssignRole(entry);
             case REVOKE_ASSIGNMENT -> handleRevokeAssignment(entry);

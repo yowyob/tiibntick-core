@@ -1,6 +1,6 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web;
 
-import com.yowyob.tiibntick.core.gofreelancer.adapter.out.kafka.event.MatchingNotificationEvent;
+import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.response.MatchingNotificationResponse;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.NotificationStreamPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -37,16 +37,17 @@ public class NotificationStreamController {
     private final NotificationStreamPort notificationStreamPort;
 
     @GetMapping("/stream/{freelancerId}")
-    public ResponseEntity<Flux<ServerSentEvent<MatchingNotificationEvent>>> getNotificationStream(
+    public ResponseEntity<Flux<ServerSentEvent<MatchingNotificationResponse>>> getNotificationStream(
             @PathVariable UUID freelancerId) {
-        Flux<ServerSentEvent<MatchingNotificationEvent>> body = notificationStreamPort
+        Flux<ServerSentEvent<MatchingNotificationResponse>> body = notificationStreamPort
                 .getNotificationStream(freelancerId)
-                .map(event -> ServerSentEvent.<MatchingNotificationEvent>builder(event)
+                .map(MatchingNotificationResponse::from)
+                .map(event -> ServerSentEvent.<MatchingNotificationResponse>builder(event)
                         .event("notification")
                         .build())
                 // Immediate comment keeps the SSE response open under strict Accept negotiation
                 // and avoids idle clients seeing a hung connection with no headers flushed.
-                .startWith(ServerSentEvent.<MatchingNotificationEvent>builder()
+                .startWith(ServerSentEvent.<MatchingNotificationResponse>builder()
                         .comment("connected")
                         .build());
         return ResponseEntity.ok()

@@ -72,6 +72,13 @@ public final class TntPermission {
     public static final String ACTOR_SUSPEND = "actor:suspend";
 
     // ─────────────────────────────────────────────────────────────
+    // FREELANCER — Freelancer profile (FreelancerController, actor-core)
+    // ─────────────────────────────────────────────────────────────
+
+    /** Read one's own freelancer profile ({@code GET /api/v1/freelancers/me}). */
+    public static final String FREELANCER_READ = "freelancer:read";
+
+    // ─────────────────────────────────────────────────────────────
     // ROUTE & GEO — Route optimization and geolocation
     // ─────────────────────────────────────────────────────────────
 

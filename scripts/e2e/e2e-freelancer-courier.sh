@@ -190,19 +190,10 @@ kafka_invalidate_permission_cache() {
 cleanup() {
   echo
   echo "──── NETTOYAGE ────"
-  # Rôle RBAC E2E (lot C4)
-  if [ "$SEEDED_ROLE" = "1" ] && [ -n "$FREELANCER_USER_ID" ] && [ -n "$JWT_TENANT" ]; then
-    psql_q "DELETE FROM tnt_user_role_assignments \
-      WHERE role_id='${E2E_ROLE_C4_ID}';" > /dev/null 2>&1 || true
-    psql_q "DELETE FROM tnt_roles WHERE id='${E2E_ROLE_C4_ID}';" > /dev/null 2>&1 || true
-    echo "Rôle RBAC E2E C4 supprimé."
-  fi
-  # Quota gofp_freelancers + tnt_delivery_persons (créés pour le test)
-  if [ -n "${GOFP_FL_ID:-}" ] && [ -n "${FREELANCER_USER_ID:-}" ]; then
-    psql_q "DELETE FROM gofp_freelancers WHERE id='${GOFP_FL_ID}' AND core_user_id='${FREELANCER_USER_ID}';" > /dev/null 2>&1 || true
-    psql_q "DELETE FROM tnt_delivery_persons WHERE id='${GOFP_FL_ID}' AND actor_id='${FREELANCER_USER_ID}';" > /dev/null 2>&1 || true
-    echo "Entrées gofp_freelancers + tnt_delivery_persons E2E supprimées."
-  fi
+  # Rôle RBAC E2E (lot C4) — supprimé en C-18 : le rôle FREELANCER canonique
+  # est attribué par FreelancerService et persiste (pas de nettoyage).
+  # gofp_freelancers + tnt_delivery_persons — créés par GofpFreelancerProjectionService,
+  # persistants : aucun nettoyage nécessaire.
   # Annonces + livraisons C10/C11 (cancel guard)
   psql_q "DELETE FROM deliveries WHERE id IN ('${E2E_DEL_C10_ID}','${E2E_DEL_C11_ID}');" > /dev/null 2>&1 || true
   psql_q "DELETE FROM announcements WHERE id IN ('${E2E_ANN_C10_ID}','${E2E_ANN_C11_ID}');" > /dev/null 2>&1 || true
@@ -406,11 +397,56 @@ fi
 # contamination réelle.
 # On supprime le rôle de la DB si présent (idempotent) puis on invalide le cache.
 if psql_available 2>/dev/null && [ -n "$FREELANCER_USER_ID" ] && [ -n "$JWT_TENANT" ]; then
-  psql_q "DELETE FROM tnt_user_role_assignments WHERE role_id='${E2E_ROLE_C4_ID}';" > /dev/null 2>&1 || true
-  psql_q "DELETE FROM tnt_roles WHERE id='${E2E_ROLE_C4_ID}';" > /dev/null 2>&1 || true
+  # Lot C-18 : plus de rôle E2E_COURIER_C4 à purger. On invalide seulement le cache
+  # pour que les permissions FREELANCER (C-16/C-17) soient fraîches dès C0b.
   kafka_invalidate_permission_cache "${JWT_TENANT}" "${FREELANCER_USER_ID}"
   sleep 2
-  info "Purge RBAC pré-C0b : rôle E2E supprimé + cache invalidé pour ${FREELANCER_USER_ID:0:8}…"
+  info "Purge RBAC pré-C0b : cache invalidé pour ${FREELANCER_USER_ID:0:8}…"
+fi
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ONBOARD — devenir freelancer par le chemin exact de l'application mobile (C-18)
+#
+#   mobile → BFF POST /v1/kyc/freelancer/submit (tiibntick-bff src/routes/kyc.ts)
+#          → RealCoreFreelancer.ensureProfile → GET /api/v1/freelancers/me,
+#            puis POST /api/v1/freelancers si absent (idempotent)
+#          → FreelancerService.createFreelancerProfile → grantFreelancerRole (C-16)
+#
+# Le script n'écrit RIEN en SQL ici : il appelle l'API puis vérifie que le profil
+# et l'assignation du rôle canonique FREELANCER existent. Rejouable : si le profil
+# existe déjà, ensureProfile le renvoie tel quel.
+# ══════════════════════════════════════════════════════════════════════════════
+step "ONBOARD — POST /v1/kyc/freelancer/submit (chemin mobile)"
+
+if [ "$BFF_ADAPTER" != "mock" ] && [ -n "$FREELANCER_USER_ID" ]; then
+  ONB_HTTP=$(curl -s -o /tmp/tnt_onboard.json -w "%{http_code}" --max-time 30 \
+    -X POST "${BFF_URL}/v1/kyc/freelancer/submit" \
+    -H "Authorization: Bearer ${TOKEN_FREELANCER}" \
+    -H "Content-Type: application/json" \
+    -d '{"firstName":"E2E","lastName":"Courier","birthDate":"1990-01-01","nationality":"CM",
+         "rectoUri":"e2e://recto","versoUri":"e2e://verso","selfieUri":"e2e://selfie",
+         "vehicleType":"moto","vehiclePlate":"E2E-C18","vehiclePhotoUris":["e2e://vehicle"]}' \
+    2>/dev/null || echo "000")
+  assert_http "201" "$ONB_HTTP" "ONBOARD BFF /v1/kyc/freelancer/submit"
+  if psql_available 2>/dev/null; then
+    ONB_PROFILE=$(psql_q "SELECT id FROM tnt_actor.freelancer_profiles WHERE actor_id='${FREELANCER_USER_ID}' LIMIT 1;" 2>/dev/null || echo "")
+    assert_nonempty "$ONB_PROFILE" "ONBOARD : tnt_actor.freelancer_profiles créé par POST /api/v1/freelancers"
+    ONB_ROLES=$(psql_q "SELECT string_agg(r.code, ',' ORDER BY r.code) FROM tnt_user_role_assignments a
+                        JOIN tnt_roles r ON r.id=a.role_id WHERE a.user_id='${FREELANCER_USER_ID}';" 2>/dev/null || echo "")
+    if echo ",${ONB_ROLES}," | grep -q ",FREELANCER,"; then
+      pass "ONBOARD : rôle canonique FREELANCER assigné (rôles : ${ONB_ROLES})"
+    else
+      fail "ONBOARD : FREELANCER absent des rôles de l'utilisateur (rôles : '${ONB_ROLES}')"
+    fi
+    if echo ",${ONB_ROLES}," | grep -q ",E2E_COURIER_C4,"; then
+      fail "ONBOARD : rôle ad hoc E2E_COURIER_C4 encore présent — béquille non retirée"
+    fi
+  fi
+  # La permission ajoutée par l'assignation doit être visible tout de suite.
+  kafka_invalidate_permission_cache "${JWT_TENANT}" "${FREELANCER_USER_ID}"
+  sleep 2
+else
+  warn "ONBOARD ignoré (BFF=$BFF_ADAPTER ou userId inconnu)"
 fi
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -523,72 +559,54 @@ echo -e "  └──────────────────────
 echo
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SETUP RBAC — rôle minimal E2E (lot C4)
+# SETUP RBAC — assertion du rôle FREELANCER canonique (lot C-17/C-18)
 #
-# Permissions requises par ce scénario :
-#   announcement:respond → POST /api/announcements/:id/subscribe (SETUP + C3 via BFF)
-#   announcement:elect   → POST /api/announcements/:id/assign   (SETUP)
-#   wallet:read          → GET /api/v1/billing/wallet/...        (C6)
-#   freelancer:read      → GET /api/v1/freelancers/me            (C0b sonde-c, BFF resolveFreelancerId)
+# Lot C-16 : FreelancerService.grantFreelancerRole assigne automatiquement FREELANCER
+#            à la création du profil (POST /api/v1/freelancers).
+# Lot C-17 : la réconciliation TntRoleInitializationService garantit que FREELANCER
+#            contient announcement:respond ET announcement:elect dans ses permissions.
 #
-# Mécanisme identique à e2e-freelancer-flow.sh SETUP RBAC (lot 21).
-# SEEDED_ROLE=1 active le cleanup sur EXIT.
+# Ce bloc NE crée plus aucun rôle ad hoc en SQL. Il vérifie que le rôle FREELANCER
+# a bien été attribué par le code de production, et invalide le cache pour s'assurer
+# que les permissions sont fraîches pour la suite du scénario.
 # ══════════════════════════════════════════════════════════════════════════════
-step "SETUP RBAC — rôle E2E courier (lot C4)"
+step "SETUP RBAC — vérification rôle FREELANCER canonique (C-16/C-17)"
 
 if psql_available 2>/dev/null && [ -n "$FREELANCER_USER_ID" ] && [ -n "$JWT_TENANT" ]; then
-  # ─── Nettoyage préventif ──────────────────────────────────────────────────
-  psql_q "DELETE FROM tnt_user_role_assignments WHERE role_id='${E2E_ROLE_C4_ID}';" > /dev/null 2>&1 || true
-  psql_q "DELETE FROM tnt_roles WHERE id='${E2E_ROLE_C4_ID}';" > /dev/null 2>&1 || true
+  # ─── Vérifier que FREELANCER est bien assigné par le code de production ──
+  FREELANCER_ROLE_CODE=$(psql_q "
+    SELECT r.code FROM tnt_user_role_assignments a
+    JOIN tnt_roles r ON r.id = a.role_id
+    WHERE a.user_id='${FREELANCER_USER_ID}' AND a.tenant_id='${JWT_TENANT}'
+      AND r.code='FREELANCER'
+    LIMIT 1;
+  " 2>/dev/null || echo "")
+  assert_eq "FREELANCER" "$FREELANCER_ROLE_CODE" \
+    "SETUP RBAC : rôle FREELANCER assigné automatiquement par FreelancerService (C-16)"
 
-  # ─── Créer le rôle minimal ────────────────────────────────────────────────
-  psql_q "
-    INSERT INTO tnt_roles (id, tenant_id, code, name, scope_type, permissions, system_role, editable)
-    VALUES (
-      '${E2E_ROLE_C4_ID}',
-      '${JWT_TENANT}',
-      'E2E_COURIER_C4',
-      'E2E Courier (lot C4)',
-      'TENANT',
-      'announcement:respond,announcement:elect,wallet:read,freelancer:read',
-      false,
-      true
-    ) ON CONFLICT (id) DO NOTHING;
-  " > /dev/null
+  # ─── Vérifier que FREELANCER contient les permissions requises ────────────
+  # Le rôle canonique vit dans le tenant système : on le lit via l'assignation,
+  # jamais par tenant_id = tenant de l'utilisateur.
+  FL_PERMS=$(psql_q "
+    SELECT r.permissions FROM tnt_user_role_assignments a
+    JOIN tnt_roles r ON r.id = a.role_id
+    WHERE a.user_id='${FREELANCER_USER_ID}' AND a.tenant_id='${JWT_TENANT}' AND r.code='FREELANCER'
+    LIMIT 1;
+  " 2>/dev/null || echo "")
+  # Vérifier announcement:respond et announcement:elect (injectés par C-17)
+  if echo "$FL_PERMS" | grep -q "announcement:respond" && echo "$FL_PERMS" | grep -q "announcement:elect"; then
+    setup_ok "SETUP RBAC : FREELANCER.permissions contient announcement:respond + announcement:elect (C-17)"
+  else
+    assert_eq "announcement:respond,announcement:elect (in permissions)" \
+      "$FL_PERMS" "SETUP RBAC : FREELANCER manque une permission announcement"
+  fi
 
-  ROLE_PERMS=$(psql_q "SELECT permissions FROM tnt_roles WHERE id='${E2E_ROLE_C4_ID}';" 2>/dev/null || echo "")
-  assert_eq "announcement:respond,announcement:elect,wallet:read,freelancer:read" \
-    "$ROLE_PERMS" "SETUP RBAC rôle E2E C4 : permissions correctes (pas '*')"
-
-  # ─── Assigner à l'acteur ──────────────────────────────────────────────────
-  psql_q "
-    INSERT INTO tnt_user_role_assignments
-      (id, tenant_id, user_id, role_id, scope_type, scope_id)
-    VALUES (
-      gen_random_uuid(),
-      '${JWT_TENANT}',
-      '${FREELANCER_USER_ID}',
-      '${E2E_ROLE_C4_ID}',
-      'TENANT',
-      '${JWT_TENANT}'
-    ) ON CONFLICT DO NOTHING;
-  " > /dev/null
-
-  # ─── Read-back obligatoire ────────────────────────────────────────────────
-  ASSIGN_COUNT=$(psql_q "
-    SELECT COUNT(*) FROM tnt_user_role_assignments
-    WHERE tenant_id='${JWT_TENANT}' AND user_id='${FREELANCER_USER_ID}'
-      AND role_id='${E2E_ROLE_C4_ID}';
-  " 2>/dev/null || echo "0")
-  assert_eq "1" "$ASSIGN_COUNT" "SETUP RBAC assignation E2E C4 créée pour l'acteur"
-  SEEDED_ROLE=1
-
-  # ─── Invalider le cache Caffeine ──────────────────────────────────────────
+  # ─── Invalider le cache Caffeine pour que les permissions soient fraîches ─
   kafka_invalidate_permission_cache "${JWT_TENANT}" "${FREELANCER_USER_ID}"
   sleep 2
-  setup_ok "SETUP RBAC : rôle E2E C4 créé et assigné, cache invalidé"
+  setup_ok "SETUP RBAC : rôle FREELANCER vérifié + cache invalidé"
 else
-  warn "SETUP RBAC : psql absent ou user_id/tenant inconnus — permissions non injectées" # [info] les étapes RBAC-dépendantes (C6) échoueront par 403 ; non assertif ici
+  warn "SETUP RBAC : psql absent ou user_id/tenant inconnus — vérification RBAC ignorée"
   warn "  SETUP-PICKUP, C3, C6 peuvent échouer par 403."
 fi
 
@@ -685,40 +703,15 @@ if psql_available 2>/dev/null; then
   # ce qui déclenchait soit un 409 quota (pas de gofp_freelancers) soit un doublon.
   psql_q "DELETE FROM tnt_announcement_responses WHERE announcement_id='${E2E_ANN_C3_ID_PSQL}';" > /dev/null 2>&1 || true
 
-  # ── Seed quota gofp_freelancers ──────────────────────────────────────────────
-  # AnnouncementApplicationService.subscribe appelle FreelancerQuotaService.hasRemainingQuota
-  # qui cherche par id puis par core_freelancer_id dans gofp_freelancers.
-  # Sans entrée → 409 quota. On crée une entrée minimale avec remaining_deliveries=100.
-  # La variable GOFP_FL_ID est utilisée par le cleanup.
+  # ── Projection gofp_freelancers + tnt_delivery_persons (lot C-18) ───────────
+  # Plus aucun INSERT manuel ici. GofpFreelancerProjectionService (via
+  # GofpFreelancerProvisioningFilter @Order(1)) provisionne automatiquement
+  # gofp_freelancers et tnt_delivery_persons à la première requête gofp authentifiée.
+  # Les assertions sur ces lignes sont placées APRÈS subscribe (SETUP-PICKUP),
+  # qui déclenche le filtre et garantit que la projection a eu lieu.
   GOFP_FL_ID=$(psql_q "SELECT id FROM tnt_actor.freelancer_profiles WHERE actor_id='${FREELANCER_USER_ID}' LIMIT 1;" 2>/dev/null || echo "")
-  if [ -n "$GOFP_FL_ID" ] && [ "$GOFP_FL_ID" != "null" ]; then
-    psql_q "
-      INSERT INTO gofp_freelancers (id, core_freelancer_id, core_user_id, status, is_active, remaining_deliveries)
-      VALUES ('${GOFP_FL_ID}', '${GOFP_FL_ID}', '${FREELANCER_USER_ID}', 'APPROVED', true, 100)
-      ON CONFLICT (id) DO UPDATE SET remaining_deliveries=100, is_active=true, status='APPROVED';
-    " > /dev/null
-    QUOTA_CHECK=$(psql_q "SELECT remaining_deliveries FROM gofp_freelancers WHERE id='${GOFP_FL_ID}';" 2>/dev/null || echo "")
-    assert_eq "100" "$QUOTA_CHECK" "SEED quota gofp_freelancers : remaining_deliveries=100"
-
-    # Seed tnt_delivery_persons — DeliveryAnnouncementService.respondToAnnouncement appelle
-    # deliveryPersonRepository.findById(tenantId, freelancerId). Le freelancerId envoyé par GOFP
-    # est l'actor profile ID (GOFP_FL_ID). L'entrée existante (id=139ee07e-…, status=AVAILABLE)
-    # a un ID différent ET un statut invalide (AVAILABLE n'est pas dans DeliveryPersonStatus).
-    # On efface et on recrée avec id=GOFP_FL_ID et status=APPROVED.
-    psql_q "
-      DELETE FROM tnt_delivery_persons
-        WHERE actor_id='${FREELANCER_USER_ID}' AND tenant_id='${E2E_TENANT_ID}';
-      INSERT INTO tnt_delivery_persons
-        (id, tenant_id, actor_id, logistics_type, logistics_class, tank_capacity,
-         gross_floor, total_seat_number, status, created_at, updated_at, version)
-      VALUES ('${GOFP_FL_ID}', '${E2E_TENANT_ID}', '${FREELANCER_USER_ID}',
-              'MOTORBIKE', 'STANDARD', 5.0, 0.0, 2, 'APPROVED', NOW(), NOW(), 0)
-      ON CONFLICT (id) DO UPDATE SET status='APPROVED', updated_at=NOW();
-    " > /dev/null
-    DP_STATUS=$(psql_q "SELECT status FROM tnt_delivery_persons WHERE id='${GOFP_FL_ID}';" 2>/dev/null || echo "")
-    assert_eq "APPROVED" "$DP_STATUS" "SEED tnt_delivery_persons : status=APPROVED"
-  else
-    warn "SEED quota : profil acteur introuvable — subscribe peut échouer (quota/disponibilité)" # [info] si le profil n'existe pas, subscribe retournera 409 et CR[C3] sera FAIL
+  if [ -z "$GOFP_FL_ID" ] || [ "$GOFP_FL_ID" = "null" ]; then
+    warn "SEED : profil acteur introuvable avant subscribe — la projection démarrera dès le premier appel gofp"
   fi
 
   # ── Livraisons C10/C11 : gardes de propriété cancel ──────────────────────────
@@ -960,6 +953,29 @@ else
   CR[C4]="🔴 BLOQUÉ — SETUP-PICKUP échoué (subscribe HTTP $SETUP_SUB_HTTP)"
   # C4 ne peut pas s'exécuter sans l'OTP — continuer pour C6/C7/C8
   goto_c3=true
+fi
+
+# ── Assertions C-18 : la projection a été faite par le code de production ─────
+# Exécutées que subscribe ait réussi ou non : si la projection manque, c'est elle
+# qu'on veut voir rouge (et non un simple « subscribe 409 »). Le script n'écrit
+# JAMAIS dans gofp_freelancers ni tnt_delivery_persons (GofpProjectionTablesSeedGuardTest).
+if psql_available 2>/dev/null && [ -n "${FREELANCER_USER_ID:-}" ]; then
+  AP_ID=$(psql_q "SELECT id FROM tnt_actor.freelancer_profiles WHERE actor_id='${FREELANCER_USER_ID}' LIMIT 1;" 2>/dev/null || echo "")
+  GOFP_FL_ID="${AP_ID}"
+  GFL_ROW=$(psql_q "SELECT id||'|'||core_freelancer_id||'|'||core_user_id||'|'||status||'|'||is_active
+                    FROM gofp_freelancers WHERE core_user_id='${FREELANCER_USER_ID}';" 2>/dev/null || echo "")
+  assert_eq "${AP_ID}|${AP_ID}|${FREELANCER_USER_ID}|APPROVED|true" "$GFL_ROW" \
+    "C-18 projection : gofp_freelancers (id=core_freelancer_id=profileId, core_user_id, APPROVED, actif) — non écrit par le script"
+  GFL_REMAINING=$(psql_q "SELECT remaining_deliveries FROM gofp_freelancers WHERE id='${AP_ID}';" 2>/dev/null || echo "")
+  if [ -n "$GFL_REMAINING" ] && [ "$GFL_REMAINING" -gt 0 ] 2>/dev/null; then
+    setup_ok "C-18 projection : gofp_freelancers.remaining_deliveries=${GFL_REMAINING} (> 0)"
+  else
+    assert_eq ">0" "$GFL_REMAINING" "C-18 projection : gofp_freelancers.remaining_deliveries doit être > 0"
+  fi
+  DP_ROW=$(psql_q "SELECT id||'|'||actor_id||'|'||status FROM tnt_delivery_persons
+                   WHERE id='${AP_ID}' AND tenant_id='${JWT_TENANT}';" 2>/dev/null || echo "")
+  assert_eq "${AP_ID}|${FREELANCER_USER_ID}|APPROVED" "$DP_ROW" \
+    "C-18 projection : tnt_delivery_persons (id=profileId, actor_id=user, APPROVED) — non écrit par le script"
 fi
 
 if [ "${goto_c3:-false}" != "true" ]; then
@@ -1252,27 +1268,31 @@ fi
 step "C5 — POST /v1/freelancer/jobs/:id/deliver"
 
 if [ -n "$DELIVERY_OTP" ] && [ "$DELIVERY_OTP" != "null" ]; then
-  # ── Avant livraison : seed du wallet si absent, relevé du solde ──────────────
-  # Le wallet est indexé sur tnt_delivery_persons.actor_id (= FREELANCER_USER_ID),
-  # pas sur le profil freelancerId. Sans wallet → WalletNotFoundException.
+  # ── C-18 : plus de seed de wallet ici ────────────────────────────────────────
+  # Le script ne crée jamais de wallet. Lot C-19.2 : sur un compte vierge il n'y a
+  # aucune ligne avant la livraison ; elle doit être créée par getOrCreateWallet au
+  # premier crédit. Wallet absent = solde 0, et on retient qu'il était absent pour
+  # exiger ensuite sa création pendant ce run (sinon la preuve de paiement était sautée).
+  WALLET_EXISTED_BEFORE="unknown"
   if psql_available 2>/dev/null && [ -n "${FREELANCER_USER_ID:-}" ] && [ -n "${JWT_TENANT:-}" ]; then
-    psql_q "
-      INSERT INTO billing.wallet_wallets
-        (id, user_id, tenant_id, balance, reserved_balance, currency, owner_type, owner_id, status, created_at, updated_at, version)
-      SELECT gen_random_uuid(), '${FREELANCER_USER_ID}'::uuid, '${JWT_TENANT}'::uuid,
-             0.00, 0.00, 'XAF', 'ACTOR', '${FREELANCER_USER_ID}', 'ACTIVE', NOW(), NOW(), 0
-      WHERE NOT EXISTS (
-        SELECT 1 FROM billing.wallet_wallets
+    WALLET_ROWS_BEFORE=$(psql_q "
+      SELECT COUNT(*) FROM billing.wallet_wallets
+      WHERE owner_id='${FREELANCER_USER_ID}' AND tenant_id='${JWT_TENANT}'::uuid;
+    " 2>/dev/null | tr -d '\n' || echo "?")
+    if [ "$WALLET_ROWS_BEFORE" = "0" ]; then
+      WALLET_EXISTED_BEFORE="false"
+      WALLET_BALANCE_BEFORE="0"
+      info "C5 (avant livraison) : AUCUN wallet pour ${FREELANCER_USER_ID:0:8}… (compte vierge) — solde de départ 0"
+    elif [ "$WALLET_ROWS_BEFORE" != "?" ]; then
+      WALLET_EXISTED_BEFORE="true"
+      WALLET_BALANCE_BEFORE=$(psql_q "
+        SELECT COALESCE(balance, 0)
+        FROM billing.wallet_wallets
         WHERE owner_id='${FREELANCER_USER_ID}' AND tenant_id='${JWT_TENANT}'::uuid
-      );
-    " > /dev/null 2>&1 || true
-    WALLET_BALANCE_BEFORE=$(psql_q "
-      SELECT COALESCE(balance, 0)
-      FROM billing.wallet_wallets
-      WHERE owner_id='${FREELANCER_USER_ID}' AND tenant_id='${JWT_TENANT}'::uuid
-      LIMIT 1;
-    " 2>/dev/null || echo "?")
-    info "C5 (avant livraison) : solde wallet = ${WALLET_BALANCE_BEFORE} XAF"
+        LIMIT 1;
+      " 2>/dev/null | tr -d '\n' || echo "?")
+      info "C5 (avant livraison) : solde wallet = ${WALLET_BALANCE_BEFORE} XAF (wallet préexistant)"
+    fi
   fi
 
   C5_HTTP=$(curl -s \
@@ -1309,6 +1329,16 @@ if [ -n "$DELIVERY_OTP" ] && [ "$DELIVERY_OTP" != "null" ]; then
     DELIVERY_TARIF=$(psql_q "
       SELECT COALESCE(tarif, 0) FROM deliveries WHERE id='${E2E_DELIVERY_ID}' LIMIT 1;
     " 2>/dev/null || echo "0")
+
+    if [ "${WALLET_EXISTED_BEFORE:-unknown}" = "false" ]; then
+      WALLET_CREATED_IN_RUN=$(psql_q "
+        SELECT COUNT(*) FROM billing.wallet_wallets
+        WHERE owner_id='${FREELANCER_USER_ID}' AND tenant_id='${JWT_TENANT}'::uuid
+          AND created_at >= '${E2E_RUN_START}'::timestamptz;
+      " 2>/dev/null | tr -d '\n' || echo "?")
+      assert_eq "1" "$WALLET_CREATED_IN_RUN" \
+        "C5 wallet : absent avant, exactement une ligne créée pendant ce run (getOrCreateWallet au premier crédit)"
+    fi
 
     info "C5 tarif delivery = ${DELIVERY_TARIF} XAF"
     info "C5 solde wallet : avant=${WALLET_BALANCE_BEFORE}, après=${WALLET_BALANCE_AFTER} XAF"
@@ -1555,15 +1585,36 @@ echo "════════════════════════�
 # 'best-effort|side-effect failed|Access denied' apparaît.
 echo
 echo "──── ASSERTION TRANSVERSALE : logs core (depuis $E2E_RUN_START) ────"
+# Lot C-20 : motif élargi et insensible à la casse. L'ancien motif
+# (best-effort|side-effect failed|Access denied) a laissé passer 15 entrées DEAD de
+# tnt_role_sync_outbox pendant deux mois. Deux classes distinctes :
+#   - SWALLOW : erreur avalée côté core (dont UNPAID_DELIVERED, C-20.3) → FAIL ;
+#   - KERNEL  : propagation vers le Kernel morte (403 /api/roles, sync DEAD, 405 acteurs)
+#               → verdict « BLOQUÉ EXTERNE », code de sortie 2 : vert localement ne veut
+#               pas dire que le Kernel sait qui est freelancer.
+SWALLOW_RE='best-effort|side-effect failed|access denied|UNPAID_DELIVERED'
+KERNEL_RE='kernel bridge error|kernel sync failed|exhausted [0-9]+ attempts|marking DEAD|not provisioned in the kernel'
+KERNEL_BLOCKED=0
 if docker inspect "$CORE_CONTAINER" > /dev/null 2>&1; then
-  BESTEFFORT_HITS=$(docker logs "$CORE_CONTAINER" --since "$E2E_RUN_START" 2>&1 | \
-    grep -cE "best-effort|side-effect failed|Access denied" | tr -d '\n' || echo "0")
+  RUN_LOGS=$(docker logs "$CORE_CONTAINER" --since "$E2E_RUN_START" 2>&1)
+  BESTEFFORT_HITS=$(echo "$RUN_LOGS" | grep -ciE "$SWALLOW_RE" | tr -d '\n' || echo "0")
   if [ "${BESTEFFORT_HITS:-0}" -gt "0" ] 2>/dev/null; then
-    fail "LOGS : ${BESTEFFORT_HITS} occurrence(s) 'best-effort|side-effect failed|Access denied' dans les logs core — une erreur a été avalée pendant ce run"
-    docker logs "$CORE_CONTAINER" --since "$E2E_RUN_START" 2>&1 | \
-      grep -E "best-effort|side-effect failed|Access denied" | head -5 | sed 's/^/  /'
+    fail "LOGS : ${BESTEFFORT_HITS} occurrence(s) '${SWALLOW_RE}' (-i) dans les logs core — une erreur a été avalée pendant ce run"
+    echo "$RUN_LOGS" | grep -iE "$SWALLOW_RE" | grep -v '^\s*at ' | head -5 | cut -c1-240 | sed 's/^/  /'
   else
-    pass "LOGS : aucune erreur avalée dans les logs core (best-effort|side-effect failed|Access denied)"
+    pass "LOGS : aucune erreur avalée dans les logs core (${SWALLOW_RE}, insensible à la casse)"
+  fi
+  KERNEL_HITS=$(echo "$RUN_LOGS" | grep -ciE "$KERNEL_RE" | tr -d '\n' || echo "0")
+  KERNEL_DEAD_NEW=""
+  psql_available 2>/dev/null && KERNEL_DEAD_NEW=$(psql_q "SELECT count(*) FROM tnt_role_sync_outbox
+      WHERE status IN ('DEAD','RETRYING') AND created_at >= '${E2E_RUN_START}'::timestamptz;" 2>/dev/null | tr -d '\n')
+  if [ "${KERNEL_HITS:-0}" -gt "0" ] 2>/dev/null || [ "${KERNEL_DEAD_NEW:-0}" -gt "0" ] 2>/dev/null; then
+    KERNEL_BLOCKED=1
+    blocked "KERNEL : ${KERNEL_HITS} ligne(s) de propagation Kernel en échec, ${KERNEL_DEAD_NEW:-?} entrée(s) outbox DEAD/RETRYING créées pendant ce run"
+    echo "$RUN_LOGS" | grep -iE "$KERNEL_RE" | grep -v '^\s*at ' | cut -c1-200 \
+      | sed -E 's/^[0-9-]+ [0-9:.]+ //; s/[0-9a-f]{8}-[0-9a-f-]{27}/<id>/g' | sort | uniq -c | head -5 | sed 's/^/  /'
+  else
+    pass "KERNEL : aucune erreur de propagation Kernel pendant ce run"
   fi
 else
   warn "LOGS : conteneur '$CORE_CONTAINER' introuvable — assertion transversale ignorée (TNT_CORE_CONTAINER=${CORE_CONTAINER})" # [info] TNT_CORE_CONTAINER est configurable ; les assertions HTTP précédentes restent valides
@@ -1581,5 +1632,10 @@ else
     echo -e "${GREEN}  BILAN : C0-C4, C6-C9 verts. C5 bloqué (TNT_GOFP_DELIVERY_OTP_PREVIEW absent du conteneur).${RESET}"
   fi
   [ "$TENANT_SCOPING_PROVEN" != "true" ] && echo -e "${YELLOW}  NOTE : TENANT_SCOPING_PROVEN=${TENANT_SCOPING_PROVEN} — run en mode ${AUTH_MODE}.${RESET}"
+  if [ "$KERNEL_BLOCKED" -eq 1 ]; then
+    echo -e "${YELLOW}  BILAN KERNEL : vert localement, propagation Kernel morte (BLOQUÉ EXTERNE) — sortie 2.${RESET}"
+    echo
+    exit 2
+  fi
   echo
 fi

@@ -1,0 +1,27 @@
+# Lot C-21 — quel profil Spring la production exécute-t-elle réellement ? (mesure, 2026-10-02T04:03:18Z)
+
+## 1. /actuator/info
+prod       https://tiibntick-core.yowyob.com : {"commit":"689fabf","activeProfile":"DEV"}
+local prod http://localhost:18080 (SPRING_PROFILES_ACTIVE=prod) : {"commit":"e25403e","activeProfile":"PROD"}
+local dev  http://localhost:8080  (SPRING_PROFILES_ACTIVE=dev)  : {"commit":"e25403e","activeProfile":"DEV"}
+  activeProfile = ApplicationProfile.valueOf(${spring.profiles.active:dev}) — ApplicationProfileConfig.java:28-51 (identique dans le miroir)
+
+## 2. /actuator/prometheus sans authentification
+  TntSecurityConfig.java:146 : public « in every profile except PROD (Audit n°7 · #16) »
+prod       → HTTP 200
+local prod → HTTP 401
+local dev  → HTTP 200
+
+## 3. docker-compose.prod.yml du miroir (yowyob/main 689fabf2) : aucune variable SPRING_PROFILES_ACTIVE dans 'environment:'
+   (elle pourrait venir de env_file .env, illisible d'ici — mais 1. et 2. montrent qu'elle ne vaut pas 'prod')
+   Et le fichier le dit en clair, l.80-81 :
+      # (on n'active PAS le profil prod : il désactive Swagger et exige Postgres TLS +
+      #  clé JWT montée, non disponibles ici.)
+   22:    env_file: [.env]
+   72:      # faisait écraser la valeur du .env (environment l'emporte sur env_file), donc changer de
+
+## Conclusion mesurée
+La production exécute le document par défaut de application.yml (profil DEV au sens d'ApplicationProfile), pas le profil 'prod'.
+Conséquences : TntProdSecretsGuard inactif ; prometheus public ; le bloc 'springdoc ... enabled: true' du profil prod n'est PAS
+ce qui ouvre Swagger en prod — c'est le défaut du document principal ; le bloc management.endpoint.health.status (C-20.2),
+qui est dans le document principal, s'applique bien en prod.

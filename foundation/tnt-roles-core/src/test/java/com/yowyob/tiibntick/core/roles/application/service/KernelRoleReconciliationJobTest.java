@@ -93,7 +93,7 @@ class KernelRoleReconciliationJobTest {
                 .asProcessing()
                 .asProvisioned(kernelRoleId);
         Role role = new Role(roleId, TENANT_ID, "AGENCY_MANAGER", "Agency Manager",
-                RoleScopeType.TENANT, Set.of("agency:read"));
+                RoleScopeType.TENANT, Set.of("agency:read"), false);
 
         when(outboxRepository.findByStatus(RoleSyncStatus.PROVISIONED)).thenReturn(Flux.just(provisioned));
         when(provisioningPort.roleExistsById(TENANT_ID, kernelRoleId)).thenReturn(Mono.just(false));
@@ -172,7 +172,7 @@ class KernelRoleReconciliationJobTest {
         UserRoleAssignment assignment = new UserRoleAssignment(
                 assignmentId, TENANT_ID, userId, roleId, RoleScopeType.TENANT, scopeId);
         Role role = new Role(roleId, TENANT_ID, "AGENCY_MANAGER", "Agency Manager",
-                RoleScopeType.TENANT, Set.of("agency:read"));
+                RoleScopeType.TENANT, Set.of("agency:read"), false);
 
         when(outboxRepository.findByStatus(RoleSyncStatus.PROVISIONED)).thenReturn(Flux.just(provisioned));
         when(assignmentRepository.findById(TENANT_ID, assignmentId)).thenReturn(Mono.just(assignment));

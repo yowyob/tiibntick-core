@@ -1,0 +1,29 @@
+═══ measure-cold-latency — AVANT C-19 (f23fabb) — compte vierge, pas encore freelancer ═══
+date (UTC)   : 2026-10-02T01:40:09Z
+core         : {"commit":"f23fabb","dirty":"false"}
+route        : GET /api/delivery-needs/user/ab57d86b-bb7a-4bd0-aa76-b7c041dadb06
+sub          : ab57d86b-bb7a-4bd0-aa76-b7c041dadb06
+jeton expire : 01:54:18Z
+
+── Mesure 1 : première requête authentifiée après redémarrage, puis 30 à chaud ──
+  conteneur prêt (liveness UP) après 33.1 s
+  froid #1   : 200 1.173355
+  froid #2   : 200 0.033567
+  codes HTTP à chaud : 30 200
+  n=30  min=21.3 ms  médiane=25.3 ms  p95=33.5 ms  max=58.5 ms
+
+── Mesure 2 : 5 requêtes concurrentes, première rafale après redémarrage ──
+  conteneur prêt (liveness UP) après 34.2 s
+  froid concurrent #3 : 200 0.974764
+  froid concurrent #5 : 200 1.047966
+  froid concurrent #2 : 200 1.058014
+  froid concurrent #1 : 200 1.100932
+  froid concurrent #4 : 200 1.150606
+
+── Journal core pendant la mesure 2 (provisioning / projection / erreurs) ──
+2026-10-02 01:40:53.441 [main] INFO  [] [] c.y.t.bootstrap.startup.StartupStep - [5/9] Starting: RoleRegistration — Provision 9 canonical TntRole definitions via tnt-roles-core (TntRoleInitializationService, idempotent, system tenant)
+2026-10-02 01:40:53.448 [main] INFO  [] [] c.y.t.b.registry.TntRoleRegistrar - TiiBnTick role provisioning completed via tnt-roles-core — 9 roles provisioned for system tenant [00000000-0000-0000-0000-000000000001]
+2026-10-02 01:40:54.641 [reactor-tcp-epoll-1] INFO  [] [] c.y.t.c.g.a.s.GofpUserProvisioningService - Auto-provisioning GofpUser for coreUserId=ab57d86b-bb7a-4bd0-aa76-b7c041dadb06
+2026-10-02 01:41:40.804 [main] INFO  [] [] c.y.t.bootstrap.startup.StartupStep - [5/9] Starting: RoleRegistration — Provision 9 canonical TntRole definitions via tnt-roles-core (TntRoleInitializationService, idempotent, system tenant)
+2026-10-02 01:41:40.814 [main] INFO  [] [] c.y.t.b.registry.TntRoleRegistrar - TiiBnTick role provisioning completed via tnt-roles-core — 9 roles provisioned for system tenant [00000000-0000-0000-0000-000000000001]
+═══ fin ═══

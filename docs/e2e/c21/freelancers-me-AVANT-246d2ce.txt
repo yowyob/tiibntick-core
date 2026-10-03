@@ -1,0 +1,12 @@
+# 2026-10-02T03:44:57Z — http://localhost:8080
+# binaire en vol : {"commit":"246d2ce","dirty":"false"}
+# sub du jeton  : 61aab2d1-1477-414e-b1b0-4cf9d291b084
+GET /api/v1/freelancers/me → 403
+{"status":"ERROR","error":{"code":"ROLE_FORBIDDEN","message":"Access denied: permission 'freelancer:read' is required."},"data":null}
+               user_id                |          assignment_tenant           |             role_tenant              |    code    | has_freelancer_read 
+--------------------------------------+--------------------------------------+--------------------------------------+------------+---------------------
+ 61aab2d1-1477-414e-b1b0-4cf9d291b084 | dbae6615-8f7e-4ef5-9e58-23a6179acf22 | 00000000-0000-0000-0000-000000000001 | FREELANCER | f
+ ab57d86b-bb7a-4bd0-aa76-b7c041dadb06 | dbae6615-8f7e-4ef5-9e58-23a6179acf22 | 00000000-0000-0000-0000-000000000001 | FREELANCER | f
+ f69444e3-ec21-4fee-bd84-20c435c567ae | dbae6615-8f7e-4ef5-9e58-23a6179acf22 | 00000000-0000-0000-0000-000000000001 | FREELANCER | f
+(3 rows)
+

@@ -1,6 +1,9 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.yowyob.tiibntick.core.gofreelancer.application.service.GofpUserProvisioningService;
+import com.yowyob.tiibntick.core.gofreelancer.config.GofpProvisioningProperties;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
@@ -35,6 +38,11 @@ import java.util.UUID;
  * handlers that strictly need the row (e.g. {@code me()}) will fail with a
  * clear domain error if the row is absent.
  *
+ * <p>Lot C-19: a user whose row is known to exist is remembered in a bounded
+ * Caffeine cache (max size + TTL from {@link GofpProvisioningProperties}), so the
+ * filter costs no database read after a user's first request on this instance,
+ * instead of one read per authenticated request on every route of the monolith.
+ *
  * @author François-Charles ATANGA
  */
 @Slf4j
@@ -45,15 +53,22 @@ public class GofpUserProvisioningFilter implements WebFilter {
 
     private final GofpUserProvisioningService provisioningService;
     private final MeterRegistry meterRegistry;
+    private final GofpProvisioningProperties properties;
 
     /** Counts silent provisioning errors — query at /actuator/metrics/gofp.provisioning.failures */
     private Counter provisioningFailures;
+
+    private Cache<UUID, Boolean> provisioned;
 
     @PostConstruct
     void init() {
         provisioningFailures = Counter.builder("gofp.provisioning.failures")
                 .description("Silent provisioning errors swallowed by GofpUserProvisioningFilter")
                 .register(meterRegistry);
+        provisioned = Caffeine.newBuilder()
+                .maximumSize(properties.getCacheMaxSize())
+                .expireAfterWrite(properties.getCacheTtl())
+                .build();
     }
 
     @Override
@@ -66,7 +81,10 @@ public class GofpUserProvisioningFilter implements WebFilter {
                     if (name == null || name.isBlank()) return Mono.empty();
                     try {
                         UUID coreUserId = UUID.fromString(name);
-                        return provisioningService.provisionIfAbsent(coreUserId).then();
+                        if (provisioned.getIfPresent(coreUserId) != null) return Mono.empty();
+                        return provisioningService.provisionIfAbsent(coreUserId)
+                                .doOnNext(user -> provisioned.put(coreUserId, Boolean.TRUE))
+                                .then();
                     } catch (IllegalArgumentException e) {
                         return Mono.empty();
                     }

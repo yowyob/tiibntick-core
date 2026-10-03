@@ -1,0 +1,7 @@
+# 2026-10-03T10:25:02Z — http://localhost:18080
+# binaire : {"commit":"7fc45b3","dirty":"false"}
+# conteneur tnt-c21-prod : profil prod, démarré 2026-10-03T10:21:36Z, redémarrages 0
+# tnt_role_sync_outbox (tiibntick_c21_prod) : DEAD=10 PROVISIONED=2
+/actuator/health             → HTTP 200  {"status":"DEGRADED"}
+/actuator/health/liveness    → HTTP 200  {"status":"UP"}
+/actuator/health/readiness   → HTTP 200  {"status":"UP"}

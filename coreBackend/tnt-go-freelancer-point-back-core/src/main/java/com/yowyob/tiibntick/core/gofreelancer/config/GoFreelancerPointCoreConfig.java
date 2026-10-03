@@ -36,7 +36,7 @@ import java.util.Arrays;
 @EnableR2dbcRepositories(
         basePackages = "com.yowyob.tiibntick.core.gofreelancer.adapter.out.persistence.repository"
 )
-@EnableConfigurationProperties(GofpDeliveryOtpProperties.class)
+@EnableConfigurationProperties({GofpDeliveryOtpProperties.class, GofpProvisioningProperties.class})
 public class GoFreelancerPointCoreConfig {
 
     @Autowired

@@ -20,9 +20,18 @@ public interface RoleRepository {
 
     Mono<Boolean> existsByCode(UUID tenantId, String code);
 
+    Mono<Role> findByCode(UUID tenantId, String code);
+
     Mono<Role> findById(UUID tenantId, UUID roleId);
 
     Flux<Role> findByTenantId(UUID tenantId);
+
+    /**
+     * Every role with this code, across all tenants (case-insensitive). Used by the startup
+     * reconciliation to reach the tenant-scoped copies of a canonical role provisioned at
+     * agency onboarding, which a system-tenant-only pass would leave on stale permissions.
+     */
+    Flux<Role> findAllByCode(String code);
 
     Mono<Role> save(Role role);
 

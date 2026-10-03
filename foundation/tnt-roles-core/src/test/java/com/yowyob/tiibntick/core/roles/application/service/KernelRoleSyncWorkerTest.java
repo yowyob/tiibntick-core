@@ -316,6 +316,35 @@ class KernelRoleSyncWorkerTest {
         assertThat(finalState.status()).isEqualTo(RoleSyncStatus.RETRYING);
     }
 
+    // ── UPDATE_ROLE (test 7 from lot C-17/C-18) ─────────────────────────────────
+
+    @Test
+    void updateRole_marksProvisioned_withNullKernelRefId_andProcessedAtStamped() {
+        // UPDATE_ROLE is local-only: no Kernel call, but the entry must reach PROVISIONED
+        // so it doesn't accumulate as a zombie in PROCESSING state.
+        RoleSyncOutboxEntry entry = entryFor(
+                RoleSyncOperation.UPDATE_ROLE, RoleSyncAggregateType.ROLE,
+                "{\"tenantId\":\"" + TENANT_ID + "\",\"code\":\"FREELANCER\"}");
+
+        when(outboxRepository.fetchPendingBatch(50)).thenReturn(reactor.core.publisher.Flux.just(entry));
+
+        StepVerifier.create(worker.poll())
+                .expectNext(1)
+                .verifyComplete();
+
+        // save() is called twice: once for asProcessing(), once for asProvisioned()
+        ArgumentCaptor<RoleSyncOutboxEntry> savedCaptor = ArgumentCaptor.forClass(RoleSyncOutboxEntry.class);
+        verify(outboxRepository, times(2)).save(savedCaptor.capture());
+
+        RoleSyncOutboxEntry finalState = savedCaptor.getAllValues().get(1);
+        assertThat(finalState.status()).isEqualTo(RoleSyncStatus.PROVISIONED);
+        assertThat(finalState.kernelRefId()).isNull();  // no Kernel-side id for local-only ops
+        assertThat(finalState.processedAt()).isNotNull();
+
+        // No Kernel ports should have been invoked
+        verify(provisioningPort, never()).provisionRole(any(), any());
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
 
     /** Builds a pending entry, then fast-forwards it through {@code attemptCount} failed cycles. */

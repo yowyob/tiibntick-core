@@ -26,6 +26,13 @@ public class InMemoryRoleRepository implements RoleRepository {
     }
 
     @Override
+    public Mono<Role> findByCode(UUID tenantId, String code) {
+        return Mono.justOrEmpty(roles.values().stream()
+                .filter(r -> tenantId.equals(r.tenantId()) && r.code().equalsIgnoreCase(code))
+                .findFirst());
+    }
+
+    @Override
     public Mono<Role> findById(UUID tenantId, UUID roleId) {
         return Mono.justOrEmpty(roles.get(roleId))
                 .filter(r -> tenantId.equals(r.tenantId()));
@@ -35,6 +42,12 @@ public class InMemoryRoleRepository implements RoleRepository {
     public Flux<Role> findByTenantId(UUID tenantId) {
         return Flux.fromIterable(roles.values())
                 .filter(r -> tenantId.equals(r.tenantId()));
+    }
+
+    @Override
+    public Flux<Role> findAllByCode(String code) {
+        return Flux.fromIterable(roles.values())
+                .filter(r -> r.code().equalsIgnoreCase(code));
     }
 
     @Override

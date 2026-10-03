@@ -125,6 +125,18 @@ management:
       show-details: when-authorized
       probes:
         enabled: true
+      # Lot C-20.2 — DEGRADED (TntRoleSyncOutboxHealthIndicator: DEAD Kernel role-sync
+      # entries) ranks above UP so the aggregate shows it, but stays HTTP 200: a
+      # Kernel-side refusal is not something a pod restart can fix.
+      # Lot C-21 — a custom http-mapping REPLACES Spring's defaults instead of extending
+      # them: with DEGRADED alone, DOWN and OUT_OF_SERVICE were served as 200 on every
+      # health endpoint, liveness/readiness included (measured). Keep the two 503 lines.
+      status:
+        order: DOWN,OUT_OF_SERVICE,DEGRADED,UP,UNKNOWN
+        http-mapping:
+          DOWN: 503
+          OUT_OF_SERVICE: 503
+          DEGRADED: 200
       group:
         liveness:
           include: livenessState

@@ -1,0 +1,6 @@
+# Contrôle de sensibilité (mutant : champs title/message permutés dans MatchingNotificationResponse) — attendu ROUGE
+Tests run: 2, Failures: 2, Errors: 0, Skipped: 0, Time elapsed: 5.561 s <<< FAILURE! -- in com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.NotificationStreamControllerSseContractTest
+expected: 
+ but was: 
+expected: 
+ but was: 

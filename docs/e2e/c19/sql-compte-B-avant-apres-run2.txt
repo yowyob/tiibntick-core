@@ -1,0 +1,56 @@
+═══ état SQL — sub=61aab2d1-1477-414e-b1b0-4cf9d291b084 AVANT RUN (compte vierge B) — 2026-10-02T02:07:00Z ═══
+── comptes ──
+ freelancer_profiles | role_assignments | gofp_users | gofp_freelancers | tnt_delivery_persons | wallet_wallets | wallet_wallets_total 
+---------------------+------------------+------------+------------------+----------------------+----------------+----------------------
+                   0 |                0 |          0 |                0 |                    0 |              0 |                    1
+(1 row)
+
+── invariant des trois id ──
+ freelancer_profiles_id | gofp_freelancers_id | core_freelancer_id | tnt_delivery_persons_id | gofp_quota | dp_quota 
+------------------------+---------------------+--------------------+-------------------------+------------+----------
+(0 rows)
+
+── rôles ──
+ code | assignment_tenant | role_tenant 
+------+-------------------+-------------
+(0 rows)
+
+── wallet + transactions ──
+ id | owner_id | balance | currency | created_at 
+----+----------+---------+----------+------------
+(0 rows)
+
+ type | amount | created_at 
+------+--------+------------
+(0 rows)
+
+═══ état SQL — sub=61aab2d1-1477-414e-b1b0-4cf9d291b084 APRÈS RUN — 2026-10-02T02:08:46Z ═══
+── comptes ──
+ freelancer_profiles | role_assignments | gofp_users | gofp_freelancers | tnt_delivery_persons | wallet_wallets | wallet_wallets_total 
+---------------------+------------------+------------+------------------+----------------------+----------------+----------------------
+                   1 |                1 |          1 |                1 |                    1 |              1 |                    2
+(1 row)
+
+── invariant des trois id ──
+        freelancer_profiles_id        |         gofp_freelancers_id          |          core_freelancer_id          |       tnt_delivery_persons_id        | gofp_quota | dp_quota 
+--------------------------------------+--------------------------------------+--------------------------------------+--------------------------------------+------------+----------
+ 47fa0b91-91a2-4f0d-b365-fd6eb9009a95 | 47fa0b91-91a2-4f0d-b365-fd6eb9009a95 | 47fa0b91-91a2-4f0d-b365-fd6eb9009a95 | 47fa0b91-91a2-4f0d-b365-fd6eb9009a95 |        100 |      100
+(1 row)
+
+── rôles ──
+    code    |          assignment_tenant           |             role_tenant              
+------------+--------------------------------------+--------------------------------------
+ FREELANCER | dbae6615-8f7e-4ef5-9e58-23a6179acf22 | 00000000-0000-0000-0000-000000000001
+(1 row)
+
+── wallet + transactions ──
+                  id                  |               owner_id               | balance | currency |         created_at         
+--------------------------------------+--------------------------------------+---------+----------+----------------------------
+ 34728a32-0d56-4f27-8bf7-b7d801daed40 | 61aab2d1-1477-414e-b1b0-4cf9d291b084 | 2850.00 | XAF      | 2026-10-02 02:08:37.234379
+(1 row)
+
+  type  | amount  |         created_at         
+--------+---------+----------------------------
+ CREDIT | 2850.00 | 2026-10-02 02:08:37.266002
+(1 row)
+

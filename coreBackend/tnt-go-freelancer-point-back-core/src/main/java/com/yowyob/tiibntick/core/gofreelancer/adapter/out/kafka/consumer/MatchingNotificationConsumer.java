@@ -3,6 +3,7 @@ package com.yowyob.tiibntick.core.gofreelancer.adapter.out.kafka.consumer;
 import com.yowyob.tiibntick.common.kafka.TntTopics;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.NotificationStreamPort;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.kafka.event.MatchingNotificationEvent;
+import com.yowyob.tiibntick.core.gofreelancer.domain.model.MatchingNotification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -24,6 +25,7 @@ public class MatchingNotificationConsumer {
     @KafkaListener(topics = TntTopics.GOFP_MATCHING_NOTIFICATIONS, groupId = "tiibntick-stream-group")
     public void consumeMatchingNotification(MatchingNotificationEvent event) {
         log.info("Consumed MatchingNotificationEvent from Kafka: {}", event);
-        notificationStreamPort.pushNotification(event);
+        notificationStreamPort.pushNotification(new MatchingNotification(
+                event.getFreelancerId(), event.getAnnouncementId(), event.getTitle(), event.getMessage()));
     }
 }
