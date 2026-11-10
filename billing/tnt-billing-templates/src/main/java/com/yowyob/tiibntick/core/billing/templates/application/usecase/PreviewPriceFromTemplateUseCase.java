@@ -101,7 +101,7 @@ public class PreviewPriceFromTemplateUseCase implements IPreviewPriceUseCase {
         BillingPolicy policy = BillingPolicy.builder()
                 .id(UUID.randomUUID()).tenantId(UUID.randomUUID()).name("preview " + templateCode)
                 .pricingRules(m.pricingRules()).surchargeRules(m.surchargeRules())
-                .promotions(List.of()).loyaltyRules(List.of()).commissionRules(List.of())
+                .promotions(List.of()).loyaltyRules(m.loyaltyRules()).commissionRules(m.commissionRules())
                 .specialSurcharges(List.of()).hubStorageRules(List.of()).networkTransitRules(List.of())
                 .status(PolicyStatus.ACTIVE).validFrom(LocalDate.now()).build();
         return pricingEngine.evaluateWith(policy, toContext(c))

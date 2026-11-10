@@ -130,6 +130,7 @@ public enum TntRole {
                     ANNOUNCEMENT_READ, ANNOUNCEMENT_RESPOND, ANNOUNCEMENT_ELECT,
                     ACTOR_READ,
                     FREELANCER_READ,
+                    INVOICE_READ, REPORT_OWN,
                     WALLET_READ, WALLET_WRITE,
                     PAYMENT_PROCESS,
                     TRUST_READ, TRUST_VERIFY,

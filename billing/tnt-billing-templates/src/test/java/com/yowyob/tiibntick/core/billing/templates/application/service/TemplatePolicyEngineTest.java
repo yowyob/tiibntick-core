@@ -46,7 +46,7 @@ class TemplatePolicyEngineTest {
         var m = materializer.materialize(code, params);
         return BillingPolicy.builder().id(UUID.randomUUID()).tenantId(UUID.randomUUID()).name(code)
                 .pricingRules(m.pricingRules()).surchargeRules(m.surchargeRules())
-                .promotions(List.of()).loyaltyRules(List.of()).commissionRules(List.of())
+                .promotions(List.of()).loyaltyRules(m.loyaltyRules()).commissionRules(m.commissionRules())
                 .specialSurcharges(List.of()).hubStorageRules(List.of()).networkTransitRules(List.of())
                 .status(PolicyStatus.ACTIVE).validFrom(LocalDate.now()).build();
     }
@@ -156,12 +156,89 @@ class TemplatePolicyEngineTest {
                 .hasMessageContaining("No PricingRule matched");
     }
 
+    private PriceEvaluation evaluate(String code, Map<String, String> params, PricingContext c) {
+        return engine.evaluateWith(policy(code, params), c).block();
+    }
+
     @Test
-    @DisplayName("modifier-only and non-delivery templates are refused instead of priced at zero")
+    @DisplayName("TPL-TIME_SLOTS: night, rush, weekend and holiday multipliers apply on top of the default grid")
+    void timeSlots() {
+        long base = price("TPL-TIME_SLOTS", Map.of(), ctx().build());   // 500 + 10×50 + 2×30
+        assertThat(base).isEqualTo(1060);
+        assertThat(price("TPL-TIME_SLOTS", Map.of(), ctx().timeOfDay(LocalTime.of(3, 0)).build()))
+                .isEqualTo(Math.round(base * 1.5));
+        assertThat(price("TPL-TIME_SLOTS", Map.of(), ctx().timeOfDay(LocalTime.of(7, 30)).build()))
+                .isEqualTo(Math.round(base * 1.2));
+        assertThat(price("TPL-TIME_SLOTS", Map.of(), ctx().timeOfDay(LocalTime.of(18, 0)).build()))
+                .isEqualTo(Math.round(base * 1.3));
+        assertThat(price("TPL-TIME_SLOTS", Map.of(), ctx().timeOfDay(LocalTime.of(21, 0)).build()))
+                .isEqualTo(Math.round(base * 1.2));
+        assertThat(price("TPL-TIME_SLOTS", Map.of(), ctx().dayOfWeek(DayOfWeek.SATURDAY).build()))
+                .isEqualTo(Math.round(base * 1.15));
+        assertThat(price("TPL-TIME_SLOTS", Map.of(), ctx().isPublicHoliday(true).build()))
+                .isEqualTo(Math.round(base * 1.5));
+        assertThat(price("TPL-TIME_SLOTS", Map.of("night_multiplier", "2.0"), ctx().timeOfDay(LocalTime.of(3, 0)).build()))
+                .isEqualTo(base * 2);
+    }
+
+    @Test
+    @DisplayName("TPL-WEATHER_ADAPTIVE: rain and storm add their fixed surcharge, clear weather none")
+    void weather() {
+        long base = price("TPL-WEATHER_ADAPTIVE", Map.of(), ctx().build());
+        assertThat(base).isEqualTo(1060);
+        assertThat(price("TPL-WEATHER_ADAPTIVE", Map.of(), ctx().weatherCondition(
+                com.yowyob.tiibntick.core.billing.dsl.domain.model.WeatherCondition.RAIN_LIGHT).build())).isEqualTo(base + 200);
+        assertThat(price("TPL-WEATHER_ADAPTIVE", Map.of(), ctx().weatherCondition(
+                com.yowyob.tiibntick.core.billing.dsl.domain.model.WeatherCondition.RAIN_HEAVY).build())).isEqualTo(base + 500);
+        assertThat(price("TPL-WEATHER_ADAPTIVE", Map.of(), ctx().weatherCondition(
+                com.yowyob.tiibntick.core.billing.dsl.domain.model.WeatherCondition.STORM).build())).isEqualTo(base + 800);
+        assertThat(price("TPL-WEATHER_ADAPTIVE", Map.of(), ctx().weatherCondition(
+                com.yowyob.tiibntick.core.billing.dsl.domain.model.WeatherCondition.CLEAR).build())).isEqualTo(base);
+    }
+
+    @Test
+    @DisplayName("TPL-LOYALTY_PROGRESSIVE: the discount grows with the client's transactions and lands on each tier's target")
+    void loyalty() {
+        long base = price("TPL-LOYALTY_PROGRESSIVE", Map.of(), ctx().clientTxCount(0).build());
+        assertThat(base).isEqualTo(1060);
+        long bronze = price("TPL-LOYALTY_PROGRESSIVE", Map.of(), ctx().clientTxCount(3).build());
+        long silver = price("TPL-LOYALTY_PROGRESSIVE", Map.of(), ctx().clientTxCount(10).build());
+        long gold = price("TPL-LOYALTY_PROGRESSIVE", Map.of(), ctx().clientTxCount(20).build());
+        long platinum = price("TPL-LOYALTY_PROGRESSIVE", Map.of(), ctx().clientTxCount(50).build());
+        assertThat(base).isGreaterThan(bronze);
+        assertThat(bronze).isGreaterThan(silver);
+        assertThat(silver).isGreaterThan(gold);
+        assertThat(gold).isGreaterThan(platinum);
+        // compounded whole-percent steps stay within one point of the 3 / 7 / 12 / 20 % targets
+        assertThat((double) bronze / base).isBetween(0.96, 0.98);
+        assertThat((double) silver / base).isBetween(0.92, 0.94);
+        assertThat((double) gold / base).isBetween(0.87, 0.89);
+        assertThat((double) platinum / base).isBetween(0.79, 0.81);
+    }
+
+    @Test
+    @DisplayName("TPL-COMMISSION_DELIVERER: the engine computes the deliverer's share of the selling price")
+    void commissionDeliverer() {
+        PriceEvaluation ev = evaluate("TPL-COMMISSION_DELIVERER", Map.of("base_commission_pct", "70"), ctx().build());
+        assertThat(ev.getSellingPrice().getAmount().longValue()).isEqualTo(1060);
+        assertThat(ev.getDelivererCommission().getAmount().longValue()).isEqualTo(742);
+    }
+
+    @Test
+    @DisplayName("every adjustment template parses with the real grammar and carries a priceable base")
+    void adjustmentsParse() {
+        for (String code : TemplatePolicyMaterializer.ADJUSTMENT_ONLY) {
+            var m = materializer.materialize(code, Map.of());
+            assertThat(m.pricingRules()).isNotEmpty();
+            m.surchargeRules().forEach(r -> compiler.compileCondition(r.getConditionExpression()));
+        }
+    }
+
+    @Test
+    @DisplayName("templates the engine cannot price on a delivery are refused instead of priced at zero")
     void unsupportedAreRefused() {
-        for (String code : List.of("TPL-LOYALTY_PROGRESSIVE", "TPL-TIME_SLOTS", "TPL-WEATHER_ADAPTIVE",
-                "TPL-VOLUME_SLAB", "TPL-HUB_STORAGE", "TPL-NETWORK_TRANSIT", "TPL-MARKETPLACE_COMMISSION",
-                "TPL-COMMISSION_DELIVERER", "TPL-NOPE")) {
+        for (String code : List.of("TPL-VOLUME_SLAB", "TPL-HUB_STORAGE", "TPL-NETWORK_TRANSIT",
+                "TPL-MARKETPLACE_COMMISSION", "TPL-NOPE")) {
             assertThatThrownBy(() -> materializer.materialize(code, Map.of()))
                     .isInstanceOf(TemplateNotMaterializableException.class);
         }

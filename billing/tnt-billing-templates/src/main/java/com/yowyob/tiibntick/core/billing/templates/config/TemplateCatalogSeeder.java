@@ -11,14 +11,12 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
- * Application startup component that seeds the billing policy template catalog
- * with the 15 pre-defined default templates if the catalog is empty.
- *
- * <p>This seeder runs once at application startup. If templates already exist
- * (detected via {@link IPolicyTemplateRepository#countActive()}), seeding is
- * skipped to avoid duplicates.
+ * Application startup component that keeps the billing policy template catalog in line with the
+ * 15 pre-defined default templates: missing ones are inserted and incomplete ones are rebuilt
+ * (see {@link #syncCatalog()}); complete ones are never touched.
  *
  * <p>Templates seeded:
  * <ol>
@@ -59,15 +57,7 @@ public class TemplateCatalogSeeder implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        templateRepository.countActive()
-                .flatMap(count -> {
-                    if (count > 0) {
-                        log.info("Template catalog already has {} active templates. Skipping seed.", count);
-                        return Mono.empty();
-                    }
-                    log.info("Template catalog is empty. Seeding {} default templates...", 15);
-                    return seedAll();
-                })
+        syncCatalog()
                 .subscribe(
                         null,
                         ex -> log.error("Template catalog seeding failed", ex),
@@ -75,12 +65,42 @@ public class TemplateCatalogSeeder implements ApplicationRunner {
                 );
     }
 
-    private Mono<Void> seedAll() {
-        List<PolicyTemplate> templates = buildAllTemplates();
-        return Flux.fromIterable(templates)
-                .flatMap(templateRepository::save)
-                .doOnNext(t -> log.debug("Seeded template: {}", t.getTemplateCode()))
+    /**
+     * Brings the catalog up to the default set, template by template:
+     * <ul>
+     *   <li>a missing code is inserted;</li>
+     *   <li>a code whose stored parameters are fewer than the default's is rebuilt — that is what a seeding
+     *       interrupted by a restart leaves behind (the template row is written before its parameters);</li>
+     *   <li>anything else is left untouched, so an admin's edits are never overwritten.</li>
+     * </ul>
+     * Sequential and per code, instead of the former "seed everything only when the catalog is empty", which
+     * left a half-seeded catalog half-seeded forever.
+     */
+    Mono<Void> syncCatalog() {
+        return Flux.fromIterable(buildAllTemplates())
+                .concatMap(this::syncOne)
                 .then();
+    }
+
+    private Mono<Void> syncOne(PolicyTemplate wanted) {
+        return templateRepository.findByTemplateCode(wanted.getTemplateCode())
+                .map(Optional::of)
+                .defaultIfEmpty(Optional.empty())
+                .flatMap(existing -> {
+                    if (existing.isEmpty()) {
+                        log.info("Seeding template {}", wanted.getTemplateCode());
+                        return templateRepository.save(wanted).then();
+                    }
+                    PolicyTemplate stored = existing.get();
+                    if (stored.getParameters().size() < wanted.getParameters().size()) {
+                        log.warn("Template {} is incomplete ({} of {} parameters): rebuilding it",
+                                wanted.getTemplateCode(), stored.getParameters().size(), wanted.getParameters().size());
+                        return templateRepository.deleteById(stored.getId())
+                                .then(templateRepository.save(wanted))
+                                .then();
+                    }
+                    return Mono.<Void>empty();
+                });
     }
 
     // ─── Template builders ─────────────────────────────────────────────────

@@ -120,6 +120,8 @@ public final class TntPermission {
 
     public static final String REPORT_READ   = "report:read";
     public static final String REPORT_EXPORT = "report:export";
+    /** Run the per-issuer reports restricted to one's own invoices (drivers, no management scope). */
+    public static final String REPORT_OWN    = "report:own";
 
     // ─────────────────────────────────────────────────────────────
     // TRUST — Blockchain proof and verification (TiiBnTick Trust)
