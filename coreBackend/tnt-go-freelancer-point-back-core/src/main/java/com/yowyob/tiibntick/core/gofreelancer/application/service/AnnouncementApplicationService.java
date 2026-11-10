@@ -1,10 +1,6 @@
 package com.yowyob.tiibntick.core.gofreelancer.application.service;
 
 import com.yowyob.tiibntick.common.vo.Address;
-import com.yowyob.tiibntick.core.billing.wallet.application.port.in.IWalletUseCase;
-import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.DebitWalletCommand;
-import com.yowyob.tiibntick.core.billing.wallet.domain.enums.PaymentChannel;
-import com.yowyob.tiibntick.core.billing.wallet.domain.model.Money;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.AddressDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.AnnouncementRequestDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.AnnouncementResponseDTO;
@@ -61,7 +57,6 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
     private final IDeliveryAnnouncementPort deliveryAnnouncementPort;
     private final TenantContextHolder tenantContextHolder;
     private final FreelancerQuotaService freelancerQuotaService;
-    private final IWalletUseCase walletUseCase;
     private final INegotiationChatPort negotiationChatPort;
     private final IAnnouncementRepository announcementRepository;
     private final AnnouncementSubscriptionRepository subscriptionRepository;
@@ -78,8 +73,6 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
                 .flatMap(tenantId -> {
                     PublishAnnouncementPortCommand cmd = toPublishCommand(tenantId, request);
                     return deliveryAnnouncementPort.publish(cmd)
-                            .flatMap(published -> escrowOnPublishIfFixed(published)
-                                    .thenReturn(published))
                             .flatMap(published -> softMirrorLocal(published, request)
                                     .thenReturn(toDTO(published)))
                             .flatMap(this::enrichFromLocalMirror);
@@ -249,9 +242,8 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
                                 return Mono.error(new IllegalArgumentException(
                                         "Response not found: " + responseId));
                             }
-                            Mono<Void> escrow = escrowOnSelectIfQuote(tenantId, before, responseId);
-                            return escrow.then(deliveryAnnouncementPort.selectResponse(
-                                    tenantId, announcementId, clientId, responseId));
+                            return deliveryAnnouncementPort.selectResponse(
+                                    tenantId, announcementId, clientId, responseId);
                         }))
                 .flatMap(assigned -> softMirrorAssigned(assigned)
                         .then(softMirrorDeliveryAndInitOtp(assigned))
@@ -288,57 +280,12 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
                         .map(this::localToDTO));
     }
 
-    // ── Escrow ───────────────────────────────────────────────────────────────
-
-    private Mono<Void> escrowOnPublishIfFixed(AnnouncementSnapshot announcement) {
-        if (!AnnouncementSnapshot.PRICING_MODE_FIXED_PRICE.equals(announcement.pricingMode())) {
-            return Mono.empty();
-        }
-        BigDecimal amount = announcement.offeredAmount();
-        if (amount == null || amount.signum() <= 0) {
-            return Mono.empty();
-        }
-        String currency = announcement.currency() != null ? announcement.currency() : "XAF";
-        return walletUseCase.debitWallet(new DebitWalletCommand(
-                        announcement.clientId(),
-                        announcement.tenantId(),
-                        Money.of(amount, currency),
-                        announcement.id().toString(),
-                        PaymentChannel.WALLET,
-                        "Escrow FIXED_PRICE announcement " + announcement.id(),
-                        "gofp-escrow-publish-" + announcement.id()))
-                .doOnSuccess(tx -> log.info(
-                        "[Escrow] Debited {} {} from client {} for FIXED_PRICE announcement {}",
-                        amount, currency, announcement.clientId(), announcement.id()))
-                .then();
-    }
-
-    private Mono<Void> escrowOnSelectIfQuote(UUID tenantId, AnnouncementSnapshot announcement, UUID responseId) {
-        if (!AnnouncementSnapshot.PRICING_MODE_QUOTE_REQUEST.equals(announcement.pricingMode())) {
-            return Mono.empty();
-        }
-        AnnouncementResponseSnapshot selected = announcement.responses().stream()
-                .filter(r -> r.id().equals(responseId))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Response not found: " + responseId));
-        String currency = selected.proposedCurrency() != null
-                ? selected.proposedCurrency()
-                : (announcement.currency() != null ? announcement.currency() : "XAF");
-        return deliveryAnnouncementPort.resolveEscrowAmount(tenantId, announcement.id(), responseId)
-                .flatMap(amount -> walletUseCase.debitWallet(new DebitWalletCommand(
-                                announcement.clientId(),
-                                announcement.tenantId(),
-                                Money.of(amount, currency),
-                                announcement.id().toString(),
-                                PaymentChannel.WALLET,
-                                "Escrow QUOTE_REQUEST announcement " + announcement.id()
-                                        + " response " + responseId,
-                                "gofp-escrow-select-" + announcement.id() + "-" + responseId))
-                        .doOnSuccess(tx -> log.info(
-                                "[Escrow] Debited {} {} from client {} for QUOTE select on announcement {}",
-                                amount, currency, announcement.clientId(), announcement.id())))
-                .then();
-    }
+    // ── No escrow ────────────────────────────────────────────────────────────
+    //
+    // Kernel wallet migration: publishing an announcement or selecting a response no longer
+    // debits the client. A debit needs the owner's challenge code, which only the client's app can
+    // supply; the client pays the delivery person from their own Kernel wallet once the delivery
+    // is assigned (see DeliveryPaymentApplicationService, POST /api/v1/deliveries/{id}/payment).
 
     // ── Soft local mirror (migration douce) ─────────────────────────────────
 

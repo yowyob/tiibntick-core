@@ -9,26 +9,39 @@
 | Sujet | Décision |
 |---|---|
 | Paiement d'une livraison | Le client paie depuis **son propre wallet** par un **transfert** vers le wallet du livreur (workflow Kernel : challenge → code de confirmation → transfert). Le livreur retire ensuite depuis son wallet (`withdrawals`). |
-| Code de réception du livreur | Le livreur génère un `receive-code` à l'acceptation ; **le Core le stocke sur la livraison** et le fournit au flux de paiement du client. Expiré → le livreur en régénère un. |
+| Code de réception du livreur | Le livreur déclenche la génération du `receive-code` (avec son jeton) ; **le Core le stocke sur la livraison** et le fournit au flux de paiement du client. Expiré → le livreur en régénère un. |
 | Commission plateforme (5 %) | **Demandée au Kernel** (transfert avec répartition livreur / wallet plateforme en une seule confirmation). Tant que non livrée : paiement sans prélèvement, commission tracée « due » dans le Core. |
 | Flux sans utilisateur présent (remboursement après litige, indemnisation de litige, commission d'agence) | **Désactivés** avec le message « non supporté par le Kernel » et listés en demandes au Kernel (ci-dessous). |
 | Gel de paiement lors d'une escalade incident → litige | **Table de blocages locale** `wallet_holds` (montant bloqué par wallet et par litige) ; le Core vérifie *solde Kernel − blocages* avant toute opération sortante. |
 
 ## Fait sur la branche
 
-- `WalletController` (grand livre local) sécurisé : tenant issu du JWT, `/me/**` en self-service, tout le reste derrière la nouvelle permission `wallet:admin` (TNT_ADMIN). Voir commit `fix(wallet): secure WalletController…`.
-- Client Kernel conforme à la spec : `wallets/mine`, `recharge` (`WalletRechargeRequest`), ordres de recharge, `receive-codes`, `transfers` (+ `/challenge`), `withdrawals` (+ `/challenge`), `withdrawals/availability`.
-- API `/billing/kernel-wallet/**` (self-service, aucun id de wallet ou de propriétaire dans les routes ; le Kernel résout le wallet depuis le Bearer relayé).
-- `kernelPaymentWebClient` : relais du Bearer de l'utilisateur, **aucun retry transport** (un POST d'argent expiré ne doit jamais être rejoué), disjoncteur qui compte désormais les réponses HTTP 5xx.
-- Tests d'intégration : chaîne contrôleur → service → adaptateur contre un faux Kernel ; relais du Bearer et non-rejeu sur le vrai bean `kernelPaymentWebClient`.
+**Sécurité et client Kernel**
+- Ancien `WalletController` sécurisé (tenant du JWT, `/me/**`, `wallet:admin`) puis **supprimé** avec le grand livre local.
+- Client Kernel conforme à la spec : `wallets/mine`, `recharge`, ordres de recharge, `receive-codes`, `transfers` (+ `/challenge`), `withdrawals` (+ `/challenge`), `withdrawals/availability`.
+- API `/billing/kernel-wallet/**` (self-service, aucun id de wallet/propriétaire dans les routes).
+- `kernelPaymentWebClient` : relais du Bearer de l'utilisateur, **aucun retry transport** sur les POST d'argent, disjoncteur qui compte les 5xx.
 
-## Reste à faire (ordre recommandé)
+**Paiement d'une livraison par transfert** (`/api/v1/deliveries/{id}/payment`)
+1. Livreur : `POST /receive-code` — le code est généré **avec le jeton du livreur** (le Core ne stocke jamais un code fourni par le client HTTP, ce qui évite de rediriger un paiement vers un autre wallet) et stocké sur la livraison (`driver_user_id`, `receive_code`, `receive_code_expires_at`). Expiré → le livreur le régénère.
+2. Client : `POST /challenge` puis `POST /` `{challengeToken, code}` → transfert Kernel, règlement enregistré (`PAID`), commission 5 % tracée `DUE`.
+3. `GET /` : statut du règlement (client ou livreur).
+4. À la fin de la livraison (OTP) le Core **ne bouge plus d'argent** : il réconcilie (`PAID` → ancrage blockchain ; `CASH` → espèces + commission `DUE` ; numérique non payé → `UNPAID`, compteur `gofp.delivery.payment.failures` + log `UNPAID_DELIVERED`, la requête réussit).
 
-1. **Paiement d'une livraison par transfert** : stocker le `receive-code` du livreur sur la livraison (go-freelancer), exposer `POST /billing/kernel-wallet/deliveries/{id}/pay/challenge` et `/pay` (le client confirme avec son code), enregistrer le résultat sur la livraison.
-2. **Basculer les appelants** de `IWalletUseCase` (market-back-core, go-freelancer-point-back-core, `WalletBillingEventConsumer`) vers le port Kernel ; supprimer `splitMissionRevenue`, `creditCommission`, `transferSubDelivererCommission`, `createFreelancerOrgWallet` du chemin nominal.
-3. **Table `wallet_holds`** + adaptateur de gel incident (remplace `IncidentPaymentFreezeAdapter` et `Wallet.freeze`).
-4. **Retirer le grand livre local** : `Wallet`, `WalletTransaction`, `PaymentIntent` locaux, repositories R2DBC, `ReconciliationService`, migration Liquibase de suppression — après **migration des soldes existants** (voir point ouvert ci-dessous).
-5. **Retirer `/billing/wallet/**`** (ancienne API) une fois les frontends passés sur `/billing/kernel-wallet/**`.
+**Grand livre local retiré** (module `tnt-billing-wallet`) : `Wallet`, `WalletTransaction`, `PaymentIntent`, split, réconciliation, `WalletService`, `/billing/wallet/**`, éditeur Kafka d'événements wallet, store d'idempotence Redis. Remplacés (tables supprimées par le changelog 005) par `billing.wallet_settlements` (quel objet métier a été réglé, par quel transfert ou en espèces, commission due) et `billing.wallet_holds` (montants que le Core refuse de laisser sortir pendant un incident/litige).
+
+**Appelants migrés** : annonces (plus d'escrow à la publication/sélection), frais de stockage relais (règlement tracé ; le transfert numérique des frais n'est pas fait par le Core), commandes Market (règlement tracé, plus de mouvement), gel d'incident → blocage local, `WalletBillingEventConsumer` (gel OK ; crédit de commission et indemnisation de litige **désactivés bruyamment**), commission d'agence (**501** explicite).
+
+**Vérifié** : 18 tests unitaires + 7 IT (faux Kernel) du module wallet ; 138 tests unitaires + 8 IT de bout en bout du paiement (contrôleur → services → adaptateur HTTP → faux Kernel, avec relais du Bearer par utilisateur) côté go-freelancer ; 3 IT sur un vrai Postgres (Testcontainers) pour le changelog `004` et les adaptateurs R2DBC ; démarrage complet du contexte Spring contre Postgres/Redis/Kafka réels.
+
+## Limites connues (à lire avant le déploiement)
+
+- **Aucun appel contre le vrai Kernel** n'a pu être fait (pas de jeton). Les corps de `transfers`/`challenge` suivent la spec OpenAPI ; la forme de la réponse d'un transfert est lue au mieux (`transactionId`/`id`/`reference`) faute de schéma fiable (R3).
+- **Commission 5 %** : tracée `DUE` mais **non prélevée** tant que le Kernel n'offre pas de transfert avec répartition (R2). Liste via `ISettlementUseCase#listCommissionsDue`.
+- **Frais de stockage relais en numérique** : non transférés par le Core (le point relais n'a pas de code de réception stocké). Enregistrés `UNPAID` + log `RELAY_FEE_NOT_TRANSFERRED`. Espèces : commission `DUE`.
+- **Blocages** : le Core ne contrôle que les opérations passant par `/billing/kernel-wallet`. Un utilisateur qui appellerait le Kernel directement n'est pas bloqué (R5).
+- **Soldes historiques** : le mainteneur a confirmé qu'il n'y avait aucune donnée réelle à conserver ; le changelog `005-drop-legacy-ledger-tables` **supprime** `wallet_wallets`, `wallet_transactions`, `wallet_payment_intents`, `wallet_payment_splits` et `wallet_reconciliations` (irréversible, aucune migration de soldes). Seules `wallet_settlements` et `wallet_holds` restent. Le script `scripts/sql/wallet-ledger-reconciliation.sql` est supprimé avec elles.
+- **Rupture d'API** : `/billing/wallet/**` n'existe plus (remplacé par `/billing/kernel-wallet/**`) ; le paiement d'agence nécessite R1.
 
 ## Demandes à envoyer à l'équipe Kernel (TSAFACK Savio)
 
@@ -44,5 +57,5 @@
 
 ## Points ouverts
 
-- **Soldes existants** : les tables locales `billing.wallet_*` contiennent des soldes réels (et un écart connu de 2 850 XAF, voir lot C-11). Il faut décider : migrer (nécessite R1), ou solder/exporter avant suppression.
-- **Livreurs sans wallet Kernel** : tant que R7 n'est pas livré, le wallet doit être créé par le livreur lui-même (`POST /billing/kernel-wallet/me`) avant d'accepter une course.
+- **Livreurs sans wallet Kernel** : tant que R7 n'est pas livré, le livreur doit créer son wallet lui-même (`POST /billing/kernel-wallet/me`) avant de pouvoir générer un code de réception.
+- **Événements `tnt.billing.wallet.payment.confirmed`** : plus émis par le Core. Les consommateurs (facturation, comptabilité, market, commission d'agence) restent à l'écoute mais ne reçoivent plus rien ; à rebrancher sur le règlement `PAID` si ces flux doivent rester actifs.

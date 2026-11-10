@@ -26,25 +26,7 @@ public class WalletExceptionHandler {
         return Mono.just(pd);
     }
 
-    @ExceptionHandler(PaymentIntentNotFoundException.class)
-    public Mono<ProblemDetail> handlePaymentIntentNotFound(PaymentIntentNotFoundException ex) {
-        log.warn("Payment intent not found: {}", ex.getMessage());
-        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
-        pd.setType(URI.create("urn:tiibntick:billing:payment-intent-not-found"));
-        pd.setTitle("Payment Intent Not Found");
-        pd.setProperty("timestamp", Instant.now());
-        return Mono.just(pd);
-    }
 
-    @ExceptionHandler(InsufficientBalanceException.class)
-    public Mono<ProblemDetail> handleInsufficientBalance(InsufficientBalanceException ex) {
-        log.warn("Insufficient balance: {}", ex.getMessage());
-        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.valueOf(422), ex.getMessage());
-        pd.setType(URI.create("urn:tiibntick:billing:insufficient-balance"));
-        pd.setTitle("Insufficient Balance");
-        pd.setProperty("timestamp", Instant.now());
-        return Mono.just(pd);
-    }
 
     @ExceptionHandler(WalletFrozenException.class)
     public Mono<ProblemDetail> handleWalletFrozen(WalletFrozenException ex) {
@@ -56,15 +38,6 @@ public class WalletExceptionHandler {
         return Mono.just(pd);
     }
 
-    @ExceptionHandler(DuplicatePaymentException.class)
-    public Mono<ProblemDetail> handleDuplicatePayment(DuplicatePaymentException ex) {
-        log.warn("Duplicate payment: {}", ex.getMessage());
-        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
-        pd.setType(URI.create("urn:tiibntick:billing:duplicate-payment"));
-        pd.setTitle("Duplicate Payment");
-        pd.setProperty("timestamp", Instant.now());
-        return Mono.just(pd);
-    }
 
     /**
      * Relays a Kernel HTTP error (wrong confirmation code, insufficient funds, unknown wallet…)

@@ -222,6 +222,13 @@
             <version>${project.version}</version>
         </dependency>
 
+        <!-- Fake Kernel for the delivery payment integration test -->
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>mockwebserver</artifactId>
+            <scope>test</scope>
+        </dependency>
+
         <!-- TiiBnTick Billing Wallet -->
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>

@@ -1,6 +1,5 @@
 package com.yowyob.tiibntick.core.gofreelancer.application.service;
 
-import com.yowyob.tiibntick.core.billing.wallet.application.port.in.IWalletUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.AnnouncementResponseDTO;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.AnnouncementSubscriptionRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepository;
@@ -47,7 +46,6 @@ class DeliveryOtpPreviewModeTest {
     @Mock private IDeliveryAnnouncementPort deliveryAnnouncementPort;
     @Mock private TenantContextHolder tenantContextHolder;
     @Mock private FreelancerQuotaService freelancerQuotaService;
-    @Mock private IWalletUseCase walletUseCase;
     @Mock private INegotiationChatPort negotiationChatPort;
     @Mock private IAnnouncementRepository announcementRepository;
     @Mock private AnnouncementSubscriptionRepository subscriptionRepository;
@@ -120,7 +118,7 @@ class DeliveryOtpPreviewModeTest {
     private AnnouncementApplicationService buildService(GofpDeliveryOtpProperties props) {
         return new AnnouncementApplicationService(
                 deliveryAnnouncementPort, tenantContextHolder, freelancerQuotaService,
-                walletUseCase, negotiationChatPort, announcementRepository, subscriptionRepository,
+                negotiationChatPort, announcementRepository, subscriptionRepository,
                 gofpFreelancerRepository, gofpUserRepository, deliveryRepository, deliveryOtpService,
                 props);
     }

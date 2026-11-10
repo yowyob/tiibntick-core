@@ -1,6 +1,6 @@
 package com.yowyob.tiibntick.core.gofreelancer.application.service;
 
-import com.yowyob.tiibntick.core.billing.wallet.application.port.in.IWalletUseCase;
+import com.yowyob.tiibntick.core.billing.wallet.application.port.in.ISettlementUseCase;
 import com.yowyob.tiibntick.core.delivery.application.port.in.DeliveryLifecycleUseCase;
 import com.yowyob.tiibntick.core.delivery.application.port.in.command.CompleteDeliveryCommand;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepository;
@@ -54,7 +54,7 @@ class RelayDepositServiceTest {
     @Mock private NotificationService notificationService;
     @Mock private GofpRelayPointRepository gofpRelayPointRepository;
     @Mock private GofpUserRepository gofpUserRepository;
-    @Mock private IWalletUseCase walletUseCase;
+    @Mock private ISettlementUseCase settlements;
     @Mock private IDeliveryNeedRepository deliveryNeedRepository;
     @Mock private RelayPointSubscriptionRepository relayPointSubscriptionRepository;
     @Mock private DepositHubPackageUseCase depositHubPackageUseCase;
@@ -76,7 +76,7 @@ class RelayDepositServiceTest {
     void setUp() {
         service = new RelayDepositService(
                 relayDepositRepository, deliveryRepository, otpService, custodyTransferUseCase,
-                notificationService, gofpRelayPointRepository, gofpUserRepository, walletUseCase,
+                notificationService, gofpRelayPointRepository, gofpUserRepository, settlements,
                 deliveryNeedRepository, relayPointSubscriptionRepository, depositHubPackageUseCase,
                 pickupHubPackageUseCase, relayHubPort, deliveryLifecycleUseCase);
 
@@ -189,8 +189,7 @@ class RelayDepositServiceTest {
                 .verifyComplete();
 
         verify(relayDepositRepository).save(any(RelayDeposit.class));
-        verify(walletUseCase, org.mockito.Mockito.never()).debitWallet(any());
-        verify(walletUseCase, org.mockito.Mockito.never()).splitMissionRevenue(any());
+        verify(settlements, org.mockito.Mockito.never()).record(any());
     }
 
     @Test

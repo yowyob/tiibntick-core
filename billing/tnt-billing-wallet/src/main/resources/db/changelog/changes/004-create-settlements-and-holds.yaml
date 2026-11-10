@@ -1,0 +1,82 @@
+databaseChangeLog:
+  - changeSet:
+      id: 004-create-wallet-settlements-and-holds
+      author: TiiBnTick Team
+      comment: >
+        Kernel wallet migration. Balances and movements now live in the Kernel wallet; the Core
+        keeps only (1) wallet_settlements — which business object (delivery, relay deposit…) was
+        settled by which Kernel transfer or in cash, plus the platform commission still due, and
+        (2) wallet_holds — amounts the Core refuses to let a user move out while an incident or
+        dispute is open (the Kernel has no freeze/reservation). The legacy ledger tables
+        (wallet_wallets, wallet_transactions, wallet_payment_intents, …) are intentionally left
+        untouched as a read-only archive until existing balances have been exported/migrated.
+      changes:
+        - createTable:
+            schemaName: billing
+            tableName: wallet_settlements
+            columns:
+              - column: { name: id, type: UUID, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: tenant_id, type: UUID, constraints: { nullable: false } }
+              - column: { name: reference_type, type: VARCHAR(30), constraints: { nullable: false }, remarks: "DELIVERY | RELAY_DEPOSIT | MARKET_ORDER" }
+              - column: { name: reference_id, type: UUID, constraints: { nullable: false } }
+              - column: { name: payer_user_id, type: UUID, remarks: "JWT subject of the payer (Kernel wallet owner)" }
+              - column: { name: payee_user_id, type: UUID, remarks: "JWT subject of the beneficiary (Kernel wallet owner)" }
+              - column: { name: amount, type: "NUMERIC(19,4)", constraints: { nullable: false } }
+              - column: { name: currency, type: VARCHAR(3), constraints: { nullable: false } }
+              - column: { name: method, type: VARCHAR(30), constraints: { nullable: false }, remarks: "WALLET_TRANSFER | CASH | EXTERNAL_PROVIDER" }
+              - column: { name: status, type: VARCHAR(30), constraints: { nullable: false }, remarks: "PAID | CASH_COLLECTED | UNPAID" }
+              - column: { name: kernel_reference, type: VARCHAR(255), remarks: "Reference sent to / returned by the Kernel transfer" }
+              - column: { name: commission_rate, type: "NUMERIC(7,6)", defaultValueNumeric: 0, constraints: { nullable: false } }
+              - column: { name: commission_amount, type: "NUMERIC(19,4)", defaultValueNumeric: 0, constraints: { nullable: false } }
+              - column: { name: commission_status, type: VARCHAR(20), defaultValue: NONE, constraints: { nullable: false }, remarks: "NONE | DUE | SETTLED | WAIVED" }
+              - column: { name: created_at, type: TIMESTAMP, defaultValueComputed: NOW(), constraints: { nullable: false } }
+              - column: { name: paid_at, type: TIMESTAMP }
+              - column: { name: updated_at, type: TIMESTAMP, defaultValueComputed: NOW(), constraints: { nullable: false } }
+        - addUniqueConstraint:
+            schemaName: billing
+            tableName: wallet_settlements
+            columnNames: tenant_id, reference_type, reference_id
+            constraintName: uq_wallet_settlement_reference
+        - createIndex:
+            schemaName: billing
+            tableName: wallet_settlements
+            indexName: idx_wallet_settlement_reference
+            columns:
+              - column: { name: reference_type }
+              - column: { name: reference_id }
+        - createIndex:
+            schemaName: billing
+            tableName: wallet_settlements
+            indexName: idx_wallet_settlement_commission
+            columns:
+              - column: { name: tenant_id }
+              - column: { name: commission_status }
+        - createTable:
+            schemaName: billing
+            tableName: wallet_holds
+            columns:
+              - column: { name: id, type: UUID, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: tenant_id, type: UUID, constraints: { nullable: false } }
+              - column: { name: owner_user_id, type: UUID, constraints: { nullable: false }, remarks: "Kernel wallet owner (JWT subject)" }
+              - column: { name: reference_type, type: VARCHAR(30), constraints: { nullable: false } }
+              - column: { name: reference_id, type: UUID, constraints: { nullable: false } }
+              - column: { name: amount, type: "NUMERIC(19,4)", constraints: { nullable: false } }
+              - column: { name: currency, type: VARCHAR(3), constraints: { nullable: false } }
+              - column: { name: reason, type: VARCHAR(500) }
+              - column: { name: status, type: VARCHAR(20), constraints: { nullable: false }, remarks: "ACTIVE | RELEASED" }
+              - column: { name: created_at, type: TIMESTAMP, defaultValueComputed: NOW(), constraints: { nullable: false } }
+              - column: { name: released_at, type: TIMESTAMP }
+        - createIndex:
+            schemaName: billing
+            tableName: wallet_holds
+            indexName: idx_wallet_hold_owner_status
+            columns:
+              - column: { name: owner_user_id }
+              - column: { name: status }
+        - createIndex:
+            schemaName: billing
+            tableName: wallet_holds
+            indexName: idx_wallet_hold_reference
+            columns:
+              - column: { name: reference_type }
+              - column: { name: reference_id }

@@ -71,12 +71,6 @@
             <groupId>com.yowyob.tiibntick.core</groupId>
             <artifactId>tnt-billing-pricing</artifactId>
         </dependency>
-        <!-- ── tnt-billing-wallet: implements IPaymentAnchorPort (one-directional —
-             billing-wallet does not depend back on trust, no cycle) ── -->
-        <dependency>
-            <groupId>com.yowyob.tiibntick.core</groupId>
-            <artifactId>tnt-billing-wallet</artifactId>
-        </dependency>
         <!-- ── tnt-dispute-core: implements IBlockchainProofPort (one-directional —
              dispute does not depend back on trust, no cycle) ── -->
         <dependency>

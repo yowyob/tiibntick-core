@@ -1,7 +1,9 @@
 package com.yowyob.tiibntick.core.gofreelancer.application.service;
 
-import com.yowyob.tiibntick.core.billing.wallet.application.port.in.IWalletUseCase;
-import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.SplitMissionRevenueCommand;
+import com.yowyob.tiibntick.core.billing.wallet.application.port.in.ISettlementUseCase;
+import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.RecordSettlementCommand;
+import com.yowyob.tiibntick.core.billing.wallet.domain.enums.SettlementMethod;
+import com.yowyob.tiibntick.core.billing.wallet.domain.enums.SettlementStatus;
 import com.yowyob.tiibntick.core.delivery.application.port.in.command.DepositAtRelayPointCommand;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.DeliveryStatusUpdateDTO;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepository;
@@ -51,8 +53,8 @@ public class DeliveryStatusApplicationService {
     private final OtpService otpService;
     private final DeliveryOtpService deliveryOtpService;
 
-    // ── Wallet & Payment (tnt-billing-wallet) ──────────────────────────
-    private final IWalletUseCase walletUseCase;
+    // ── Settlement tracking (tnt-billing-wallet) — no money moves here any more ──
+    private final ISettlementUseCase settlements;
 
     // ── Blockchain (tnt-trust-core) ────────────────────────────────────
     private final RecordCustodyTransferUseCase custodyTransferUseCase;
@@ -500,8 +502,20 @@ public class DeliveryStatusApplicationService {
                 e.getClass().getSimpleName(), e.getMessage());
     }
 
+    /**
+     * Kernel wallet migration: completing a delivery no longer MOVES money. The client pays from
+     * their own Kernel wallet through the challenge/confirm flow ({@code DeliveryPaymentController}),
+     * which records a PAID settlement; this method only reconciles what happened at delivery time:
+     * <ul>
+     *   <li>already PAID by transfer → nothing to do;</li>
+     *   <li>CASH → the delivery person kept the cash: record it and the platform commission as DUE
+     *       (the Core cannot debit their Kernel wallet without their confirmation code);</li>
+     *   <li>digital but not paid yet → record UNPAID, count it and log the greppable
+     *       {@code UNPAID_DELIVERED} marker; the client can still pay afterwards. The HTTP call
+     *       succeeds: the parcel was handed over and that fact must not be rolled back.</li>
+     * </ul>
+     */
     private Mono<Void> processDeliveryPaymentWithActor(Delivery delivery, UUID actorId, UUID tenantId) {
-        // 1. Retrieve the payment method from DeliveryNeed or Announcement
         Mono<String> paymentMethodMono;
         if (delivery.getDeliveryNeedId() != null) {
             paymentMethodMono = deliveryNeedRepository.findById(delivery.getDeliveryNeedId())
@@ -514,76 +528,49 @@ public class DeliveryStatusApplicationService {
 
         return paymentMethodMono.flatMap(paymentMethod -> {
             log.info("Payment method for delivery {} is {}", delivery.getId(), paymentMethod);
+            java.math.BigDecimal amount = java.math.BigDecimal.valueOf(delivery.getTarif())
+                    .setScale(2, java.math.RoundingMode.HALF_UP);
+            java.math.BigDecimal rate = DeliveryPaymentApplicationService.COMMISSION_RATE;
 
-            Mono<Void> walletAction;
-            double platformCommissionAmount = delivery.getTarif() * 0.05; // 5% commission
-
+            Mono<String> settle;
             if ("CASH".equalsIgnoreCase(paymentMethod)) {
-                // Freelancer collected physical cash. DEBIT their wallet for the platform commission.
-                walletAction = walletUseCase.debitWallet(
-                        new com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.DebitWalletCommand(
-                                actorId,
-                                tenantId,
-                                com.yowyob.tiibntick.core.billing.wallet.domain.model.Money.of(java.math.BigDecimal.valueOf(platformCommissionAmount), "XAF"),
-                                delivery.getId().toString(),
-                                com.yowyob.tiibntick.core.billing.wallet.domain.enums.PaymentChannel.CASH_ON_DELIVERY,
-                                "Commission logicielle (5%) pour la course payée en espèces : " + delivery.getId(),
-                                "cash-commission:" + delivery.getId()
-                        )
-                ).doOnSuccess(tx -> log.info("Debited commission {} from actorId={} for CASH delivery",
-                        platformCommissionAmount, actorId)).then();
+                settle = settlements.record(new RecordSettlementCommand(
+                                tenantId, DeliveryPaymentApplicationService.REFERENCE_TYPE, delivery.getId(),
+                                null, actorId, amount, DeliveryPaymentApplicationService.CURRENCY,
+                                SettlementMethod.CASH, SettlementStatus.CASH_COLLECTED, null, rate))
+                        .doOnSuccess(st -> log.info("Cash delivery {}: commission {} due by actorId={}",
+                                delivery.getId(), st.getCommissionAmount(), actorId))
+                        .thenReturn("CASH_COLLECTED_COMMISSION_DUE");
             } else {
-                // Digital payments (ORANGE_MONEY, MTN_MOBILE_MONEY, CARD, etc.)
-                // splitMissionRevenue only looks the beneficiary wallet up (findByOwnerId) and
-                // fails with WalletNotFoundException when absent: a freelancer's first paid
-                // delivery must therefore create it first (lot C-19.2 — the fresh-account run
-                // got HTTP 500 here). getOrCreateWallet creates the ACTOR wallet keyed on
-                // actorId, the same key the split looks up; the CASH branch above already goes
-                // through it via debitWallet.
-                walletAction = walletUseCase.getOrCreateWallet(actorId, tenantId)
-                        .then(Mono.defer(() -> walletUseCase.splitMissionRevenue(
-                                new SplitMissionRevenueCommand(
-                                        delivery.getId().toString(),
-                                        java.math.BigDecimal.valueOf(delivery.getTarif()),
-                                        actorId.toString(),
-                                        tenantId,
-                                        null,
-                                        0.05,
-                                        0.0
-                                )
-                        )))
-                        .doOnSuccess(split -> log.info("Revenue split for delivery {} (Method: {}) — platform: {}, org: {}",
-                                delivery.getId(), paymentMethod, split.platformCommission(), split.orgRevenue()))
-                        .then();
+                settle = settlements.record(new RecordSettlementCommand(
+                                tenantId, DeliveryPaymentApplicationService.REFERENCE_TYPE, delivery.getId(),
+                                null, actorId, amount, DeliveryPaymentApplicationService.CURRENCY,
+                                SettlementMethod.WALLET_TRANSFER, SettlementStatus.UNPAID, null, rate))
+                        .map(st -> {
+                            if (st.getStatus() != SettlementStatus.PAID) {
+                                paymentFailures.increment();
+                                log.warn("UNPAID_DELIVERED delivery={} actor={} amount={} — delivered but the client "
+                                                + "has not paid from their Kernel wallet yet (method {})",
+                                        delivery.getId(), actorId, amount, paymentMethod);
+                            }
+                            return st.getStatus() == SettlementStatus.PAID
+                                    ? "DIGITAL_WALLET_TRANSFER" : "";
+                        });
             }
 
-            // Record the payment action on the blockchain for traceability
-            Mono<Void> anchorPayment = paymentUseCase.record(
-                            delivery.getId().toString(),
-                            actorId.toString(),
-                            actorId.toString(),
-                            "default",
-                            "CASH".equalsIgnoreCase(paymentMethod) ? "CASH_COLLECTED_COMMISSION_DEBITED" : "DIGITAL_WALLET_SPLIT",
-                            delivery.getId().toString(),
-                            String.valueOf(delivery.getTarif()),
-                            "XAF"
-                    )
-                    .doOnSuccess(txHash -> log.info("Blockchain: payment anchored for delivery {} — txHash={}",
-                            delivery.getId(), txHash))
-                    .doOnError(e -> log.error(
-                            "Blockchain: failed to anchor payment for delivery {} — "
-                                    + "best-effort, not blocking (ADR-018)",
-                            delivery.getId(), e))
-                    .onErrorResume(e -> Mono.empty())
-                    .then();
-
-            // walletAction is NOT best-effort: a real wallet failure (insufficient funds,
-            // wallet service down) must surface to the caller rather than being silently
-            // swallowed — only blockchain trust-anchoring (anchorPayment, above) is
-            // ADR-018 best-effort.
-            return Mono.when(walletAction, anchorPayment)
-                    .doOnError(e -> log.error(
-                            "Payment processing failed for delivery {} — propagating",
+            // Blockchain trust-anchoring is best-effort (ADR-018); settlement recording is not.
+            return settle.flatMap(action -> action.isEmpty() ? Mono.<Void>empty()
+                    : paymentUseCase.record(
+                                    delivery.getId().toString(), actorId.toString(), actorId.toString(),
+                                    "default", action, delivery.getId().toString(),
+                                    String.valueOf(delivery.getTarif()), "XAF")
+                            .doOnSuccess(txHash -> log.info("Blockchain: payment anchored for delivery {} — txHash={}",
+                                    delivery.getId(), txHash))
+                            .doOnError(e -> log.error("Blockchain: failed to anchor payment for delivery {} — "
+                                    + "best-effort, not blocking (ADR-018)", delivery.getId(), e))
+                            .onErrorResume(e -> Mono.empty())
+                            .then())
+                    .doOnError(e -> log.error("Settlement recording failed for delivery {} — propagating",
                             delivery.getId(), e));
         });
     }

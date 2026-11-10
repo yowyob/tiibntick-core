@@ -1,9 +1,5 @@
 package com.yowyob.tiibntick.core.gofreelancer.application.service;
 
-import com.yowyob.tiibntick.core.billing.wallet.application.port.in.IWalletUseCase;
-import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.DebitWalletCommand;
-import com.yowyob.tiibntick.core.billing.wallet.domain.model.Money;
-import com.yowyob.tiibntick.core.billing.wallet.domain.model.WalletTransaction;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.AnnouncementRequestDTO;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IAnnouncementRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryAnnouncementPort;
@@ -17,7 +13,6 @@ import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.announcement.An
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Mono;
@@ -36,13 +31,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Unit tests for {@link AnnouncementApplicationService}'s escrow branches — the module's
- * biggest correctness risk given it had zero test coverage (see
- * {@code docs/knowledge/known-issues.md} #23) despite handling real money movement.
- *
- * <p>Covers both product experiences from {@code architecture/decisions.md} ADR-021:
- * FIXED_PRICE escrows at publish time, QUOTE_REQUEST escrows at selection time using the
- * chosen response's own proposed price — and that neither path double-charges the other.
+ * Unit tests for {@link AnnouncementApplicationService}'s pricing branches after the Kernel
+ * wallet migration: neither FIXED_PRICE (publish) nor QUOTE_REQUEST (select) escrows money any
+ * more — a debit needs the client's own confirmation code, so the client pays the delivery
+ * person from their Kernel wallet once the delivery is assigned (DeliveryPaymentApplicationService).
  *
  * @author MANFOUO BRAUN
  */
@@ -52,7 +44,6 @@ class AnnouncementApplicationServiceTest {
     @Mock private IDeliveryAnnouncementPort deliveryAnnouncementPort;
     @Mock private TenantContextHolder tenantContextHolder;
     @Mock private FreelancerQuotaService freelancerQuotaService;
-    @Mock private IWalletUseCase walletUseCase;
     @Mock private INegotiationChatPort negotiationChatPort;
     @Mock private IAnnouncementRepository announcementRepository;
     @Mock private AnnouncementSubscriptionRepository subscriptionRepository;
@@ -73,7 +64,7 @@ class AnnouncementApplicationServiceTest {
     void setUp() {
         service = new AnnouncementApplicationService(
                 deliveryAnnouncementPort, tenantContextHolder, freelancerQuotaService,
-                walletUseCase, negotiationChatPort, announcementRepository, subscriptionRepository,
+                negotiationChatPort, announcementRepository, subscriptionRepository,
                 gofpFreelancerRepository, gofpUserRepository, deliveryRepository, deliveryOtpService,
                 deliveryOtpProperties);
         lenient().when(announcementRepository.findById(any())).thenReturn(Mono.empty());
@@ -83,7 +74,7 @@ class AnnouncementApplicationServiceTest {
     }
 
     @Test
-    void createAnnouncement_fixedPrice_debitsWalletEscrowAtPublish() {
+    void createAnnouncement_fixedPrice_publishesWithoutAnyEscrow() {
         AnnouncementRequestDTO request = new AnnouncementRequestDTO();
         request.setClientId(clientId);
         request.setPricingMode("FIXED_PRICE");
@@ -96,22 +87,15 @@ class AnnouncementApplicationServiceTest {
         when(tenantContextHolder.currentTenantId()).thenReturn(Mono.just(tenantId));
         when(deliveryAnnouncementPort.publish(any(PublishAnnouncementPortCommand.class)))
                 .thenReturn(Mono.just(published));
-        when(walletUseCase.debitWallet(any())).thenReturn(Mono.just(WalletTransaction.builder().build()));
         when(announcementRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
 
         StepVerifier.create(service.createAnnouncement(request))
                 .expectNextMatches(dto -> announcementId.equals(dto.getId()))
                 .verifyComplete();
-
-        ArgumentCaptor<DebitWalletCommand> captor = ArgumentCaptor.forClass(DebitWalletCommand.class);
-        verify(walletUseCase).debitWallet(captor.capture());
-        assertThat(captor.getValue().amount()).isEqualTo(Money.of(BigDecimal.valueOf(5000), "XAF"));
-        assertThat(captor.getValue().userId()).isEqualTo(clientId);
-        assertThat(captor.getValue().tenantId()).isEqualTo(tenantId);
     }
 
     @Test
-    void createAnnouncement_quoteRequest_doesNotDebitWalletAtPublish() {
+    void createAnnouncement_quoteRequest_publishesWithoutAnyEscrow() {
         AnnouncementRequestDTO request = new AnnouncementRequestDTO();
         request.setClientId(clientId);
         request.setPricingMode("QUOTE_REQUEST");
@@ -128,12 +112,10 @@ class AnnouncementApplicationServiceTest {
         StepVerifier.create(service.createAnnouncement(request))
                 .expectNextCount(1)
                 .verifyComplete();
-
-        verify(walletUseCase, never()).debitWallet(any());
     }
 
     @Test
-    void assignResponse_quoteRequest_resolvesEscrowAmountFromPortAndDebitsProposedPrice() {
+    void assignResponse_quoteRequest_selectsWithoutEscrow() {
         UUID responseId = UUID.randomUUID();
         AnnouncementResponseSnapshot response = new AnnouncementResponseSnapshot(
                 responseId, freelancerId, BigDecimal.valueOf(3500), "XAF", "SENT", Instant.now());
@@ -144,24 +126,17 @@ class AnnouncementApplicationServiceTest {
 
         when(tenantContextHolder.currentTenantId()).thenReturn(Mono.just(tenantId));
         when(deliveryAnnouncementPort.findById(tenantId, announcementId)).thenReturn(Mono.just(before));
-        when(deliveryAnnouncementPort.resolveEscrowAmount(tenantId, announcementId, responseId))
-                .thenReturn(Mono.just(BigDecimal.valueOf(3500)));
         when(deliveryAnnouncementPort.selectResponse(tenantId, announcementId, clientId, responseId))
                 .thenReturn(Mono.just(assigned));
-        when(walletUseCase.debitWallet(any())).thenReturn(Mono.just(WalletTransaction.builder().build()));
         when(announcementRepository.findById(announcementId)).thenReturn(Mono.empty());
 
         StepVerifier.create(service.assignResponse(announcementId, clientId, responseId))
                 .expectNextCount(1)
                 .verifyComplete();
-
-        ArgumentCaptor<DebitWalletCommand> captor = ArgumentCaptor.forClass(DebitWalletCommand.class);
-        verify(walletUseCase).debitWallet(captor.capture());
-        assertThat(captor.getValue().amount()).isEqualTo(Money.of(BigDecimal.valueOf(3500), "XAF"));
     }
 
     @Test
-    void assignResponse_fixedPrice_doesNotDebitWalletAgainAtSelect() {
+    void assignResponse_fixedPrice_selectsWithoutEscrow() {
         UUID responseId = UUID.randomUUID();
         AnnouncementResponseSnapshot response = new AnnouncementResponseSnapshot(
                 responseId, freelancerId, null, null, "SENT", Instant.now());
@@ -180,8 +155,6 @@ class AnnouncementApplicationServiceTest {
                 .expectNextCount(1)
                 .verifyComplete();
 
-        verify(walletUseCase, never()).debitWallet(any());
-        verify(deliveryAnnouncementPort, never()).resolveEscrowAmount(any(), any(), any());
     }
 
     @Test

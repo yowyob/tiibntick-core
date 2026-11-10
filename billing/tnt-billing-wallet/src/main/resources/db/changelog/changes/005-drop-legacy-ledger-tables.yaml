@@ -1,0 +1,30 @@
+databaseChangeLog:
+  - changeSet:
+      id: 005-drop-legacy-wallet-ledger-tables
+      author: TiiBnTick Team
+      comment: >
+        Kernel wallet migration, final step. The local ledger (wallets, transactions, payment
+        intents, payment splits, reconciliations) is retired: balances and movements live in the
+        Kernel wallet. The maintainer confirmed there is no real data to keep, so the legacy
+        tables are dropped (irreversible). wallet_settlements and wallet_holds (004) stay.
+      changes:
+        - dropTable:
+            schemaName: billing
+            tableName: wallet_reconciliations
+            cascadeConstraints: true
+        - dropTable:
+            schemaName: billing
+            tableName: wallet_payment_splits
+            cascadeConstraints: true
+        - dropTable:
+            schemaName: billing
+            tableName: wallet_payment_intents
+            cascadeConstraints: true
+        - dropTable:
+            schemaName: billing
+            tableName: wallet_transactions
+            cascadeConstraints: true
+        - dropTable:
+            schemaName: billing
+            tableName: wallet_wallets
+            cascadeConstraints: true

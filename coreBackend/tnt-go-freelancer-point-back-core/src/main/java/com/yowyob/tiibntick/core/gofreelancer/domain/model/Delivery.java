@@ -97,4 +97,26 @@ public class Delivery implements Persistable<UUID>, TntPersistableEntity {
     /** Timestamp when the recipient confirmed receipt of the parcel (DELIVERED confirmed). */
     @Column("actual_delivery_time")
     private Instant actualDeliveryTime;
+
+    // ── Kernel wallet payment (receive code of the delivery person) ─────────
+
+    /** JWT subject of the delivery person who generated {@link #receiveCode}. */
+    @Column("driver_user_id")
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private UUID driverUserId;
+
+    /** Short-lived Kernel receive code the client's transfer is addressed to. Never serialised. */
+    @Column("receive_code")
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private String receiveCode;
+
+    @Column("receive_code_expires_at")
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private Instant receiveCodeExpiresAt;
+
+    /** True when a non-expired receive code is stored. */
+    public boolean hasValidReceiveCode() {
+        return receiveCode != null && !receiveCode.isBlank()
+                && (receiveCodeExpiresAt == null || receiveCodeExpiresAt.isAfter(Instant.now()));
+    }
 }

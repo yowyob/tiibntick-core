@@ -2,7 +2,6 @@ package com.yowyob.tiibntick.core.agency.commission.application.service;
 
 import com.yowyob.tiibntick.common.exception.TntNotFoundException;
 import com.yowyob.tiibntick.core.agency.commission.adapter.in.web.dto.CommissionResponse;
-import com.yowyob.tiibntick.core.agency.commission.adapter.out.clients.WalletCorePort;
 import com.yowyob.tiibntick.core.agency.commission.adapter.out.persistence.CommissionRecordR2dbcRepository;
 import com.yowyob.tiibntick.core.agency.commission.application.mapper.CommissionMapper;
 import com.yowyob.tiibntick.core.agency.commission.domain.CommissionRecord;
@@ -31,7 +30,6 @@ public class CommissionService {
     private final CommissionRecordR2dbcRepository commissionRepo;
     private final AgencyRegistryR2dbcRepository agencyRepo;
     private final DelivererR2dbcRepository delivererRepo;
-    private final WalletCorePort walletCore;
 
     public Flux<CommissionResponse> listByAgency(UUID tenantId, UUID agencyId) {
         return commissionRepo.findByAgencyIdAndTenantId(agencyId, tenantId)
@@ -72,34 +70,21 @@ public class CommissionService {
     }
 
     /**
-     * Marks commission PAID and triggers Mobile Money payout via billing-wallet.
+     * Agency commission payout is DISABLED since the Kernel wallet migration.
+     *
+     * <p>Paying a commission means crediting the deliverer's wallet with nobody present to confirm
+     * it; the Kernel only moves money with the owner's one-time code and has no server-to-server
+     * credit (Kernel request R1, docs/audits/remediation/kernel-wallet-migration.md). The check
+     * runs <em>before</em> any state change so a refused payout never leaves a commission marked
+     * PAID. Settle it by hand, then call {@link #confirmWalletPayment}.
      */
-    @Transactional
     public Mono<CommissionResponse> pay(UUID tenantId, UUID commissionId) {
-        return requireCommissionEntity(commissionId, tenantId)
-                .flatMap(entity -> {
-                    CommissionRecord record = CommissionMapper.toDomain(entity);
-                    if (record.getStatus() != CommissionStatus.VALIDATED) {
-                        return Mono.error(new IllegalStateException(
-                                "Commission must be VALIDATED before payment (current: "
-                                        + record.getStatus() + ")"));
-                    }
-                    record.pay(Instant.now());
-                    return commissionRepo.save(CommissionMapper.toEntity(record))
-                            .map(CommissionMapper::toDomain);
-                })
-                .flatMap(saved -> delivererRepo.findByIdAndTenantId(saved.getDelivererId(), tenantId)
-                        .flatMap(deliverer -> walletCore.pay(new WalletCorePort.PaymentRequest(
-                                saved.getTenantId(),
-                                deliverer.getActorId(),
-                                saved.getId(),
-                                deliverer.getPhone(),
-                                saved.getAmount(),
-                                saved.getCurrency(),
-                                "Commission mission " + saved.getMissionId(),
-                                UUID.randomUUID().toString()
-                        )).thenReturn(saved)))
-                .map(CommissionMapper::toResponse);
+        return requireCommission(commissionId, tenantId)
+                .then(Mono.<CommissionResponse>error(new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_IMPLEMENTED,
+                        "Agency commission payout is not supported by the Kernel wallet: it cannot credit a "
+                                + "deliverer without their confirmation code (Kernel request R1). "
+                                + "Settle the commission manually.")));
     }
 
     @Transactional

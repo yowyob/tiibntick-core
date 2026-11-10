@@ -89,10 +89,8 @@ public interface DeliveryQueryUseCase {
      *
      * <p>The delivery person's profile ID ({@code tnt_delivery_persons.id}) and
      * their kernel actor ID ({@code tnt_delivery_persons.actor_id}) are two different
-     * UUIDs for the same person. Wallet ownership is keyed on {@code actor_id}, so
-     * callers that build {@link com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.DebitWalletCommand}
-     * or {@link com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.SplitMissionRevenueCommand}
-     * must use the resolved {@code actorId}, not the profile ID.
+     * UUIDs for the same person. Payments and settlements are keyed on the {@code actor_id}
+     * (the Kernel wallet owner), so callers must use the resolved {@code actorId}, not the profile ID.
      *
      * @param tenantId         the tenant scope
      * @param deliveryPersonId the profile ID from {@code tnt_delivery_persons.id}

@@ -2,6 +2,8 @@ package com.yowyob.tiibntick.core.billing.wallet.adapter.in.web;
 
 import com.yowyob.tiibntick.core.billing.wallet.adapter.out.kernel.KernelPaymentGatewayAdapter;
 import com.yowyob.tiibntick.core.billing.wallet.application.service.KernelWalletService;
+import com.yowyob.tiibntick.core.billing.wallet.application.service.WalletHoldService;
+import com.yowyob.tiibntick.core.billing.wallet.support.InMemoryWalletRepositories;
 import com.yowyob.tiibntick.core.roles.adapter.in.web.TntPermissionAspect;
 import com.yowyob.tiibntick.core.roles.adapter.in.web.TntRoleExceptionHandler;
 import com.yowyob.tiibntick.core.roles.application.port.out.ReactivePermissionResolver;
@@ -58,6 +60,9 @@ class KernelWalletFlowIntegrationTest {
 
     private MockWebServer kernel;
     private final List<RecordedRequest> seen = new CopyOnWriteArrayList<>();
+    private final InMemoryWalletRepositories.Holds holdRepo = new InMemoryWalletRepositories.Holds();
+    private final InMemoryWalletRepositories.Settlements settlementRepo = new InMemoryWalletRepositories.Settlements();
+    private final WalletHoldService holdService = new WalletHoldService(holdRepo, settlementRepo);
 
     @BeforeEach
     void setUp() throws IOException {
@@ -156,6 +161,35 @@ class KernelWalletFlowIntegrationTest {
     }
 
     @Test
+    @DisplayName("funds held for a dispute cannot be transferred or withdrawn: 422 and no Kernel money call")
+    void heldFundsCannotBeMovedOut() {
+        // balance 12 500, 12 000 held → only 500 spendable
+        holdService.placeHold(UUID.randomUUID(), OWNER_ID, "DELIVERY", UUID.randomUUID(),
+                new java.math.BigDecimal("12000"), "XAF", "DISPUTE_HOLD").block();
+        WebTestClient c = client("payment:process", "wallet:read");
+
+        c.post().uri("/billing/kernel-wallet/me/transfers/challenge")
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .bodyValue("{\"recipientCode\":\"AB12CD\",\"amount\":4750,\"reference\":\"R\"}")
+                .exchange().expectStatus().isEqualTo(422)
+                .expectBody(String.class).value(b -> assertThat(b).contains("held"));
+
+        c.post().uri("/billing/kernel-wallet/me/withdrawals/challenge")
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .bodyValue("{\"amount\":4750,\"phoneNumber\":\"+237670000000\"}")
+                .exchange().expectStatus().isEqualTo(422);
+
+        assertThat(seen.stream().map(RecordedRequest::getPath))
+                .noneMatch(p -> p.contains("/transfers") || p.contains("/withdrawals"));
+
+        // a small amount within the spendable part still goes through
+        c.post().uri("/billing/kernel-wallet/me/transfers/challenge")
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .bodyValue("{\"recipientCode\":\"AB12CD\",\"amount\":400,\"reference\":\"R\"}")
+                .exchange().expectStatus().isOk();
+    }
+
+    @Test
     @DisplayName("a Kernel 400 (wrong confirmation code) is relayed as HTTP 400 with the Kernel message")
     void kernelClientErrorIsRelayed() {
         client("payment:process", "wallet:read").post().uri("/billing/kernel-wallet/me/transfers")
@@ -242,7 +276,7 @@ class KernelWalletFlowIntegrationTest {
                     c.defaultCodecs().jackson2JsonDecoder(new Jackson2JsonDecoder(mapper));
                 }).build())
                 .baseUrl(kernel.url("/").toString()).build();
-        KernelWalletService service = new KernelWalletService(new KernelPaymentGatewayAdapter(webClient));
+        KernelWalletService service = new KernelWalletService(new KernelPaymentGatewayAdapter(webClient), holdService);
 
         TntPermissionEvaluator evaluator = new TntPermissionEvaluator(
                 mock(ReactivePermissionResolver.class), new TntRoleDefinitionRegistry());

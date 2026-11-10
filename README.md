@@ -230,7 +230,8 @@ docker compose --profile app up -d
 | `PricingController` | `/api/v1/billing/pricing` | 9 | Calcul prix vente, surcharges, commission split |
 | `InvoiceController` | `/api/v1/billing/invoices` | 9 | Génération, PDF, annulation, crédit-note |
 | `ReportingController` | `/api/v1/billing/reports` | 10 | Revenus, commissions, marges, KPIs, export CSV |
-| `WalletController` | `/billing/wallet` | 9 | Solde/transactions (`/me/*` self-service), crédits, gel, split (admin `wallet:admin`) — tenant issu du JWT |
+| `KernelWalletController` | `/billing/kernel-wallet` | 13 | Wallet **Kernel** de l'utilisateur connecté : solde, transactions, recharge, code de réception, transfert (challenge → code), retrait. Aucun grand livre local ; erreurs Kernel relayées |
+| `DeliveryPaymentController` | `/api/v1/deliveries/{id}/payment` | 4 | Paiement d'une livraison par transfert wallet client → livreur : `receive-code` (livreur), `challenge` puis confirmation (client), statut |
 | `CostController` | `/billing/cost` | 6 | Coût opérationnel, paramètres flotte |
 | `PaymentWebhookController` | `/billing/webhooks` | 3 | MTN MoMo, Orange Money, Stripe |
 

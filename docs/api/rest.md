@@ -22,7 +22,8 @@ REST endpoint index across all modules — base paths, key endpoints, and where 
 | tnt-sales-core | `/api/sales/orders` | `SalesOrderController` |
 | tnt-accounting-core | `/api/v1/accounting/{accounts,reports,journal-entries}` | `AccountController`, `AccountingReportController`, `JournalEntryController` |
 | tnt-billing-invoice | `/api/v1/billing/invoices` | `InvoiceController` |
-| tnt-billing-wallet | `/billing/wallet` | `WalletController` |
+| tnt-billing-wallet | `/billing/kernel-wallet` | `KernelWalletController` |
+| tnt-go-freelancer-point-back-core (payment) | `/api/v1/deliveries/{id}/payment` | `DeliveryPaymentController` |
 | tnt-billing-pricing | `/api/v1/billing/pricing`, `/api/v1/billing/policies` | `PricingController`, `BillingPolicyController` |
 | tnt-billing-cost | `/billing/cost` | `CostController` |
 | tnt-billing-report | `/api/v1/billing/reports` | `ReportingController` |
@@ -41,7 +42,11 @@ REST endpoint index across all modules — base paths, key endpoints, and where 
 
 **Realtime SSE** (`SseController`) — `GET /tracking/{trackingCode}`, `GET /mission/{missionId}`, `GET /fleet/{freelancerOrgId}` — `text/event-stream`, 15s heartbeat comment frames, events named `eta-update`/`mission-update`/`fleet-gps`.
 
-**Wallet** (`WalletController`) — tenant always from the JWT (`tenantId` query/body values are ignored). Self-service: `GET /me/balance`, `GET /me/transactions`, `POST /pay` (202 Accepted — async, payer = JWT user; `payment:process`). Admin only (`wallet:admin`, TNT_ADMIN by default): `GET /{userId}/balance`, `GET /{userId}/transactions`, `POST /{userId}/credit`, `POST /{userId}/pay` (on behalf of an owner), `PUT /{userId}/{freeze,unfreeze}`, `POST /freelancer-org`, `POST /split-revenue`, `POST /transfer-commission`. Provider webhooks are handled by the Kernel (no webhook endpoint in the Core).
+**Wallet** (`KernelWalletController`, `/billing/kernel-wallet`) — the Core keeps **no ledger**: balances and movements live in the Kernel wallet and every call runs with the caller's own bearer token (the Kernel resolves the wallet; no wallet or owner id in any route). Self-service only: `GET /me`, `POST /me` (create), `GET /me/transactions`, `POST /me/recharge`, `GET /me/recharge-orders`, `GET /recharge-orders/{id}[/refresh]`, `POST /me/receive-codes`, `POST /me/transfers/challenge` then `POST /me/transfers` (Kernel confirmation code), `GET /withdrawals/availability`, `POST /me/withdrawals/challenge` then `POST /me/withdrawals`. Kernel 4xx errors are relayed with their status and message (`kernelStatus` property); Kernel 5xx become 502. Outgoing transfers/withdrawals are refused (422) when they would dip into funds held for an open incident or dispute (local `billing.wallet_holds`).
+
+**Delivery payment** (`DeliveryPaymentController`, `/api/v1/deliveries/{deliveryId}/payment`) — the client pays the delivery person from their own Kernel wallet: (1) delivery person `POST /receive-code` (code generated with *their* token, stored on the delivery, short-lived — regenerate when expired); (2) client `POST /challenge` (Kernel sends a one-time confirmation code to the client); (3) client `POST /` with `{challengeToken, code}` → money moves, settlement recorded, 5 % platform commission tracked as `DUE` (the Kernel cannot split a transfer yet); `GET /` returns the settlement status for the client or the delivery person. 403 = not the client / not the assigned delivery person, 409 = already paid, cash delivery, cancelled or no valid receive code. Cash deliveries and unpaid digital deliveries are reconciled when the delivery is completed (`UNPAID_DELIVERED` log marker + `gofp.delivery.payment.failures` counter).
+
+**Not supported since the Kernel wallet migration** (Kernel can only move money with the owner's one-time code): dispute refunds/compensation payout (`COMPENSATION_NOT_SUPPORTED` log, no `compensation.paid` event), commission earnings credit (`COMMISSION_CREDIT_NOT_SUPPORTED`), agency commission payout (`PATCH /api/v1/tenants/{tenantId}/agency-registry/commissions/{commissionId}/pay` → 501). See `docs/audits/remediation/kernel-wallet-migration.md` for the Kernel requests R1–R7.
 
 ## Multi-tenancy patterns (pick the right one when adding endpoints)
 | Pattern | Used by | Example |

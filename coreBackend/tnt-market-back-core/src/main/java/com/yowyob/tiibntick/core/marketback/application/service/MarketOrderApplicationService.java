@@ -5,10 +5,10 @@ import com.yowyob.tiibntick.core.billing.invoice.application.port.in.GenerateInv
 import com.yowyob.tiibntick.core.billing.invoice.application.port.in.command.GenerateInvoiceCommand;
 import com.yowyob.tiibntick.core.billing.invoice.domain.model.InvoiceLine;
 import com.yowyob.tiibntick.core.billing.invoice.domain.model.enums.LineItemType;
-import com.yowyob.tiibntick.core.billing.wallet.application.port.in.IWalletUseCase;
-import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.CreditCommissionCommand;
-import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.DebitWalletCommand;
-import com.yowyob.tiibntick.core.billing.wallet.domain.enums.PaymentChannel;
+import com.yowyob.tiibntick.core.billing.wallet.application.port.in.ISettlementUseCase;
+import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.RecordSettlementCommand;
+import com.yowyob.tiibntick.core.billing.wallet.domain.enums.SettlementMethod;
+import com.yowyob.tiibntick.core.billing.wallet.domain.enums.SettlementStatus;
 import com.yowyob.tiibntick.core.delivery.application.port.in.DeliveryQueryUseCase;
 import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryStatus;
 import com.yowyob.tiibntick.core.dispute.application.command.OpenDisputeCommand;
@@ -123,7 +123,7 @@ public class MarketOrderApplicationService implements IManageMarketOrderUseCase 
     private final IDisputeCommandUseCase disputeCommandUseCase;
     private final CreateTntSalesOrderUseCase salesOrderUseCase;
     private final GenerateInvoiceUseCase invoiceUseCase;
-    private final IWalletUseCase walletUseCase;
+    private final ISettlementUseCase settlements;
 
     @Override
     @Transactional
@@ -212,25 +212,18 @@ public class MarketOrderApplicationService implements IManageMarketOrderUseCase 
     @Override
     @Transactional
     public Mono<MarketOrderResponse> processPayment(UUID orderId, ProcessPaymentCommand cmd, String tenantId) {
-        // ── tnt-billing-wallet semantics (business-critical — read before touching) ──────────────
-        // ProcessPaymentCommand carries paymentMethod + transactionRef + paidAmountXaf: the shape of
-        // a *payment confirmation callback* (client already paid MTN/Orange/Stripe/cash externally,
-        // or authorized a wallet debit), not a "please charge this client now" initiation request —
-        // tnt-billing-wallet's own InitiatePaymentCommand/PaymentIntent flow (IWalletUseCase#initiatePayment)
-        // is what would own true initiation, and this module doesn't call it.
+        // ── Kernel wallet migration (business-critical — read before touching) ──────────────────
+        // ProcessPaymentCommand is a payment CONFIRMATION (paymentMethod + transactionRef +
+        // paidAmountXaf): the client already paid MTN/Orange/Stripe/cash, or transferred from their
+        // own Kernel wallet. The Core no longer moves any money here — there is no local ledger and
+        // the Kernel needs the payer's confirmation code for every debit. What the Core records is
+        // the settlement of the order (which channel, which reference), written BEFORE order.save():
+        // if recording fails the order is never persisted as PAID, so a retry is safe. Errors are
+        // intentionally NOT swallowed.
         //
-        // Given that, we still perform REAL ledger movements here (not just an audit no-op):
-        //   - debitWallet: only when paymentMethod == WALLET, i.e. the client actually paid from their
-        //     TiiBnTick wallet balance. For MTN/Orange/Stripe/CASH_ON_DELIVERY the money never moved
-        //     through the wallet, so calling debitWallet for those would be a meaningless/incorrect
-        //     ledger entry (or a spurious insufficient-funds failure).
-        //   - creditCommission: always, once payment is confirmed — this is real revenue owed to the
-        //     provider and must be recorded regardless of payment channel.
-        // Both calls happen BEFORE order.save(): if wallet-core fails, the Mono errors out and the
-        // order is never persisted as PAID (nor are events published/notifications sent), so a retry
-        // of processPayment is safe and the system never claims "paid" without the wallet ledger
-        // agreeing. Errors are intentionally NOT swallowed (no .onErrorResume) — this is the actual
-        // money-movement gap being closed.
+        // Limit (Kernel request R3): a WALLET confirmation is taken at face value — the Kernel
+        // transaction reference is stored but cannot be verified until the Kernel documents its
+        // transaction schema.
         return findOrError(orderId, tenantId)
                 .flatMap(order -> {
                     Money paidAmount = new Money(cmd.paidAmountXaf(), "XAF");
@@ -240,7 +233,7 @@ public class MarketOrderApplicationService implements IManageMarketOrderUseCase 
                     List<Object> events = order.pullDomainEvents();
                     UUID tenantUuid = UUID.fromString(tenantId);
 
-                    return processWalletMovement(tenantUuid, orderId, order, cmd, paidAmount)
+                    return recordSettlement(tenantUuid, orderId, order, cmd, paidAmount)
                             .then(orderRepository.save(order))
                             .flatMap(saved -> eventPublisher.publishAll(events, tenantId)
                                     .then(notificationPort.notifyOrderPaid(tenantId, saved.getProviderId(),
@@ -251,29 +244,24 @@ public class MarketOrderApplicationService implements IManageMarketOrderUseCase 
     }
 
     /**
-     * Performs the real wallet-core ledger movements for a confirmed payment. Not error-swallowing —
-     * see the reasoning comment on {@link #processPayment}.
+     * Records the settlement of a confirmed order payment. Not error-swallowing — see
+     * {@link #processPayment}. No platform commission is tracked here (rate 0): the market has no
+     * commission policy of its own yet.
      */
-    private Mono<Void> processWalletMovement(UUID tenantUuid, UUID orderId, MarketOrder order,
+    private Mono<Void> recordSettlement(UUID tenantUuid, UUID orderId, MarketOrder order,
                                               ProcessPaymentCommand cmd, Money paidAmount) {
-        com.yowyob.tiibntick.core.billing.wallet.domain.model.Money walletAmount =
-                com.yowyob.tiibntick.core.billing.wallet.domain.model.Money.of(
-                        BigDecimal.valueOf(paidAmount.amount()), paidAmount.currency());
-
-        Mono<Void> debit = Mono.empty();
-        if (cmd.paymentMethod() == com.yowyob.tiibntick.core.marketback.domain.model.PaymentMethod.WALLET) {
-            DebitWalletCommand debitCmd = new DebitWalletCommand(
-                    order.getClientId(), tenantUuid, walletAmount, orderId.toString(),
-                    PaymentChannel.WALLET, "MarketOrder payment " + orderId, cmd.transactionRef());
-            debit = walletUseCase.debitWallet(debitCmd).then();
-        }
-
-        String invoiceRef = order.getInvoiceId() != null ? order.getInvoiceId().toString() : orderId.toString();
-        CreditCommissionCommand creditCmd = new CreditCommissionCommand(
-                order.getProviderId(), tenantUuid, walletAmount, orderId.toString(), invoiceRef);
-        Mono<Void> credit = walletUseCase.creditCommission(creditCmd).then();
-
-        return debit.then(credit);
+        boolean cash = cmd.paymentMethod() == com.yowyob.tiibntick.core.marketback.domain.model.PaymentMethod.CASH_ON_DELIVERY;
+        return settlements.record(new RecordSettlementCommand(
+                        tenantUuid, "MARKET_ORDER", orderId, order.getClientId(), order.getProviderId(),
+                        BigDecimal.valueOf(paidAmount.amount()), paidAmount.currency(),
+                        switch (cmd.paymentMethod()) {
+                            case WALLET -> SettlementMethod.WALLET_TRANSFER;
+                            case CASH_ON_DELIVERY -> SettlementMethod.CASH;
+                            default -> SettlementMethod.EXTERNAL_PROVIDER;
+                        },
+                        cash ? SettlementStatus.CASH_COLLECTED : SettlementStatus.PAID,
+                        cmd.transactionRef(), BigDecimal.ZERO))
+                .then();
     }
 
     @Override

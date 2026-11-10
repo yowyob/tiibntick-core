@@ -1,6 +1,5 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web;
 
-import com.yowyob.tiibntick.core.billing.wallet.domain.exception.InsufficientBalanceException;
 import com.yowyob.tiibntick.core.actor.domain.exception.DelivererNotFoundException;
 import com.yowyob.tiibntick.core.delivery.domain.exception.AnnouncementNotFoundException;
 import com.yowyob.tiibntick.core.delivery.domain.exception.DeliveryDomainException;
@@ -116,12 +115,6 @@ public class GlobalExceptionHandler {
     public Mono<ResponseEntity<ErrorResponse>> handleAccessDenied(
             AccessDeniedException ex, ServerWebExchange exchange) {
         return error(HttpStatus.FORBIDDEN, "Forbidden", ex.getMessage(), exchange);
-    }
-
-    @ExceptionHandler(InsufficientBalanceException.class)
-    public Mono<ResponseEntity<ErrorResponse>> handleInsufficientBalance(
-            InsufficientBalanceException ex, ServerWebExchange exchange) {
-        return error(HttpStatus.UNPROCESSABLE_ENTITY, "Insufficient Balance", ex.getMessage(), exchange);
     }
 
     @ExceptionHandler({ServerWebInputException.class, DecodingException.class})

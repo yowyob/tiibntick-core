@@ -418,4 +418,9 @@
                  relativeToChangelogFile="false"/>
     </changeSet>
 
+    <changeSet id="071-add-delivery-receive-code" author="TiiBnTickTeam">
+        <sqlFile path="db/changelog/20261110_add_delivery_receive_code.sql"
+                 relativeToChangelogFile="false"/>
+    </changeSet>
+
 </databaseChangeLog>

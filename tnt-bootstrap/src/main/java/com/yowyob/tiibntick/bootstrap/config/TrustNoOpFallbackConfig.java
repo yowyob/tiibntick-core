@@ -8,14 +8,12 @@ import com.yowyob.tiibntick.bootstrap.config.trustnoop.NoOpBlockchainProofPort;
 import com.yowyob.tiibntick.bootstrap.config.trustnoop.NoOpDeliveryProofAnchorPort;
 import com.yowyob.tiibntick.bootstrap.config.trustnoop.NoOpFreelancerOrgDidAnchorPort;
 import com.yowyob.tiibntick.bootstrap.config.trustnoop.NoOpGeofenceAnchorPort;
-import com.yowyob.tiibntick.bootstrap.config.trustnoop.NoOpPaymentAnchorPort;
 import com.yowyob.tiibntick.bootstrap.config.trustnoop.NoOpRecordCustodyTransferUseCase;
 import com.yowyob.tiibntick.bootstrap.config.trustnoop.NoOpRecordMissionUseCase;
 import com.yowyob.tiibntick.bootstrap.config.trustnoop.NoOpRecordPaymentUseCase;
 import com.yowyob.tiibntick.core.actor.application.port.out.IActorDidAnchorPort;
 import com.yowyob.tiibntick.core.actor.application.port.out.IBadgeAnchorPort;
 import com.yowyob.tiibntick.core.billing.pricing.domain.port.out.BillingPolicyAnchorPort;
-import com.yowyob.tiibntick.core.billing.wallet.application.port.out.IPaymentAnchorPort;
 import com.yowyob.tiibntick.core.delivery.application.port.out.DeliveryProofAnchorPort;
 import com.yowyob.tiibntick.core.dispute.application.port.outbound.IBlockchainProofPort;
 import com.yowyob.tiibntick.core.incident.port.outbound.IBlockchainAuditPort;
@@ -87,12 +85,6 @@ public class TrustNoOpFallbackConfig {
     @ConditionalOnMissingBean
     public BillingPolicyAnchorPort billingPolicyAnchorPort() {
         return new NoOpBillingPolicyAnchorPort();
-    }
-
-    @Bean
-    @ConditionalOnMissingBean
-    public IPaymentAnchorPort paymentAnchorPort() {
-        return new NoOpPaymentAnchorPort();
     }
 
     @Bean

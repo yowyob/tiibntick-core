@@ -1,10 +1,9 @@
 package com.yowyob.tiibntick.core.gofreelancer.application.service;
 
-import com.yowyob.tiibntick.core.billing.wallet.application.port.in.IWalletUseCase;
-import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.DebitWalletCommand;
-import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.SplitMissionRevenueCommand;
-import com.yowyob.tiibntick.core.billing.wallet.domain.enums.PaymentChannel;
-import com.yowyob.tiibntick.core.billing.wallet.domain.model.Money;
+import com.yowyob.tiibntick.core.billing.wallet.application.port.in.ISettlementUseCase;
+import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.RecordSettlementCommand;
+import com.yowyob.tiibntick.core.billing.wallet.domain.enums.SettlementMethod;
+import com.yowyob.tiibntick.core.billing.wallet.domain.enums.SettlementStatus;
 import com.yowyob.tiibntick.core.delivery.application.port.in.DeliveryLifecycleUseCase;
 import com.yowyob.tiibntick.core.delivery.application.port.in.command.CompleteDeliveryCommand;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepository;
@@ -60,7 +59,7 @@ public class RelayDepositService {
     private final NotificationService notificationService;
     private final GofpRelayPointRepository gofpRelayPointRepository;
     private final GofpUserRepository gofpUserRepository;
-    private final IWalletUseCase walletUseCase;
+    private final ISettlementUseCase settlements;
     private final IDeliveryNeedRepository deliveryNeedRepository;
     private final RelayPointSubscriptionRepository relayPointSubscriptionRepository;
     private final DepositHubPackageUseCase depositHubPackageUseCase;
@@ -301,6 +300,16 @@ public class RelayDepositService {
         return gofpRelayPointRepository.save(rp).then();
     }
 
+    /**
+     * Kernel wallet migration: the Core no longer moves the storage fee. It records the
+     * settlement and the platform commission:
+     * <ul>
+     *   <li>CASH — the relay owner collected the fee in cash → {@code CASH_COLLECTED}, commission DUE;</li>
+     *   <li>digital — the fee is <b>not</b> transferred by the Core (the relay owner has no stored
+     *       Kernel receive code yet, see docs/audits/remediation/kernel-wallet-migration.md) →
+     *       recorded {@code UNPAID} with a greppable {@code RELAY_FEE_NOT_TRANSFERRED} marker.</li>
+     * </ul>
+     */
     private Mono<Void> processRelayPayment(RelayDeposit deposit, String paymentMethod) {
         if (deposit.getStorageFee() == null || deposit.getStorageFee() <= 0) {
             return Mono.empty();
@@ -310,61 +319,42 @@ public class RelayDepositService {
                 .switchIfEmpty(gofpRelayPointRepository.findById(deposit.getRelayPointId()))
                 .flatMap(rp -> {
                     if (rp.getCoreFreelancerId() == null) {
-                        log.error("Relay point {} has no freelancer owner — cannot process storage fee",
+                        log.error("Relay point {} has no freelancer owner — cannot record storage fee",
                                 rp.getId());
                         return Mono.error(new IllegalStateException(
-                                "Relay point owner missing for wallet split: " + rp.getId()));
+                                "Relay point owner missing for settlement: " + rp.getId()));
                     }
 
                     UUID ownerId = rp.getCoreFreelancerId();
+                    boolean cash = "CASH".equalsIgnoreCase(paymentMethod);
 
                     return relayPointSubscriptionRepository.findByRelayPointId(rp.getCoreRelayPointId())
                             .map(sub -> sub.getSubscriptionType().getCommissionPercent() / 100.0)
                             .defaultIfEmpty(RelayPointSubscriptionType.BASIC.getCommissionPercent() / 100.0)
-                            .flatMap(commissionRate -> {
-                                double platformCommission = deposit.getStorageFee() * commissionRate;
-
-                                if ("CASH".equalsIgnoreCase(paymentMethod)) {
-                                    return walletUseCase.debitWallet(
-                                            new DebitWalletCommand(
-                                                    ownerId,
-                                                    TenantContextHolder.SYSTEM_TENANT,
-                                                    Money.of(java.math.BigDecimal.valueOf(platformCommission),
-                                                            deposit.getCurrency() != null
-                                                                    ? deposit.getCurrency() : "XAF"),
-                                                    deposit.getId().toString(),
-                                                    PaymentChannel.CASH_ON_DELIVERY,
-                                                    "Commission logicielle (" + (commissionRate * 100)
-                                                            + "%) frais stockage cash : " + deposit.getId(),
-                                                    "relay-storage-fee:" + deposit.getId()
-                                            )
-                                    ).doOnSuccess(tx -> log.info(
-                                            "Debited commission {} from relay owner {}",
-                                            platformCommission, ownerId))
-                                    .doOnError(e -> log.error(
-                                            "Wallet debit FAILED for deposit {} — propagating",
+                            .flatMap(commissionRate -> settlements.record(new RecordSettlementCommand(
+                                            TenantContextHolder.SYSTEM_TENANT, "RELAY_DEPOSIT", deposit.getId(),
+                                            deposit.getClientId(), ownerId,
+                                            java.math.BigDecimal.valueOf(deposit.getStorageFee())
+                                                    .setScale(2, java.math.RoundingMode.HALF_UP),
+                                            deposit.getCurrency() != null ? deposit.getCurrency() : "XAF",
+                                            cash ? SettlementMethod.CASH : SettlementMethod.WALLET_TRANSFER,
+                                            cash ? SettlementStatus.CASH_COLLECTED : SettlementStatus.UNPAID,
+                                            null,
+                                            java.math.BigDecimal.valueOf(commissionRate)))
+                                    .doOnSuccess(st -> {
+                                        if (cash) {
+                                            log.info("Relay storage fee {} collected in cash by owner {} — "
+                                                    + "commission {} due", deposit.getId(), ownerId,
+                                                    st.getCommissionAmount());
+                                        } else {
+                                            log.warn("RELAY_FEE_NOT_TRANSFERRED deposit={} owner={} amount={} — "
+                                                    + "digital storage fee is not moved by the Core any more",
+                                                    deposit.getId(), ownerId, deposit.getStorageFee());
+                                        }
+                                    })
+                                    .doOnError(e -> log.error("Settlement recording FAILED for deposit {} — propagating",
                                             deposit.getId(), e))
-                                    .then();
-                                }
-                                return walletUseCase.splitMissionRevenue(
-                                                new SplitMissionRevenueCommand(
-                                                        deposit.getId().toString(),
-                                                        java.math.BigDecimal.valueOf(deposit.getStorageFee()),
-                                                        ownerId.toString(),
-                                                        TenantContextHolder.SYSTEM_TENANT,
-                                                        null,
-                                                        commissionRate,
-                                                        0.0
-                                                )
-                                        )
-                                        .doOnSuccess(split -> log.info(
-                                                "Revenue split storage fee {} — platform={}, owner={}",
-                                                deposit.getId(), split.platformCommission(), split.orgRevenue()))
-                                        .doOnError(e -> log.error(
-                                                "Wallet split FAILED for deposit {} — propagating",
-                                                deposit.getId(), e))
-                                        .then();
-                            });
+                                    .then());
                 });
     }
 

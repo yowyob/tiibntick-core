@@ -131,6 +131,12 @@ A second, parallel principal type exists for platform *backends* (not human user
 - Commit messages follow Conventional Commits style: `feat:`, `fix:`, `refactor:`, `chore(deps):`, optionally scoped (`feat(dispute): ...`).
 - Authors/ownership by layer (see root `pom.xml` `<developers>`): MANFOUO Braun — L0 event kernel, L3 logistics, L5 billing, L6 trust, L7 bootstrap; PAFE Dilane — L0 i18n, L2 organization, L3 logistics, L4 accounting, L5 billing; FRANCOIS — L2 identity (tp/administration), L4 business.
 
+## Liquibase rules (mandatory)
+
+- **Never edit an already-merged changeset** (id, author, file, or its SQL/YAML body): production databases hold its checksum and the app would refuse to start. Fix forward with a new numbered changeset in the owning module's changelog (`NNN-<what>.yaml`), registered in that module's `*-master.yaml`.
+- Prefer idempotent DDL (`IF NOT EXISTS` / preConditions) for additive changes; destructive changes (`dropTable`, `dropColumn`) need an explicit maintainer decision recorded in the changeset comment.
+- `tnt-bootstrap/src/test/.../LiquibaseMasterChangelogIntegrationTest` is the production gate: it applies the real `tnt-core-master.yaml` (all module JARs) on PostGIS, checks `validate`, idempotent re-run, and an upgrade of a populated database. Run it after any changelog change: `mvn -o verify -Pintegration-tests -pl tnt-bootstrap -am -Dtest=NoSuchTest -Dsurefire.failIfNoSpecifiedTests=false -Dit.test=LiquibaseMasterChangelogIntegrationTest -Dfailsafe.failIfNoSpecifiedTests=false` (**`-am` is required**, otherwise stale module JARs from `~/.m2` are used).
+
 ## Git workflow rules (mandatory)
 
 - **Dedicated branch per workstream**: never commit directly to `main`; create a branch named after the work (e.g. `feat/wallet-hardening-and-kernel-migration`).
