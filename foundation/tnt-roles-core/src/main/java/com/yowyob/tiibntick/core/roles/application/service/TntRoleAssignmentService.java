@@ -14,6 +14,12 @@ import com.yowyob.tiibntick.core.roles.domain.model.RoleSyncOperation;
 import com.yowyob.tiibntick.core.roles.domain.model.RoleSyncOutboxEntry;
 import com.yowyob.tiibntick.core.roles.domain.model.TntRole;
 import com.yowyob.tiibntick.core.roles.domain.model.UserRoleAssignment;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
+import org.springframework.security.core.context.SecurityContext;
+import com.yowyob.tiibntick.core.roles.application.port.out.ITntRoleAssignmentPort;
 import org.springframework.transaction.reactive.TransactionalOperator;
 import reactor.core.publisher.Mono;
 
@@ -37,6 +43,8 @@ import java.util.UUID;
  */
 public class TntRoleAssignmentService implements AssignTntRoleUseCase {
 
+    private static final Logger log = LoggerFactory.getLogger(TntRoleAssignmentService.class);
+
     private final RoleRepository roleRepository;
     private final UserRoleAssignmentRepository assignmentRepository;
     private final RoleSyncOutboxRepository outboxRepository;
@@ -44,6 +52,9 @@ public class TntRoleAssignmentService implements AssignTntRoleUseCase {
     private final ObjectMapper objectMapper;
     private final UUID systemTenantId;
     private final IPermissionChangeNotifier permissionChangeNotifier;
+    /** Optional: when present, a grant is also pushed to the Kernel right away with the caller's bearer. */
+    private final ITntRoleAssignmentPort kernelAssignmentPort;
+    private final TntRoleDefinitionRegistry definitionRegistry;
 
     public TntRoleAssignmentService(RoleRepository roleRepository,
                                      UserRoleAssignmentRepository assignmentRepository,
@@ -52,6 +63,21 @@ public class TntRoleAssignmentService implements AssignTntRoleUseCase {
                                      ObjectMapper objectMapper,
                                      UUID systemTenantId,
                                      IPermissionChangeNotifier permissionChangeNotifier) {
+        this(roleRepository, assignmentRepository, outboxRepository, transactionalOperator, objectMapper,
+                systemTenantId, permissionChangeNotifier, null, null);
+    }
+
+    public TntRoleAssignmentService(RoleRepository roleRepository,
+                                     UserRoleAssignmentRepository assignmentRepository,
+                                     RoleSyncOutboxRepository outboxRepository,
+                                     TransactionalOperator transactionalOperator,
+                                     ObjectMapper objectMapper,
+                                     UUID systemTenantId,
+                                     IPermissionChangeNotifier permissionChangeNotifier,
+                                     ITntRoleAssignmentPort kernelAssignmentPort,
+                                     TntRoleDefinitionRegistry definitionRegistry) {
+        this.kernelAssignmentPort = kernelAssignmentPort;
+        this.definitionRegistry = definitionRegistry;
         this.roleRepository = roleRepository;
         this.assignmentRepository = assignmentRepository;
         this.outboxRepository = outboxRepository;
@@ -86,6 +112,12 @@ public class TntRoleAssignmentService implements AssignTntRoleUseCase {
                 .next()
                 .switchIfEmpty(Mono.error(TntRoleException.roleNotSeeded(role.code())))
                 .flatMap(localRole -> existingAssignment(resolvedTenantId, targetUserId, localRole.id(), scopeType, resolvedScopeId)
+                        // Heal a grant that exists locally but never reached the Kernel (the outbox
+                        // worker has no bearer): push it now that a caller identity is available.
+                        .flatMap(existing -> assignmentRepository.findKernelAssignmentId(resolvedTenantId, existing.id())
+                                .hasElement()
+                                .flatMap(synced -> synced ? Mono.just(existing)
+                                        : pushToKernelNow(existing, null, role, scopeType, resolvedTenantId, resolvedScopeId)))
                         .map(existing -> new TntRoleAssignmentResult(
                                 existing.id(), targetUserId, role.code(), scopeType.name(), resolvedScopeId))
                         .switchIfEmpty(Mono.defer(() -> saveAssignmentAndEnqueue(
@@ -122,7 +154,45 @@ public class TntRoleAssignmentService implements AssignTntRoleUseCase {
                 .flatMap(saved -> outboxRepository.save(outboxEntry).thenReturn(saved))
                 .as(transactionalOperator::transactional)
                 .doOnSuccess(saved -> permissionChangeNotifier.notifyChanged(resolvedTenantId, targetUserId))
+                .flatMap(saved -> pushToKernelNow(saved, outboxEntry, role, scopeType, resolvedTenantId, resolvedScopeId))
                 .map(saved -> new TntRoleAssignmentResult(
                         saved.id(), targetUserId, role.code(), scopeType.name(), resolvedScopeId));
+    }
+
+    /**
+     * Pushes the grant to the Kernel immediately, with the bearer of the request that triggered
+     * it. The outbox worker runs on a scheduler thread with no security context, so the Kernel
+     * call it makes carries no {@code Authorization} header and is rejected: relying on the
+     * outbox alone left every self-service grant (a new client or freelancer profile) unsynced,
+     * and the user's JWT never carried the role.
+     *
+     * <p>Best-effort and never fatal: when there is no caller identity, no Kernel port, or the
+     * Kernel refuses, the local assignment and its PENDING outbox entry stay as they are.
+     */
+    private Mono<UserRoleAssignment> pushToKernelNow(UserRoleAssignment saved, RoleSyncOutboxEntry outboxEntry,
+            TntRole role, RoleScopeType scopeType, UUID tenantId, UUID scopeId) {
+        if (kernelAssignmentPort == null || definitionRegistry == null) {
+            return Mono.just(saved);
+        }
+        return ReactiveSecurityContextHolder.getContext()
+                .map(SecurityContext::getAuthentication)
+                .filter(auth -> auth != null && auth.isAuthenticated()
+                        && !(auth instanceof AnonymousAuthenticationToken))
+                .flatMap(auth -> definitionRegistry.findByCode(role.code())
+                        .map(definition -> kernelAssignmentPort
+                                .assignRoleInCallerTenant(saved.userId(), definition, scopeType.name(), scopeId))
+                        .orElse(Mono.empty()))
+                .flatMap(kernelAssignmentId -> assignmentRepository
+                        .markKernelAssignmentId(tenantId, saved.id(), kernelAssignmentId)
+                        .then(outboxEntry == null ? Mono.<RoleSyncOutboxEntry>empty()
+                                : outboxRepository.save(outboxEntry.asProcessing().asProvisioned(kernelAssignmentId)))
+                        .doOnSuccess(v -> log.info("Role {} granted to user {} in the Kernel (assignment {})",
+                                role.code(), saved.userId(), kernelAssignmentId)))
+                .onErrorResume(error -> {
+                    log.warn("Immediate Kernel grant of {} to {} failed — left to the outbox worker: {}",
+                            role.code(), saved.userId(), error.getMessage());
+                    return Mono.empty();
+                })
+                .thenReturn(saved);
     }
 }

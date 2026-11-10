@@ -2,6 +2,8 @@ package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web;
 
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.FreelancerPricingDTO;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.FreelancerPricingPolicyUseCase;
+import com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser;
+import com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -37,7 +39,11 @@ public class FreelancerPricingPolicyController {
     @PutMapping("/{id}/policies")
     public Mono<FreelancerPricingDTO> upsertPolicy(
             @PathVariable("id") UUID freelancerId,
-            @Valid @RequestBody FreelancerPricingDTO request) {
-        return freelancerPricingPolicyUseCase.upsertPolicy(freelancerId, request);
+            @Valid @RequestBody FreelancerPricingDTO request,
+            @CurrentUser(required = false) TntSecurityContext ctx) {
+        UUID callerId = ctx != null ? ctx.userId() : null;
+        UUID tenantId = ctx != null ? ctx.tenantId() : null;
+        boolean admin = ctx != null && ctx.hasPermission("gofp-admin", "manage");
+        return freelancerPricingPolicyUseCase.upsertPolicyAsCaller(freelancerId, request, tenantId, callerId, admin);
     }
 }

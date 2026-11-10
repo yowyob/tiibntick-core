@@ -63,7 +63,10 @@ public class DslRuleController {
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Create a new DSL tariff rule")
-    public Mono<DslRuleResponse> create(@Valid @RequestBody DslRuleRequest request) {
+    public Mono<DslRuleResponse> create(@CurrentUser TntUserIdentity currentUser,
+                                        @Valid @RequestBody DslRuleRequest request) {
+        assertStaff(currentUser);
+        assertSameTenant(currentUser, request.tenantId());
         return dslRuleUseCase.createRule(toDomain(null, request))
                 .map(DslRuleResponse::from);
     }
@@ -75,6 +78,8 @@ public class DslRuleController {
             @CurrentUser TntUserIdentity currentUser,
             @PathVariable UUID ruleId,
             @Valid @RequestBody DslRuleRequest request) {
+        assertStaff(currentUser);
+        assertSameTenant(currentUser, request.tenantId());
         return dslRuleUseCase.updateRule(toDomain(ruleId, request), currentUser.tenantId())
                 .map(DslRuleResponse::from);
     }
@@ -84,6 +89,7 @@ public class DslRuleController {
     public Mono<DslRuleResponse> getById(
             @CurrentUser TntUserIdentity currentUser,
             @PathVariable UUID ruleId) {
+        assertStaff(currentUser);
         return dslRuleUseCase.findById(ruleId, currentUser.tenantId())
                 .map(DslRuleResponse::from);
     }
@@ -93,6 +99,7 @@ public class DslRuleController {
     public Flux<DslRuleResponse> listByPolicy(
             @CurrentUser TntUserIdentity currentUser,
             @PathVariable UUID policyId) {
+        assertStaff(currentUser);
         return dslRuleUseCase.findAllByPolicyId(policyId, currentUser.tenantId())
                 .map(DslRuleResponse::from);
     }
@@ -102,6 +109,7 @@ public class DslRuleController {
     public Flux<DslRuleResponse> listActiveByPolicy(
             @CurrentUser TntUserIdentity currentUser,
             @PathVariable UUID policyId) {
+        assertStaff(currentUser);
         return dslRuleUseCase.findActiveByPolicyId(policyId, currentUser.tenantId())
                 .map(DslRuleResponse::from);
     }
@@ -112,6 +120,7 @@ public class DslRuleController {
     public Mono<DslRuleResponse> activate(
             @CurrentUser TntUserIdentity currentUser,
             @PathVariable UUID ruleId) {
+        assertStaff(currentUser);
         return dslRuleUseCase.activateRule(ruleId, currentUser.tenantId())
                 .map(DslRuleResponse::from);
     }
@@ -122,6 +131,7 @@ public class DslRuleController {
     public Mono<DslRuleResponse> deactivate(
             @CurrentUser TntUserIdentity currentUser,
             @PathVariable UUID ruleId) {
+        assertStaff(currentUser);
         return dslRuleUseCase.deactivateRule(ruleId, currentUser.tenantId())
                 .map(DslRuleResponse::from);
     }
@@ -133,6 +143,7 @@ public class DslRuleController {
     public Mono<Void> delete(
             @CurrentUser TntUserIdentity currentUser,
             @PathVariable UUID ruleId) {
+        assertStaff(currentUser);
         return dslRuleUseCase.deleteRule(ruleId, currentUser.tenantId());
     }
 
@@ -166,7 +177,10 @@ public class DslRuleController {
 
     @PostMapping("/evaluate")
     @Operation(summary = "Evaluate all active rules of a policy against a pricing context")
-    public Mono<EvaluationResultResponse> evaluate(@Valid @RequestBody EvaluateRequest request) {
+    public Mono<EvaluationResultResponse> evaluate(@CurrentUser TntUserIdentity currentUser,
+                                                   @Valid @RequestBody EvaluateRequest request) {
+        assertStaff(currentUser);
+        assertSameTenant(currentUser, request.tenantId());
         PricingContext ctx = PricingContext.builder()
                 // v1.0 — original fields
                 .weightKg(request.weightKg())
@@ -244,4 +258,27 @@ public class DslRuleController {
     public record ValidationResponse(
             boolean valid,
             List<ValidationError> errors) {}
+
+    /** A tenant id in the body must be the caller's own: it is not a way to reach another tenant's rules. */
+    private static void assertSameTenant(TntUserIdentity user, UUID tenantId) {
+        if (user == null || user.tenantId() == null || !user.tenantId().equals(tenantId)) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "tenantId must be the caller's own tenant");
+        }
+    }
+
+    /**
+     * DSL rules hang off a billing policy whose owner this module does not know, so managing or reading them is
+     * reserved to billing management ({@code billing:write}) and platform admins. Drivers shape their tariff
+     * through templates and their price grid, not raw rules. Pure syntax validation stays open to every caller.
+     */
+    private static void assertStaff(TntUserIdentity user) {
+        boolean staff = user != null && (user.hasPermission("billing", "write")
+                || user.hasPermission("tnt", "platform:admin")
+                || user.permissions().contains("ROLE_TNT_ADMIN"));
+        if (!staff) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "DSL rules can only be managed by billing management (billing:write)");
+        }
+    }
 }

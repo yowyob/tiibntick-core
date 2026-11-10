@@ -121,6 +121,9 @@ public class VariableNode extends AstNode {
             case "networkhops",
                  "networkhopcount"           -> ctx.getNetworkHopCount() != null
                                                  ? ctx.getNetworkHopCount() : 0;
+            case "volume",
+                 "volumecbm"                 -> ctx.getVolumeCbm() != null ? ctx.getVolumeCbm() : 0.0;
+            case "waitingminutes"            -> ctx.getWaitingMinutes() != null ? ctx.getWaitingMinutes() : 0;
             default -> throw new DslEvaluationException(
                     "Unknown DSL variable: '" + variableName + "'. "
                     + "Supported (): weight, distance, packageType, priority, "
@@ -130,7 +133,7 @@ public class VariableNode extends AstNode {
                     + "requiresIdCheck, deliveryAttempt, zoneType, zoneDifficulty, "
                     + "paymentMethod, clientSegment, isRecurringClient, "
                     + "dayOfWeek, isHoliday, isWeekend, isWeekday, "
-                    + "policyOwnerType, storageHours, networkHops");
+                    + "policyOwnerType, storageHours, networkHops, volumeCbm, waitingMinutes");
         };
     }
 

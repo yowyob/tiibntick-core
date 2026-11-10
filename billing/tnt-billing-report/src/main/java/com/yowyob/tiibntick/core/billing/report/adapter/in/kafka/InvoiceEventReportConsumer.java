@@ -27,6 +27,11 @@ public class InvoiceEventReportConsumer {
 
     private static final Logger log = LoggerFactory.getLogger(InvoiceEventReportConsumer.class);
     private static final double DEFAULT_PLATFORM_FEE_RATE = 2.5;
+    /**
+     * Projections are applied synchronously on the listener thread: a PAID event must not overtake the
+     * ISSUED insert it updates (a fire-and-forget subscribe let the two race and lose the status change).
+     */
+    private static final java.time.Duration PROJECTION_TIMEOUT = java.time.Duration.ofSeconds(15);
 
     private final InvoiceProjectionService projectionService;
     private final ObjectMapper objectMapper;
@@ -83,20 +88,37 @@ public class InvoiceEventReportConsumer {
 
             LocalDate today = LocalDate.now();
 
+            // PAID / CANCELLED carry no party data: they only move the row the ISSUED event wrote.
+            if (status != InvoiceStatus.ISSUED) {
+                projectionService.updateStatus(tenantId, invoiceId, status,
+                                status == InvoiceStatus.PAID ? today : null)
+                        .doOnSuccess(v -> log.debug("Invoice {} projected as {}", invoiceId, status))
+                        .doOnError(e -> log.error("Status projection failed for invoice {}: {}", invoiceId, e.getMessage()))
+                        .block(PROJECTION_TIMEOUT);
+                return;
+            }
+
             InvoiceReportEntry entry = new InvoiceReportEntry(
                     invoiceId, invoiceNumber, tenantId, countryCode, clientId, missionId,
                     grossMoney, taxMoney, netMoney, platformFee,
-                    status, today, status == InvoiceStatus.PAID ? today : null,
-                    null, null, null, Money.of(BigDecimal.ZERO, netMoney.currency())
+                    status, today, null,
+                    blankToNull((String) payload.get("issuerOrgType")),
+                    blankToNull((String) payload.get("issuerOrgId")),
+                    blankToNull((String) payload.get("appliedTemplateName")),
+                    Money.of(BigDecimal.ZERO, netMoney.currency())
                 );
 
             projectionService.project(entry)
                     .doOnSuccess(v -> log.debug("Projected invoice {} status={}", invoiceId, status))
                     .doOnError(e -> log.error("Projection failed for invoice {}: {}", invoiceId, e.getMessage()))
-                    .subscribe();
+                    .block(PROJECTION_TIMEOUT);
 
         } catch (Exception e) {
             log.error("Failed processing invoice event at offset={}: {}", record.offset(), e.getMessage(), e);
         }
+    }
+
+    private static String blankToNull(String v) {
+        return v == null || v.isBlank() ? null : v;
     }
 }

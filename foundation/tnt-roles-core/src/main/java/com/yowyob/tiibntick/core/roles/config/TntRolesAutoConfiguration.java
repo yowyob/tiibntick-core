@@ -226,9 +226,12 @@ public class TntRolesAutoConfiguration {
             TransactionalOperator transactionalOperator,
             ObjectMapper objectMapper,
             TntRolesProperties properties,
-            IPermissionChangeNotifier permissionChangeNotifier) {
+            IPermissionChangeNotifier permissionChangeNotifier,
+            org.springframework.beans.factory.ObjectProvider<ITntRoleAssignmentPort> kernelAssignmentPort,
+            TntRoleDefinitionRegistry definitionRegistry) {
         return new TntRoleAssignmentService(roleRepository, assignmentRepository, outboxRepository,
-                transactionalOperator, objectMapper, properties.getSystemTenantId(), permissionChangeNotifier);
+                transactionalOperator, objectMapper, properties.getSystemTenantId(), permissionChangeNotifier,
+                kernelAssignmentPort.getIfAvailable(), definitionRegistry);
     }
 
     @Bean

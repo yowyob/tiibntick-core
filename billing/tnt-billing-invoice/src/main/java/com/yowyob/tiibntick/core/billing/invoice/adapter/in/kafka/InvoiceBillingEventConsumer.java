@@ -85,7 +85,7 @@ public class InvoiceBillingEventConsumer {
                     List.of(line), List.of(), currency,
                     LocalDateTime.now().plusDays(7));
 
-            invoiceService.generate(command)
+            invoiceService.generateAsSystem(command)
                     .doOnSuccess(inv -> log.info("Invoice generated from DeliveryCompleted: {}", inv.getNumber()))
                     .doOnError(e -> log.error("Failed to generate invoice for mission={}: {}", missionId, e.getMessage()))
                     .subscribe();
@@ -118,7 +118,7 @@ public class InvoiceBillingEventConsumer {
             }
 
             MarkInvoicePaidCommand command = new MarkInvoicePaidCommand(tenantId, invoiceId, paymentRef);
-            invoiceService.markPaid(command)
+            invoiceService.markPaidAsSystem(command)
                     .doOnSuccess(inv -> log.info("Invoice marked paid: {}", inv.getNumber()))
                     .doOnError(e -> log.error("Failed to mark invoice paid={}: {}", invoiceId, e.getMessage()))
                     .subscribe();

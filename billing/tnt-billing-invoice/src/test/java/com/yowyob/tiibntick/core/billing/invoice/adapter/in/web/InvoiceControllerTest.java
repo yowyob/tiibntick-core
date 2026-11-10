@@ -67,7 +67,10 @@ class InvoiceControllerTest {
 
     @BeforeEach
     void setUp() {
-        InvoiceController controller = new InvoiceController(invoiceService, mapper);
+        // Row-level access rules have their own tests (InvoiceAccessControlTest); here the caller is staff.
+        InvoiceAccessPolicy access = mock(InvoiceAccessPolicy.class);
+        org.mockito.Mockito.lenient().when(access.requireStaff()).thenReturn(Mono.empty());
+        InvoiceController controller = new InvoiceController(invoiceService, mapper, access);
         webTestClient = WebTestClient
                 .bindToController(controller)
                 .controllerAdvice(new InvoiceExceptionHandler())

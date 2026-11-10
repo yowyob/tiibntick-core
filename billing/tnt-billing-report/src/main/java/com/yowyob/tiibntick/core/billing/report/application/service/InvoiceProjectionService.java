@@ -23,4 +23,11 @@ public class InvoiceProjectionService {
     public Mono<Void> project(InvoiceReportEntry entry) {
         return projectionRepository.upsert(entry);
     }
+
+    /** PAID / CANCELLED events: move the already projected invoice, keep its client and issuer. */
+    public Mono<Void> updateStatus(java.util.UUID tenantId, java.util.UUID invoiceId,
+                                   com.yowyob.tiibntick.core.billing.invoice.domain.model.enums.InvoiceStatus status,
+                                   java.time.LocalDate paidDate) {
+        return projectionRepository.updateStatus(tenantId, invoiceId, status, paidDate);
+    }
 }

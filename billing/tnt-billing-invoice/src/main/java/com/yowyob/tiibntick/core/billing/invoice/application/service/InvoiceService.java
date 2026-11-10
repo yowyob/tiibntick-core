@@ -1,10 +1,12 @@
 package com.yowyob.tiibntick.core.billing.invoice.application.service;
 
 import com.yowyob.tiibntick.core.billing.invoice.application.port.in.GenerateInvoiceUseCase;
+import com.yowyob.tiibntick.core.billing.invoice.application.port.in.SystemInvoicingUseCase;
 import com.yowyob.tiibntick.core.billing.invoice.application.port.in.command.*;
 import com.yowyob.tiibntick.core.billing.invoice.application.port.out.*;
 import com.yowyob.tiibntick.core.billing.invoice.domain.exception.InvoiceNotFoundException;
 import com.yowyob.tiibntick.core.billing.invoice.domain.model.*;
+import com.yowyob.tiibntick.core.billing.invoice.domain.model.enums.InvoiceStatus;
 import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,7 +43,7 @@ import java.util.UUID;
  * @author MANFOUO Braun
  */
 @Service
-public class InvoiceService implements GenerateInvoiceUseCase {
+public class InvoiceService implements GenerateInvoiceUseCase, SystemInvoicingUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(InvoiceService.class);
 
@@ -79,6 +81,10 @@ public class InvoiceService implements GenerateInvoiceUseCase {
     @Transactional
     @RequirePermission(resource = "invoice", action = "issue")
     public Mono<Invoice> generate(GenerateInvoiceCommand command) {
+        return doGenerate(command);
+    }
+
+    private Mono<Invoice> doGenerate(GenerateInvoiceCommand command) {
         int year = Year.now().getValue();
         return sequencePort.nextSequence(command.tenantId(), year)
                 .flatMap(seq -> {
@@ -132,6 +138,26 @@ public class InvoiceService implements GenerateInvoiceUseCase {
     public Mono<Invoice> getByNumber(String invoiceNumber) {
         return invoiceRepository.findByNumber(invoiceNumber)
                 .switchIfEmpty(Mono.error(new InvoiceNotFoundException(invoiceNumber)));
+    }
+
+    /** Same as {@link #getByNumber(String)} but only inside {@code tenantId} (not found otherwise). */
+    @RequirePermission(resource = "invoice", action = "read")
+    public Mono<Invoice> getByNumber(String invoiceNumber, UUID tenantId) {
+        return invoiceRepository.findByNumber(invoiceNumber)
+                .filter(inv -> tenantId.equals(inv.getTenantId()))
+                .switchIfEmpty(Mono.error(new InvoiceNotFoundException(invoiceNumber)));
+    }
+
+    /** Same as {@link #listByMissionId(String)} but only inside {@code tenantId}. */
+    @RequirePermission(resource = "invoice", action = "read")
+    public Flux<Invoice> listByMissionId(String missionId, UUID tenantId) {
+        return invoiceRepository.findByMissionId(missionId).filter(inv -> tenantId.equals(inv.getTenantId()));
+    }
+
+    /** Invoices issued by {@code issuerOrgId} (an organisation or a driver) inside {@code tenantId}. */
+    @RequirePermission(resource = "invoice", action = "read")
+    public Flux<Invoice> listByIssuerOrgId(UUID tenantId, String issuerOrgId) {
+        return invoiceRepository.findByIssuerOrgId(tenantId, issuerOrgId);
     }
 
     /**
@@ -191,6 +217,10 @@ public class InvoiceService implements GenerateInvoiceUseCase {
     @Transactional
     @RequirePermission(resource = "payment", action = "process")
     public Mono<Invoice> markPaid(MarkInvoicePaidCommand command) {
+        return doMarkPaid(command);
+    }
+
+    private Mono<Invoice> doMarkPaid(MarkInvoicePaidCommand command) {
         return invoiceRepository.findByIdAndTenantId(command.invoiceId(), command.tenantId())
                 .switchIfEmpty(Mono.error(new InvoiceNotFoundException(command.invoiceId())))
                 .flatMap(invoice -> {
@@ -205,13 +235,15 @@ public class InvoiceService implements GenerateInvoiceUseCase {
 
     /**
      * Returns a pre-signed download URL for the invoice PDF, scoped to the caller's tenant.
-     * Requires permission {@code report:read}.
+     * Requires permission {@code invoice:read} (it used to require {@code report:read}, an analytics
+     * permission that neither clients nor drivers hold, so they could never download their own invoice;
+     * who may see <em>which</em> invoice is decided by the controller's access policy).
      *
      * @param invoiceId the invoice UUID
      * @param tenantId  the tenant the invoice must belong to
      * @return a Mono emitting the pre-signed URL (valid for 1 hour)
      */
-    @RequirePermission(resource = "report", action = "read")
+    @RequirePermission(resource = "invoice", action = "read")
     public Mono<String> getPdfUrl(UUID invoiceId, UUID tenantId) {
         return invoiceRepository.findByIdAndTenantId(invoiceId, tenantId)
                 .switchIfEmpty(Mono.error(new InvoiceNotFoundException(invoiceId)))
@@ -259,5 +291,30 @@ public class InvoiceService implements GenerateInvoiceUseCase {
                     CreditNote note = CreditNote.issue(invoiceId, tenantId, invoice.getNetAmount(), reason);
                     return creditNoteRepository.save(note);
                 });
+    }
+
+    // ── trusted in-process callers (no user security context) ─────────────────
+
+    @Override
+    @Transactional
+    public Mono<Invoice> generateAsSystem(GenerateInvoiceCommand command) {
+        return doGenerate(command);
+    }
+
+    @Override
+    @Transactional
+    public Mono<Invoice> markPaidAsSystem(MarkInvoicePaidCommand command) {
+        return doMarkPaid(command);
+    }
+
+    @Override
+    public Mono<Invoice> issuePaidInvoiceAsSystem(GenerateInvoiceCommand command, String paymentRef) {
+        return invoiceRepository.findByMissionId(command.missionId())
+                .filter(inv -> command.tenantId().equals(inv.getTenantId()))
+                .next()
+                .switchIfEmpty(Mono.defer(() -> doGenerate(command)))
+                .flatMap(inv -> inv.getStatus() == InvoiceStatus.PAID
+                        ? Mono.just(inv)
+                        : doMarkPaid(new MarkInvoicePaidCommand(inv.getTenantId(), inv.getId(), paymentRef)));
     }
 }

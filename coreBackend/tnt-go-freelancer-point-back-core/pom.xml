@@ -236,6 +236,21 @@
             <version>${project.version}</version>
         </dependency>
 
+        <!-- TiiBnTick Billing Invoice: a confirmed delivery payment issues its (paid) invoice -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-billing-invoice</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- TiiBnTick Billing Pricing: freelancer rate grids are BillingPolicies priced by the shared engine
+             (brings tnt-billing-dsl transitively) -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-billing-pricing</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- ── Deep Java Library (DJL) — Sentiment Analysis ──────────────
              nlptown/bert-base-multilingual-uncased-sentiment
              Outputs 1-5 star labels natively, supports French.

@@ -33,10 +33,13 @@ public class ReportingController {
 
     private final ReportingService reportingService;
     private final ReportWebMapper mapper;
+    private final ReportAccessPolicy access;
 
-    public ReportingController(ReportingService reportingService, ReportWebMapper mapper) {
+    public ReportingController(ReportingService reportingService, ReportWebMapper mapper,
+                               ReportAccessPolicy access) {
         this.reportingService = reportingService;
         this.mapper = mapper;
+        this.access = access;
     }
 
     // ─── Revenue ─────────────────────────────────────────────────────────────
@@ -136,64 +139,67 @@ public class ReportingController {
         KPISnapshotQuery query = new KPISnapshotQuery(currentUser.tenantId(), currency);
         return reportingService.getOrRefreshKPISnapshot(query).map(mapper::toResponse);
     }
-    // ── : FreelancerOrg reports ───────────────────────────────────────────
+    // ── Per-issuer reports ────────────────────────────────────────────────
 
     /**
-     * GET /billing/reports/freelancer-org/{orgId}
-     * Generates a financial report for a specific FreelancerOrg.
+     * GET /api/v1/billing/reports/freelancer-org/{orgId}
+     *
+     * <p>Financial report of one driver / FreelancerOrg. The tenant is always the caller's (it used to be a
+     * request parameter, which let any holder of {@code report:read} read another tenant). Management reads any
+     * issuer of their tenant; a driver reads only their own id.
      */
     @GetMapping("/freelancer-org/{orgId}")
-    public Mono<com.yowyob.tiibntick.core.billing.report.domain.model.FreelancerOrgReport>
-            getFreelancerOrgReport(
-                    @PathVariable String orgId,
-                    @RequestParam java.util.UUID tenantId,
-                    @RequestParam String from,
-                    @RequestParam String to,
-                    @RequestParam(defaultValue = "XAF") String currency) {
-        var period = com.yowyob.tiibntick.core.billing.report.domain.model.ReportPeriod.of(
-                java.time.LocalDate.parse(from), java.time.LocalDate.parse(to));
-        return reportingService.generateFreelancerOrgReport(
-                new com.yowyob.tiibntick.core.billing.report.application.port.in.query.FreelancerOrgReportQuery(
-                        tenantId, orgId, period, currency));
+    @Operation(summary = "Financial report of a driver or FreelancerOrg (own id for drivers)")
+    public Mono<com.yowyob.tiibntick.core.billing.report.domain.model.FreelancerOrgReport> getFreelancerOrgReport(
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
+            @PathVariable String orgId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "XAF") String currency) {
+        FreelancerOrgReportQuery query = new FreelancerOrgReportQuery(
+                currentUser.tenantId(), orgId, ReportPeriod.of(from, to), currency);
+        return access.isStaff().flatMap(staff -> staff
+                ? reportingService.generateFreelancerOrgReport(query)
+                : ownOnly(currentUser, orgId, () -> reportingService.generateOwnFreelancerReport(query)));
     }
 
-    /**
-     * GET /billing/reports/surcharge-analytics
-     * Generates surcharge analytics for an actor's billing policy.
-     */
+    /** GET /api/v1/billing/reports/surcharge-analytics — surcharge revenue of one issuer. */
     @GetMapping("/surcharge-analytics")
-    public Mono<com.yowyob.tiibntick.core.billing.report.domain.model.SurchargeAnalyticsReport>
-            getSurchargeAnalytics(
-                    @RequestParam java.util.UUID tenantId,
-                    @RequestParam String ownerOrgId,
-                    @RequestParam String ownerOrgType,
-                    @RequestParam String from,
-                    @RequestParam String to,
-                    @RequestParam(defaultValue = "XAF") String currency) {
-        var period = com.yowyob.tiibntick.core.billing.report.domain.model.ReportPeriod.of(
-                java.time.LocalDate.parse(from), java.time.LocalDate.parse(to));
-        return reportingService.generateSurchargeAnalytics(
-                new com.yowyob.tiibntick.core.billing.report.application.port.in.query.SurchargeAnalyticsQuery(
-                        tenantId, ownerOrgId, ownerOrgType, period, currency));
+    @Operation(summary = "Surcharge analytics of an issuer (own id for drivers)")
+    public Mono<com.yowyob.tiibntick.core.billing.report.domain.model.SurchargeAnalyticsReport> getSurchargeAnalytics(
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
+            @RequestParam String ownerOrgId,
+            @RequestParam String ownerOrgType,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "XAF") String currency) {
+        SurchargeAnalyticsQuery query = new SurchargeAnalyticsQuery(
+                currentUser.tenantId(), ownerOrgId, ownerOrgType, ReportPeriod.of(from, to), currency);
+        return access.isStaff().flatMap(staff -> staff
+                ? reportingService.generateSurchargeAnalytics(query)
+                : ownOnly(currentUser, ownerOrgId, () -> reportingService.generateOwnSurchargeAnalytics(query)));
     }
 
-    /**
-     * GET /billing/reports/template-usage
-     * Generates billing template usage analytics report.
-     */
+    /** GET /api/v1/billing/reports/template-usage — management only (report:read), caller's tenant. */
     @GetMapping("/template-usage")
-    public Mono<com.yowyob.tiibntick.core.billing.report.domain.model.TemplateUsageReport>
-            getTemplateUsageReport(
-                    @RequestParam java.util.UUID tenantId,
-                    @RequestParam(required = false) String templateCode,
-                    @RequestParam String from,
-                    @RequestParam String to,
-                    @RequestParam(defaultValue = "XAF") String currency) {
-        var period = com.yowyob.tiibntick.core.billing.report.domain.model.ReportPeriod.of(
-                java.time.LocalDate.parse(from), java.time.LocalDate.parse(to));
-        return reportingService.generateTemplateUsageReport(
-                new com.yowyob.tiibntick.core.billing.report.application.port.in.query.TemplateUsageReportQuery(
-                        tenantId, templateCode, period, currency));
+    @Operation(summary = "Billing template usage over a period")
+    public Mono<com.yowyob.tiibntick.core.billing.report.domain.model.TemplateUsageReport> getTemplateUsageReport(
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
+            @RequestParam(required = false) String templateCode,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "XAF") String currency) {
+        return reportingService.generateTemplateUsageReport(new TemplateUsageReportQuery(
+                currentUser.tenantId(), templateCode, ReportPeriod.of(from, to), currency));
+    }
+
+    private static <T> Mono<T> ownOnly(TntUserIdentity user, String issuerId,
+                                       java.util.function.Supplier<Mono<T>> own) {
+        if (!ReportAccessPolicy.isOwn(user, issuerId)) {
+            return Mono.error(com.yowyob.tiibntick.core.roles.domain.exception.TntRoleException
+                    .forbidden("report", "read"));
+        }
+        return own.get();
     }
 
 }

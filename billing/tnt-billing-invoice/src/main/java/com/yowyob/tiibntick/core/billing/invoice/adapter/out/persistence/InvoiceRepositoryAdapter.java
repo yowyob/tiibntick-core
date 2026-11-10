@@ -72,6 +72,11 @@ public class InvoiceRepositoryAdapter implements InvoiceRepository {
     }
 
     @Override
+    public Flux<Invoice> findByIssuerOrgId(UUID tenantId, String issuerOrgId) {
+        return r2dbcRepo.findByTenantIdAndIssuerOrgId(tenantId, issuerOrgId).map(mapper::toDomain);
+    }
+
+    @Override
     public Flux<Invoice> findOverdue(LocalDateTime now) {
         return r2dbcRepo.findOverdue(now).map(mapper::toDomain);
     }

@@ -66,6 +66,7 @@ class TntRoleAssignmentServiceTest {
         lenient().when(transactionalOperator.transactional(any(Mono.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         lenient().when(assignmentRepository.findByTenantIdAndUserId(any(), any())).thenReturn(Flux.empty());
+        lenient().when(assignmentRepository.findKernelAssignmentId(any(), any())).thenReturn(Mono.just(UUID.randomUUID()));
     }
 
     private Role canonicalRole(String code, RoleScopeType scopeType) {

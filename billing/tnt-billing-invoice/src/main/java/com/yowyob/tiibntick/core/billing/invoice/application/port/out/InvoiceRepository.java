@@ -32,6 +32,9 @@ public interface InvoiceRepository {
 
     Flux<Invoice> findByTenantId(UUID tenantId);
 
+    /** Invoices issued by the given organisation/driver (the {@code issuer_org_id} column), newest first. */
+    Flux<Invoice> findByIssuerOrgId(UUID tenantId, String issuerOrgId);
+
     /** Finds invoices past their due date still in payable states. */
     Flux<Invoice> findOverdue(LocalDateTime now);
 

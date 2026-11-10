@@ -6,7 +6,8 @@ import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.AddressDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.response.FreelancerCandidateDTO;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.AddressUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.AdminRelayPointUseCase;
-import com.yowyob.tiibntick.core.gofreelancer.application.port.in.FreelancerPricingPolicyUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.FreelancerEligibilityUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.FreelancerPriceQuoteUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpFreelancerRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpUserRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryNeedRepository;
@@ -52,7 +53,8 @@ class DeliveryNeedApplicationServiceCandidatesTest {
     @Mock private AddressUseCase addressUseCase;
     @Mock private GofpUserRepository gofpUserRepository;
     @Mock private GofpFreelancerRepository gofpFreelancerRepository;
-    @Mock private FreelancerPricingPolicyUseCase freelancerPricingPolicyUseCase;
+    @Mock private FreelancerPriceQuoteUseCase freelancerPriceQuoteUseCase;
+    @Mock private FreelancerEligibilityUseCase freelancerEligibilityUseCase;
     @Mock private DatabaseClient databaseClient;
 
     private DeliveryNeedApplicationService service;
@@ -74,7 +76,7 @@ class DeliveryNeedApplicationServiceCandidatesTest {
         service = new DeliveryNeedApplicationService(
                 deliveryNeedRepository, adminRelayPointUseCase, pushNotificationPort,
                 matchingUseCase, addressUseCase, gofpUserRepository,
-                gofpFreelancerRepository, freelancerPricingPolicyUseCase, databaseClient);
+                gofpFreelancerRepository, freelancerPriceQuoteUseCase, freelancerEligibilityUseCase, databaseClient);
     }
 
     @Test
@@ -126,8 +128,10 @@ class DeliveryNeedApplicationServiceCandidatesTest {
         // so it falls back to default pricing (acceptable for this coordinate-loading test)
         when(gofpFreelancerRepository.findById(any(UUID.class))).thenReturn(Mono.empty());
         when(gofpFreelancerRepository.findByCoreFreelancerId(any(UUID.class))).thenReturn(Mono.empty());
-        // priceCandidate calls getPolicy; stub to empty so DEFAULT_POLICY is used
-        when(freelancerPricingPolicyUseCase.getPolicy(any())).thenReturn(Mono.empty());
+        // priceCandidate asks the billing-engine quote service for the price
+        when(freelancerEligibilityUseCase.isEligible(any(), any())).thenReturn(Mono.just(true));
+        when(freelancerPriceQuoteUseCase.quote(any(), any())).thenReturn(Mono.just(
+                new FreelancerPriceQuoteUseCase.Quote(1700.0, "XAF", "Base 500 = 1700 XAF", "PLATFORM_DEFAULT", null)));
         // priceCandidate calls findByCoreUserId for name; stub to empty → "Freelancer" fallback
         when(gofpUserRepository.findByCoreUserId(any())).thenReturn(Mono.empty());
 
@@ -153,6 +157,34 @@ class DeliveryNeedApplicationServiceCandidatesTest {
                 eq(DELIVERY_LON),
                 eq(0.0),
                 eq(null));
+    }
+
+    @Test
+    void getCandidatesWithPricing_dropsCandidatesRejectedByTheirEligibility() {
+        DeliveryNeed need = DeliveryNeed.builder().id(deliveryNeedId).userId(ownerId)
+                .pickupAddressId(pickupAddressId).deliveryAddressId(deliveryAddressId)
+                .title("Colis").status(DeliveryNeedStatus.PENDING).build();
+        AddressDTO dto = AddressDTO.builder().id(pickupAddressId)
+                .address(Address.builder().landmark("Warda").city("Yaoundé").country("Cameroun")
+                        .coordinates(GeoCoordinates.of(PICKUP_LAT, PICKUP_LON)).build()).build();
+        TopsisRankingUseCase.FreelancerCandidate candidate = TopsisRankingUseCase.FreelancerCandidate.builder()
+                .freelancerId(UUID.randomUUID()).latitude(PICKUP_LAT).longitude(PICKUP_LON)
+                .rating(4.5).topsisScore(0.85).build();
+
+        when(deliveryNeedRepository.findById(deliveryNeedId)).thenReturn(Mono.just(need));
+        when(addressUseCase.getAddressById(any())).thenReturn(Mono.just(dto));
+        when(matchingUseCase.processMatchingForDeliveryNeed(
+                any(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), any()))
+                .thenReturn(Mono.just(List.of(candidate)));
+        when(gofpFreelancerRepository.findById(any(UUID.class))).thenReturn(Mono.empty());
+        when(gofpFreelancerRepository.findByCoreFreelancerId(any(UUID.class))).thenReturn(Mono.empty());
+        when(freelancerEligibilityUseCase.isEligible(any(), any())).thenReturn(Mono.just(false));
+
+        StepVerifier.create(service.getCandidatesWithPricing(deliveryNeedId, ownerId).collectList())
+                .assertNext(dtos -> assertThat(dtos).isEmpty())
+                .verifyComplete();
+
+        org.mockito.Mockito.verifyNoInteractions(freelancerPriceQuoteUseCase);
     }
 
     @Test

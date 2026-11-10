@@ -219,6 +219,19 @@ public class ReportingService {
      */
     @RequirePermission(resource = "report", action = "read")
     public Mono<FreelancerOrgReport> generateFreelancerOrgReport(FreelancerOrgReportQuery query) {
+        return doGenerateFreelancerOrgReport(query);
+    }
+
+    /**
+     * The caller's own report ({@code report:own}, held by drivers). The controller only calls it with the
+     * caller's own id as {@code freelancerOrgId}; tenant-wide staff use {@link #generateFreelancerOrgReport}.
+     */
+    @RequirePermission(resource = "report", action = "own")
+    public Mono<FreelancerOrgReport> generateOwnFreelancerReport(FreelancerOrgReportQuery query) {
+        return doGenerateFreelancerOrgReport(query);
+    }
+
+    private Mono<FreelancerOrgReport> doGenerateFreelancerOrgReport(FreelancerOrgReportQuery query) {
         String cur = query.currency();
         ReportPeriod period = query.period();
         String orgId = query.freelancerOrgId();
@@ -289,6 +302,15 @@ public class ReportingService {
      */
     @RequirePermission(resource = "report", action = "read")
     public Mono<SurchargeAnalyticsReport> generateSurchargeAnalytics(SurchargeAnalyticsQuery query) {
+        return doGenerateSurchargeAnalytics(query);
+    }
+
+    @RequirePermission(resource = "report", action = "own")
+    public Mono<SurchargeAnalyticsReport> generateOwnSurchargeAnalytics(SurchargeAnalyticsQuery query) {
+        return doGenerateSurchargeAnalytics(query);
+    }
+
+    private Mono<SurchargeAnalyticsReport> doGenerateSurchargeAnalytics(SurchargeAnalyticsQuery query) {
         log.info("Generating SurchargeAnalyticsReport for ownerOrgId={} tenant={}", query.ownerOrgId(), query.tenantId());
 
         return projectionRepo.sumTotalSurchargeByOwnerOrgAndPeriod(

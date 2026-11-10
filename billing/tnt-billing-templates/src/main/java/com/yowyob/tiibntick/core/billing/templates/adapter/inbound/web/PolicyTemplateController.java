@@ -16,7 +16,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser;
+import com.yowyob.tiibntick.core.auth.domain.model.TntUserIdentity;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
@@ -133,7 +137,9 @@ public class PolicyTemplateController {
         @ApiResponse(responseCode = "404", description = "Template not found"),
         @ApiResponse(responseCode = "410", description = "Template is inactive")
     })
-    public Mono<ApplyTemplateResponse> applyTemplate(@Valid @RequestBody ApplyTemplateRequest request) {
+    public Mono<ApplyTemplateResponse> applyTemplate(@CurrentUser TntUserIdentity user,
+            @Valid @RequestBody ApplyTemplateRequest request) {
+        assertOwnsActor(user, request.getOwnerActorId());
         log.info("POST /api/v1/billing/templates/apply templateCode={} actor={} ownerType={}",
                 request.getTemplateCode(), request.getOwnerActorId(), request.getOwnerType());
 
@@ -141,7 +147,7 @@ public class PolicyTemplateController {
                 .templateCode(request.getTemplateCode())
                 .ownerActorId(request.getOwnerActorId())
                 .ownerType(request.getOwnerType())
-                .tenantId(request.getTenantId())
+                .tenantId(tenantOf(user))
                 .policyName(request.getPolicyName())
                 .customizedParameters(request.getCustomizedParameters() != null
                         ? request.getCustomizedParameters() : Map.of())
@@ -224,10 +230,12 @@ public class PolicyTemplateController {
     @GetMapping("/custom")
     @Operation(summary = "List custom templates", description = "Lists all personal templates saved by an actor")
     public Flux<CustomPolicyTemplateResponse> listCustomTemplates(
+            @CurrentUser TntUserIdentity user,
             @RequestParam @Parameter(description = "Actor UUID", example = "550e8400-e29b-41d4-a716-446655440000")
             String ownerActorId) {
 
         log.debug("GET /api/v1/billing/templates/custom?ownerActorId={}", ownerActorId);
+        assertOwnsActor(user, ownerActorId);
         return saveCustomTemplateUseCase.listByOwner(ownerActorId).map(responseMapper::toResponse);
     }
 
@@ -242,7 +250,9 @@ public class PolicyTemplateController {
     @Operation(summary = "Save a custom template",
                description = "Saves a personalized template configuration for the actor to reuse later")
     public Mono<CustomPolicyTemplateResponse> saveCustomTemplate(
+            @CurrentUser TntUserIdentity user,
             @Valid @RequestBody SaveCustomTemplateRequest request) {
+        assertOwnsActor(user, request.getOwnerActorId());
 
         log.info("POST /api/v1/billing/templates/custom name={} actor={}",
                 request.getName(), request.getOwnerActorId());
@@ -250,7 +260,7 @@ public class PolicyTemplateController {
         SaveCustomTemplateCommand command = SaveCustomTemplateCommand.builder()
                 .ownerActorId(request.getOwnerActorId())
                 .ownerType(request.getOwnerType())
-                .tenantId(request.getTenantId())
+                .tenantId(tenantOf(user))
                 .name(request.getName())
                 .sourceTemplateCode(request.getSourceTemplateCode())
                 .customizedParameters(request.getCustomizedParameters())
@@ -270,10 +280,11 @@ public class PolicyTemplateController {
     @PatchMapping("/custom/{customTemplateId}/rename")
     @Operation(summary = "Rename a custom template")
     public Mono<CustomPolicyTemplateResponse> renameCustomTemplate(
+            @CurrentUser TntUserIdentity user,
             @PathVariable UUID customTemplateId,
             @RequestParam String ownerActorId,
             @RequestParam String newName) {
-
+        assertOwnsActor(user, ownerActorId);
         return saveCustomTemplateUseCase.rename(customTemplateId, ownerActorId, newName)
                 .map(responseMapper::toResponse);
     }
@@ -289,9 +300,10 @@ public class PolicyTemplateController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Delete a custom template")
     public Mono<Void> deleteCustomTemplate(
+            @CurrentUser TntUserIdentity user,
             @PathVariable UUID customTemplateId,
             @RequestParam String ownerActorId) {
-
+        assertOwnsActor(user, ownerActorId);
         log.info("DELETE /api/v1/billing/templates/custom/{} actor={}", customTemplateId, ownerActorId);
         return saveCustomTemplateUseCase.delete(customTemplateId, ownerActorId);
     }
@@ -306,6 +318,7 @@ public class PolicyTemplateController {
      * @return Flux of all templates
      */
     @GetMapping("/admin/all")
+    @PreAuthorize("hasRole('TNT_ADMIN')")
     @Operation(summary = "[Admin] List all templates",
                description = "Returns all templates including inactive ones. Requires ADMIN role.")
     public Flux<PolicyTemplateResponse> listAllTemplates() {
@@ -320,6 +333,7 @@ public class PolicyTemplateController {
      * @return the updated template
      */
     @PostMapping("/admin/{templateCode}/activate")
+    @PreAuthorize("hasRole('TNT_ADMIN')")
     @Operation(summary = "[Admin] Activate a template")
     public Mono<PolicyTemplateResponse> activateTemplate(@PathVariable String templateCode) {
         log.info("POST /api/v1/billing/templates/admin/{}/activate", templateCode);
@@ -333,6 +347,7 @@ public class PolicyTemplateController {
      * @return the updated template
      */
     @PostMapping("/admin/{templateCode}/deactivate")
+    @PreAuthorize("hasRole('TNT_ADMIN')")
     @Operation(summary = "[Admin] Deactivate a template")
     public Mono<PolicyTemplateResponse> deactivateTemplate(@PathVariable String templateCode) {
         log.info("POST /api/v1/billing/templates/admin/{}/deactivate", templateCode);
@@ -347,6 +362,7 @@ public class PolicyTemplateController {
      * @return the updated template
      */
     @PatchMapping("/admin/{templateCode}/defaults")
+    @PreAuthorize("hasRole('TNT_ADMIN')")
     @Operation(summary = "[Admin] Update template default values",
                description = "Updates the default parameter values. Does not affect existing BillingPolicies.")
     public Mono<PolicyTemplateResponse> updateDefaults(
@@ -356,5 +372,37 @@ public class PolicyTemplateController {
         log.info("PATCH /api/v1/billing/templates/admin/{}/defaults", templateCode);
         return createAdminTemplateUseCase.updateDefaultValues(templateCode, newDefaultValues)
                 .map(responseMapper::toResponse);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // CALLER SCOPING
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /**
+     * The tenant always comes from the caller's token. A tenant id in the body used to be
+     * trusted, which let any authenticated user create policies in another tenant.
+     */
+    private static String tenantOf(TntUserIdentity user) {
+        if (user == null || user.tenantId() == null) {
+            throw new AccessDeniedException("The token carries no tenant");
+        }
+        return user.tenantId().toString();
+    }
+
+    /**
+     * A policy or custom template is owned by the Kernel user who creates it ({@code ownerActorId}
+     * is the user id). Anyone else gets a 403, unless they are a platform administrator.
+     */
+    private static void assertOwnsActor(TntUserIdentity user, String ownerActorId) {
+        if (user == null || user.userId() == null) {
+            throw new AccessDeniedException("Not authenticated as a user");
+        }
+        if (user.userId().toString().equalsIgnoreCase(ownerActorId)) {
+            return;
+        }
+        if (user.hasPermission("tnt", "platform:admin") || user.permissions().contains("ROLE_TNT_ADMIN")) {
+            return;
+        }
+        throw new AccessDeniedException("ownerActorId must be the caller's own user id");
     }
 }

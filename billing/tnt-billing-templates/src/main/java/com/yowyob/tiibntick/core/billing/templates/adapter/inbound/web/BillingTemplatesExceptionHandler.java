@@ -54,6 +54,20 @@ public class BillingTemplatesExceptionHandler {
     }
 
     /**
+     * Handles templates the pricing engine cannot evaluate yet → HTTP 422.
+     */
+    @ExceptionHandler(com.yowyob.tiibntick.core.billing.templates.domain.exception.TemplateNotMaterializableException.class)
+    public Mono<ProblemDetail> handleNotMaterializable(
+            com.yowyob.tiibntick.core.billing.templates.domain.exception.TemplateNotMaterializableException ex) {
+        log.warn("Template not materializable: {}", ex.getMessage());
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
+        problem.setType(URI.create(BASE_URI + "template-not-materializable"));
+        problem.setTitle("Template Not Applicable Yet");
+        problem.setProperty("timestamp", Instant.now());
+        return Mono.just(problem);
+    }
+
+    /**
      * Handles template inactive errors → HTTP 410 Gone.
      */
     @ExceptionHandler(TemplateInactiveException.class)

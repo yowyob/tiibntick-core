@@ -97,6 +97,7 @@ public final class TntRoleDefinition {
                     "mission:start", "mission:complete",
                     "delivery:read", "delivery:confirm", "delivery:proof",
                     "wallet:read",
+                    "invoice:read", "report:own",
                     "freelancer:read",
                     "media:read", "media:upload"))
             .systemRole(false)

@@ -27,8 +27,7 @@ public class SaveCustomTemplateRequest {
     @Schema(description = "Actor type", example = "FREELANCER_ORG")
     private PolicyOwnerType ownerType;
 
-    @NotBlank
-    @Schema(description = "Tenant ID", example = "FRL-550e8400-e29b-41d4-a716-446655440000")
+    @Schema(description = "Ignored: the tenant is always the one carried by the caller's token", deprecated = true)
     private String tenantId;
 
     @NotBlank

@@ -19,6 +19,12 @@ public interface InvoiceReportProjectionRepository {
 
     Mono<Void> upsert(InvoiceReportEntry entry);
 
+    /**
+     * Moves an already projected invoice to a new status (PAID / CANCELLED events carry no party data, so
+     * they must not overwrite the row the ISSUED event wrote). Inserts nothing when the invoice is unknown.
+     */
+    Mono<Void> updateStatus(UUID tenantId, UUID invoiceId, InvoiceStatus status, java.time.LocalDate paidDate);
+
     Mono<Long> countByTenantAndPeriodAndStatus(UUID tenantId, ReportPeriod period, InvoiceStatus status);
 
     Mono<Money> sumNetAmountByTenantAndPeriodAndStatus(UUID tenantId, ReportPeriod period, InvoiceStatus status, String currency);

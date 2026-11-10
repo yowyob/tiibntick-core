@@ -298,7 +298,8 @@ public final class Invoice {
                 version, createdAt, Instant.now(), new ArrayList<>(),
                 issuerOrgType, issuerOrgId, issuerTradeName,
                 vatApplicable, surchargeLines, isFromTemplate, appliedTemplateName);
-        issued.domainEvents.add(new InvoiceGenerated(id, number.value(), missionId, netAmount, tenantId, Instant.now()));
+        issued.domainEvents.add(new InvoiceGenerated(id, number.value(), missionId, netAmount, tenantId, Instant.now(),
+                clientId, countryCode, issuerOrgType, issuerOrgId, appliedTemplateName));
         return issued;
     }
 
@@ -323,7 +324,7 @@ public final class Invoice {
                 version, createdAt, Instant.now(), new ArrayList<>(),
                 issuerOrgType, issuerOrgId, issuerTradeName,
                 vatApplicable, surchargeLines, isFromTemplate, appliedTemplateName);
-        paid.domainEvents.add(new InvoicePaid(id, paymentRef, netAmount, Instant.now()));
+        paid.domainEvents.add(new InvoicePaid(id, paymentRef, netAmount, Instant.now(), tenantId));
         return paid;
     }
 
@@ -346,7 +347,7 @@ public final class Invoice {
                 version, createdAt, Instant.now(), new ArrayList<>(),
                 issuerOrgType, issuerOrgId, issuerTradeName,
                 vatApplicable, surchargeLines, isFromTemplate, appliedTemplateName);
-        cancelled.domainEvents.add(new InvoiceCancelled(id, reason, Instant.now()));
+        cancelled.domainEvents.add(new InvoiceCancelled(id, reason, Instant.now(), tenantId));
         return cancelled;
     }
 

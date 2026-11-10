@@ -72,6 +72,13 @@ public class PricingEngineService implements IPricingUseCase {
     }
 
     @Override
+    public Mono<PriceEvaluation> evaluateWith(BillingPolicy policy, PricingContext ctx) {
+        BillingPolicy active = policy.isActive()
+                ? policy : policy.withStatus(com.yowyob.tiibntick.core.billing.pricing.domain.model.enums.PolicyStatus.ACTIVE);
+        return computeEvaluation(active, ctx);
+    }
+
+    @Override
     public Mono<Money> computeSellingPrice(UUID policyId, PricingContext ctx) {
         return evaluatePolicy(policyId, ctx).map(PriceEvaluation::getSellingPrice);
     }
@@ -118,6 +125,24 @@ public class PricingEngineService implements IPricingUseCase {
                 breakdown.add(PriceLineItem.of(
                         String.format("%.1f kg × %s/kg", ctx.getWeightKg(), matchedRule.getPerKgRate()),
                         LineItemType.PER_KG, kgCharge));
+            }
+
+            if (matchedRule.getPerCbmRate() != null && ctx.getVolumeCbm() != null && ctx.getVolumeCbm() > 0) {
+                Money cbmCharge = matchedRule.getPerCbmRate().multiply(ctx.getVolumeCbm());
+                current = current.add(cbmCharge);
+                breakdown.add(PriceLineItem.of(
+                        String.format("%.2f m³ × %s/m³", ctx.getVolumeCbm(), matchedRule.getPerCbmRate()),
+                        LineItemType.PER_CBM, cbmCharge));
+            }
+
+            if (matchedRule.getWaitingFeePerMinute() != null
+                    && ctx.getWaitingMinutes() != null && ctx.getWaitingMinutes() > 0) {
+                Money waitCharge = matchedRule.getWaitingFeePerMinute().multiply(ctx.getWaitingMinutes());
+                current = current.add(waitCharge);
+                breakdown.add(PriceLineItem.of(
+                        String.format("%d min d'attente × %s/min", ctx.getWaitingMinutes(),
+                                matchedRule.getWaitingFeePerMinute()),
+                        LineItemType.WAITING, waitCharge));
             }
 
             current = applyMinMax(matchedRule, current);

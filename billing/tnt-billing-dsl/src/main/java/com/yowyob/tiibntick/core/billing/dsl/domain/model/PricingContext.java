@@ -261,6 +261,14 @@ public class PricingContext {
      */
     Integer networkHopCount;
 
+    // Freelancer grid components ─────────────────────────────────────
+
+    /** Declared package volume in cubic metres (null = not billed). */
+    Double volumeCbm;
+
+    /** Minutes spent waiting at pickup/delivery (null = none). */
+    Integer waitingMinutes;
+
     // ── Convenience query methods ─────────────────────────────────────────────
 
     /** @return {@code true} if any of the given package types are present */

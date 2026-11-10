@@ -44,7 +44,14 @@ class PreviewPriceFromTemplateUseCaseTest {
                 templateRepository,
                 new TemplateApplicabilityService(),
                 new TemplateParameterValidationService(),
-                new TemplatePriceCalculatorService()
+                new TemplatePriceCalculatorService(),
+                new com.yowyob.tiibntick.core.billing.templates.application.service.TemplatePolicyMaterializer(),
+                new com.yowyob.tiibntick.core.billing.pricing.application.service.PricingEngineService(
+                        null,
+                        new com.yowyob.tiibntick.core.billing.dsl.application.service.DslCompilerService(
+                                new com.yowyob.tiibntick.core.billing.dsl.infrastructure.dsl.lexer.DslLexer(),
+                                new com.yowyob.tiibntick.core.billing.dsl.infrastructure.dsl.parser.DslParser()),
+                        new com.yowyob.tiibntick.core.billing.dsl.infrastructure.dsl.evaluator.DslEvaluator())
         );
 
         baseStdTemplate = PolicyTemplate.createNew(

@@ -130,7 +130,7 @@ class InvoiceControllerPermissionEnforcementTest {
         factory.addAspect(aspect);
         InvoiceService proxiedService = factory.getProxy();
 
-        InvoiceController controller = new InvoiceController(proxiedService, new InvoiceWebMapper());
+        InvoiceController controller = new InvoiceController(proxiedService, new InvoiceWebMapper(), new InvoiceAccessPolicy(evaluator));
 
         return WebTestClient.bindToController(controller)
                 .controllerAdvice(new TntRoleExceptionHandler(), new InvoiceExceptionHandler())

@@ -42,10 +42,12 @@ public class InvoiceController {
 
     private final InvoiceService invoiceService;
     private final InvoiceWebMapper mapper;
+    private final InvoiceAccessPolicy access;
 
-    public InvoiceController(InvoiceService invoiceService, InvoiceWebMapper mapper) {
+    public InvoiceController(InvoiceService invoiceService, InvoiceWebMapper mapper, InvoiceAccessPolicy access) {
         this.invoiceService = invoiceService;
         this.mapper = mapper;
+        this.access = access;
     }
 
     @PostMapping("/generate")
@@ -63,19 +65,28 @@ public class InvoiceController {
     public Mono<InvoiceResponse> getById(
             @CurrentUser TntUserIdentity currentUser,
             @PathVariable UUID invoiceId) {
-        return invoiceService.getById(invoiceId, currentUser.tenantId()).map(mapper::toResponse);
+        return invoiceService.getById(invoiceId, currentUser.tenantId())
+                .flatMap(inv -> access.readable(inv, currentUser))
+                .map(mapper::toResponse);
     }
 
     @GetMapping("/number/{invoiceNumber}")
     @Operation(summary = "Get an invoice by its formatted number (e.g., TNT-FACT-AGY001-2026-000042)")
-    public Mono<InvoiceResponse> getByNumber(@PathVariable String invoiceNumber) {
-        return invoiceService.getByNumber(invoiceNumber).map(mapper::toResponse);
+    public Mono<InvoiceResponse> getByNumber(
+            @CurrentUser TntUserIdentity currentUser,
+            @PathVariable String invoiceNumber) {
+        return invoiceService.getByNumber(invoiceNumber, currentUser.tenantId())
+                .flatMap(inv -> access.readable(inv, currentUser))
+                .map(mapper::toResponse);
     }
 
     @GetMapping("/mission/{missionId}")
     @Operation(summary = "List invoices for a specific delivery mission")
-    public Flux<InvoiceResponse> listByMission(@PathVariable String missionId) {
-        return invoiceService.listByMissionId(missionId).map(mapper::toResponse);
+    public Flux<InvoiceResponse> listByMission(
+            @CurrentUser TntUserIdentity currentUser,
+            @PathVariable String missionId) {
+        return access.readable(invoiceService.listByMissionId(missionId, currentUser.tenantId()), currentUser)
+                .map(mapper::toResponse);
     }
 
     @GetMapping("/client/{clientId}")
@@ -83,7 +94,28 @@ public class InvoiceController {
     public Flux<InvoiceResponse> listByClient(
             @CurrentUser TntUserIdentity currentUser,
             @PathVariable String clientId) {
-        return invoiceService.listByClientId(currentUser.tenantId(), clientId).map(mapper::toResponse);
+        return access.readable(invoiceService.listByClientId(currentUser.tenantId(), clientId), currentUser)
+                .map(mapper::toResponse);
+    }
+
+    @GetMapping("/mine")
+    @Operation(summary = "Invoices addressed to the caller (as client), newest first")
+    public Flux<InvoiceResponse> listMine(@CurrentUser TntUserIdentity currentUser) {
+        return Flux.fromIterable(InvoiceAccessPolicy.idsOf(currentUser))
+                .concatMap(id -> invoiceService.listByClientId(currentUser.tenantId(), id))
+                .distinct(inv -> inv.getId())
+                .sort((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
+                .map(mapper::toResponse);
+    }
+
+    @GetMapping("/issued/mine")
+    @Operation(summary = "Invoices issued by the caller (a driver or organisation), newest first")
+    public Flux<InvoiceResponse> listIssuedByMe(@CurrentUser TntUserIdentity currentUser) {
+        return Flux.fromIterable(InvoiceAccessPolicy.idsOf(currentUser))
+                .concatMap(id -> invoiceService.listByIssuerOrgId(currentUser.tenantId(), id))
+                .distinct(inv -> inv.getId())
+                .sort((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
+                .map(mapper::toResponse);
     }
 
     @PostMapping("/{invoiceId}/cancel")
@@ -103,7 +135,11 @@ public class InvoiceController {
             @PathVariable UUID invoiceId,
             @RequestParam String paymentRef) {
         MarkInvoicePaidCommand command = new MarkInvoicePaidCommand(currentUser.tenantId(), invoiceId, paymentRef);
-        return invoiceService.markPaid(command).map(mapper::toResponse);
+        // Staff only: CLIENT holds payment:process (needed to pay), which must not let a client declare
+        // an invoice paid by calling this endpoint — payments are confirmed by the wallet flow itself.
+        return access.requireStaff()
+                .then(Mono.defer(() -> invoiceService.markPaid(command)))
+                .map(mapper::toResponse);
     }
 
     @GetMapping("/{invoiceId}/pdf")
@@ -111,7 +147,9 @@ public class InvoiceController {
     public Mono<String> getPdfUrl(
             @CurrentUser TntUserIdentity currentUser,
             @PathVariable UUID invoiceId) {
-        return invoiceService.getPdfUrl(invoiceId, currentUser.tenantId());
+        return invoiceService.getById(invoiceId, currentUser.tenantId())
+                .flatMap(inv -> access.readable(inv, currentUser))
+                .then(Mono.defer(() -> invoiceService.getPdfUrl(invoiceId, currentUser.tenantId())));
     }
 
     @PostMapping("/{invoiceId}/credit-note")

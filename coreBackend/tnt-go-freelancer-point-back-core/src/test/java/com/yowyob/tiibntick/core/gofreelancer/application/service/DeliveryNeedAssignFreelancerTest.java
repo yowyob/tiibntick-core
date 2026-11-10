@@ -3,7 +3,8 @@ package com.yowyob.tiibntick.core.gofreelancer.application.service;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.response.DeliveryNeedResponseDTO;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.AddressUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.AdminRelayPointUseCase;
-import com.yowyob.tiibntick.core.gofreelancer.application.port.in.FreelancerPricingPolicyUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.FreelancerEligibilityUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.FreelancerPriceQuoteUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpFreelancerRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpUserRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryNeedRepository;
@@ -51,7 +52,8 @@ class DeliveryNeedAssignFreelancerTest {
     @Mock private AddressUseCase addressUseCase;
     @Mock private GofpUserRepository gofpUserRepository;
     @Mock private GofpFreelancerRepository gofpFreelancerRepository;
-    @Mock private FreelancerPricingPolicyUseCase freelancerPricingPolicyUseCase;
+    @Mock private FreelancerPriceQuoteUseCase freelancerPriceQuoteUseCase;
+    @Mock private FreelancerEligibilityUseCase freelancerEligibilityUseCase;
     @Mock private DatabaseClient databaseClient;
 
     private DeliveryNeedApplicationService service;
@@ -61,7 +63,7 @@ class DeliveryNeedAssignFreelancerTest {
         service = new DeliveryNeedApplicationService(
                 deliveryNeedRepository, adminRelayPointUseCase, pushNotificationPort,
                 matchingUseCase, addressUseCase, gofpUserRepository,
-                gofpFreelancerRepository, freelancerPricingPolicyUseCase, databaseClient);
+                gofpFreelancerRepository, freelancerPriceQuoteUseCase, freelancerEligibilityUseCase, databaseClient);
     }
 
     @Test

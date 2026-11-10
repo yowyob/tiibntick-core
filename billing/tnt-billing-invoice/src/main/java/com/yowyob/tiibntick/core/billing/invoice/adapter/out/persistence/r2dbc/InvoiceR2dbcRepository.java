@@ -31,6 +31,9 @@ public interface InvoiceR2dbcRepository extends ReactiveCrudRepository<InvoiceEn
     @Query("SELECT * FROM tnt_invoices WHERE tenant_id = :tenantId ORDER BY created_at DESC")
     Flux<InvoiceEntity> findByTenantId(UUID tenantId);
 
+    @Query("SELECT * FROM tnt_invoices WHERE tenant_id = :tenantId AND issuer_org_id = :issuerOrgId ORDER BY created_at DESC")
+    Flux<InvoiceEntity> findByTenantIdAndIssuerOrgId(UUID tenantId, String issuerOrgId);
+
     @Query("SELECT * FROM tnt_invoices WHERE status IN ('ISSUED','PARTIALLY_PAID') AND due_at < :now")
     Flux<InvoiceEntity> findOverdue(LocalDateTime now);
 

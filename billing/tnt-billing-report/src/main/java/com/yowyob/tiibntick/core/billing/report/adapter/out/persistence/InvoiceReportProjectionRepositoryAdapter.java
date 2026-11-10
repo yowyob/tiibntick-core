@@ -18,6 +18,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.UUID;
 
 /**
@@ -40,15 +41,24 @@ public class InvoiceReportProjectionRepositoryAdapter implements InvoiceReportPr
 
     @Override
     public Mono<Void> upsert(InvoiceReportEntry entry) {
-        return databaseClient.sql(
+        // issuer / template columns are part of the INSERT (they used to be left NULL, which made every
+        // per-issuer report empty); on conflict only the lifecycle and amounts move, never the parties.
+        DatabaseClient.GenericExecuteSpec spec = databaseClient.sql(
                 "INSERT INTO tnt_invoice_report_entries " +
                 "(invoice_id, invoice_number, tenant_id, country_code, client_id, mission_id, " +
-                " gross_amount, tax_amount, net_amount, platform_fee, currency, status, invoice_date, paid_date) " +
+                " gross_amount, tax_amount, net_amount, platform_fee, currency, status, invoice_date, paid_date, " +
+                " issuer_org_type, issuer_org_id, applied_template_name, total_surcharge_amount) " +
                 "VALUES (:invoiceId, :invoiceNumber, :tenantId, :countryCode, :clientId, :missionId, " +
-                " :grossAmount, :taxAmount, :netAmount, :platformFee, :currency, :status, :invoiceDate, :paidDate) " +
+                " :grossAmount, :taxAmount, :netAmount, :platformFee, :currency, :status, :invoiceDate, :paidDate, " +
+                " :issuerOrgType, :issuerOrgId, :appliedTemplateName, :totalSurcharge) " +
                 "ON CONFLICT (invoice_id) DO UPDATE SET " +
-                " status = EXCLUDED.status, paid_date = EXCLUDED.paid_date, " +
-                " gross_amount = EXCLUDED.gross_amount, net_amount = EXCLUDED.net_amount")
+                " status = CASE WHEN tnt_invoice_report_entries.status IN ('PAID','CANCELLED') " +
+                "     THEN tnt_invoice_report_entries.status ELSE EXCLUDED.status END, " +
+                " paid_date = COALESCE(tnt_invoice_report_entries.paid_date, EXCLUDED.paid_date), " +
+                " gross_amount = EXCLUDED.gross_amount, net_amount = EXCLUDED.net_amount, " +
+                " issuer_org_type = COALESCE(EXCLUDED.issuer_org_type, tnt_invoice_report_entries.issuer_org_type), " +
+                " issuer_org_id = COALESCE(EXCLUDED.issuer_org_id, tnt_invoice_report_entries.issuer_org_id), " +
+                " applied_template_name = COALESCE(EXCLUDED.applied_template_name, tnt_invoice_report_entries.applied_template_name)")
                 .bind("invoiceId",     entry.invoiceId())
                 .bind("invoiceNumber", entry.invoiceNumber())
                 .bind("tenantId",      entry.tenantId())
@@ -62,8 +72,29 @@ public class InvoiceReportProjectionRepositoryAdapter implements InvoiceReportPr
                 .bind("currency",      entry.netAmount().currency())
                 .bind("status",        entry.status().name())
                 .bind("invoiceDate",   entry.invoiceDate())
-                .bind("paidDate",      entry.paidDate())
-                .fetch().rowsUpdated().then();
+                .bind("totalSurcharge", entry.totalSurchargeAmount() != null
+                        ? entry.totalSurchargeAmount().amount() : BigDecimal.ZERO);
+        spec = bindNullable(spec, "paidDate", entry.paidDate(), LocalDate.class);
+        spec = bindNullable(spec, "issuerOrgType", entry.issuerOrgType(), String.class);
+        spec = bindNullable(spec, "issuerOrgId", entry.issuerOrgId(), String.class);
+        spec = bindNullable(spec, "appliedTemplateName", entry.appliedTemplateName(), String.class);
+        return spec.fetch().rowsUpdated().then();
+    }
+
+    @Override
+    public Mono<Void> updateStatus(UUID tenantId, UUID invoiceId, InvoiceStatus status, LocalDate paidDate) {
+        DatabaseClient.GenericExecuteSpec spec = databaseClient.sql(
+                "UPDATE tnt_invoice_report_entries SET status = :status, paid_date = :paidDate " +
+                "WHERE invoice_id = :invoiceId AND tenant_id = :tenantId")
+                .bind("status", status.name())
+                .bind("invoiceId", invoiceId)
+                .bind("tenantId", tenantId);
+        return bindNullable(spec, "paidDate", paidDate, LocalDate.class).fetch().rowsUpdated().then();
+    }
+
+    private static <T> DatabaseClient.GenericExecuteSpec bindNullable(
+            DatabaseClient.GenericExecuteSpec spec, String name, T value, Class<T> type) {
+        return value == null ? spec.bindNull(name, type) : spec.bind(name, value);
     }
 
     @Override

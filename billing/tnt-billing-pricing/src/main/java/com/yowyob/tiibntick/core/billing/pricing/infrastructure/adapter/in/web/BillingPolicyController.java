@@ -57,7 +57,10 @@ public class BillingPolicyController {
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Create a new billing policy")
-    public Mono<BillingPolicyResponse> create(@Valid @RequestBody CreateBillingPolicyRequest req) {
+    public Mono<BillingPolicyResponse> create(@CurrentUser TntUserIdentity currentUser,
+                                              @Valid @RequestBody CreateBillingPolicyRequest req) {
+        assertSameTenant(currentUser, req.tenantId());
+        assertMayAct(currentUser, req.ownerActorId());
         return policyUseCase.createPolicy(RequestToDomainMapper.toDomain(req))
                 .map(BillingPolicyResponse::from);
     }
@@ -67,24 +70,32 @@ public class BillingPolicyController {
     public Mono<BillingPolicyResponse> getById(
             @CurrentUser TntUserIdentity currentUser,
             @PathVariable UUID policyId) {
-        return policyUseCase.findById(policyId, currentUser.tenantId()).map(BillingPolicyResponse::from);
+        return ownedPolicy(currentUser, policyId).map(BillingPolicyResponse::from);
     }
 
     @GetMapping
     @Operation(summary = "List all policies for a tenant")
-    public Flux<BillingPolicyResponse> listByTenant(@RequestParam UUID tenantId) {
+    public Flux<BillingPolicyResponse> listByTenant(@CurrentUser TntUserIdentity currentUser,
+                                                    @RequestParam UUID tenantId) {
+        assertSameTenant(currentUser, tenantId);
+        assertStaff(currentUser);
         return policyUseCase.findByTenantId(tenantId).map(BillingPolicyResponse::from);
     }
 
     @GetMapping("/active")
     @Operation(summary = "List active policies for a tenant")
-    public Flux<BillingPolicyResponse> listActive(@RequestParam UUID tenantId) {
+    public Flux<BillingPolicyResponse> listActive(@CurrentUser TntUserIdentity currentUser,
+                                                  @RequestParam UUID tenantId) {
+        assertSameTenant(currentUser, tenantId);
+        assertStaff(currentUser);
         return policyUseCase.findActiveByTenantId(tenantId).map(BillingPolicyResponse::from);
     }
 
     @GetMapping("/default")
     @Operation(summary = "Get the default policy for a tenant")
-    public Mono<BillingPolicyResponse> getDefault(@RequestParam UUID tenantId) {
+    public Mono<BillingPolicyResponse> getDefault(@CurrentUser TntUserIdentity currentUser,
+                                                  @RequestParam UUID tenantId) {
+        assertSameTenant(currentUser, tenantId);
         return policyUseCase.findDefaultForTenant(tenantId).map(BillingPolicyResponse::from);
     }
 
@@ -94,7 +105,9 @@ public class BillingPolicyController {
     public Mono<BillingPolicyResponse> activate(
             @CurrentUser TntUserIdentity currentUser,
             @PathVariable UUID policyId) {
-        return policyUseCase.activatePolicy(policyId, currentUser.tenantId()).map(BillingPolicyResponse::from);
+        return ownedPolicy(currentUser, policyId)
+                .then(Mono.defer(() -> policyUseCase.activatePolicy(policyId, currentUser.tenantId())))
+                .map(BillingPolicyResponse::from);
     }
 
     @PatchMapping("/{policyId}/deactivate")
@@ -103,7 +116,9 @@ public class BillingPolicyController {
     public Mono<BillingPolicyResponse> deactivate(
             @CurrentUser TntUserIdentity currentUser,
             @PathVariable UUID policyId) {
-        return policyUseCase.deactivatePolicy(policyId, currentUser.tenantId()).map(BillingPolicyResponse::from);
+        return ownedPolicy(currentUser, policyId)
+                .then(Mono.defer(() -> policyUseCase.deactivatePolicy(policyId, currentUser.tenantId())))
+                .map(BillingPolicyResponse::from);
     }
 
     @PatchMapping("/{policyId}/archive")
@@ -112,7 +127,9 @@ public class BillingPolicyController {
     public Mono<BillingPolicyResponse> archive(
             @CurrentUser TntUserIdentity currentUser,
             @PathVariable UUID policyId) {
-        return policyUseCase.archivePolicy(policyId, currentUser.tenantId()).map(BillingPolicyResponse::from);
+        return ownedPolicy(currentUser, policyId)
+                .then(Mono.defer(() -> policyUseCase.archivePolicy(policyId, currentUser.tenantId())))
+                .map(BillingPolicyResponse::from);
     }
 
     @DeleteMapping("/{policyId}")
@@ -122,7 +139,8 @@ public class BillingPolicyController {
     public Mono<Void> delete(
             @CurrentUser TntUserIdentity currentUser,
             @PathVariable UUID policyId) {
-        return policyUseCase.deletePolicy(policyId, currentUser.tenantId());
+        return ownedPolicy(currentUser, policyId)
+                .then(Mono.defer(() -> policyUseCase.deletePolicy(policyId, currentUser.tenantId())));
     }
 
     // Multi-owner endpoints ──────────────────────────────────────────
@@ -140,7 +158,9 @@ public class BillingPolicyController {
             @PathVariable UUID policyId,
             @RequestParam @NotBlank String orgId,
             @RequestParam @NotNull PolicyOwnerType ownerType) {
-        return policyUseCase.assignPolicyToOrg(policyId, orgId, ownerType, currentUser.tenantId())
+        assertMayAct(currentUser, orgId);
+        return ownedPolicy(currentUser, policyId)
+                .then(Mono.defer(() -> policyUseCase.assignPolicyToOrg(policyId, orgId, ownerType, currentUser.tenantId())))
                 .map(BillingPolicyResponse::from);
     }
 
@@ -150,8 +170,15 @@ public class BillingPolicyController {
      */
     @GetMapping("/owner/{ownerActorId}")
     @Operation(summary = " — List billing policies for a given owner actor")
-    public Flux<BillingPolicyResponse> listByOwner(@PathVariable String ownerActorId) {
-        return policyUseCase.findByOwnerActorId(ownerActorId).map(BillingPolicyResponse::from);
+    public Flux<BillingPolicyResponse> listByOwner(@CurrentUser TntUserIdentity currentUser,
+                                                   @PathVariable String ownerActorId) {
+        // Policies of other tenants are not listed, whatever the owner id asked for; a non-staff caller
+        // lists their own policies only.
+        assertMayAct(currentUser, ownerActorId);
+        return policyUseCase.findByOwnerActorId(ownerActorId)
+                .filter(p -> currentUser != null && currentUser.tenantId() != null
+                        && currentUser.tenantId().equals(p.getTenantId()))
+                .map(BillingPolicyResponse::from);
     }
 
     /**
@@ -166,14 +193,70 @@ public class BillingPolicyController {
                        + "Templates provide default rules for FREELANCER_STANDARD, "
                        + "HUB_STORAGE_BASIC, LINK_NETWORK_STANDARD, etc.")
     public Mono<BillingPolicyResponse> createFromTemplate(
+            @CurrentUser TntUserIdentity currentUser,
             @RequestParam @NotBlank String templateCode,
             @RequestParam @NotNull PolicyOwnerType ownerType,
             @RequestParam @NotBlank String ownerActorId,
             @RequestParam @NotNull UUID tenantId,
             @RequestParam(required = false, defaultValue = "XAF") String currency) {
+        assertSameTenant(currentUser, tenantId);
+        assertMayAct(currentUser, ownerActorId);
         return policyUseCase.createPolicyFromTemplate(
                 templateCode, ownerType, ownerActorId, tenantId,
                 Map.of("currency", currency))
                 .map(BillingPolicyResponse::from);
+    }
+
+    /** A tenant id taken from the query string must be the caller's own: it is not a way to read another tenant. */
+    private static void assertSameTenant(TntUserIdentity user, UUID tenantId) {
+        if (user == null || user.tenantId() == null || !user.tenantId().equals(tenantId)) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "tenantId must be the caller's own tenant");
+        }
+    }
+
+    // ── Ownership ─────────────────────────────────────────────────────────
+
+    /**
+     * Management ({@code billing:write}, or platform admin) works on any policy of its tenant; anyone else only
+     * on policies whose owner is themselves. Without this every authenticated user of a tenant could
+     * activate, archive or delete another driver's tariff.
+     */
+    private static boolean isStaff(TntUserIdentity user) {
+        return user != null && (user.hasPermission("billing", "write")
+                || user.hasPermission("tnt", "platform:admin")
+                || user.permissions().contains("ROLE_TNT_ADMIN"));
+    }
+
+    private static boolean isSelf(TntUserIdentity user, String ownerActorId) {
+        if (user == null || ownerActorId == null) return false;
+        return (user.userId() != null && user.userId().toString().equalsIgnoreCase(ownerActorId))
+                || (user.actorId() != null && user.actorId().toString().equalsIgnoreCase(ownerActorId));
+    }
+
+    private static void assertStaff(TntUserIdentity user) {
+        if (!isStaff(user)) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Listing a whole tenant's policies requires billing:write");
+        }
+    }
+
+    private static void assertMayAct(TntUserIdentity user, String ownerActorId) {
+        if (!isStaff(user) && !isSelf(user, ownerActorId)) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "A policy can only be managed by its owner or by billing management");
+        }
+    }
+
+    /** The caller's tenant's policy, if the caller may act on it (else 403; unknown policy ⇒ empty / 404). */
+    private Mono<com.yowyob.tiibntick.core.billing.pricing.domain.model.BillingPolicy> ownedPolicy(
+            TntUserIdentity user, UUID policyId) {
+        return policyUseCase.findById(policyId, user.tenantId()).flatMap(p -> {
+            if (!isStaff(user) && !isSelf(user, p.getOwnerActorId())) {
+                return Mono.error(new org.springframework.security.access.AccessDeniedException(
+                        "This billing policy belongs to someone else"));
+            }
+            return Mono.just(p);
+        });
     }
 }

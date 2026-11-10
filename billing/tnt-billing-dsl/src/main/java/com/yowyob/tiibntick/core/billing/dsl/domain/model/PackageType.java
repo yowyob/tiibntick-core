@@ -15,5 +15,11 @@ public enum PackageType {
     HAZARDOUS,
     DOCUMENT,
     ELECTRONICS,
-    LIQUID
+    LIQUID,
+    /** High-value goods (jewellery, art): drives the "precious" surcharges. */
+    LUXURY,
+    /** Goods needing active refrigeration. */
+    REFRIGERATED,
+    /** Medicines and medical supplies. */
+    PHARMACEUTICAL
 }

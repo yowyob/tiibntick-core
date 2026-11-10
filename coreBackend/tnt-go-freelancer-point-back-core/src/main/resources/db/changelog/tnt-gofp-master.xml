@@ -423,4 +423,9 @@
                  relativeToChangelogFile="false"/>
     </changeSet>
 
+    <changeSet id="072-create-freelancer-eligibility" author="TiiBnTickTeam">
+        <sqlFile path="db/changelog/20261111_create_freelancer_eligibility.sql"
+                 relativeToChangelogFile="false"/>
+    </changeSet>
+
 </databaseChangeLog>

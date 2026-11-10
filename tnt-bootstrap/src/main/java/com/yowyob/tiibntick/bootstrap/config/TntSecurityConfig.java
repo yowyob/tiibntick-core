@@ -335,6 +335,17 @@ public class TntSecurityConfig {
                         .map(SimpleGrantedAuthority::new)
                         .forEach(authorities::add);
 
+                // Self-service personas granted by the Kernel (ROLE_CLIENT, ROLE_FREELANCER#TENANT:<id>…)
+                // become plain ROLE_<CODE> authorities so @PreAuthorize("hasRole(..)") works.
+                permList.stream()
+                        .filter(String.class::isInstance)
+                        .map(String.class::cast)
+                        .map(TntSecurityConfig::selfServiceRoleAuthority)
+                        .flatMap(java.util.Optional::stream)
+                        .distinct()
+                        .map(SimpleGrantedAuthority::new)
+                        .forEach(authorities::add);
+
                 // Kernel OWNER of TiiBnTick's own system tenant → grant all TiiBnTick roles and
                 // fine-grained authority strings. ROLE_OWNER/tenant:admin only means "owner of
                 // THIS particular Kernel tenant" — it must not be treated as system-wide
@@ -380,5 +391,30 @@ public class TntSecurityConfig {
         });
 
         return converter;
+    }
+
+    /**
+     * Roles any user may legitimately hold in their own tenant just by creating the matching
+     * profile. Deliberately a short allow-list: a tenant owner can create and assign arbitrary
+     * role codes in their own Kernel tenant, so privileged codes (TNT_ADMIN, AGENCY_MANAGER…)
+     * must never be derived from the token alone — they keep the system-tenant check above.
+     */
+    static final java.util.Set<String> SELF_SERVICE_ROLES = java.util.Set.of("CLIENT", "FREELANCER");
+
+    /**
+     * Maps a {@code permissions}-claim entry such as {@code ROLE_FREELANCER} or
+     * {@code ROLE_FREELANCER#TENANT:<id>} to {@code ROLE_FREELANCER} when it names a
+     * self-service role; empty otherwise.
+     */
+    static java.util.Optional<String> selfServiceRoleAuthority(String permission) {
+        if (permission == null || !permission.startsWith("ROLE_")) {
+            return java.util.Optional.empty();
+        }
+        String code = permission.substring("ROLE_".length());
+        int hash = code.indexOf('#');
+        if (hash >= 0) {
+            code = code.substring(0, hash);
+        }
+        return SELF_SERVICE_ROLES.contains(code) ? java.util.Optional.of("ROLE_" + code) : java.util.Optional.empty();
     }
 }

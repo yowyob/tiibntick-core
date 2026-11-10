@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.core.roles.application.port.out;
 
+import com.yowyob.tiibntick.core.roles.domain.model.TntRoleDefinition;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
@@ -25,6 +26,28 @@ public interface ITntRoleAssignmentPort {
      * @return the Kernel-assigned assignment id
      */
     Mono<UUID> assignRole(UUID targetUserId, String roleCode, String scopeType, UUID scopeId);
+
+    /**
+     * Assigns a TiiBnTick role to a user inside <strong>the tenant of the calling JWT</strong>,
+     * using the caller's own bearer token (relayed by the Kernel web client).
+     *
+     * <p>The Kernel resolves the tenant from the token's {@code tid} claim, not from any header,
+     * so a role definition that only exists in the system tenant is invisible to a user working
+     * in another tenant. This operation therefore looks the role up in the caller's tenant,
+     * creates it there from {@code definition} when it is missing (on-demand tenant
+     * provisioning, idempotent), and then grants it. An assignment that already exists is
+     * returned as is.
+     *
+     * <p>It needs a JWT in the reactive security context: the scheduled outbox worker has none,
+     * which is why role grants made only through the outbox never reached the Kernel.
+     *
+     * @return the Kernel-side assignment id
+     */
+    default Mono<UUID> assignRoleInCallerTenant(UUID targetUserId, TntRoleDefinition definition,
+                                                String scopeType, UUID scopeId) {
+        return Mono.error(new UnsupportedOperationException(
+                "assignRoleInCallerTenant is not supported by this adapter"));
+    }
 
     /**
      * Revokes a previously granted role assignment.

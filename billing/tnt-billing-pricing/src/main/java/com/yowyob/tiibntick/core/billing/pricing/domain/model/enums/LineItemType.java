@@ -17,6 +17,10 @@ public enum LineItemType {
     BASE,
     PER_KM,
     PER_KG,
+    /** Volume-based component (price per cubic metre). */
+    PER_CBM,
+    /** Waiting-time component (price per minute at pickup or delivery). */
+    WAITING,
     SURCHARGE,
     PROMOTION,
     LOYALTY,

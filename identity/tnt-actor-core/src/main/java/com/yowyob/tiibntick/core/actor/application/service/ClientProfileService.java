@@ -8,6 +8,7 @@ import com.yowyob.tiibntick.core.actor.application.port.out.IKernelActorPort;
 import com.yowyob.tiibntick.core.actor.domain.event.ActorProfileUpdatedEvent;
 import com.yowyob.tiibntick.core.actor.domain.event.ActorStatusChangedEvent;
 import com.yowyob.tiibntick.core.actor.domain.model.ClientProfile;
+import com.yowyob.tiibntick.core.roles.application.port.in.AssignTntRoleUseCase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -25,19 +26,42 @@ public class ClientProfileService implements ICreateClientProfileUseCase {
     private final IClientProfileRepository clientProfileRepository;
     private final IKernelActorPort kernelActorPort;
     private final IActorEventPublisher eventPublisher;
+    private final AssignTntRoleUseCase assignRoleUseCase;
 
     public ClientProfileService(IClientProfileRepository clientProfileRepository,
                                  IKernelActorPort kernelActorPort,
-                                 IActorEventPublisher eventPublisher) {
+                                 IActorEventPublisher eventPublisher,
+                                 AssignTntRoleUseCase assignRoleUseCase) {
         this.clientProfileRepository = clientProfileRepository;
         this.kernelActorPort = kernelActorPort;
         this.eventPublisher = eventPublisher;
+        this.assignRoleUseCase = assignRoleUseCase;
     }
 
     @Override
     @Transactional
     public Mono<ClientProfile> createClientProfile(CreateClientProfileCommand command) {
         Objects.requireNonNull(command, "command must not be null");
+        return createOrFindProfile(command)
+                .flatMap(profile -> grantClientRole(profile, command.tenantId(), command.actorId()));
+    }
+
+    /**
+     * Grants the CLIENT role so the Kernel puts it in the user's next JWT. Best-effort and
+     * idempotent (an existing assignment is returned as is): the profile is returned even if
+     * the grant fails, exactly like {@link FreelancerService}.
+     */
+    private Mono<ClientProfile> grantClientRole(ClientProfile profile, UUID tenantId, UUID userId) {
+        return assignRoleUseCase.assignRole(tenantId, userId, "CLIENT", tenantId)
+                .thenReturn(profile)
+                .onErrorResume(err -> {
+                    log.warn("CLIENT role assignment failed for actor {} in tenant {} (best-effort — profile returned): {}",
+                            userId, tenantId, err.getMessage());
+                    return Mono.just(profile);
+                });
+    }
+
+    private Mono<ClientProfile> createOrFindProfile(CreateClientProfileCommand command) {
         return clientProfileRepository.existsByActorId(command.tenantId(), command.actorId())
                 .flatMap(exists -> {
                     if (exists) {

@@ -19,6 +19,10 @@ public class PricingRule {
     Money basePrice;
     Money perKmRate;
     Money perKgRate;
+    /** Price per cubic metre of declared volume; {@code null} = volume is not billed. */
+    Money perCbmRate;
+    /** Price per minute of waiting at pickup/delivery; {@code null} = waiting is free. */
+    Money waitingFeePerMinute;
     Money minimumPrice;
     Money maximumPrice;
     int priority;
@@ -32,6 +36,12 @@ public class PricingRule {
         }
         if (perKgRate != null) {
             subtotal = subtotal.add(perKgRate.multiply(ctx.getWeightKg()));
+        }
+        if (perCbmRate != null && ctx.getVolumeCbm() != null && ctx.getVolumeCbm() > 0) {
+            subtotal = subtotal.add(perCbmRate.multiply(ctx.getVolumeCbm()));
+        }
+        if (waitingFeePerMinute != null && ctx.getWaitingMinutes() != null && ctx.getWaitingMinutes() > 0) {
+            subtotal = subtotal.add(waitingFeePerMinute.multiply(ctx.getWaitingMinutes()));
         }
         if (minimumPrice != null && subtotal.getAmount().compareTo(minimumPrice.getAmount()) < 0) {
             subtotal = minimumPrice;

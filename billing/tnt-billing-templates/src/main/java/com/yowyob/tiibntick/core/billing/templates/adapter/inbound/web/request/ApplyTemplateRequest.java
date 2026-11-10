@@ -32,8 +32,7 @@ public class ApplyTemplateRequest {
     @Schema(description = "Type of the requesting actor", example = "FREELANCER_ORG")
     private PolicyOwnerType ownerType;
 
-    @NotBlank
-    @Schema(description = "Tenant ID of the actor", example = "FRL-550e8400-e29b-41d4-a716-446655440000")
+    @Schema(description = "Ignored: the tenant is always the one carried by the caller's token", deprecated = true)
     private String tenantId;
 
     @Schema(description = "Optional custom name for the generated BillingPolicy")

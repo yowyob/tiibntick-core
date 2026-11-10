@@ -3,7 +3,6 @@ package com.yowyob.tiibntick.core.gofreelancer.application.service;
 import com.yowyob.tiibntick.common.vo.Address;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.AddressDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.DeliveryNeedRequestDTO;
-import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.FreelancerPricingDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.PacketDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.response.DeliveryNeedResponseDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.response.FreelancerCandidateDTO;
@@ -14,7 +13,8 @@ import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.deliveryNeed.De
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.AddressUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.AdminRelayPointUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.DeliveryNeedUseCase;
-import com.yowyob.tiibntick.core.gofreelancer.application.port.in.FreelancerPricingPolicyUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.FreelancerEligibilityUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.FreelancerPriceQuoteUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpFreelancerRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpUserRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.PushNotificationPort;
@@ -31,9 +31,8 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -48,26 +47,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
 
-    // TODO(pricing): valeurs provisoires, à remplacer par le barème plateforme officiel
-    private static final double DEFAULT_BASE_FEE = 500.0;
-    private static final double DEFAULT_PRICE_PER_KM = 100.0;
-    private static final double DEFAULT_PRICE_PER_KG = 50.0;
-    private static final double DEFAULT_PRICE_PER_CBM = 2000.0;
-    private static final double DEFAULT_FRAGILE_SURCHARGE = 500.0;
-    private static final double DEFAULT_PERISHABLE_SURCHARGE = 500.0;
-    private static final String DEFAULT_CURRENCY = "FCFA";
-
-    /** Barème de repli quand le freelancer n'a pas (encore) publié sa politique de prix. */
-    private static final FreelancerPricingDTO DEFAULT_POLICY = FreelancerPricingDTO.builder()
-            .baseFee(DEFAULT_BASE_FEE)
-            .pricePerKm(DEFAULT_PRICE_PER_KM)
-            .pricePerKg(DEFAULT_PRICE_PER_KG)
-            .pricePerCbm(DEFAULT_PRICE_PER_CBM)
-            .fragileSurcharge(DEFAULT_FRAGILE_SURCHARGE)
-            .perishableSurcharge(DEFAULT_PERISHABLE_SURCHARGE)
-            .currency(DEFAULT_CURRENCY)
-            .build();
-
     private final IDeliveryNeedRepository deliveryNeedRepository;
     private final AdminRelayPointUseCase adminRelayPointUseCase;
     private final PushNotificationPort pushNotificationPort;
@@ -75,7 +54,8 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
     private final AddressUseCase addressUseCase;
     private final GofpUserRepository gofpUserRepository;
     private final GofpFreelancerRepository gofpFreelancerRepository;
-    private final FreelancerPricingPolicyUseCase freelancerPricingPolicyUseCase;
+    private final FreelancerPriceQuoteUseCase freelancerPriceQuoteUseCase;
+    private final FreelancerEligibilityUseCase freelancerEligibilityUseCase;
     private final DatabaseClient databaseClient;
 
     /**
@@ -426,7 +406,7 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
                                             delivery.lat(), delivery.lon(),
                                             packet.volumeM3(), need.getPickupDeadline())
                                     .flatMapMany(Flux::fromIterable)
-                                    .flatMap(candidate -> toPricedCandidate(candidate, distanceKm, packet));
+                                    .flatMap(candidate -> toPricedCandidate(candidate, distanceKm, packet, need));
                         }));
     }
 
@@ -448,7 +428,8 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
      * {@code "Freelancer"} et le tarif sur {@link #DEFAULT_POLICY}, silencieusement.
      */
     private Mono<FreelancerCandidateDTO> toPricedCandidate(
-            TopsisRankingUseCase.FreelancerCandidate candidate, double distanceKm, PacketMetrics packet) {
+            TopsisRankingUseCase.FreelancerCandidate candidate, double distanceKm, PacketMetrics packet,
+            DeliveryNeed need) {
 
         UUID freelancerId = candidate.getFreelancerId();
 
@@ -461,28 +442,59 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
                             freelancerId, e);
                     return Mono.just(Optional.empty());
                 })
-                .flatMap(freelancer -> priceCandidate(candidate, freelancer.orElse(null), distanceKm, packet));
+                .flatMap(freelancer -> isEligible(candidate, freelancer.orElse(null), packet, need)
+                        .filter(Boolean::booleanValue)
+                        .flatMap(ok -> priceCandidate(candidate, freelancer.orElse(null), distanceKm, packet, need)));
+    }
+
+    /**
+     * Les contraintes dures publiées par le livreur (colis acceptés, plage de poids, jours de travail)
+     * — voir {@link FreelancerEligibilityRules}. Sans préférence enregistrée, ou si la lecture échoue,
+     * le livreur reste éligible.
+     */
+    private Mono<Boolean> isEligible(TopsisRankingUseCase.FreelancerCandidate candidate, GofpFreelancer freelancer,
+                                     PacketMetrics packet, DeliveryNeed need) {
+        UUID wireId = candidate.getFreelancerId();
+        List<UUID> ids = new java.util.ArrayList<>();
+        if (freelancer != null && freelancer.getCoreFreelancerId() != null) ids.add(freelancer.getCoreFreelancerId());
+        ids.add(wireId);
+        java.time.DayOfWeek day = need != null && need.getPickupDeadline() != null
+                ? need.getPickupDeadline().getDayOfWeek() : null;
+        return freelancerEligibilityUseCase.isEligible(ids,
+                new FreelancerEligibilityUseCase.Parcel(packet.weightKg(), packet.fragile(), packet.perishable(), day))
+                .doOnNext(ok -> {
+                    if (!ok) log.info("Candidate {} filtered out by its eligibility preferences", wireId);
+                });
     }
 
     private Mono<FreelancerCandidateDTO> priceCandidate(
             TopsisRankingUseCase.FreelancerCandidate candidate,
             GofpFreelancer freelancer,
-            double distanceKm, PacketMetrics packet) {
+            double distanceKm, PacketMetrics packet, DeliveryNeed need) {
 
         UUID freelancerId = candidate.getFreelancerId();
         // Repli sur l'id fil quand la ligne gofp_freelancers est introuvable : au pire on
-        // retombe sur les valeurs par défaut, jamais sur une exception.
+        // retombe sur le barème plateforme, jamais sur une exception.
         UUID pricingId = (freelancer != null && freelancer.getCoreFreelancerId() != null)
                 ? freelancer.getCoreFreelancerId() : freelancerId;
         UUID identityId = (freelancer != null && freelancer.getCoreUserId() != null)
                 ? freelancer.getCoreUserId() : freelancerId;
 
-        Mono<FreelancerPricingDTO> policyMono = freelancerPricingPolicyUseCase.getPolicy(pricingId)
-                .defaultIfEmpty(DEFAULT_POLICY)
+        // Le prix vient du moteur billing : politique active du livreur (grille ou template),
+        // sinon grille d'avant migration, sinon barème plateforme — voir FreelancerPriceQuoteService.
+        FreelancerPriceQuoteUseCase.QuoteInput input = new FreelancerPriceQuoteUseCase.QuoteInput(
+                distanceKm, packet.weightKg(), packet.volumeM3(), packet.fragile(), packet.perishable(),
+                null, null, need != null ? need.getPickupDeadline() : null,
+                need != null ? need.getPaymentMethod() : null, null);
+
+        Mono<FreelancerPriceQuoteUseCase.Quote> quoteMono = freelancerPriceQuoteUseCase
+                .quote(List.of(pricingId, identityId, freelancerId), input)
                 .onErrorResume(e -> {
-                    log.warn("Pricing policy lookup failed for delivery person {} — falling back to default barème",
-                            pricingId, e);
-                    return Mono.just(DEFAULT_POLICY);
+                    // Un livreur dont le tarif est incalculable n'est pas proposé : mieux vaut
+                    // l'omettre que montrer 0 ou un prix inventé.
+                    log.error("Cannot price candidate {} for delivery need {} — candidate omitted",
+                            freelancerId, need != null ? need.getId() : null, e);
+                    return Mono.empty();
                 });
 
         Mono<String[]> nameMono = gofpUserRepository.findByCoreUserId(identityId)
@@ -492,55 +504,15 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
                 .defaultIfEmpty(new String[]{"Freelancer", ""})
                 .onErrorReturn(new String[]{"Freelancer", ""});
 
-        return Mono.zip(policyMono, nameMono)
-                .map(t -> {
-                    FreelancerPricingDTO policy = t.getT1();
-                    String[] name = t.getT2();
-
-                    double baseFee = orDefault(policy.getBaseFee(), DEFAULT_BASE_FEE);
-                    double perKm = orDefault(policy.getPricePerKm(), DEFAULT_PRICE_PER_KM);
-                    double perKg = orDefault(policy.getPricePerKg(), DEFAULT_PRICE_PER_KG);
-                    double perCbm = orDefault(policy.getPricePerCbm(), DEFAULT_PRICE_PER_CBM);
-                    double fragileFee = packet.fragile()
-                            ? orDefault(policy.getFragileSurcharge(), DEFAULT_FRAGILE_SURCHARGE) : 0.0;
-                    double perishableFee = packet.perishable()
-                            ? orDefault(policy.getPerishableSurcharge(), DEFAULT_PERISHABLE_SURCHARGE) : 0.0;
-                    String currency = (policy.getCurrency() != null && !policy.getCurrency().isBlank())
-                            ? policy.getCurrency() : DEFAULT_CURRENCY;
-
-                    double distanceCost = perKm * distanceKm;
-                    double weightCost = perKg * packet.weightKg();
-                    double volumeCost = perCbm * packet.volumeM3();
-                    double total = round2(baseFee + distanceCost + weightCost + volumeCost
-                            + fragileFee + perishableFee);
-
-                    StringBuilder breakdown = new StringBuilder("Base ").append(num(baseFee));
-                    if (distanceCost != 0.0) {
-                        breakdown.append(" + ").append(num(distanceKm)).append("km×").append(num(perKm));
-                    }
-                    if (weightCost != 0.0) {
-                        breakdown.append(" + ").append(num(packet.weightKg())).append("kg×").append(num(perKg));
-                    }
-                    if (volumeCost != 0.0) {
-                        breakdown.append(" + ").append(num(packet.volumeM3())).append("m³×").append(num(perCbm));
-                    }
-                    if (fragileFee != 0.0) {
-                        breakdown.append(" + fragile ").append(num(fragileFee));
-                    }
-                    if (perishableFee != 0.0) {
-                        breakdown.append(" + périssable ").append(num(perishableFee));
-                    }
-                    breakdown.append(" = ").append(num(total)).append(' ').append(currency);
-
-                    return FreelancerCandidateDTO.builder()
-                            .freelancerId(freelancerId)
-                            .firstName(name[0])
-                            .lastName(name[1])
-                            .rating(candidate.getRating())
-                            .estimatedPrice(total)
-                            .priceBreakdown(breakdown.toString())
-                            .build();
-                });
+        return Mono.zip(quoteMono, nameMono)
+                .map(t -> FreelancerCandidateDTO.builder()
+                        .freelancerId(freelancerId)
+                        .firstName(t.getT2()[0])
+                        .lastName(t.getT2()[1])
+                        .rating(candidate.getRating())
+                        .estimatedPrice(t.getT1().totalPrice())
+                        .priceBreakdown(t.getT1().breakdown())
+                        .build());
     }
 
     /** Coordonnées d'une adresse ; {@code (0,0)} si l'adresse ou ses coordonnées sont absentes. */
@@ -611,18 +583,6 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
 
     private static double orDefault(Double value, double fallback) {
         return value != null ? value : fallback;
-    }
-
-    private static double round2(double value) {
-        return BigDecimal.valueOf(value).setScale(2, RoundingMode.HALF_UP).doubleValue();
-    }
-
-    /** Formatage compact pour {@code priceBreakdown} : 500 plutôt que 500.0, 0.024 plutôt que 0.024000. */
-    private static String num(double value) {
-        return BigDecimal.valueOf(value)
-                .setScale(6, RoundingMode.HALF_UP)
-                .stripTrailingZeros()
-                .toPlainString();
     }
 
     /**

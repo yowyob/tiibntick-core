@@ -22,4 +22,13 @@ public class PriceCalculationRequest {
     private Double distanceKm = 0.0; // Pour le livreur
     @Builder.Default
     private Integer days = 1; // Pour le point relais (1 jour par défaut)
+
+    // Contexte optionnel transmis au moteur de tarification (règles DSL : heure, priorité, attente…)
+    private Integer waitingMinutes;
+    /** LOW, NORMAL, HIGH, URGENT, CRITICAL (ou STANDARD/EXPRESS). */
+    private String priority;
+    /** Heure prévue de prise en charge ; défaut : maintenant. */
+    private java.time.LocalDateTime scheduledAt;
+    private String paymentMethod;
+    private Double declaredValueXaf;
 }

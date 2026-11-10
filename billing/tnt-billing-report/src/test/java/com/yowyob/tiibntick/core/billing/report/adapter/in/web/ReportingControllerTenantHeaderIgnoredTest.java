@@ -47,7 +47,7 @@ class ReportingControllerTenantHeaderIgnoredTest {
 
         ReportingService reportingService = mock(ReportingService.class);
         ReportWebMapper mapper = mock(ReportWebMapper.class);
-        ReportingController controller = new ReportingController(reportingService, mapper);
+        ReportingController controller = new ReportingController(reportingService, mapper, mock(ReportAccessPolicy.class));
 
         RevenueReport stub = mock(RevenueReport.class);
         when(reportingService.generateRevenueReport(any())).thenReturn(Mono.just(stub));

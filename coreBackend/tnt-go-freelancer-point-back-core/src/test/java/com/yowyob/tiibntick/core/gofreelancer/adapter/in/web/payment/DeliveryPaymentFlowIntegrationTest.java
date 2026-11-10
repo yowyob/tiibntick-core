@@ -19,6 +19,8 @@ import com.yowyob.tiibntick.core.billing.wallet.domain.model.WalletSettlement;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IAnnouncementRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryNeedRepository;
+import com.yowyob.tiibntick.core.billing.invoice.application.port.in.SystemInvoicingUseCase;
+import com.yowyob.tiibntick.core.billing.invoice.application.port.in.command.GenerateInvoiceCommand;
 import com.yowyob.tiibntick.core.gofreelancer.application.service.DeliveryPaymentApplicationService;
 import com.yowyob.tiibntick.core.gofreelancer.application.service.DeliveryStatusApplicationService;
 import com.yowyob.tiibntick.core.gofreelancer.application.service.TenantContextHolder;
@@ -108,6 +110,11 @@ class DeliveryPaymentFlowIntegrationTest {
     private DeliveryNeed need;
     private WebTestClient web;
     private WalletHoldService holdService;
+    /** Stands for the invoice module: captures what the payment flow asks it to issue. */
+    private final SystemInvoicingUseCase invoicing = mock(SystemInvoicingUseCase.class);
+    private final List<GenerateInvoiceCommand> invoiceCommands = new CopyOnWriteArrayList<>();
+    private final List<String> invoicePaymentRefs = new CopyOnWriteArrayList<>();
+    private boolean invoicingFails;
 
     @BeforeEach
     void setUp() throws IOException {
@@ -206,6 +213,19 @@ class DeliveryPaymentFlowIntegrationTest {
         assertThat(s.getKernelReference()).isEqualTo("tx-42");
         assertThat(s.getCommissionStatus()).isEqualTo(CommissionStatus.DUE);
 
+        // the paid invoice is issued once: client = payer, issuer = the delivery person, Kernel tx as payment ref
+        assertThat(invoiceCommands).singleElement().satisfies(c -> {
+            assertThat(c.tenantId()).isEqualTo(TENANT);
+            assertThat(c.missionId()).isEqualTo(DELIVERY_ID.toString());
+            assertThat(c.clientId()).isEqualTo(CLIENT.toString());
+            assertThat(c.issuerOrgId()).isEqualTo(DRIVER.toString());
+            assertThat(c.issuerOrgType()).isEqualTo("FREELANCER_ORG");
+            assertThat(c.currency()).isEqualTo("XAF");
+            assertThat(c.lines()).singleElement().satisfies(l ->
+                    assertThat(l.lineTotal().amount().doubleValue()).isEqualTo(3000.0));
+        });
+        assertThat(invoicePaymentRefs).containsExactly("tx-42");
+
         // both parties can read it; a stranger cannot
         get(CLIENT).expectStatus().isOk().expectBody().jsonPath("$.status").isEqualTo("PAID");
         get(DRIVER).expectStatus().isOk().expectBody().jsonPath("$.status").isEqualTo("PAID");
@@ -277,6 +297,20 @@ class DeliveryPaymentFlowIntegrationTest {
                 .expectBody(String.class).value(b -> assertThat(b).contains("Invalid confirmation code"));
         assertThat(settlementStore).isEmpty();
         get(CLIENT).expectStatus().isOk().expectBody().jsonPath("$.status").isEqualTo("NOT_SETTLED");
+    }
+
+    @Test
+    @DisplayName("an invoicing failure never turns a successful payment into an error")
+    void invoiceFailureDoesNotBreakPayment() {
+        invoicingFails = true;
+        bearer.set(DRIVER);
+        post(DRIVER, BASE + "/receive-code", null).expectStatus().isOk();
+        bearer.set(CLIENT);
+        post(CLIENT, BASE, "{\"challengeToken\":\"chal-1\",\"code\":\"123456\"}")
+                .expectStatus().isOk()
+                .expectBody().jsonPath("$.status").isEqualTo("PAID");
+        assertThat(settlementStore).hasSize(1);
+        assertThat(invoiceCommands).isEmpty();
     }
 
     @Test
@@ -364,8 +398,20 @@ class DeliveryPaymentFlowIntegrationTest {
         TenantContextHolder tenantHolder = mock(TenantContextHolder.class);
         when(tenantHolder.currentTenantId()).thenReturn(Mono.just(TENANT));
 
+        when(invoicing.issuePaidInvoiceAsSystem(any(), any())).thenAnswer(inv -> {
+            if (invoicingFails) {
+                return Mono.error(new IllegalStateException("invoice sequence unavailable"));
+            }
+            invoiceCommands.add(inv.getArgument(0));
+            invoicePaymentRefs.add(inv.getArgument(1));
+            return Mono.just(mock(com.yowyob.tiibntick.core.billing.invoice.domain.model.Invoice.class));
+        });
+        com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpUserRepository users =
+                mock(com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpUserRepository.class);
+        when(users.findByCoreUserId(any())).thenReturn(Mono.empty());
+
         DeliveryPaymentApplicationService service = new DeliveryPaymentApplicationService(
-                deliveries, announcements, needs, status, kernelWallet, settlements, tenantHolder);
+                deliveries, announcements, needs, status, kernelWallet, settlements, tenantHolder, invoicing, users);
 
         var auth = new TestingAuthenticationToken("user", "n/a",
                 java.util.Arrays.stream(authorities).map(SimpleGrantedAuthority::new).toList());

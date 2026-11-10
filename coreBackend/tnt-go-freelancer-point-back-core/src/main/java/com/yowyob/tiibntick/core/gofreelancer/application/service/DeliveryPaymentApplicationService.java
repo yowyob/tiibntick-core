@@ -1,6 +1,10 @@
 package com.yowyob.tiibntick.core.gofreelancer.application.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.yowyob.tiibntick.core.billing.invoice.application.port.in.SystemInvoicingUseCase;
+import com.yowyob.tiibntick.core.billing.invoice.application.port.in.command.GenerateInvoiceCommand;
+import com.yowyob.tiibntick.core.billing.invoice.domain.model.InvoiceLine;
+import com.yowyob.tiibntick.core.billing.invoice.domain.model.enums.LineItemType;
 import com.yowyob.tiibntick.core.billing.wallet.application.port.in.IKernelWalletUseCase;
 import com.yowyob.tiibntick.core.billing.wallet.application.port.in.ISettlementUseCase;
 import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.RecordSettlementCommand;
@@ -15,6 +19,7 @@ import com.yowyob.tiibntick.core.gofreelancer.application.exception.DeliveryPaym
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.DeliveryPaymentUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IAnnouncementRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpUserRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryNeedRepository;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryStatus;
@@ -25,6 +30,8 @@ import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -45,6 +52,12 @@ public class DeliveryPaymentApplicationService implements DeliveryPaymentUseCase
     private final IKernelWalletUseCase kernelWallet;
     private final ISettlementUseCase settlements;
     private final TenantContextHolder tenantContextHolder;
+    private final SystemInvoicingUseCase invoicing;
+    private final GofpUserRepository gofpUserRepository;
+
+    /** Printed on invoices: the platform brand and the market the gofp module serves. */
+    static final String INVOICE_TENANT_CODE = "TNT";
+    static final String INVOICE_COUNTRY_CODE = "CM";
 
     // ── 1. Delivery person: receive code ───────────────────────────────────
 
@@ -113,7 +126,49 @@ public class DeliveryPaymentApplicationService implements DeliveryPaymentUseCase
                 .doOnError(e -> log.error("PAYMENT_UNRECORDED delivery={} payer={} amount={} {} — the Kernel "
                                 + "transfer SUCCEEDED but the settlement could not be saved ({}); record it by hand",
                         delivery.getId(), payerUserId, amount, CURRENCY, e.toString()))
-                .map(s -> toResponse(delivery, s));
+                .flatMap(s -> issueInvoice(tenantId, delivery, payerUserId, amount, cmd.kernelReference())
+                        .thenReturn(toResponse(delivery, s)));
+    }
+
+    /**
+     * The paid invoice of this delivery: the client's receipt and the driver's statement of income.
+     * Best effort by design — the money has already moved and the settlement is recorded, so a failure
+     * here (invoice sequence, PDF storage…) is logged, never turned into a payment error. The invoice
+     * module issues at most one invoice per delivery, so a retried confirmation cannot duplicate it.
+     */
+    private Mono<Void> issueInvoice(UUID tenantId, Delivery delivery, UUID payerUserId, BigDecimal amount,
+                                    String paymentRef) {
+        UUID driverUserId = delivery.getDriverUserId();
+        return driverTradeName(driverUserId)
+                .flatMap(tradeName -> {
+                    InvoiceLine line = InvoiceLine.of(1, "Livraison " + delivery.getId(), 1.0,
+                            com.yowyob.tiibntick.core.billing.invoice.domain.model.Money.of(amount.doubleValue(), CURRENCY),
+                            BigDecimal.ZERO, LineItemType.DELIVERY_FEE);
+                    GenerateInvoiceCommand command = new GenerateInvoiceCommand(
+                            tenantId, INVOICE_TENANT_CODE, INVOICE_COUNTRY_CODE,
+                            delivery.getId().toString(), null, payerUserId.toString(),
+                            List.of(line), List.of(), CURRENCY, LocalDateTime.now(),
+                            "FREELANCER_ORG", driverUserId != null ? driverUserId.toString() : null,
+                            tradeName, false, List.of(), false, null);
+                    return invoicing.issuePaidInvoiceAsSystem(command, paymentRef);
+                })
+                .doOnNext(inv -> log.info("Invoice {} issued for delivery {}", inv.getNumber(), delivery.getId()))
+                .onErrorResume(e -> {
+                    log.error("INVOICE_NOT_ISSUED delivery={} — payment is recorded, invoice must be issued by hand: {}",
+                            delivery.getId(), e.toString());
+                    return Mono.empty();
+                })
+                .then();
+    }
+
+    private Mono<String> driverTradeName(UUID driverUserId) {
+        if (driverUserId == null) return Mono.just("Livreur");
+        return gofpUserRepository.findByCoreUserId(driverUserId)
+                .map(u -> ((u.getFirstName() != null ? u.getFirstName() : "") + " "
+                        + (u.getLastName() != null ? u.getLastName() : "")).trim())
+                .filter(n -> !n.isBlank())
+                .defaultIfEmpty("Livreur")
+                .onErrorReturn("Livreur");
     }
 
     // ── Status ─────────────────────────────────────────────────────────────

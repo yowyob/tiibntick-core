@@ -5,7 +5,8 @@ import com.yowyob.tiibntick.common.vo.GeoCoordinates;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.AddressDTO;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.AddressUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.AdminRelayPointUseCase;
-import com.yowyob.tiibntick.core.gofreelancer.application.port.in.FreelancerPricingPolicyUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.FreelancerEligibilityUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.FreelancerPriceQuoteUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpFreelancerRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpUserRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryNeedRepository;
@@ -71,7 +72,8 @@ class DeliveryNeedOwnershipGuardTest {
     @Mock private AddressUseCase addressUseCase;
     @Mock private GofpUserRepository gofpUserRepository;
     @Mock private GofpFreelancerRepository gofpFreelancerRepository;
-    @Mock private FreelancerPricingPolicyUseCase freelancerPricingPolicyUseCase;
+    @Mock private FreelancerPriceQuoteUseCase freelancerPriceQuoteUseCase;
+    @Mock private FreelancerEligibilityUseCase freelancerEligibilityUseCase;
     @Mock private DatabaseClient databaseClient;
 
     private DeliveryNeedApplicationService service;
@@ -83,7 +85,7 @@ class DeliveryNeedOwnershipGuardTest {
         service = new DeliveryNeedApplicationService(
                 deliveryNeedRepository, adminRelayPointUseCase, pushNotificationPort,
                 matchingUseCase, addressUseCase, gofpUserRepository,
-                gofpFreelancerRepository, freelancerPricingPolicyUseCase, databaseClient);
+                gofpFreelancerRepository, freelancerPriceQuoteUseCase, freelancerEligibilityUseCase, databaseClient);
 
         needOwnedByOwner = DeliveryNeed.builder()
                 .id(NEED_ID)
@@ -142,7 +144,9 @@ class DeliveryNeedOwnershipGuardTest {
                 .thenReturn(Mono.just(List.of(candidate)));
         when(gofpFreelancerRepository.findById(any(UUID.class))).thenReturn(Mono.empty());
         when(gofpFreelancerRepository.findByCoreFreelancerId(any(UUID.class))).thenReturn(Mono.empty());
-        when(freelancerPricingPolicyUseCase.getPolicy(any())).thenReturn(Mono.empty());
+        when(freelancerEligibilityUseCase.isEligible(any(), any())).thenReturn(Mono.just(true));
+        when(freelancerPriceQuoteUseCase.quote(any(), any())).thenReturn(Mono.just(
+                new FreelancerPriceQuoteUseCase.Quote(1700.0, "XAF", "Base 500 = 1700 XAF", "PLATFORM_DEFAULT", null)));
         when(gofpUserRepository.findByCoreUserId(any())).thenReturn(Mono.empty());
 
         StepVerifier.create(
