@@ -11,5 +11,7 @@ public interface IClientProfileRepository {
 
     Mono<ClientProfile> findByActorId(UUID tenantId, UUID actorId);
 
+    Mono<ClientProfile> findById(UUID tenantId, UUID profileId);
+
     Mono<ClientProfile> save(ClientProfile profile);
 }

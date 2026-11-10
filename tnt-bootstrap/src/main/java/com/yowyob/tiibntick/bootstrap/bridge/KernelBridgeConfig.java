@@ -165,6 +165,32 @@ public class KernelBridgeConfig {
     }
 
     /**
+     * Kernel WebClient for calls made <b>on behalf of the authenticated end user</b>
+     * ({@code GET /api/actors/me}, {@code PUT /api/actors/me/identity}, ...): same credentials
+     * as {@link #kernelWebClient}, plus the caller's Bearer JWT propagated from the reactive
+     * security context so the Kernel resolves "me" to the right actor.
+     * Used by {@code tnt-actor-core}'s {@code KernelActorAdapter}.
+     */
+    @Bean("kernelUserWebClient")
+    public WebClient kernelUserWebClient(
+            WebClient.Builder builder,
+            CircuitBreakerRegistry circuitBreakerRegistry,
+            TimeLimiterRegistry timeLimiterRegistry,
+            RetryRegistry retryRegistry) {
+        return builder.clone()
+                .baseUrl(kernelBaseUrl)
+                .defaultHeader("X-Api-Key", kernelApiKey)
+                .defaultHeader("X-Client-Id", kernelClientId)
+                .defaultHeader("X-Solution-Code", "TNT")
+                .clientConnector(timeoutConnector())
+                .filter(propagateBearerToken())
+                .filter(resilience("kernelUserWebClient", circuitBreakerRegistry, timeLimiterRegistry, retryRegistry))
+                .filter(logRequest())
+                .filter(logResponse())
+                .build();
+    }
+
+    /**
      * Kernel WebClient for Payment/Wallet calls ({@code tnt-billing-wallet}).
      * Points to the same Kernel base URL with the same credentials — no new network
      * configuration, per the payment/wallet delegation workstream (see

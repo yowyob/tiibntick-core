@@ -3,6 +3,8 @@ package com.yowyob.tiibntick.core.actor.adapter.out.kernel;
 import com.yowyob.tiibntick.common.kernel.KernelResponses;
 import com.yowyob.tiibntick.core.actor.application.port.out.IKernelActorPort;
 import com.yowyob.tiibntick.core.actor.domain.model.KernelActorDto;
+import com.yowyob.tiibntick.core.actor.domain.model.KernelBusinessActorDto;
+import com.yowyob.tiibntick.core.actor.domain.model.UpdateActorIdentityCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -10,6 +12,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -22,6 +26,9 @@ import java.util.UUID;
  * and are fail-open: 404 or any error resolves to empty/false rather than
  * propagating — a Kernel-unreachable window must never block actor-profile
  * creation.</p>
+ *
+ * <p>{@code findCurrent}/{@code updateCurrentIdentity} act on behalf of the caller via
+ * {@code kernelUserWebClient} (bearer propagated).</p>
  *
  * <p><b>Known gap</b>: as of the 2026-07-08 Kernel OpenAPI spec, {@code actor-controller}
  * does not document a single-actor-by-id GET endpoint (only {@code POST /api/actors},
@@ -49,9 +56,12 @@ public class KernelActorAdapter implements IKernelActorPort {
     private static final Logger log = LoggerFactory.getLogger(KernelActorAdapter.class);
 
     private final WebClient kernelWebClient;
+    private final WebClient kernelUserWebClient;
 
-    public KernelActorAdapter(@Qualifier("kernelWebClient") WebClient kernelWebClient) {
+    public KernelActorAdapter(@Qualifier("kernelWebClient") WebClient kernelWebClient,
+                              @Qualifier("kernelUserWebClient") WebClient kernelUserWebClient) {
         this.kernelWebClient = kernelWebClient;
+        this.kernelUserWebClient = kernelUserWebClient;
     }
 
     @Override
@@ -68,5 +78,26 @@ public class KernelActorAdapter implements IKernelActorPort {
                 .map(dto -> true)
                 .defaultIfEmpty(false)
                 .onErrorReturn(false);
+    }
+
+    @Override
+    public Mono<KernelBusinessActorDto> findCurrent() {
+        var responseSpec = kernelUserWebClient.get()
+                .uri("/api/actors/me")
+                .retrieve();
+        return KernelResponses.unwrapObject(responseSpec, KernelBusinessActorDto.class, log, "findCurrent");
+    }
+
+    @Override
+    public Mono<KernelActorDto> updateCurrentIdentity(UpdateActorIdentityCommand command) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        if (command.firstName() != null) body.put("firstName", command.firstName());
+        if (command.lastName() != null) body.put("lastName", command.lastName());
+        if (command.phoneNumber() != null) body.put("phoneNumber", command.phoneNumber());
+        var responseSpec = kernelUserWebClient.put()
+                .uri("/api/actors/me/identity")
+                .bodyValue(body)
+                .retrieve();
+        return KernelResponses.unwrapObjectOrPropagate(responseSpec, KernelActorDto.class);
     }
 }

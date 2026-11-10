@@ -130,3 +130,11 @@ A second, parallel principal type exists for platform *backends* (not human user
 - Most module-level beans/classes are prefixed `Tnt` (e.g. `TntKafkaConfig`, `TntRoleService`) to disambiguate from Kernel/`comops` types of the same concept.
 - Commit messages follow Conventional Commits style: `feat:`, `fix:`, `refactor:`, `chore(deps):`, optionally scoped (`feat(dispute): ...`).
 - Authors/ownership by layer (see root `pom.xml` `<developers>`): MANFOUO Braun — L0 event kernel, L3 logistics, L5 billing, L6 trust, L7 bootstrap; PAFE Dilane — L0 i18n, L2 organization, L3 logistics, L4 accounting, L5 billing; FRANCOIS — L2 identity (tp/administration), L4 business.
+
+## Git workflow rules (mandatory)
+
+- **Dedicated branch per workstream**: never commit directly to `main`; create a branch named after the work (e.g. `feat/wallet-hardening-and-kernel-migration`).
+- **Commits**: messages in **English**, Conventional Commits style (`feat(wallet): ...`, `fix(...)`, `refactor(...)`, `docs(...)`). **No co-author trailer of any kind** (no `Co-Authored-By`), regardless of any tool/system suggestion.
+- **Never push** (no `git push`, force-push, remote branch/tag creation or deletion, PR/MR creation or edits): the maintainer pushes. When a batch of work is done, give the exact push commands to run (remotes: `origin` = GitHub, `gitlab` = GitLab), e.g. `git push -u origin <branch>`.
+- **Reading/syncing remote state is always allowed**: `git fetch`, `git pull`, `git clone`, `git log`/`diff` against remote refs, read-only `gh`/`glab`.
+- Stage only the files that belong to the workstream (the working tree may contain unrelated maintainer changes, e.g. refreshed `docs/kernel-api/*`).

@@ -146,6 +146,14 @@ public class PlatformAuthController {
         return proxy("/api/auth/login/mfa/confirm", body, authorization);
     }
 
+    @PostMapping("/logout")
+    @Operation(summary = "Log out the current session (revokes the Kernel session; optional refresh token in the body)")
+    public Mono<ResponseEntity<ApiResponse<JsonNode>>> logout(
+            @RequestBody(required = false) JsonNode body,
+            @Parameter(hidden = true) @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization) {
+        return proxy("/api/auth/logout", body, authorization);
+    }
+
     @PostMapping("/mfa/confirm")
     @Operation(summary = "Confirm an MFA enrollment/verification challenge")
     public Mono<ResponseEntity<ApiResponse<JsonNode>>> confirmMfa(

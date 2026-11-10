@@ -114,6 +114,10 @@ public final class FreelancerProfile extends TntActorProfile {
 
     /**
      * Creates a new standalone freelancer profile (no org link).
+     *
+     * <p>The profile starts {@link ActorStatus#ACTIVE}: self-service creation does not wait for an
+     * admin approval (product decision). KYC stays {@link KycStatus#PENDING} and is tracked
+     * separately; an admin can still suspend or deactivate a profile afterwards.
      */
     public static FreelancerProfile create(
             UUID tenantId,
@@ -122,7 +126,7 @@ public final class FreelancerProfile extends TntActorProfile {
             List<AvailabilitySlot> availabilitySlots) {
         return new FreelancerProfile(
                 UUID.randomUUID(), tenantId, actorId,
-                ActorStatus.INACTIVE, KycStatus.PENDING,
+                ActorStatus.ACTIVE, KycStatus.PENDING,
                 null, ActorRating.zero(), Set.of(),
                 Instant.now(), Instant.now(),
                 serviceZoneIds, availabilitySlots, null, Set.of(),

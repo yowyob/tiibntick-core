@@ -12,4 +12,6 @@ public interface ClientProfileSpringDataRepository
     Mono<Boolean> existsByTenantIdAndActorId(UUID tenantId, UUID actorId);
 
     Mono<ClientProfileEntity> findByTenantIdAndActorId(UUID tenantId, UUID actorId);
+
+    Mono<ClientProfileEntity> findByTenantIdAndId(UUID tenantId, UUID id);
 }

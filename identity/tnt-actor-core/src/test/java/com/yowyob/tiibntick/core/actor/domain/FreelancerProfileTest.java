@@ -39,9 +39,9 @@ class FreelancerProfileTest {
     // ── Creation ──────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("create() initializes with INACTIVE status, KYC PENDING, no org link")
+    @DisplayName("create() initializes ACTIVE (no admin approval), KYC PENDING, no org link")
     void create_initialState() {
-        assertThat(profile.actorStatus()).isEqualTo(ActorStatus.INACTIVE);
+        assertThat(profile.actorStatus()).isEqualTo(ActorStatus.ACTIVE);
         assertThat(profile.kycStatus()).isEqualTo(KycStatus.PENDING);
         assertThat(profile.freelancerOrgId()).isNull();
         assertThat(profile.roleInOrg()).isNull();
@@ -53,13 +53,14 @@ class FreelancerProfileTest {
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("activate() transitions to ACTIVE status")
+    @DisplayName("activate() transitions a deactivated profile back to ACTIVE status")
     void activate_changesStatus() {
-        FreelancerProfile activated = profile.activate();
+        FreelancerProfile deactivated = profile.deactivate();
+        FreelancerProfile activated = deactivated.activate();
         assertThat(activated.actorStatus()).isEqualTo(ActorStatus.ACTIVE);
         assertThat(activated.isActive()).isTrue();
         // immutable: original unchanged
-        assertThat(profile.actorStatus()).isEqualTo(ActorStatus.INACTIVE);
+        assertThat(deactivated.actorStatus()).isEqualTo(ActorStatus.INACTIVE);
     }
 
     @Test

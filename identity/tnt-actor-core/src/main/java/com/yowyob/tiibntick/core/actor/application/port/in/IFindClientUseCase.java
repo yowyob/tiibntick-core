@@ -14,4 +14,7 @@ import java.util.UUID;
 public interface IFindClientUseCase {
 
     Mono<ClientProfile> findByActorId(UUID tenantId, UUID actorId);
+
+    /** Finds a client by its profile id (the {@code id} returned as {@code clientId}). */
+    Mono<ClientProfile> findById(UUID tenantId, UUID profileId);
 }

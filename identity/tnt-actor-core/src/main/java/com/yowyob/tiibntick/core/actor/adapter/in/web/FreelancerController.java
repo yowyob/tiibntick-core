@@ -125,7 +125,7 @@ public class FreelancerController {
                     zones, slots,
                     req.pricingPolicyId()));
         })
-        .flatMap(profile -> identityUseCase.resolve(profile.actorId())
+        .flatMap(profile -> identityUseCase.resolveCurrent()
                 .map(identity -> FreelancerProfileResponse.from(profile, identity))
                 .defaultIfEmpty(FreelancerProfileResponse.from(profile)))
         .map(r -> ResponseEntity.status(HttpStatus.CREATED)
@@ -138,7 +138,7 @@ public class FreelancerController {
     public Mono<ResponseEntity<ApiResponse<FreelancerProfileResponse>>> getMyProfile(
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
         return findUseCase.findByActorId(currentUser.tenantId(), currentUser.userId())
-                .flatMap(profile -> identityUseCase.resolve(profile.actorId())
+                .flatMap(profile -> identityUseCase.resolveCurrent()
                         .map(identity -> FreelancerProfileResponse.from(profile, identity))
                         .defaultIfEmpty(FreelancerProfileResponse.from(profile)))
                 .map(r -> ResponseEntity.ok(ApiResponse.success(r)));

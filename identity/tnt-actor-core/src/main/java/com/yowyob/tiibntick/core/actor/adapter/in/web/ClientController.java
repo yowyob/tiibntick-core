@@ -61,7 +61,7 @@ public class ClientController {
         return requestMono.flatMap(req ->
                 createUseCase.createClientProfile(
                         new CreateClientProfileCommand(currentUser.tenantId(), currentUser.userId())))
-                .flatMap(profile -> identityUseCase.resolve(profile.actorId())
+                .flatMap(profile -> identityUseCase.resolveCurrent()
                         .map(identity -> ClientProfileResponse.from(profile, identity))
                         .defaultIfEmpty(ClientProfileResponse.from(profile)))
                 .map(r -> ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(r)));
@@ -74,7 +74,7 @@ public class ClientController {
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
         return findUseCase.findByActorId(currentUser.tenantId(), currentUser.userId())
                 .switchIfEmpty(Mono.error(new ClientNotFoundException(currentUser.tenantId(), currentUser.userId())))
-                .flatMap(profile -> identityUseCase.resolve(profile.actorId())
+                .flatMap(profile -> identityUseCase.resolveCurrent()
                         .map(identity -> ClientProfileResponse.from(profile, identity))
                         .defaultIfEmpty(ClientProfileResponse.from(profile)))
                 .map(r -> ResponseEntity.ok(ApiResponse.success(r)));

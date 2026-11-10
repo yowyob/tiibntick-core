@@ -14,4 +14,11 @@ import java.util.UUID;
 public interface IResolveActorIdentityUseCase {
 
     Mono<ActorIdentitySummary> resolve(UUID actorId);
+
+    /**
+     * Resolves the identity of the <b>authenticated caller</b> (Kernel {@code GET /api/actors/me},
+     * with the caller's bearer). Preferred over {@link #resolve(UUID)} for "my profile" endpoints,
+     * since the Kernel has no by-id actor lookup.
+     */
+    Mono<ActorIdentitySummary> resolveCurrent();
 }

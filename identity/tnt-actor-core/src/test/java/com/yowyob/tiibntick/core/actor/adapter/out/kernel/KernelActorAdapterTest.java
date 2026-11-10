@@ -25,7 +25,7 @@ class KernelActorAdapterTest {
     private static final UUID ACTOR_ID = UUID.randomUUID();
 
     private KernelActorAdapter adapterFor(KernelActorDto found) {
-        return new KernelActorAdapter(null) {
+        return new KernelActorAdapter(null, null) {
             @Override
             public Mono<KernelActorDto> findById(UUID actorId) {
                 return actorId.equals(ACTOR_ID) && found != null ? Mono.just(found) : Mono.empty();

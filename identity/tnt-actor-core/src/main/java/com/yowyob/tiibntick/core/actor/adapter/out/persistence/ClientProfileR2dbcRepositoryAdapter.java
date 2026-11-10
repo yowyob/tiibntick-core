@@ -33,6 +33,11 @@ public class ClientProfileR2dbcRepositoryAdapter implements IClientProfileReposi
     }
 
     @Override
+    public Mono<ClientProfile> findById(UUID tenantId, UUID profileId) {
+        return repository.findByTenantIdAndId(tenantId, profileId).map(this::toDomain);
+    }
+
+    @Override
     public Mono<ClientProfile> save(ClientProfile profile) {
         var entity = toEntity(profile);
         return repository.existsById(entity.id())

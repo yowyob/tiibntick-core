@@ -1,6 +1,8 @@
 package com.yowyob.tiibntick.core.gofreelancer.application.service;
 
 import com.yowyob.tiibntick.core.actor.application.port.in.ICreateClientProfileUseCase;
+import com.yowyob.tiibntick.core.actor.application.port.in.IFindClientUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.domain.exception.ResourceNotFoundException;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.ClientDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.ClientResponseDTO;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.ClientUseCase;
@@ -24,6 +26,8 @@ import java.util.UUID;
 public class ClientApplicationService implements ClientUseCase {
 
     private final ICreateClientProfileUseCase createClientProfileUseCase;
+    private final IFindClientUseCase findClientUseCase;
+    private final TenantContextHolder tenantContextHolder;
     private final PasswordHasherService passwordHasherService;
 
     private static final UUID DEFAULT_TENANT = TenantContextHolder.SYSTEM_TENANT;
@@ -49,10 +53,18 @@ public class ClientApplicationService implements ClientUseCase {
 
     @Override
     public Mono<ClientResponseDTO> getClientById(UUID id) {
-        // Client profile lookup — returns minimal DTO from actor-core
-        ClientResponseDTO resp = new ClientResponseDTO();
-        resp.setId(id);
-        return Mono.just(resp);
+        // Looks the client up by profile id, then by actor id; unknown ids resolve to a 404.
+        return tenantContextHolder.currentTenantId()
+                .flatMap(tenantId -> findClientUseCase.findById(tenantId, id)
+                        .switchIfEmpty(Mono.defer(() -> findClientUseCase.findByActorId(tenantId, id))))
+                .map(profile -> {
+                    ClientResponseDTO resp = new ClientResponseDTO();
+                    resp.setId(profile.id());
+                    resp.setStatus(profile.actorStatus().name());
+                    resp.setRating(profile.rating().score());
+                    return resp;
+                })
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException("Client", "id", id)));
     }
 
     @Override

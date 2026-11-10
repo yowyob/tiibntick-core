@@ -1,6 +1,8 @@
 package com.yowyob.tiibntick.core.actor.application.port.out;
 
 import com.yowyob.tiibntick.core.actor.domain.model.KernelActorDto;
+import com.yowyob.tiibntick.core.actor.domain.model.KernelBusinessActorDto;
+import com.yowyob.tiibntick.core.actor.domain.model.UpdateActorIdentityCommand;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
@@ -38,4 +40,17 @@ public interface IKernelActorPort {
      * @return {@code true} if the actor was found
      */
     Mono<Boolean> exists(UUID actorId);
+
+    /**
+     * Fetches the <b>authenticated caller's</b> own Kernel actor ({@code GET /api/actors/me}),
+     * using the caller's bearer token. Fail-open: empty when not found / unreachable.
+     */
+    Mono<KernelBusinessActorDto> findCurrent();
+
+    /**
+     * Updates the caller's personal identity ({@code PUT /api/actors/me/identity}) with the
+     * caller's bearer token. <b>Not fail-open</b>: Kernel errors propagate so the caller can
+     * tell the user their data was not saved.
+     */
+    Mono<KernelActorDto> updateCurrentIdentity(UpdateActorIdentityCommand command);
 }
