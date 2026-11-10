@@ -1,12 +1,17 @@
 package com.yowyob.tiibntick.core.billing.wallet.adapter.out.kernel;
 
-import com.yowyob.tiibntick.core.billing.wallet.adapter.out.kernel.dto.KernelPaymentOrderDto;
-import com.yowyob.tiibntick.core.billing.wallet.adapter.out.kernel.dto.KernelWalletDto;
-import com.yowyob.tiibntick.core.billing.wallet.adapter.out.kernel.dto.KernelWalletTransactionDto;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.yowyob.tiibntick.core.billing.wallet.application.port.out.kernel.KernelChallengeDto;
+import com.yowyob.tiibntick.core.billing.wallet.application.port.out.kernel.KernelPaymentOrderDto;
+import com.yowyob.tiibntick.core.billing.wallet.application.port.out.kernel.KernelReceiveCodeDto;
+import com.yowyob.tiibntick.core.billing.wallet.application.port.out.kernel.KernelWalletRechargeDto;
+import com.yowyob.tiibntick.core.billing.wallet.application.port.out.kernel.KernelWalletDto;
+import com.yowyob.tiibntick.core.billing.wallet.application.port.out.kernel.KernelWalletTransactionDto;
 import com.yowyob.tiibntick.core.billing.wallet.application.port.out.IKernelPaymentGatewayPort;
 import com.yowyob.tiibntick.common.kernel.KernelResponses;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -173,5 +178,169 @@ public class KernelPaymentGatewayAdapter implements IKernelPaymentGatewayPort {
         body.put("reference", reference);
         body.put("description", description);
         return body;
+    }
+
+    // ── User-bound wallet operations (Kernel wallet migration) ─────────────────
+
+    @Override
+    public Mono<KernelWalletDto> getMyWallet() {
+        // 404 = "no wallet yet" -> empty; every other error propagates (never mask an auth failure).
+        return KernelResponses.unwrapObjectOrPropagate(
+                        kernelPaymentWebClient.get().uri("/api/payments/wallets/mine").retrieve(),
+                        KernelWalletDto.class)
+                .onErrorResume(WebClientResponseException.NotFound.class, ex -> Mono.empty());
+    }
+
+    @Override
+    public Mono<KernelWalletDto> createMyWallet(String label) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        if (label != null) {
+            body.put("label", label);
+        }
+        return KernelResponses.unwrapObjectOrPropagate(
+                kernelPaymentWebClient.post().uri("/api/payments/wallets/mine").bodyValue(body).retrieve(),
+                KernelWalletDto.class);
+    }
+
+    @Override
+    public Mono<KernelWalletRechargeDto> recharge(UUID walletId, BigDecimal amount, String currency,
+                                                  String provider, String method, String payerReference,
+                                                  String idempotencyKey) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("amount", amount);
+        body.put("currency", currency);
+        body.put("provider", provider);
+        body.put("method", method);
+        if (payerReference != null) {
+            body.put("payerReference", payerReference);
+        }
+        body.put("idempotencyKey", idempotencyKey);
+        return KernelResponses.unwrapObjectOrPropagate(
+                kernelPaymentWebClient.post()
+                        .uri("/api/payments/wallets/{walletId}/recharge", walletId)
+                        .bodyValue(body).retrieve(),
+                KernelWalletRechargeDto.class);
+    }
+
+    @Override
+    public Mono<KernelWalletRechargeDto> getRechargeOrder(UUID orderId) {
+        return KernelResponses.unwrapObjectOrPropagate(
+                kernelPaymentWebClient.get()
+                        .uri("/api/payments/wallets/recharge-orders/{orderId}", orderId).retrieve(),
+                KernelWalletRechargeDto.class);
+    }
+
+    @Override
+    public Mono<KernelWalletRechargeDto> refreshRechargeOrder(UUID orderId) {
+        return KernelResponses.unwrapObjectOrPropagate(
+                kernelPaymentWebClient.post()
+                        .uri("/api/payments/wallets/recharge-orders/{orderId}/refresh", orderId).retrieve(),
+                KernelWalletRechargeDto.class);
+    }
+
+    @Override
+    public Flux<KernelWalletRechargeDto> listRechargeOrders(UUID walletId, Integer limit) {
+        return KernelResponses.unwrapListOrPropagate(
+                kernelPaymentWebClient.get()
+                        .uri(b -> {
+                            b.path("/api/payments/wallets/{walletId}/recharge-orders");
+                            if (limit != null) {
+                                b.queryParam("limit", limit);
+                            }
+                            return b.build(walletId);
+                        })
+                        .retrieve(),
+                KernelWalletRechargeDto.class);
+    }
+
+    @Override
+    public Mono<KernelReceiveCodeDto> generateReceiveCode(UUID walletId) {
+        return KernelResponses.unwrapObjectOrPropagate(
+                kernelPaymentWebClient.post()
+                        .uri("/api/payments/wallets/{walletId}/receive-codes", walletId).retrieve(),
+                KernelReceiveCodeDto.class);
+    }
+
+    @Override
+    public Mono<KernelChallengeDto> transferChallenge(UUID walletId, String recipientCode,
+                                                      BigDecimal amount, String reference) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("recipientCode", recipientCode);
+        body.put("amount", amount);
+        if (reference != null) {
+            body.put("reference", reference);
+        }
+        return KernelResponses.unwrapObjectOrPropagate(
+                kernelPaymentWebClient.post()
+                        .uri("/api/payments/wallets/{walletId}/transfers/challenge", walletId)
+                        .bodyValue(body).retrieve(),
+                KernelChallengeDto.class);
+    }
+
+    @Override
+    public Mono<JsonNode> transfer(UUID walletId, String recipientCode, BigDecimal amount, String reference,
+                                   String challengeToken, String code) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("recipientCode", recipientCode);
+        body.put("amount", amount);
+        if (reference != null) {
+            body.put("reference", reference);
+        }
+        body.put("challengeToken", challengeToken);
+        body.put("code", code);
+        return KernelResponses.unwrapObjectOrPropagate(
+                kernelPaymentWebClient.post()
+                        .uri("/api/payments/wallets/{walletId}/transfers", walletId)
+                        .bodyValue(body).retrieve(),
+                JsonNode.class);
+    }
+
+    @Override
+    public Mono<KernelChallengeDto> withdrawalChallenge(UUID walletId, BigDecimal amount, String phoneNumber) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("amount", amount);
+        body.put("phoneNumber", phoneNumber);
+        return KernelResponses.unwrapObjectOrPropagate(
+                kernelPaymentWebClient.post()
+                        .uri("/api/payments/wallets/{walletId}/withdrawals/challenge", walletId)
+                        .bodyValue(body).retrieve(),
+                KernelChallengeDto.class);
+    }
+
+    @Override
+    public Mono<JsonNode> withdraw(UUID walletId, BigDecimal amount, String currency, String phoneNumber,
+                                   String method, String recipientName, String challengeToken, String code) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("amount", amount);
+        body.put("currency", currency);
+        body.put("phoneNumber", phoneNumber);
+        body.put("method", method);
+        if (recipientName != null) {
+            body.put("recipientName", recipientName);
+        }
+        body.put("challengeToken", challengeToken);
+        body.put("code", code);
+        return KernelResponses.unwrapObjectOrPropagate(
+                kernelPaymentWebClient.post()
+                        .uri("/api/payments/wallets/{walletId}/withdrawals", walletId)
+                        .bodyValue(body).retrieve(),
+                JsonNode.class);
+    }
+
+    @Override
+    public Mono<Boolean> withdrawalsAvailable() {
+        record Availability(Boolean available) { }
+        return KernelResponses.unwrapObjectOrPropagate(
+                        kernelPaymentWebClient.get().uri("/api/payments/withdrawals/availability").retrieve(),
+                        Availability.class)
+                .map(a -> Boolean.TRUE.equals(a.available()));
+    }
+
+    @Override
+    public Flux<JsonNode> getTransactionsRaw(UUID walletId) {
+        return KernelResponses.unwrapListOrPropagate(
+                kernelPaymentWebClient.get()
+                        .uri("/api/payments/wallets/{walletId}/transactions", walletId).retrieve(),
+                JsonNode.class);
     }
 }

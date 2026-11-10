@@ -98,4 +98,18 @@ public final class KernelResponses {
                     return Flux.empty();
                 });
     }
+
+    /**
+     * List-valued counterpart of {@link #unwrapObjectOrPropagate}: unwraps
+     * {@code ApiResponseListXxx} -> {@code data: Xxx[]} but lets every HTTP/network error propagate.
+     */
+    public static <T> Flux<T> unwrapListOrPropagate(WebClient.ResponseSpec responseSpec, Class<T> itemType) {
+        ResolvableType listType = ResolvableType.forClassWithGenerics(List.class, itemType);
+        ResolvableType envelopeType = ResolvableType.forClassWithGenerics(KernelEnvelope.class, listType);
+        ParameterizedTypeReference<KernelEnvelope<List<T>>> typeRef = ParameterizedTypeReference.forType(envelopeType.getType());
+        return responseSpec.bodyToMono(typeRef)
+                .flatMapMany(envelope -> envelope.success() && envelope.data() != null
+                        ? Flux.fromIterable(envelope.data())
+                        : Flux.empty());
+    }
 }

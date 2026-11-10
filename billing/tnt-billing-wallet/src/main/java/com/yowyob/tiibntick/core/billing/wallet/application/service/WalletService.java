@@ -1,6 +1,6 @@
 package com.yowyob.tiibntick.core.billing.wallet.application.service;
 
-import com.yowyob.tiibntick.core.billing.wallet.adapter.out.kernel.dto.KernelPaymentOrderDto;
+import com.yowyob.tiibntick.core.billing.wallet.application.port.out.kernel.KernelPaymentOrderDto;
 import com.yowyob.tiibntick.core.billing.wallet.application.port.in.IWalletUseCase;
 import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.*;
 import com.yowyob.tiibntick.core.billing.wallet.application.port.out.*;

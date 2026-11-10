@@ -5,7 +5,6 @@ import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 import com.yowyob.kernel.event.application.port.out.DeadLetterRepository;
 import com.yowyob.kernel.event.application.port.out.EventEnvelopeRepository;
@@ -44,7 +43,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * <p>The batch size and poll interval are configurable via
  * {@code yow.event.outbox.batch-size} and {@code yow.event.outbox.poll-interval-ms}.
  */
-@Service
+// Deliberately NOT a Spring stereotype: the poller was decommissioned on 2026-09-18 (events are
+// published to Kafka directly by EventPublisherService). A @Service here would be re-registered by
+// YowEventKernelAutoConfiguration's @ComponentScan despite the explicit un-wiring, and its
+// scheduledPoll() would then run (and fail LockAssert where no ShedLock provider exists) forever.
 public class OutboxPollerService implements OutboxPollerPort {
 
     private static final Logger log = LoggerFactory.getLogger(OutboxPollerService.class);

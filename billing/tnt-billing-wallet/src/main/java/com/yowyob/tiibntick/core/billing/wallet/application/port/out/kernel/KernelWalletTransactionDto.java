@@ -1,4 +1,4 @@
-package com.yowyob.tiibntick.core.billing.wallet.adapter.out.kernel.dto;
+package com.yowyob.tiibntick.core.billing.wallet.application.port.out.kernel;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 

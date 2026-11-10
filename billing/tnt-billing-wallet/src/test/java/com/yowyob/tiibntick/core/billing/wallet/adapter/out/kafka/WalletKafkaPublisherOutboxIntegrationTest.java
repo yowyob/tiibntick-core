@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.yowyob.kernel.event.application.port.in.PublishEventUseCase;
 import com.yowyob.kernel.event.application.port.out.EventEnvelopeRepository;
-import com.yowyob.kernel.event.application.port.out.OutboxPollerPort;
 import com.yowyob.kernel.event.config.YowEventKernelAutoConfiguration;
 import com.yowyob.kernel.event.domain.enums.EnvelopeStatus;
 import com.yowyob.tiibntick.core.billing.wallet.domain.enums.PaymentChannel;
@@ -68,11 +67,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.kafka.test.utils.KafkaTestUtils.getSingleRecord;
 
 /**
- * End-to-end integration test proving the Chantier C · Audit n°3 · P5 migration:
- * {@link WalletKafkaPublisher} now enqueues events into the {@code yow-event-kernel}
- * transactional outbox instead of sending to Kafka directly, and {@code OutboxPollerService}
- * relays them asynchronously — on the same {@code tnt.billing.wallet.*} topics and wire
- * payload format (the raw serialised domain event) already consumed downstream.
+ * End-to-end integration test of {@link WalletKafkaPublisher} on top of {@code yow-event-kernel}.
+ *
+ * <p>Since the 2026-09-18 decision (commit 8de52d56, "publish domain events to Kafka directly,
+ * decommission outbox poller") {@code EventPublisherService} persists the envelope in the event
+ * store and then publishes it to Kafka <em>immediately</em>: the envelope ends {@code PUBLISHED}
+ * once the broker acknowledged it, and nothing is relayed later. This test asserts that
+ * behaviour — same {@code tnt.billing.wallet.*} topics, same wire payload (the raw serialised
+ * domain event) as consumers already expect.
  *
  * <p>Uses a real PostgreSQL Testcontainer (event_bus schema migrated via yow-event-kernel's
  * own Liquibase changelog) and an embedded Kafka broker, mirroring
@@ -128,18 +130,15 @@ class WalletKafkaPublisherOutboxIntegrationTest {
     private WalletKafkaPublisher publisher;
 
     @Autowired
-    private OutboxPollerPort outboxPollerPort;
-
-    @Autowired
     private EventEnvelopeRepository envelopeRepository;
 
     @Autowired
     private EmbeddedKafkaBroker embeddedKafka;
 
     @Test
-    @DisplayName("publish(WalletCredited) enqueues to the outbox (PENDING); the poller then "
-            + "delivers it keyed by walletId with the raw-event wire format consumers expect")
-    void walletCreditedGoesThroughOutbox() throws Exception {
+    @DisplayName("publish(WalletCredited) stores the envelope and publishes it to Kafka at once, keyed by "
+            + "walletId, with the raw-event wire format consumers expect; the envelope ends PUBLISHED")
+    void walletCreditedIsPublishedDirectly() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
         UUID walletId = UUID.randomUUID();
@@ -151,17 +150,6 @@ class WalletKafkaPublisherOutboxIntegrationTest {
 
         publisher.publish(event).block(Duration.ofSeconds(10));
 
-        // 1. The envelope is durably persisted PENDING — nothing sent to Kafka yet.
-        StepVerifier.create(envelopeRepository.findByAggregateId(
-                        walletId.toString(), "Wallet", tenantId.toString()))
-                .assertNext(envelope -> {
-                    assertThat(envelope.getKafkaTopic()).isEqualTo(WALLET_CREDITED_TOPIC);
-                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PENDING);
-                    assertThat(envelope.getTenantId()).isEqualTo(tenantId.toString());
-                    assertThat(envelope.getKafkaPartitionKey()).isEqualTo(walletId.toString());
-                })
-                .verifyComplete();
-
         Map<String, Object> consumerProps = new HashMap<>(
                 KafkaTestUtils.consumerProps(embeddedKafka, "wallet-outbox-it", true));
         consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
@@ -171,12 +159,7 @@ class WalletKafkaPublisherOutboxIntegrationTest {
         try (Consumer<String, String> rawConsumer = new KafkaConsumer<>(consumerProps)) {
             embeddedKafka.consumeFromAnEmbeddedTopic(rawConsumer, WALLET_CREDITED_TOPIC);
 
-            // 2. Trigger one poll cycle directly (what OutboxPollerService.scheduledPoll() does
-            //    on a fixed delay in production).
-            StepVerifier.create(outboxPollerPort.poll())
-                    .expectNextMatches(count -> count >= 1)
-                    .verifyComplete();
-
+            // The message is already on the topic — no relay step.
             ConsumerRecord<String, String> received =
                     getSingleRecord(rawConsumer, WALLET_CREDITED_TOPIC, Duration.ofSeconds(15));
 
@@ -191,16 +174,21 @@ class WalletKafkaPublisherOutboxIntegrationTest {
             assertThat(wireEvent.get("referenceId").asText()).isEqualTo("REF-001");
         }
 
-        // 3. Once relayed, the envelope transitions to PUBLISHED.
+        // The envelope is persisted in the event store and marked PUBLISHED once Kafka acked it.
         StepVerifier.create(envelopeRepository.findByAggregateId(
                         walletId.toString(), "Wallet", tenantId.toString()))
-                .assertNext(envelope -> assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED))
+                .assertNext(envelope -> {
+                    assertThat(envelope.getKafkaTopic()).isEqualTo(WALLET_CREDITED_TOPIC);
+                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED);
+                    assertThat(envelope.getTenantId()).isEqualTo(tenantId.toString());
+                    assertThat(envelope.getKafkaPartitionKey()).isEqualTo(walletId.toString());
+                })
                 .verifyComplete();
     }
 
     @Test
-    @DisplayName("publish(PaymentInitiated) routes to its own topic through the outbox, keyed by paymentIntentId")
-    void paymentInitiatedGoesThroughOutbox() throws Exception {
+    @DisplayName("publish(PaymentInitiated) routes to its own topic, keyed by paymentIntentId, and ends PUBLISHED")
+    void paymentInitiatedIsPublishedDirectly() throws Exception {
         UUID paymentIntentId = UUID.randomUUID();
         UUID walletId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
@@ -211,15 +199,6 @@ class WalletKafkaPublisherOutboxIntegrationTest {
 
         publisher.publish(event).block(Duration.ofSeconds(10));
 
-        StepVerifier.create(envelopeRepository.findByAggregateId(
-                        paymentIntentId.toString(), "Wallet", tenantId.toString()))
-                .assertNext(envelope -> {
-                    assertThat(envelope.getKafkaTopic()).isEqualTo(PAYMENT_INITIATED_TOPIC);
-                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PENDING);
-                    assertThat(envelope.getKafkaPartitionKey()).isEqualTo(paymentIntentId.toString());
-                })
-                .verifyComplete();
-
         Map<String, Object> consumerProps = new HashMap<>(
                 KafkaTestUtils.consumerProps(embeddedKafka, "wallet-outbox-payment-it", true));
         consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
@@ -229,15 +208,20 @@ class WalletKafkaPublisherOutboxIntegrationTest {
         try (Consumer<String, String> rawConsumer = new KafkaConsumer<>(consumerProps)) {
             embeddedKafka.consumeFromAnEmbeddedTopic(rawConsumer, PAYMENT_INITIATED_TOPIC);
 
-            StepVerifier.create(outboxPollerPort.poll())
-                    .expectNextMatches(count -> count >= 1)
-                    .verifyComplete();
-
             ConsumerRecord<String, String> received =
                     getSingleRecord(rawConsumer, PAYMENT_INITIATED_TOPIC, Duration.ofSeconds(15));
             assertThat(received.topic()).isEqualTo(PAYMENT_INITIATED_TOPIC);
             assertThat(received.key()).isEqualTo(paymentIntentId.toString());
         }
+
+        StepVerifier.create(envelopeRepository.findByAggregateId(
+                        paymentIntentId.toString(), "Wallet", tenantId.toString()))
+                .assertNext(envelope -> {
+                    assertThat(envelope.getKafkaTopic()).isEqualTo(PAYMENT_INITIATED_TOPIC);
+                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED);
+                    assertThat(envelope.getKafkaPartitionKey()).isEqualTo(paymentIntentId.toString());
+                })
+                .verifyComplete();
     }
 
     @Configuration

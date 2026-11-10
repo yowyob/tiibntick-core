@@ -110,6 +110,7 @@ public final class TntPermission {
 
     public static final String WALLET_READ    = "wallet:read";
     public static final String WALLET_WRITE   = "wallet:write";
+    public static final String WALLET_ADMIN   = "wallet:admin";
     public static final String PAYMENT_PROCESS = "payment:process";
     public static final String PAYMENT_REFUND  = "payment:refund";
 

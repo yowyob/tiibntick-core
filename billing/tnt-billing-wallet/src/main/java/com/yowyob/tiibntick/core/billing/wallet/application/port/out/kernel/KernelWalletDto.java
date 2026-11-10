@@ -1,4 +1,4 @@
-package com.yowyob.tiibntick.core.billing.wallet.adapter.out.kernel.dto;
+package com.yowyob.tiibntick.core.billing.wallet.application.port.out.kernel;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
@@ -20,6 +20,7 @@ import java.util.UUID;
 public record KernelWalletDto(
         UUID id,
         UUID ownerId,
+        String ownerType,
         String ownerName,
         BigDecimal balance,
         Instant createdAt,

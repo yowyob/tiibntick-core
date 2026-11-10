@@ -217,6 +217,7 @@ resilience4j:
         automatic-transition-from-open-to-half-open-enabled: true
       kernelOrganizationWebClient: *kernelCircuitBreaker
       kernelTpWebClient: *kernelCircuitBreaker
+      kernelPaymentWebClient: *kernelCircuitBreaker
   timelimiter:
     instances:
       trustEventGatewayRead:
@@ -225,6 +226,7 @@ resilience4j:
         timeout-duration: 5s
       kernelOrganizationWebClient: *kernelTimeLimiter
       kernelTpWebClient: *kernelTimeLimiter
+      kernelPaymentWebClient: *kernelTimeLimiter
   retry:
     instances:
       kernelWebClient: &kernelRetry
@@ -237,6 +239,13 @@ resilience4j:
           - io.github.resilience4j.circuitbreaker.CallNotPermittedException
       kernelOrganizationWebClient: *kernelRetry
       kernelTpWebClient: *kernelRetry
+      # Money-moving calls (transfers, withdrawals, recharge, order initiation) must NEVER be
+      # replayed by the transport layer: a timed-out POST may already have been applied by the
+      # Kernel. max-attempts: 1 = no retry; the order poller retries on its own schedule.
+      kernelPaymentWebClient:
+        max-attempts: 1
+        ignore-exceptions:
+          - io.github.resilience4j.circuitbreaker.CallNotPermittedException
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TNT — Module-level properties

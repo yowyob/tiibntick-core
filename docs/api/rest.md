@@ -22,7 +22,7 @@ REST endpoint index across all modules — base paths, key endpoints, and where 
 | tnt-sales-core | `/api/sales/orders` | `SalesOrderController` |
 | tnt-accounting-core | `/api/v1/accounting/{accounts,reports,journal-entries}` | `AccountController`, `AccountingReportController`, `JournalEntryController` |
 | tnt-billing-invoice | `/api/v1/billing/invoices` | `InvoiceController` |
-| tnt-billing-wallet | `/billing/wallet`, `/billing/wallet/webhooks` | `WalletController`, `PaymentWebhookController` |
+| tnt-billing-wallet | `/billing/wallet` | `WalletController` |
 | tnt-billing-pricing | `/api/v1/billing/pricing`, `/api/v1/billing/policies` | `PricingController`, `BillingPolicyController` |
 | tnt-billing-cost | `/billing/cost` | `CostController` |
 | tnt-billing-report | `/api/v1/billing/reports` | `ReportingController` |
@@ -41,7 +41,7 @@ REST endpoint index across all modules — base paths, key endpoints, and where 
 
 **Realtime SSE** (`SseController`) — `GET /tracking/{trackingCode}`, `GET /mission/{missionId}`, `GET /fleet/{freelancerOrgId}` — `text/event-stream`, 15s heartbeat comment frames, events named `eta-update`/`mission-update`/`fleet-gps`.
 
-**Wallet** (`WalletController` + `PaymentWebhookController`) — `/{userId}/balance`, `/{userId}/credit`, `/pay` (202 Accepted — async), `/{userId}/transactions`, `/{userId}/{freeze,unfreeze}`; webhooks for MTN MoMo / Orange Money / Stripe under `/billing/wallet/webhooks`.
+**Wallet** (`WalletController`) — tenant always from the JWT (`tenantId` query/body values are ignored). Self-service: `GET /me/balance`, `GET /me/transactions`, `POST /pay` (202 Accepted — async, payer = JWT user; `payment:process`). Admin only (`wallet:admin`, TNT_ADMIN by default): `GET /{userId}/balance`, `GET /{userId}/transactions`, `POST /{userId}/credit`, `POST /{userId}/pay` (on behalf of an owner), `PUT /{userId}/{freeze,unfreeze}`, `POST /freelancer-org`, `POST /split-revenue`, `POST /transfer-commission`. Provider webhooks are handled by the Kernel (no webhook endpoint in the Core).
 
 ## Multi-tenancy patterns (pick the right one when adding endpoints)
 | Pattern | Used by | Example |

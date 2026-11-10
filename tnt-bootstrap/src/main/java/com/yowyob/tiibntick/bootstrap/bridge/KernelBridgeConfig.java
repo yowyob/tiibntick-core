@@ -4,7 +4,6 @@ import com.yowyob.tiibntick.core.organization.application.port.out.KernelOrganiz
 import com.yowyob.tiibntick.core.organization.domain.model.KernelOrganizationDto;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
-import io.github.resilience4j.reactor.circuitbreaker.operator.CircuitBreakerOperator;
 import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.retry.RetryRegistry;
 import io.github.resilience4j.reactor.retry.RetryOperator;
@@ -212,6 +211,10 @@ public class KernelBridgeConfig {
                 .defaultHeader("X-Client-Id", kernelClientId)
                 .defaultHeader("X-Solution-Code", "TNT")
                 .clientConnector(timeoutConnector())
+                // The Kernel wallet is bound to the END USER (wallets/mine, transfers, withdrawals…):
+                // forward the caller's bearer token when the call runs inside a request. Scheduler /
+                // Kafka-driven calls (order polling) have no JWT in context and keep API-key auth only.
+                .filter(propagateBearerToken())
                 .filter(resilience("kernelPaymentWebClient", circuitBreakerRegistry, timeLimiterRegistry, retryRegistry))
                 .filter(logRequest())
                 .filter(logResponse())
@@ -248,12 +251,41 @@ public class KernelBridgeConfig {
         TimeLimiter timeLimiter = timeLimiterRegistry.timeLimiter(instanceName);
         Retry retry = retryRegistry.retry(instanceName);
 
-        return (request, next) -> next.exchange(request)
-                .transformDeferred(TimeLimiterOperator.of(timeLimiter))
-                .transformDeferred(CircuitBreakerOperator.of(circuitBreaker))
+        return (request, next) -> Mono.defer(() -> callWithBreaker(circuitBreaker, next.exchange(request)
+                        .transformDeferred(TimeLimiterOperator.of(timeLimiter))))
                 .transformDeferred(RetryOperator.of(retry))
                 .doOnError(ex -> log.warn("Kernel call via {} failed: {} → {}: {}",
                         instanceName, request.method(), request.url(), ex.toString()));
+    }
+
+    /**
+     * Circuit-breaker accounting for one exchange. Unlike {@code CircuitBreakerOperator}, which
+     * only sees reactive error signals, this also records an HTTP <strong>5xx response</strong> as
+     * a failure: {@code exchange()} completes normally with a 5xx {@code ClientResponse}, so a
+     * Kernel answering 500 on every call would otherwise never open the breaker. The response
+     * itself is passed through untouched, so callers keep seeing exactly what they saw before
+     * (including passthrough proxies that relay the Kernel's error body).
+     */
+    private static Mono<org.springframework.web.reactive.function.client.ClientResponse> callWithBreaker(
+            CircuitBreaker circuitBreaker, Mono<org.springframework.web.reactive.function.client.ClientResponse> call) {
+        if (!circuitBreaker.tryAcquirePermission()) {
+            return Mono.error(io.github.resilience4j.circuitbreaker.CallNotPermittedException
+                    .createCallNotPermittedException(circuitBreaker));
+        }
+        final long start = System.nanoTime();
+        return call
+                .doOnNext(response -> {
+                    long elapsed = System.nanoTime() - start;
+                    if (response.statusCode().is5xxServerError()) {
+                        circuitBreaker.onError(elapsed, java.util.concurrent.TimeUnit.NANOSECONDS,
+                                new IllegalStateException("Kernel responded HTTP " + response.statusCode().value()));
+                    } else {
+                        circuitBreaker.onSuccess(elapsed, java.util.concurrent.TimeUnit.NANOSECONDS);
+                    }
+                })
+                .doOnError(error -> circuitBreaker.onError(
+                        System.nanoTime() - start, java.util.concurrent.TimeUnit.NANOSECONDS, error))
+                .doOnCancel(circuitBreaker::releasePermission);
     }
 
     /**

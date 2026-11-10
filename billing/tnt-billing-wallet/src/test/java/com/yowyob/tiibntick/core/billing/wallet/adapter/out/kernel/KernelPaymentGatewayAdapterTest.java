@@ -1,7 +1,7 @@
 package com.yowyob.tiibntick.core.billing.wallet.adapter.out.kernel;
 
-import com.yowyob.tiibntick.core.billing.wallet.adapter.out.kernel.dto.KernelWalletDto;
-import com.yowyob.tiibntick.core.billing.wallet.adapter.out.kernel.dto.KernelWalletTransactionDto;
+import com.yowyob.tiibntick.core.billing.wallet.application.port.out.kernel.KernelWalletDto;
+import com.yowyob.tiibntick.core.billing.wallet.application.port.out.kernel.KernelWalletTransactionDto;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;

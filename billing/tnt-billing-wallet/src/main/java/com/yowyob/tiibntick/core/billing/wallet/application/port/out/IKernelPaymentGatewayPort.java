@@ -1,8 +1,12 @@
 package com.yowyob.tiibntick.core.billing.wallet.application.port.out;
 
-import com.yowyob.tiibntick.core.billing.wallet.adapter.out.kernel.dto.KernelPaymentOrderDto;
-import com.yowyob.tiibntick.core.billing.wallet.adapter.out.kernel.dto.KernelWalletDto;
-import com.yowyob.tiibntick.core.billing.wallet.adapter.out.kernel.dto.KernelWalletTransactionDto;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.yowyob.tiibntick.core.billing.wallet.application.port.out.kernel.KernelChallengeDto;
+import com.yowyob.tiibntick.core.billing.wallet.application.port.out.kernel.KernelPaymentOrderDto;
+import com.yowyob.tiibntick.core.billing.wallet.application.port.out.kernel.KernelReceiveCodeDto;
+import com.yowyob.tiibntick.core.billing.wallet.application.port.out.kernel.KernelWalletRechargeDto;
+import com.yowyob.tiibntick.core.billing.wallet.application.port.out.kernel.KernelWalletDto;
+import com.yowyob.tiibntick.core.billing.wallet.application.port.out.kernel.KernelWalletTransactionDto;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -103,4 +107,65 @@ public interface IKernelPaymentGatewayPort {
      * @param kernelOrderId the {@code id} returned by {@link #initiateOrder}
      */
     Mono<KernelPaymentOrderDto> refreshOrder(String kernelOrderId);
+
+    // ── User-bound wallet operations (Kernel wallet migration) ─────────────────
+    //
+    // These calls are authorised by the END USER's bearer token, forwarded by
+    // kernelPaymentWebClient (see KernelBridgeConfig#propagateBearerToken): the Kernel decides
+    // which wallet the caller owns. They must therefore only be invoked from a request-scoped
+    // reactive chain (never from a scheduler or a Kafka consumer). Errors propagate unchanged
+    // (WebClientResponseException) so the web adapter can relay the Kernel's status/message.
+
+    /** {@code GET /api/payments/wallets/mine} — the caller's own wallet; empty if none yet. */
+    Mono<KernelWalletDto> getMyWallet();
+
+    /** {@code POST /api/payments/wallets/mine} — creates the caller's own wallet. */
+    Mono<KernelWalletDto> createMyWallet(String label);
+
+    /**
+     * {@code POST /api/payments/wallets/{walletId}/recharge} — starts a wallet top-up through a
+     * real provider (MYCOOLPAY / STRIPE). Result is {@code PENDING_PAYMENT} until the provider
+     * confirms; follow with {@link #refreshRechargeOrder}.
+     */
+    Mono<KernelWalletRechargeDto> recharge(UUID walletId, BigDecimal amount, String currency,
+                                           String provider, String method, String payerReference,
+                                           String idempotencyKey);
+
+    /** {@code GET /api/payments/wallets/recharge-orders/{orderId}}. */
+    Mono<KernelWalletRechargeDto> getRechargeOrder(UUID orderId);
+
+    /** {@code POST /api/payments/wallets/recharge-orders/{orderId}/refresh}. */
+    Mono<KernelWalletRechargeDto> refreshRechargeOrder(UUID orderId);
+
+    /** {@code GET /api/payments/wallets/{walletId}/recharge-orders}. */
+    Flux<KernelWalletRechargeDto> listRechargeOrders(UUID walletId, Integer limit);
+
+    /** {@code POST /api/payments/wallets/{walletId}/receive-codes} — temporary code to be paid to. */
+    Mono<KernelReceiveCodeDto> generateReceiveCode(UUID walletId);
+
+    /** {@code POST /api/payments/wallets/{walletId}/transfers/challenge}. */
+    Mono<KernelChallengeDto> transferChallenge(UUID walletId, String recipientCode,
+                                               BigDecimal amount, String reference);
+
+    /**
+     * {@code POST /api/payments/wallets/{walletId}/transfers} — wallet-to-wallet transfer,
+     * confirmed with the {@code challengeToken} + one-time {@code code} from
+     * {@link #transferChallenge}. The response schema is ambiguous in the Kernel spec (see
+     * {@link KernelWalletTransactionDto}) so the raw {@code data} node is returned.
+     */
+    Mono<JsonNode> transfer(UUID walletId, String recipientCode, BigDecimal amount, String reference,
+                            String challengeToken, String code);
+
+    /** {@code POST /api/payments/wallets/{walletId}/withdrawals/challenge}. */
+    Mono<KernelChallengeDto> withdrawalChallenge(UUID walletId, BigDecimal amount, String phoneNumber);
+
+    /** {@code POST /api/payments/wallets/{walletId}/withdrawals} — cash-out to Mobile Money / card. */
+    Mono<JsonNode> withdraw(UUID walletId, BigDecimal amount, String currency, String phoneNumber,
+                            String method, String recipientName, String challengeToken, String code);
+
+    /** {@code GET /api/payments/withdrawals/availability} — whether the Kernel currently allows cash-out. */
+    Mono<Boolean> withdrawalsAvailable();
+
+    /** {@code GET /api/payments/wallets/{walletId}/transactions} with the raw (ambiguous-schema) items. */
+    Flux<JsonNode> getTransactionsRaw(UUID walletId);
 }

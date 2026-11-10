@@ -14,7 +14,12 @@ import java.util.UUID;
 public class WalletCoreClient implements WalletCorePort {
 
     private static final Logger log = LoggerFactory.getLogger(WalletCoreClient.class);
-    private static final String PAY_PATH = "/billing/wallet/pay";
+    /**
+     * Commission payouts are made on behalf of the recipient, so they use the admin form
+     * {@code POST /billing/wallet/{userId}/pay} (requires {@code wallet:admin}). The tenant is
+     * taken from the caller's JWT by the Core — it is no longer sent by the client.
+     */
+    private static final String PAY_PATH = "/billing/wallet/{userId}/pay";
 
     private final WebClient webClient;
 
@@ -27,11 +32,7 @@ public class WalletCoreClient implements WalletCorePort {
         UUID userId = request.userId() != null ? request.userId() : request.commissionId();
 
         return webClient.post()
-                .uri(uri -> uri.path(PAY_PATH)
-                        .queryParam("tenantId", request.tenantId())
-                        .queryParam("userId", userId)
-                        .build())
-                .header("X-Tenant-Id", request.tenantId().toString())
+                .uri(uri -> uri.path(PAY_PATH).build(userId))
                 .bodyValue(Map.of(
                         "invoiceId", request.commissionId().toString(),
                         "amount", request.amount(),
