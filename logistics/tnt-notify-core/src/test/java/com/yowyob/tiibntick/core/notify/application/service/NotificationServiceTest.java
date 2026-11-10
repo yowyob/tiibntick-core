@@ -1,153 +1,131 @@
 package com.yowyob.tiibntick.core.notify.application.service;
 
-import com.yowyob.tiibntick.core.notify.application.port.out.IMessageProviderPort;
+import com.yowyob.tiibntick.core.notify.application.port.out.INotificationDeliveryPort;
+import com.yowyob.tiibntick.core.notify.application.port.out.INotificationDeliveryPort.DeliveryReceipt;
+import com.yowyob.tiibntick.core.notify.application.port.out.INotificationDeliveryPort.OutboundMessage;
 import com.yowyob.tiibntick.core.notify.application.port.out.IPublishNotificationEventPort;
-import com.yowyob.tiibntick.core.notify.application.port.out.INotificationRepositoryPort;
 import com.yowyob.tiibntick.core.notify.application.port.out.ITranslationPort;
+import com.yowyob.tiibntick.core.notify.domain.enums.DeliveryStatus;
 import com.yowyob.tiibntick.core.notify.domain.enums.NotificationChannel;
 import com.yowyob.tiibntick.core.notify.domain.enums.NotificationPriority;
-import com.yowyob.tiibntick.core.notify.domain.enums.DeliveryStatus;
-import com.yowyob.tiibntick.core.notify.domain.model.Notification;
-import com.yowyob.tiibntick.core.notify.domain.vo.NotificationId;
 import com.yowyob.tiibntick.core.notify.domain.vo.NotificationModel;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
-import java.time.Instant;
-import java.util.List;
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Unit tests for {@link NotificationService}.
+ * Unit tests for {@link NotificationService}: the hand-over of a business notification to the Kernel.
  *
  * @author MANFOUO Braun
  */
 @ExtendWith(MockitoExtension.class)
 class NotificationServiceTest {
 
-    @Mock private INotificationRepositoryPort repository;
     @Mock private ITranslationPort translationPort;
-    @Mock private IMessageProviderPort smsProvider;
+    @Mock private INotificationDeliveryPort deliveryPort;
     @Mock private IPublishNotificationEventPort eventPort;
 
     private NotificationService service;
 
-    private static final String TENANT_ID      = "5b1f6e2a-0000-4c3a-9a2a-000000000001";
+    private static final String TENANT_ID = "5b1f6e2a-0000-4c3a-9a2a-000000000001";
     private static final String ORGANIZATION_ID = "5b1f6e2a-0000-4c3a-9a2a-000000000002";
-    private static final String RECIPIENT_ID  = "user-42";
-    private static final String PHONE_NUMBER     = "+237691000001";
-    private static final String TRANSLATED_MSG   = "Package PKG-99 has been delivered.";
+    private static final String RECIPIENT_ID = "5b1f6e2a-0000-4c3a-9a2a-000000000003";
+    private static final String DELIVERY_ID = "5b1f6e2a-0000-4c3a-9a2a-0000000000d1";
+    private static final String TEXT = "Package PKG-99 has been delivered.";
+
+    private final NotificationModel model = new NotificationModel(
+            "notification.package.delivered", "en_CM", Map.of("package_id", "PKG-99"), NotificationPriority.HIGH);
 
     @BeforeEach
     void setUp() {
-        service = new NotificationService(
-                repository, translationPort, List.of(smsProvider), eventPort);
+        service = new NotificationService(translationPort, deliveryPort, eventPort);
+        when(translationPort.translate(model)).thenReturn(Mono.just(TEXT));
     }
 
     @Test
-    void send_shouldTranslate_persist_dispatch_andPublishEvent() {
-        // given
-        NotificationModel model = NotificationModel.of(
-                "notification.package.delivered", "en_CM",
-                Map.of("package_id", "PKG-99"));
-
-        Notification persisted = new Notification(
-                NotificationId.generate(), TENANT_ID, ORGANIZATION_ID, RECIPIENT_ID,
-                NotificationChannel.SMS_LOCAL, TRANSLATED_MSG,
-                NotificationPriority.NORMAL, DeliveryStatus.PENDING,
-                Instant.now(), null, null, 0);
-
-        Notification sent = new Notification(
-                persisted.getId(), TENANT_ID, ORGANIZATION_ID, RECIPIENT_ID,
-                NotificationChannel.SMS_LOCAL, TRANSLATED_MSG,
-                NotificationPriority.NORMAL, DeliveryStatus.SENT,
-                Instant.now(), Instant.now(), null, 0);
-
-        when(translationPort.translate(model)).thenReturn(Mono.just(TRANSLATED_MSG));
-        when(repository.save(any())).thenReturn(Mono.just(persisted)).thenReturn(Mono.just(sent));
-        when(smsProvider.supports(NotificationChannel.SMS_LOCAL)).thenReturn(true);
-        when(smsProvider.sendMessage(any(), anyString(), anyString(), anyString(), anyString())).thenReturn(Mono.empty());
+    @DisplayName("hands the template, variables, locale and the translated body to the Kernel, and reports SENT")
+    void sentByKernel() {
+        when(deliveryPort.deliver(any())).thenReturn(Mono.just(new DeliveryReceipt(DELIVERY_ID, "SENT")));
         when(eventPort.publishNotificationSent(any())).thenReturn(Mono.empty());
 
-        // when / then
-        Mono<Notification> result = service.send(
-                TENANT_ID, ORGANIZATION_ID, RECIPIENT_ID, PHONE_NUMBER, model, NotificationChannel.SMS_LOCAL);
-        StepVerifier.create(result)
-                .expectNextMatches(n -> n.getStatus() == DeliveryStatus.SENT)
+        StepVerifier.create(service.send(TENANT_ID, ORGANIZATION_ID, RECIPIENT_ID, "+237691000001", model,
+                        NotificationChannel.SMS_LOCAL))
+                .assertNext(n -> {
+                    assertThat(n.getStatus()).isEqualTo(DeliveryStatus.SENT);
+                    assertThat(n.getId().value()).isEqualTo(DELIVERY_ID);
+                    assertThat(n.getContent()).isEqualTo(TEXT);
+                })
                 .verifyComplete();
+
+        ArgumentCaptor<OutboundMessage> sent = ArgumentCaptor.forClass(OutboundMessage.class);
+        verify(deliveryPort).deliver(sent.capture());
+        OutboundMessage m = sent.getValue();
+        assertThat(m.channel()).isEqualTo(NotificationChannel.SMS_LOCAL);
+        assertThat(m.tenantId()).isEqualTo(TENANT_ID);
+        assertThat(m.organizationId()).isEqualTo(ORGANIZATION_ID);
+        assertThat(m.recipientId()).isEqualTo(RECIPIENT_ID);
+        assertThat(m.destination()).isEqualTo("+237691000001");
+        assertThat(m.templateCode()).isEqualTo("notification.package.delivered");
+        assertThat(m.locale()).isEqualTo("en_CM");
+        assertThat(m.variables()).containsEntry("package_id", "PKG-99");
+        assertThat(m.body()).isEqualTo(TEXT);
+        assertThat(m.priority()).isEqualTo(NotificationPriority.HIGH);
     }
 
     @Test
-    void send_shouldMarkEchouee_whenNoProviderFound() {
-        // given
-        NotificationModel model = NotificationModel.of(
-                "notification.package.delivered", "fr_CM", Map.of());
+    @DisplayName("a delivery the Kernel only queued stays PENDING: the Kernel owns the final status, no event yet")
+    void queuedByKernel() {
+        when(deliveryPort.deliver(any())).thenReturn(Mono.just(new DeliveryReceipt(DELIVERY_ID, "QUEUED")));
 
-        Notification persisted = new Notification(
-                NotificationId.generate(), TENANT_ID, ORGANIZATION_ID, RECIPIENT_ID,
-                NotificationChannel.EMAIL, TRANSLATED_MSG,
-                NotificationPriority.NORMAL, DeliveryStatus.PENDING,
-                Instant.now(), null, null, 0);
-
-        Notification failed = new Notification(
-                persisted.getId(), TENANT_ID, ORGANIZATION_ID, RECIPIENT_ID,
-                NotificationChannel.EMAIL, TRANSLATED_MSG,
-                NotificationPriority.NORMAL, DeliveryStatus.FAILED,
-                Instant.now(), null, "No provider configured for channel: EMAIL", 1);
-
-        when(translationPort.translate(model)).thenReturn(Mono.just(TRANSLATED_MSG));
-        when(repository.save(any())).thenReturn(Mono.just(persisted)).thenReturn(Mono.just(failed));
-        // SMS provider does not support EMAIL
-        when(smsProvider.supports(NotificationChannel.EMAIL)).thenReturn(false);
-        when(eventPort.publishNotificationFailed(any())).thenReturn(Mono.empty());
-
-        // when / then
-        Mono<Notification> result = service.send(
-                TENANT_ID, ORGANIZATION_ID, RECIPIENT_ID, "user@example.com", model, NotificationChannel.EMAIL);
-        StepVerifier.create(result)
-                .expectNextMatches(n -> n.getStatus() == DeliveryStatus.FAILED)
+        StepVerifier.create(service.send(TENANT_ID, ORGANIZATION_ID, RECIPIENT_ID, RECIPIENT_ID, model,
+                        NotificationChannel.IN_APP_WEBSOCKET))
+                .assertNext(n -> assertThat(n.getStatus()).isEqualTo(DeliveryStatus.PENDING))
                 .verifyComplete();
+
+        verify(eventPort, never()).publishNotificationSent(any());
+        verify(eventPort, never()).publishNotificationFailed(any());
     }
 
     @Test
-    void send_shouldMarkEchouee_whenProviderThrowsException() {
-        // given
-        NotificationModel model = NotificationModel.of(
-                "notification.package.delivered", "fr_CM", Map.of());
-
-        Notification persisted = new Notification(
-                NotificationId.generate(), TENANT_ID, ORGANIZATION_ID, RECIPIENT_ID,
-                NotificationChannel.SMS_LOCAL, TRANSLATED_MSG,
-                NotificationPriority.NORMAL, DeliveryStatus.PENDING,
-                Instant.now(), null, null, 0);
-
-        Notification failed = new Notification(
-                persisted.getId(), TENANT_ID, ORGANIZATION_ID, RECIPIENT_ID,
-                NotificationChannel.SMS_LOCAL, TRANSLATED_MSG,
-                NotificationPriority.HIGH, DeliveryStatus.FAILED,
-                Instant.now(), null, "SMS gateway timeout", 1);
-
-        when(translationPort.translate(model)).thenReturn(Mono.just(TRANSLATED_MSG));
-        when(repository.save(any())).thenReturn(Mono.just(persisted)).thenReturn(Mono.just(failed));
-        when(smsProvider.supports(NotificationChannel.SMS_LOCAL)).thenReturn(true);
-        when(smsProvider.sendMessage(any(), anyString(), anyString(), anyString(), anyString()))
-                .thenReturn(Mono.error(new RuntimeException("SMS gateway timeout")));
+    @DisplayName("a delivery the Kernel reports FAILED is returned FAILED and announced on the failure topic")
+    void failedByKernel() {
+        when(deliveryPort.deliver(any())).thenReturn(Mono.just(new DeliveryReceipt(DELIVERY_ID, "FAILED")));
         when(eventPort.publishNotificationFailed(any())).thenReturn(Mono.empty());
 
-        // when / then
-        Mono<Notification> result = service.send(
-                TENANT_ID, ORGANIZATION_ID, RECIPIENT_ID, PHONE_NUMBER, model, NotificationChannel.SMS_LOCAL);
-        StepVerifier.create(result)
-                .expectNextMatches(n -> n.getStatus() == DeliveryStatus.FAILED)
+        StepVerifier.create(service.send(TENANT_ID, ORGANIZATION_ID, RECIPIENT_ID, "user@example.com", model,
+                        NotificationChannel.EMAIL))
+                .assertNext(n -> assertThat(n.getStatus()).isEqualTo(DeliveryStatus.FAILED))
                 .verifyComplete();
+        verify(eventPort).publishNotificationFailed(any());
+    }
+
+    @Test
+    @DisplayName("a refused hand-over (Kernel down, no organization…) never throws: FAILED + failure event")
+    void refusedHandOverDoesNotBreakTheCaller() {
+        when(deliveryPort.deliver(any())).thenReturn(Mono.error(new IllegalStateException("kernel unreachable")));
+        when(eventPort.publishNotificationFailed(any())).thenReturn(Mono.empty());
+
+        StepVerifier.create(service.send(TENANT_ID, null, RECIPIENT_ID, "+237691000001", model,
+                        NotificationChannel.SMS_LOCAL))
+                .assertNext(n -> {
+                    assertThat(n.getStatus()).isEqualTo(DeliveryStatus.FAILED);
+                    assertThat(n.getErrorMessage()).contains("kernel unreachable");
+                })
+                .verifyComplete();
+        verify(eventPort).publishNotificationFailed(any());
     }
 }

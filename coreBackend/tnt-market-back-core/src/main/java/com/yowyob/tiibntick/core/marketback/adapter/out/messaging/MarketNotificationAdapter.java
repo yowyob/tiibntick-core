@@ -19,12 +19,12 @@ import java.util.UUID;
  * tiibntick-market-backend's {@code NotificationClientAdapter}, which was a
  * logging-only stub; now wired to the real notification pipeline.
  *
- * <p>Uses the {@code IN_APP_WEBSOCKET} channel with the recipient's actor id
- * as the target destination, since this module has no phone/email/FCM token
- * lookup of its own — tnt-notify-core resolves per-user channel preferences
- * server-side via {@code IManageNotificationPreferencesUseCase} on delivery.
- * Notification failures are logged and swallowed ({@code onErrorResume}) so a
- * transient notify-core outage never fails the calling market use case.
+ * <p>Uses the {@code IN_APP_WEBSOCKET} channel with the recipient's actor id as the target: the Kernel
+ * notification engine resolves the user's sessions and applies that user's channel preferences from the
+ * {@code recipientUserId}. The organization is not known here, so the Kernel call uses the platform default
+ * ({@code tnt.notify.kernel.default-organization-id}).
+ * Notification failures are logged and swallowed ({@code onErrorResume}) so a transient Kernel outage never
+ * fails the calling market use case.
  *
  * @author MANFOUO Braun
  */

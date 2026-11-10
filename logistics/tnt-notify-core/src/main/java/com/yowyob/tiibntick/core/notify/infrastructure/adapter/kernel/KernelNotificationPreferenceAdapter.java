@@ -26,9 +26,7 @@ import java.util.UUID;
  * Kernel's per-channel rows into one aggregate, and {@link #save} fans a
  * save of the aggregate out into one upsert per {@link NotificationChannel}.
  *
- * <p>Active by default; set {@code tnt.notify.kernel.enabled=false} to fall
- * back to local R2DBC persistence instead (see
- * {@link com.yowyob.tiibntick.core.notify.config.NotifyCoreAutoConfiguration}).
+ * <p>The Kernel is the only store of notification preferences: TiiBnTick keeps no local copy.
  *
  * @author MANFOUO Braun
  */

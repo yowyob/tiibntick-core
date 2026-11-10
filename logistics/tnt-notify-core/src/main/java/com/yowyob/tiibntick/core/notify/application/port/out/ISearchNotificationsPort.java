@@ -6,17 +6,19 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
- * Secondary port (read side) for notification queries.
+ * Reads the notification history. The history lives in the Kernel ({@code GET /api/notifications/deliveries}),
+ * so every query is scoped by tenant and organization.
  *
+ * @author Dilane PAFE
  * @author MANFOUO Braun
  */
 public interface ISearchNotificationsPort {
 
-    Mono<Notification> findById(String notificationId);
+    Mono<Notification> findById(String tenantId, String organizationId, String notificationId);
 
-    Flux<Notification> findByRecipientId(String recipientId);
+    Flux<Notification> findByRecipientId(String tenantId, String organizationId, String recipientId);
 
-    Flux<Notification> findByStatus(DeliveryStatus status);
+    Flux<Notification> findByStatus(String tenantId, String organizationId, DeliveryStatus status);
 
-    Flux<Notification> findPendingByRecipient(String recipientId);
+    Flux<Notification> findPendingByRecipient(String tenantId, String organizationId, String recipientId);
 }

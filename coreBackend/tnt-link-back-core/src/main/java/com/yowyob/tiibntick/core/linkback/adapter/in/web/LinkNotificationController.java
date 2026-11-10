@@ -37,7 +37,7 @@ public class LinkNotificationController {
     @GetMapping("/me")
     public Flux<LinkNotificationResponse> myNotifications(
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
-        return queryLinkNotificationsUseCase.forRecipient(resolveRecipientId(currentUser))
+        return queryLinkNotificationsUseCase.forRecipient(currentUser.tenantId().toString(), resolveRecipientId(currentUser))
                 .map(LinkNotificationResponseMapper::toResponse);
     }
 
@@ -45,7 +45,8 @@ public class LinkNotificationController {
     @GetMapping("/me/pending")
     public Flux<LinkNotificationResponse> myPendingNotifications(
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
-        return queryLinkNotificationsUseCase.pendingForRecipient(resolveRecipientId(currentUser))
+        return queryLinkNotificationsUseCase.pendingForRecipient(currentUser.tenantId().toString(),
+                resolveRecipientId(currentUser))
                 .map(LinkNotificationResponseMapper::toResponse);
     }
 

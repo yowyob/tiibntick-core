@@ -15,8 +15,9 @@
     <artifactId>tnt-notify-core</artifactId>
     <name>TiiBnTick — tnt-notify-core (L3 Logistics)</name>
     <description>
-        Multi-channel notifications: FCM, MTN/Orange SMS, WhatsApp, email.
-        Logistics i18n templates (FR/EN/Pidgin). Intelligent routing.
+        Notification bridge to the Kernel notification engine (email, SMS, WhatsApp, push, in-app):
+        business event to notification mapping, i18n templates (FR/EN/Pidgin) registered in the Kernel.
+        No delivery mechanism of its own.
     </description>
 
     <dependencies>
@@ -36,24 +37,9 @@
         </dependency>
 
         <dependency>
-            <groupId>com.yowyob.tiibntick.core</groupId>
-            <artifactId>tnt-realtime-core</artifactId>
-        </dependency>
-
-        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-autoconfigure</artifactId>
         </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-r2dbc</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>org.postgresql</groupId>
-            <artifactId>r2dbc-postgresql</artifactId>
-        </dependency>
-
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webflux</artifactId>
@@ -67,13 +53,6 @@
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-core</artifactId>
-        </dependency>
-
-        <!-- JavaMailSender / MimeMessage — used by EmailNotificationAdapter,
-             only active when tnt.notify.kernel.enabled=false and mail is configured. -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
 
         <dependency>

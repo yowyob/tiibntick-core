@@ -66,7 +66,7 @@ L3  logistics/
 │   ├── tnt-incident-core       Incidents, Escalades, Alertes SLA
 │   ├── tnt-realtime-core       WebSocket STOMP, GPS Stream, Présence
 │   ├── tnt-sync-core           Offline-First, DuckDB-Wasm, Delta Sync
-│   ├── tnt-notify-core         FCM, MTN SMS, Orange SMS, WhatsApp, Email
+│   ├── tnt-notify-core         Pont vers le moteur de notifications du Kernel (email, SMS, WhatsApp, push, in-app)
 │   └── tnt-media-core          QR Code ZXing, PDF JasperReports, MinIO
 │
 L4  business/

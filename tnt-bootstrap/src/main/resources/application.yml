@@ -336,14 +336,14 @@ tnt:
   # ── Notify Core (tnt-notify-core L3) ────────────────────────────────────────
   notify:
     kernel:
-      # When true (default), notification delivery and preferences are delegated
-      # to the Kernel's generic notification engine (/api/notifications/*) via
-      # KernelDeliveryProviderAdapter / KernelNotificationPreferenceAdapter.
-      # Set to false to fall back to the direct-vendor adapters (SMTP/MTN-Orange/
-      # Meta/FCM) and local R2DBC preference persistence instead.
-      enabled: ${TNT_NOTIFY_KERNEL_ENABLED:true}
-      # Fallback X-Tenant-Id/X-Organization-Id for callers with no HTTP request to
-      # read real ones from (FreelancerOrgKafkaEventConsumer, IncidentNotificationPortAdapter).
+      # Every notification (email, SMS, WhatsApp, push, in-app), the user preferences and the delivery
+      # history are handled by the Kernel notification engine (/api/notifications/*). TiiBnTick has no
+      # SMTP/SMS/FCM credentials of its own: provider setup lives in the Kernel.
+      # true (default): send templateCode + variables so the Kernel renders its template, and register
+      # the TiiBnTick templates in the Kernel on first use. false: send the ready-made body only.
+      templates-enabled: ${TNT_NOTIFY_KERNEL_TEMPLATES_ENABLED:true}
+      # Fallback X-Tenant-Id/X-Organization-Id for every caller that does not know them (Kafka
+      # consumers, Market, Go-Freelancer, agency provisioning, incident notifications).
       # The Kernel notification engine rejects calls with no tenant context at all
       # (TENANT_CONTEXT_REQUIRED / ORGANIZATION_CONTEXT_REQUIRED) — must be a
       # tenant/org actually subscribed to the Kernel's NOTIFICATION service.

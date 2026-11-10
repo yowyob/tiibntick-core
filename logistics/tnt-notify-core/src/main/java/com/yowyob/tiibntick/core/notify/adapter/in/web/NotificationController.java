@@ -76,7 +76,7 @@ public class NotificationController {
 
     @Operation(
             summary = "Send a notification to a recipient via a specific channel",
-            description = "Translates the i18n template and dispatches to the recipient's channel. "
+            description = "Hands the notification to the Kernel notification engine, which renders its template and delivers it. "
                     + "Supported channels: PUSH_FCM, SMS_LOCAL, WHATSAPP, EMAIL, IN_APP_WEBSOCKET")
     @PostMapping("/send")
     @ResponseStatus(HttpStatus.CREATED)
@@ -103,35 +103,51 @@ public class NotificationController {
     }
 
     // ─── Query ─────────────────────────────────────────────────────────────────
-    // Local search history — TiiBnTick's own send pipeline, not tenant-scoped
-    // at the query level (recipientId/notificationId are already unique).
+    // The history lives in the Kernel delivery log, so every query is scoped to the caller's tenant
+    // (and organization, from the optional X-Organization-Id header or the configured default).
 
     @Operation(summary = "Get a single notification by ID")
     @GetMapping("/{notificationId}")
     @PreAuthorize("hasAnyRole('SUPPORT_AGENT','TNT_ADMIN')")
-    public Mono<Notification> getById(@PathVariable String notificationId) {
-        return searchNotificationsUseCase.findById(notificationId);
+    public Mono<Notification> getById(
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
+            @RequestHeader(value = "X-Organization-Id", required = false) UUID organizationId,
+            @PathVariable String notificationId) {
+        return searchNotificationsUseCase.findById(currentUser.tenantId().toString(), orgOrNull(organizationId),
+                notificationId);
     }
 
     @Operation(summary = "List all notifications for a recipient")
     @GetMapping("/recipient/{recipientId}")
     @PreAuthorize("hasAnyRole('CLIENT','PERMANENT_DELIVERER','FREELANCER','SUPPORT_AGENT','TNT_ADMIN')")
-    public Flux<Notification> listByRecipient(@PathVariable String recipientId) {
-        return searchNotificationsUseCase.findByRecipientId(recipientId);
+    public Flux<Notification> listByRecipient(
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
+            @RequestHeader(value = "X-Organization-Id", required = false) UUID organizationId,
+            @PathVariable String recipientId) {
+        return searchNotificationsUseCase.findByRecipientId(currentUser.tenantId().toString(),
+                orgOrNull(organizationId), recipientId);
     }
 
     @Operation(summary = "List pending (unread) notifications for a recipient")
     @GetMapping("/recipient/{recipientId}/pending")
     @PreAuthorize("hasAnyRole('CLIENT','PERMANENT_DELIVERER','FREELANCER','SUPPORT_AGENT','TNT_ADMIN')")
-    public Flux<Notification> listPending(@PathVariable String recipientId) {
-        return searchNotificationsUseCase.findPendingByRecipient(recipientId);
+    public Flux<Notification> listPending(
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
+            @RequestHeader(value = "X-Organization-Id", required = false) UUID organizationId,
+            @PathVariable String recipientId) {
+        return searchNotificationsUseCase.findPendingByRecipient(currentUser.tenantId().toString(),
+                orgOrNull(organizationId), recipientId);
     }
 
     @Operation(summary = "List notifications filtered by delivery status")
     @GetMapping("/by-status/{status}")
     @PreAuthorize("hasAnyRole('SUPPORT_AGENT','TNT_ADMIN')")
-    public Flux<Notification> listByStatus(@PathVariable String status) {
-        return searchNotificationsUseCase.findByStatus(DeliveryStatus.valueOf(status));
+    public Flux<Notification> listByStatus(
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
+            @RequestHeader(value = "X-Organization-Id", required = false) UUID organizationId,
+            @PathVariable String status) {
+        return searchNotificationsUseCase.findByStatus(currentUser.tenantId().toString(), orgOrNull(organizationId),
+                DeliveryStatus.valueOf(status));
     }
 
     // ─── Preferences ───────────────────────────────────────────────────────────

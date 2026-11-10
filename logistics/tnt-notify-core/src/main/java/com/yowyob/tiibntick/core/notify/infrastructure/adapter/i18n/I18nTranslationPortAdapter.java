@@ -85,6 +85,15 @@ public class I18nTranslationPortAdapter implements ITranslationPort {
                 }));
     }
 
+    @Override
+    public Mono<String> rawTemplate(String templateKey, String language) {
+        String normalizedTag = normalize(language);
+        return Mono.justOrEmpty(translateMessageUseCase.translate(templateKey, normalizedTag))
+                .switchIfEmpty(Mono.defer(() -> defaultLanguageTag.equalsIgnoreCase(normalizedTag)
+                        ? Mono.empty()
+                        : Mono.justOrEmpty(translateMessageUseCase.translate(templateKey, defaultLanguageTag))));
+    }
+
     private Mono<String> lookup(NotificationModel model, String languageTag) {
         return Mono.justOrEmpty(
                 translateMessageUseCase.translate(model.templateKey(), languageTag, model.parameters()));

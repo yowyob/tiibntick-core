@@ -6,22 +6,23 @@ import com.yowyob.tiibntick.core.notify.application.port.in.ISendNotificationUse
 import com.yowyob.tiibntick.core.notify.application.port.in.IManageNotificationPreferencesUseCase;
 import com.yowyob.tiibntick.core.notify.application.port.in.ISearchNotificationsUseCase;
 import com.yowyob.tiibntick.core.notify.application.port.out.IKernelDeliveryQueryPort;
-import com.yowyob.tiibntick.core.notify.application.port.out.IMessageProviderPort;
+import com.yowyob.tiibntick.core.notify.application.port.out.INotificationDeliveryPort;
 import com.yowyob.tiibntick.core.notify.application.port.out.INotificationPreferencePort;
 import com.yowyob.tiibntick.core.notify.application.port.out.INotificationProviderAdminPort;
 import com.yowyob.tiibntick.core.notify.application.port.out.INotificationReminderPort;
 import com.yowyob.tiibntick.core.notify.application.port.out.INotificationTemplateAdminPort;
 import com.yowyob.tiibntick.core.notify.application.port.out.IPublishNotificationEventPort;
 import com.yowyob.tiibntick.core.notify.application.port.out.ISearchNotificationsPort;
-import com.yowyob.tiibntick.core.notify.application.port.out.INotificationRepositoryPort;
 import com.yowyob.tiibntick.core.notify.application.port.out.ITranslationPort;
 import com.yowyob.tiibntick.core.notify.application.service.ManagePreferencesService;
 import com.yowyob.tiibntick.core.notify.application.service.NotificationAdminService;
 import com.yowyob.tiibntick.core.notify.application.service.SearchNotificationsService;
 import com.yowyob.tiibntick.core.notify.application.service.NotificationService;
-import com.yowyob.tiibntick.core.notify.infrastructure.adapter.kernel.KernelDeliveryProviderAdapter;
+import com.yowyob.tiibntick.core.notify.infrastructure.adapter.kernel.KernelDeliveryAdapter;
 import com.yowyob.tiibntick.core.notify.infrastructure.adapter.kernel.KernelDeliveryQueryAdapter;
 import com.yowyob.tiibntick.core.notify.infrastructure.adapter.kernel.KernelNotificationClient;
+import com.yowyob.tiibntick.core.notify.infrastructure.adapter.kernel.KernelNotificationSearchAdapter;
+import com.yowyob.tiibntick.core.notify.infrastructure.adapter.kernel.KernelTemplateRegistrar;
 import com.yowyob.tiibntick.core.notify.infrastructure.adapter.kernel.KernelNotificationPreferenceAdapter;
 import com.yowyob.tiibntick.core.notify.infrastructure.adapter.kernel.KernelNotificationProviderConfigAdapter;
 import com.yowyob.tiibntick.core.notify.infrastructure.adapter.kernel.KernelNotificationReminderAdapter;
@@ -33,17 +34,14 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.env.Environment;
-import org.springframework.data.r2dbc.repository.config.EnableR2dbcRepositories;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -56,7 +54,6 @@ import java.util.Map;
  */
 @AutoConfiguration
 @EnableConfigurationProperties(NotifyProperties.class)
-@EnableR2dbcRepositories(basePackages = "com.yowyob.tiibntick.core.notify.infrastructure.persistence.repository")
 public class NotifyCoreAutoConfiguration {
 
     /**
@@ -76,20 +73,19 @@ public class NotifyCoreAutoConfiguration {
     }
 
     /**
-     * Main notification sending use case.
+     * Main notification sending use case: hands everything to the Kernel notification engine.
      */
     @Bean
     @ConditionalOnMissingBean
     public ISendNotificationUseCase sendNotificationUseCase(
-            INotificationRepositoryPort repository,
             ITranslationPort translationPort,
-            List<IMessageProviderPort> providers,
+            INotificationDeliveryPort deliveryPort,
             IPublishNotificationEventPort eventPort) {
-        return new NotificationService(repository, translationPort, providers, eventPort);
+        return new NotificationService(translationPort, deliveryPort, eventPort);
     }
 
     /**
-     * Notification query use case.
+     * Notification history use case (served by the Kernel delivery log).
      */
     @Bean
     @ConditionalOnMissingBean
@@ -111,30 +107,41 @@ public class NotifyCoreAutoConfiguration {
     // ── Kernel (RT-comops) notification engine bridge ───────────────────────
 
     /**
-     * Delegates physical message delivery (email, SMS, WhatsApp, push) to the
-     * Kernel notification engine. Active by default; disabled when
-     * {@code tnt.notify.kernel.enabled=false}, in which case the
-     * direct-vendor adapters ({@code EmailNotificationAdapter},
-     * {@code OrangeMtnSmsAdapter}, {@code WhatsAppAdapter},
-     * {@code FcmPushAdapter}) take over instead.
+     * Registers the TiiBnTick message templates in the Kernel engine on first use.
      */
     @Bean
-    @ConditionalOnProperty(prefix = "tnt.notify.kernel", name = "enabled", havingValue = "true", matchIfMissing = true)
-    public IMessageProviderPort kernelDeliveryProviderAdapter(KernelNotificationClient client) {
-        return new KernelDeliveryProviderAdapter(client);
+    @ConditionalOnMissingBean
+    public KernelTemplateRegistrar kernelTemplateRegistrar(KernelNotificationClient client,
+            ITranslationPort translationPort) {
+        return new KernelTemplateRegistrar(client, translationPort);
     }
 
     /**
-     * Delegates user notification preferences to the Kernel notification
-     * engine. Active by default; disabled when
-     * {@code tnt.notify.kernel.enabled=false}, in which case
-     * {@code NotificationPreferenceRepositoryAdapter} (local R2DBC) takes
-     * over instead.
+     * Delivery of every channel (email, SMS, WhatsApp, push, in-app) by the Kernel.
      */
     @Bean
-    @ConditionalOnProperty(prefix = "tnt.notify.kernel", name = "enabled", havingValue = "true", matchIfMissing = true)
+    @ConditionalOnMissingBean
+    public INotificationDeliveryPort notificationDeliveryPort(KernelNotificationClient client,
+            KernelTemplateRegistrar templates, NotifyProperties properties) {
+        return new KernelDeliveryAdapter(client, templates, properties.getKernel().isTemplatesEnabled());
+    }
+
+    /**
+     * User notification preferences, held by the Kernel.
+     */
+    @Bean
+    @ConditionalOnMissingBean
     public INotificationPreferencePort kernelNotificationPreferenceAdapter(KernelNotificationClient client) {
         return new KernelNotificationPreferenceAdapter(client);
+    }
+
+    /**
+     * Notification history, read from the Kernel delivery log.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public ISearchNotificationsPort searchNotificationsPort(KernelNotificationClient client) {
+        return new KernelNotificationSearchAdapter(client);
     }
 
     /**

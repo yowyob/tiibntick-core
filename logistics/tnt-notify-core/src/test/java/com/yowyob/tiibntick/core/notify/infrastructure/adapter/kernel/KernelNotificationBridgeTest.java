@@ -3,6 +3,15 @@ package com.yowyob.tiibntick.core.notify.infrastructure.adapter.kernel;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.yowyob.tiibntick.core.notify.domain.enums.NotificationChannel;
 import com.yowyob.tiibntick.core.notify.domain.model.NotificationPreference;
+import com.yowyob.tiibntick.core.notify.application.port.out.INotificationDeliveryPort;
+import com.yowyob.tiibntick.core.notify.application.port.out.ITranslationPort;
+import com.yowyob.tiibntick.core.notify.config.NotifyProperties;
+import com.yowyob.tiibntick.core.notify.domain.enums.DeliveryStatus;
+import com.yowyob.tiibntick.core.notify.domain.enums.NotificationPriority;
+import com.yowyob.tiibntick.core.notify.domain.vo.NotificationModel;
+import com.yowyob.tiibntick.core.notify.infrastructure.adapter.kernel.dto.SendNotificationRequestDto;
+import reactor.core.publisher.Mono;
+import java.util.Map;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -50,7 +59,43 @@ class KernelNotificationBridgeTest {
         wireMock = new WireMockServer(0);
         wireMock.start();
         WebClient webClient = WebClient.builder().baseUrl(wireMock.baseUrl()).build();
-        client = new KernelNotificationClient(webClient);
+        client = clientWith(null, null);
+    }
+
+    private static KernelNotificationClient clientWith(String defaultTenant, String defaultOrganization) {
+        NotifyProperties properties = new NotifyProperties();
+        properties.getKernel().setDefaultTenantId(defaultTenant);
+        properties.getKernel().setDefaultOrganizationId(defaultOrganization);
+        return new KernelNotificationClient(WebClient.builder().baseUrl(wireMock.baseUrl()).build(), properties);
+    }
+
+    private KernelDeliveryAdapter adapter(boolean templatesEnabled) {
+        return new KernelDeliveryAdapter(client, new KernelTemplateRegistrar(client, new FakeTranslation()),
+                templatesEnabled);
+    }
+
+    private static INotificationDeliveryPort.OutboundMessage message(NotificationChannel channel, String recipientId,
+            String destination) {
+        return new INotificationDeliveryPort.OutboundMessage(channel, TENANT_ID, ORGANIZATION_ID, recipientId,
+                destination, "notify.gofp.account_approved", "fr_CM", Map.of("loginUrl", "https://x"), "Bienvenue",
+                NotificationPriority.HIGH);
+    }
+
+    private static final String DELIVERY_OK = """
+            {"success": true, "data": {"id": "5b1f6e2a-1111-4c3a-9a2a-000000000001", "status": "SENT"}}
+            """;
+
+    /** Minimal i18n stand-in: every key has the same raw pattern. */
+    private static final class FakeTranslation implements ITranslationPort {
+        @Override
+        public Mono<String> translate(NotificationModel model) {
+            return Mono.just("texte");
+        }
+
+        @Override
+        public Mono<String> rawTemplate(String templateKey, String language) {
+            return Mono.just("Bienvenue {{loginUrl}}");
+        }
     }
 
     @AfterAll
@@ -64,63 +109,184 @@ class KernelNotificationBridgeTest {
     }
 
     @Test
-    void sendMessage_shouldPostToDeliveriesEndpoint_withMappedChannelAndTenantHeaders() {
+    void deliver_shouldPostToDeliveriesEndpoint_withTenantHeadersTemplateAndVariables() {
+        wireMock.stubFor(get(urlPathEqualTo("/api/notifications/templates"))
+                .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json")
+                        .withBody("{\"success\": true, \"data\": []}")));
+        wireMock.stubFor(post(urlEqualTo("/api/notifications/templates"))
+                .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json")
+                        .withBody("{\"success\": true, \"data\": {\"code\": \"notify.gofp.account_approved\"}}")));
         wireMock.stubFor(post(urlEqualTo("/api/notifications/deliveries"))
-                .willReturn(aResponse().withStatus(200)
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("""
-                                {
-                                  "success": true,
-                                  "data": {
-                                    "id": "5b1f6e2a-1111-4c3a-9a2a-000000000001",
-                                    "channel": "EMAIL",
-                                    "status": "SENT",
-                                    "recipientAddress": "user@example.com",
-                                    "body": "hello"
-                                  }
-                                }
-                                """)));
+                .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json")
+                        .withBody(DELIVERY_OK)));
 
-        KernelDeliveryProviderAdapter adapter = new KernelDeliveryProviderAdapter(client);
-
-        StepVerifier.create(adapter.sendMessage(NotificationChannel.EMAIL, TENANT_ID, ORGANIZATION_ID,
-                        "user@example.com", "hello"))
+        StepVerifier.create(adapter(true).deliver(message(NotificationChannel.EMAIL, "someone@x.com", "someone@x.com")))
+                .assertNext(r -> {
+                    assertThat(r.deliveryId()).isEqualTo("5b1f6e2a-1111-4c3a-9a2a-000000000001");
+                    assertThat(r.status()).isEqualTo("SENT");
+                })
                 .verifyComplete();
 
         wireMock.verify(postRequestedFor(urlEqualTo("/api/notifications/deliveries"))
                 .withHeader("X-Tenant-Id", equalTo(TENANT_ID))
                 .withHeader("X-Organization-Id", equalTo(ORGANIZATION_ID))
                 .withRequestBody(matchingJsonPath("$.channel", equalTo("EMAIL")))
-                .withRequestBody(matchingJsonPath("$.recipientAddress", equalTo("user@example.com")))
-                .withRequestBody(matchingJsonPath("$.body", equalTo("hello"))));
+                .withRequestBody(matchingJsonPath("$.recipientAddress", equalTo("someone@x.com")))
+                .withRequestBody(matchingJsonPath("$.templateCode", equalTo("notify.gofp.account_approved")))
+                .withRequestBody(matchingJsonPath("$.variables.loginUrl", equalTo("https://x")))
+                .withRequestBody(matchingJsonPath("$.metadata.priority", equalTo("HIGH")))
+                .withRequestBody(matchingJsonPath("$.body", equalTo("Bienvenue"))));
     }
 
     @Test
-    void sendMessage_shouldMapEachTiiBnTickChannel_toItsKernelEquivalent() {
+    void deliver_shouldRegisterTheTemplateOnceThenReuseIt() {
+        wireMock.stubFor(get(urlPathEqualTo("/api/notifications/templates"))
+                .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json")
+                        .withBody("{\"success\": true, \"data\": []}")));
+        wireMock.stubFor(post(urlEqualTo("/api/notifications/templates"))
+                .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json")
+                        .withBody("{\"success\": true, \"data\": {\"code\": \"c\"}}")));
         wireMock.stubFor(post(urlEqualTo("/api/notifications/deliveries"))
-                .willReturn(aResponse().withStatus(200)
-                        .withHeader("Content-Type", "application/json")
+                .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json")
+                        .withBody(DELIVERY_OK)));
+        KernelDeliveryAdapter adapter = adapter(true);
+
+        StepVerifier.create(adapter.deliver(message(NotificationChannel.SMS_LOCAL, null, "+237691000001")))
+                .expectNextCount(1).verifyComplete();
+        StepVerifier.create(adapter.deliver(message(NotificationChannel.SMS_LOCAL, null, "+237691000001")))
+                .expectNextCount(1).verifyComplete();
+
+        wireMock.verify(1, postRequestedFor(urlEqualTo("/api/notifications/templates"))
+                .withRequestBody(matchingJsonPath("$.code", equalTo("notify.gofp.account_approved")))
+                .withRequestBody(matchingJsonPath("$.channel", equalTo("SMS")))
+                .withRequestBody(matchingJsonPath("$.locale", equalTo("fr_CM")))
+                .withRequestBody(matchingJsonPath("$.bodyTemplate", equalTo("Bienvenue {{loginUrl}}"))));
+        wireMock.verify(1, getRequestedFor(urlPathEqualTo("/api/notifications/templates")));
+        wireMock.verify(2, postRequestedFor(urlEqualTo("/api/notifications/deliveries")));
+    }
+
+    @Test
+    void deliver_shouldStillSend_whenTemplateRegistrationFails() {
+        wireMock.stubFor(get(urlPathEqualTo("/api/notifications/templates"))
+                .willReturn(aResponse().withStatus(500)));
+        wireMock.stubFor(post(urlEqualTo("/api/notifications/deliveries"))
+                .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json")
+                        .withBody(DELIVERY_OK)));
+
+        StepVerifier.create(adapter(true).deliver(message(NotificationChannel.WHATSAPP, null, "+237691000001")))
+                .expectNextCount(1).verifyComplete();
+        wireMock.verify(postRequestedFor(urlEqualTo("/api/notifications/deliveries"))
+                .withRequestBody(matchingJsonPath("$.body", equalTo("Bienvenue"))));
+    }
+
+    @Test
+    void deliver_withTemplatesDisabled_shouldSendOnlyTheBody() {
+        wireMock.stubFor(post(urlEqualTo("/api/notifications/deliveries"))
+                .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json")
+                        .withBody(DELIVERY_OK)));
+
+        StepVerifier.create(adapter(false).deliver(message(NotificationChannel.EMAIL, null, "a@b.c")))
+                .expectNextCount(1).verifyComplete();
+
+        wireMock.verify(0, getRequestedFor(urlPathEqualTo("/api/notifications/templates")));
+        wireMock.verify(postRequestedFor(urlEqualTo("/api/notifications/deliveries"))
+                .withRequestBody(com.github.tomakehurst.wiremock.client.WireMock.notMatching(".*\"templateCode\":\"[^\"]+\".*")));
+    }
+
+    @Test
+    void deliver_shouldAddressInAppAndPushToTheUser_notToAnAddress() {
+        wireMock.stubFor(post(urlEqualTo("/api/notifications/deliveries"))
+                .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json")
+                        .withBody(DELIVERY_OK)));
+        String user = "5b1f6e2a-7777-4c3a-9a2a-0000000000cc";
+        KernelDeliveryAdapter adapter = adapter(false);
+
+        StepVerifier.create(adapter.deliver(message(NotificationChannel.IN_APP_WEBSOCKET, user, user)))
+                .expectNextCount(1).verifyComplete();
+        StepVerifier.create(adapter.deliver(message(NotificationChannel.PUSH_FCM, user, user)))
+                .expectNextCount(1).verifyComplete();
+
+        wireMock.verify(postRequestedFor(urlEqualTo("/api/notifications/deliveries"))
+                .withRequestBody(matchingJsonPath("$.channel", equalTo("WEBSOCKET")))
+                .withRequestBody(matchingJsonPath("$.recipientUserId", equalTo(user)))
+                .withRequestBody(com.github.tomakehurst.wiremock.client.WireMock.notMatching(".*\"recipientAddress\":\"[^\"]+\".*")));
+        wireMock.verify(postRequestedFor(urlEqualTo("/api/notifications/deliveries"))
+                .withRequestBody(matchingJsonPath("$.channel", equalTo("PUSH")))
+                .withRequestBody(matchingJsonPath("$.recipientUserId", equalTo(user))));
+    }
+
+    @Test
+    void deliver_shouldKeepTheAddress_andAddTheUserId_forMailToAKnownUser() {
+        wireMock.stubFor(post(urlEqualTo("/api/notifications/deliveries"))
+                .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json")
+                        .withBody(DELIVERY_OK)));
+        String user = "5b1f6e2a-7777-4c3a-9a2a-0000000000dd";
+
+        StepVerifier.create(adapter(false).deliver(message(NotificationChannel.EMAIL, user, "u@x.com")))
+                .expectNextCount(1).verifyComplete();
+
+        wireMock.verify(postRequestedFor(urlEqualTo("/api/notifications/deliveries"))
+                .withRequestBody(matchingJsonPath("$.recipientUserId", equalTo(user)))
+                .withRequestBody(matchingJsonPath("$.recipientAddress", equalTo("u@x.com"))));
+    }
+
+    @Test
+    void client_shouldFallBackToTheConfiguredTenantAndOrganization_whenTheCallerHasNone() {
+        wireMock.stubFor(post(urlEqualTo("/api/notifications/deliveries"))
+                .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json")
+                        .withBody(DELIVERY_OK)));
+        KernelNotificationClient withDefaults = clientWith("5b1f6e2a-aaaa-4c3a-9a2a-000000000001",
+                "5b1f6e2a-aaaa-4c3a-9a2a-000000000002");
+
+        StepVerifier.create(withDefaults.send(null, null, new SendNotificationRequestDto(
+                        null, "a@b.c", "EMAIL", null, null, "x", null, null)))
+                .expectNextCount(1).verifyComplete();
+
+        wireMock.verify(postRequestedFor(urlEqualTo("/api/notifications/deliveries"))
+                .withHeader("X-Tenant-Id", equalTo("5b1f6e2a-aaaa-4c3a-9a2a-000000000001"))
+                .withHeader("X-Organization-Id", equalTo("5b1f6e2a-aaaa-4c3a-9a2a-000000000002")));
+    }
+
+    @Test
+    void client_shouldFailExplicitly_withoutCallingTheKernel_whenNoOrganizationIsAvailable() {
+        StepVerifier.create(client.send(TENANT_ID, null, new SendNotificationRequestDto(
+                        null, "a@b.c", "EMAIL", null, null, "x", null, null)))
+                .expectErrorSatisfies(e -> assertThat(e).isInstanceOf(IllegalStateException.class)
+                        .hasMessageContaining("organization"))
+                .verify();
+        wireMock.verify(0, postRequestedFor(urlEqualTo("/api/notifications/deliveries")));
+    }
+
+    @Test
+    void search_shouldFilterTheKernelDeliveryLog_byRecipientStatusAndId() {
+        String user = "5b1f6e2a-7777-4c3a-9a2a-0000000000ee";
+        wireMock.stubFor(get(urlPathEqualTo("/api/notifications/deliveries"))
+                .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json")
                         .withBody("""
-                                {"success": true, "data": {"id": "5b1f6e2a-1111-4c3a-9a2a-000000000002", "status": "SENT"}}
-                                """)));
-        KernelDeliveryProviderAdapter adapter = new KernelDeliveryProviderAdapter(client);
+                                {"success": true, "data": [
+                                  {"id": "5b1f6e2a-0001-4c3a-9a2a-000000000001", "recipientUserId": "%s",
+                                   "channel": "PUSH", "status": "SENT", "body": "a", "metadata": {"priority": "HIGH"}},
+                                  {"id": "5b1f6e2a-0001-4c3a-9a2a-000000000002", "recipientUserId": "%s",
+                                   "channel": "WEBSOCKET", "status": "QUEUED", "body": "b"},
+                                  {"id": "5b1f6e2a-0001-4c3a-9a2a-000000000003",
+                                   "recipientUserId": "5b1f6e2a-0000-4c3a-9a2a-0000000000ff",
+                                   "channel": "EMAIL", "status": "FAILED", "body": "c"}
+                                ]}
+                                """.formatted(user, user))));
+        KernelNotificationSearchAdapter search = new KernelNotificationSearchAdapter(client);
 
-        StepVerifier.create(adapter.sendMessage(NotificationChannel.SMS_LOCAL, TENANT_ID, ORGANIZATION_ID,
-                        "+237691000001", "hi"))
-                .verifyComplete();
-        StepVerifier.create(adapter.sendMessage(NotificationChannel.WHATSAPP, TENANT_ID, ORGANIZATION_ID,
-                        "+237691000001", "hi"))
-                .verifyComplete();
-        StepVerifier.create(adapter.sendMessage(NotificationChannel.PUSH_FCM, TENANT_ID, ORGANIZATION_ID,
-                        "fcm-token", "hi"))
-                .verifyComplete();
-
-        wireMock.verify(postRequestedFor(urlEqualTo("/api/notifications/deliveries"))
-                .withRequestBody(matchingJsonPath("$.channel", equalTo("SMS"))));
-        wireMock.verify(postRequestedFor(urlEqualTo("/api/notifications/deliveries"))
-                .withRequestBody(matchingJsonPath("$.channel", equalTo("WHATSAPP"))));
-        wireMock.verify(postRequestedFor(urlEqualTo("/api/notifications/deliveries"))
-                .withRequestBody(matchingJsonPath("$.channel", equalTo("PUSH"))));
+        StepVerifier.create(search.findByRecipientId(TENANT_ID, ORGANIZATION_ID, user).collectList())
+                .assertNext(list -> assertThat(list).hasSize(2)).verifyComplete();
+        StepVerifier.create(search.findPendingByRecipient(TENANT_ID, ORGANIZATION_ID, user))
+                .assertNext(n -> {
+                    assertThat(n.getStatus()).isEqualTo(DeliveryStatus.PENDING);
+                    assertThat(n.getChannel()).isEqualTo(NotificationChannel.IN_APP_WEBSOCKET);
+                }).verifyComplete();
+        StepVerifier.create(search.findByStatus(TENANT_ID, ORGANIZATION_ID, DeliveryStatus.FAILED))
+                .assertNext(n -> assertThat(n.getChannel()).isEqualTo(NotificationChannel.EMAIL)).verifyComplete();
+        StepVerifier.create(search.findById(TENANT_ID, ORGANIZATION_ID, "5b1f6e2a-0001-4c3a-9a2a-000000000001"))
+                .assertNext(n -> assertThat(n.getPriority()).isEqualTo(NotificationPriority.HIGH)).verifyComplete();
+        StepVerifier.create(search.findById(TENANT_ID, ORGANIZATION_ID, "unknown")).verifyComplete();
     }
 
     @Test

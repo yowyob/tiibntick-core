@@ -18,5 +18,5 @@ public record SendNotificationRequestDto(
         String subject,
         String body,
         Map<String, Object> variables,
-        Map<String, Object> metadata) {
+        Map<String, String> metadata) {
 }

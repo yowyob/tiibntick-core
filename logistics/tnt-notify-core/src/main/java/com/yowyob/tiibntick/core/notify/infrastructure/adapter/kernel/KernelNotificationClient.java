@@ -1,6 +1,7 @@
 package com.yowyob.tiibntick.core.notify.infrastructure.adapter.kernel;
 
 import com.yowyob.tiibntick.common.kernel.KernelResponses;
+import com.yowyob.tiibntick.core.notify.config.NotifyProperties;
 import com.yowyob.tiibntick.core.notify.infrastructure.adapter.kernel.dto.NotificationDeliveryDto;
 import com.yowyob.tiibntick.core.notify.infrastructure.adapter.kernel.dto.NotificationPreferenceDto;
 import com.yowyob.tiibntick.core.notify.infrastructure.adapter.kernel.dto.NotificationProviderDto;
@@ -53,119 +54,157 @@ public class KernelNotificationClient {
     private static final String TEMPLATES_PATH = "/api/notifications/templates";
 
     private final WebClient kernelWebClient;
+    private final NotifyProperties properties;
 
-    public KernelNotificationClient(@Qualifier("kernelWebClient") WebClient kernelWebClient) {
+    public KernelNotificationClient(@Qualifier("kernelWebClient") WebClient kernelWebClient,
+            NotifyProperties properties) {
         this.kernelWebClient = kernelWebClient;
+        this.properties = properties;
     }
 
     // ── Deliveries ───────────────────────────────────────────────────────────
 
     public Mono<NotificationDeliveryDto> send(String tenantId, String organizationId,
             SendNotificationRequestDto request) {
-        var responseSpec = kernelWebClient.post()
-                .uri(DELIVERIES_PATH)
-                .headers(h -> tenantHeaders(h, tenantId, organizationId))
-                .bodyValue(request)
-                .retrieve();
-        return KernelResponses.unwrapObjectOrPropagate(responseSpec, NotificationDeliveryDto.class);
+        return Mono.defer(() -> {
+            var responseSpec = kernelWebClient.post()
+                    .uri(DELIVERIES_PATH)
+                    .headers(h -> tenantHeaders(h, tenantId, organizationId))
+                    .bodyValue(request)
+                    .retrieve();
+            return KernelResponses.unwrapObjectOrPropagate(responseSpec, NotificationDeliveryDto.class);
+        });
     }
 
     public Flux<NotificationDeliveryDto> listDeliveries(String tenantId, String organizationId) {
-        var responseSpec = kernelWebClient.get()
-                .uri(DELIVERIES_PATH)
-                .headers(h -> tenantHeaders(h, tenantId, organizationId))
-                .retrieve();
-        return KernelResponses.unwrapList(responseSpec, NotificationDeliveryDto.class, log, "listDeliveries");
+        return Flux.defer(() -> {
+            var responseSpec = kernelWebClient.get()
+                    .uri(DELIVERIES_PATH)
+                    .headers(h -> tenantHeaders(h, tenantId, organizationId))
+                    .retrieve();
+            return KernelResponses.unwrapList(responseSpec, NotificationDeliveryDto.class, log, "listDeliveries");
+        });
     }
 
     // ── Preferences ──────────────────────────────────────────────────────────
 
     public Mono<NotificationPreferenceDto> savePreference(String tenantId, String organizationId,
             SavePreferenceRequestDto request) {
-        var responseSpec = kernelWebClient.post()
-                .uri(PREFERENCES_PATH)
-                .headers(h -> tenantHeaders(h, tenantId, organizationId))
-                .bodyValue(request)
-                .retrieve();
-        return KernelResponses.unwrapObjectOrPropagate(responseSpec, NotificationPreferenceDto.class);
+        return Mono.defer(() -> {
+            var responseSpec = kernelWebClient.post()
+                    .uri(PREFERENCES_PATH)
+                    .headers(h -> tenantHeaders(h, tenantId, organizationId))
+                    .bodyValue(request)
+                    .retrieve();
+            return KernelResponses.unwrapObjectOrPropagate(responseSpec, NotificationPreferenceDto.class);
+        });
     }
 
     public Flux<NotificationPreferenceDto> listPreferences(String tenantId, String organizationId, String userId) {
-        var responseSpec = kernelWebClient.get()
-                .uri(PREFERENCES_BY_USER_PATH, userId)
-                .headers(h -> tenantHeaders(h, tenantId, organizationId))
-                .retrieve();
-        return KernelResponses.unwrapList(responseSpec, NotificationPreferenceDto.class, log, "listPreferences userId=" + userId);
+        return Flux.defer(() -> {
+            var responseSpec = kernelWebClient.get()
+                    .uri(PREFERENCES_BY_USER_PATH, userId)
+                    .headers(h -> tenantHeaders(h, tenantId, organizationId))
+                    .retrieve();
+            return KernelResponses.unwrapList(responseSpec, NotificationPreferenceDto.class, log, "listPreferences userId=" + userId);
+        });
     }
 
     // ── Providers ────────────────────────────────────────────────────────────
 
     public Flux<NotificationProviderDto> listProviders(String tenantId, String organizationId) {
-        var responseSpec = kernelWebClient.get()
-                .uri(PROVIDERS_PATH)
-                .headers(h -> tenantHeaders(h, tenantId, organizationId))
-                .retrieve();
-        return KernelResponses.unwrapList(responseSpec, NotificationProviderDto.class, log, "listProviders");
+        return Flux.defer(() -> {
+            var responseSpec = kernelWebClient.get()
+                    .uri(PROVIDERS_PATH)
+                    .headers(h -> tenantHeaders(h, tenantId, organizationId))
+                    .retrieve();
+            return KernelResponses.unwrapList(responseSpec, NotificationProviderDto.class, log, "listProviders");
+        });
     }
 
     public Mono<NotificationProviderDto> saveProvider(String tenantId, String organizationId,
             SaveProviderRequestDto request) {
-        var responseSpec = kernelWebClient.post()
-                .uri(PROVIDERS_PATH)
-                .headers(h -> tenantHeaders(h, tenantId, organizationId))
-                .bodyValue(request)
-                .retrieve();
-        return KernelResponses.unwrapObjectOrPropagate(responseSpec, NotificationProviderDto.class);
+        return Mono.defer(() -> {
+            var responseSpec = kernelWebClient.post()
+                    .uri(PROVIDERS_PATH)
+                    .headers(h -> tenantHeaders(h, tenantId, organizationId))
+                    .bodyValue(request)
+                    .retrieve();
+            return KernelResponses.unwrapObjectOrPropagate(responseSpec, NotificationProviderDto.class);
+        });
     }
 
     // ── Reminders ────────────────────────────────────────────────────────────
 
     public Flux<NotificationReminderDto> listReminders(String tenantId, String organizationId) {
-        var responseSpec = kernelWebClient.get()
-                .uri(REMINDERS_PATH)
-                .headers(h -> tenantHeaders(h, tenantId, organizationId))
-                .retrieve();
-        return KernelResponses.unwrapList(responseSpec, NotificationReminderDto.class, log, "listReminders");
+        return Flux.defer(() -> {
+            var responseSpec = kernelWebClient.get()
+                    .uri(REMINDERS_PATH)
+                    .headers(h -> tenantHeaders(h, tenantId, organizationId))
+                    .retrieve();
+            return KernelResponses.unwrapList(responseSpec, NotificationReminderDto.class, log, "listReminders");
+        });
     }
 
     public Mono<NotificationReminderDto> saveReminder(String tenantId, String organizationId,
             SaveReminderRequestDto request) {
-        var responseSpec = kernelWebClient.post()
-                .uri(REMINDERS_PATH)
-                .headers(h -> tenantHeaders(h, tenantId, organizationId))
-                .bodyValue(request)
-                .retrieve();
-        return KernelResponses.unwrapObjectOrPropagate(responseSpec, NotificationReminderDto.class);
+        return Mono.defer(() -> {
+            var responseSpec = kernelWebClient.post()
+                    .uri(REMINDERS_PATH)
+                    .headers(h -> tenantHeaders(h, tenantId, organizationId))
+                    .bodyValue(request)
+                    .retrieve();
+            return KernelResponses.unwrapObjectOrPropagate(responseSpec, NotificationReminderDto.class);
+        });
     }
 
     // ── Templates ────────────────────────────────────────────────────────────
 
     public Flux<NotificationTemplateDto> listTemplates(String tenantId, String organizationId) {
-        var responseSpec = kernelWebClient.get()
-                .uri(TEMPLATES_PATH)
-                .headers(h -> tenantHeaders(h, tenantId, organizationId))
-                .retrieve();
-        return KernelResponses.unwrapList(responseSpec, NotificationTemplateDto.class, log, "listTemplates");
+        return Flux.defer(() -> {
+            var responseSpec = kernelWebClient.get()
+                    .uri(TEMPLATES_PATH)
+                    .headers(h -> tenantHeaders(h, tenantId, organizationId))
+                    .retrieve();
+            return KernelResponses.unwrapList(responseSpec, NotificationTemplateDto.class, log, "listTemplates");
+        });
     }
 
     public Mono<NotificationTemplateDto> saveTemplate(String tenantId, String organizationId,
             SaveTemplateRequestDto request) {
-        var responseSpec = kernelWebClient.post()
-                .uri(TEMPLATES_PATH)
-                .headers(h -> tenantHeaders(h, tenantId, organizationId))
-                .bodyValue(request)
-                .retrieve();
-        return KernelResponses.unwrapObjectOrPropagate(responseSpec, NotificationTemplateDto.class);
+        return Mono.defer(() -> {
+            var responseSpec = kernelWebClient.post()
+                    .uri(TEMPLATES_PATH)
+                    .headers(h -> tenantHeaders(h, tenantId, organizationId))
+                    .bodyValue(request)
+                    .retrieve();
+            return KernelResponses.unwrapObjectOrPropagate(responseSpec, NotificationTemplateDto.class);
+        });
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
+    /**
+     * Applies the tenant/organization context the Kernel requires on every call. A value the caller did
+     * not provide falls back to the configured platform default ({@code tnt.notify.kernel.default-*});
+     * when neither exists the call fails here with an explicit message instead of being rejected by the
+     * Kernel with {@code ORGANIZATION_CONTEXT_REQUIRED}.
+     */
     private void tenantHeaders(HttpHeaders headers, String tenantId, String organizationId) {
-        if (tenantId != null) {
-            headers.set("X-Tenant-Id", tenantId);
+        headers.set("X-Tenant-Id", requireContext("tenant", tenantId, properties.getKernel().getDefaultTenantId()));
+        headers.set("X-Organization-Id",
+                requireContext("organization", organizationId, properties.getKernel().getDefaultOrganizationId()));
+    }
+
+    private static String requireContext(String what, String given, String configuredDefault) {
+        if (given != null && !given.isBlank()) {
+            return given;
         }
-        if (organizationId != null) {
-            headers.set("X-Organization-Id", organizationId);
+        if (configuredDefault != null && !configuredDefault.isBlank()) {
+            return configuredDefault;
         }
+        throw new IllegalStateException("No " + what + " for the Kernel notification call and no default configured "
+                + "(tnt.notify.kernel.default-" + what + "-id / TNT_NOTIFY_KERNEL_DEFAULT_"
+                + what.toUpperCase() + "_ID)");
     }
 }

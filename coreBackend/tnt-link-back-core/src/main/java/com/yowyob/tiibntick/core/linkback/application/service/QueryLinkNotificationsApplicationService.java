@@ -20,12 +20,12 @@ public class QueryLinkNotificationsApplicationService implements QueryLinkNotifi
     private final ISearchNotificationsUseCase searchNotificationsUseCase;
 
     @Override
-    public Flux<Notification> forRecipient(String recipientId) {
-        return searchNotificationsUseCase.findByRecipientId(recipientId);
+    public Flux<Notification> forRecipient(String tenantId, String recipientId) {
+        return searchNotificationsUseCase.findByRecipientId(tenantId, null, recipientId);
     }
 
     @Override
-    public Flux<Notification> pendingForRecipient(String recipientId) {
-        return searchNotificationsUseCase.findPendingByRecipient(recipientId);
+    public Flux<Notification> pendingForRecipient(String tenantId, String recipientId) {
+        return searchNotificationsUseCase.findPendingByRecipient(tenantId, null, recipientId);
     }
 }

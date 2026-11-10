@@ -66,6 +66,24 @@ class I18nTranslationPortAdapterTest {
     }
 
     @Test
+    void rawTemplate_shouldReturnThePatternWithItsPlaceholders_andFallBackToTheDefaultLocale() {
+        String key = "notify.freelancer_org.verified";
+        when(translateMessageUseCase.translate(key, "en_NG")).thenReturn(Optional.empty());
+        when(translateMessageUseCase.translate(key, "fr_CM")).thenReturn(Optional.of("Org {{orgId}} vérifiée"));
+
+        StepVerifier.create(adapter.rawTemplate(key, "en_NG"))
+                .expectNext("Org {{orgId}} vérifiée")
+                .verifyComplete();
+    }
+
+    @Test
+    void rawTemplate_shouldBeEmpty_whenTheKeyExistsInNoPack() {
+        when(translateMessageUseCase.translate("unknown.key", "fr_CM")).thenReturn(Optional.empty());
+
+        StepVerifier.create(adapter.rawTemplate("unknown.key", "fr")).verifyComplete();
+    }
+
+    @Test
     void translate_shouldFallBackToDefaultLocale_whenKeyMissingForRequestedLanguage() {
         String key = "notify.freelancer_org.verified";
         when(translateMessageUseCase.translate(key, "en_NG", Map.of())).thenReturn(Optional.empty());

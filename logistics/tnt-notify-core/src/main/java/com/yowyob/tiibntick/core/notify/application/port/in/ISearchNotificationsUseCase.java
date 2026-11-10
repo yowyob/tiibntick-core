@@ -6,31 +6,18 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
- * Primary port for querying notification history.
- * Used by TiiBnTick Link, Go, and Agency dashboards.
+ * Query side of the notification history (served by the Kernel).
  *
+ * @author Dilane PAFE
  * @author MANFOUO Braun
  */
 public interface ISearchNotificationsUseCase {
 
-    /**
-     * Returns all notifications sent to a given user.
-     */
-    Flux<Notification> findByRecipientId(String recipientId);
+    Flux<Notification> findByRecipientId(String tenantId, String organizationId, String recipientId);
 
-    /**
-     * Returns notifications filtered by status (e.g., FAILED for retry
-     * dashboards).
-     */
-    Flux<Notification> findByStatus(DeliveryStatus status);
+    Flux<Notification> findByStatus(String tenantId, String organizationId, DeliveryStatus status);
 
-    /**
-     * Returns a single notification by ID.
-     */
-    Mono<Notification> findById(String notificationId);
+    Mono<Notification> findById(String tenantId, String organizationId, String notificationId);
 
-    /**
-     * Returns unread / pending notifications for a user (PENDING).
-     */
-    Flux<Notification> findPendingByRecipient(String recipientId);
+    Flux<Notification> findPendingByRecipient(String tenantId, String organizationId, String recipientId);
 }
