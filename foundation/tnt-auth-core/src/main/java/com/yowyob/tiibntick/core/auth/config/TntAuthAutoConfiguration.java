@@ -10,6 +10,8 @@ import com.yowyob.tiibntick.core.auth.application.port.out.IYowAuthTntAdapter;
 import com.yowyob.tiibntick.core.auth.application.service.KernelPublicKeyProvider;
 import com.yowyob.tiibntick.core.auth.application.service.TntJwtValidator;
 import com.yowyob.tiibntick.core.auth.application.service.TntSecurityContextService;
+import com.yowyob.tiibntick.common.session.AuthenticatedSessionPublisher;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -89,6 +91,17 @@ public class TntAuthAutoConfiguration {
     public ReactiveSecurityContextExtractor reactiveSecurityContextExtractor(
             ResolveCurrentUserUseCase resolveCurrentUserUseCase) {
         return new ReactiveSecurityContextExtractor(resolveCurrentUserUseCase);
+    }
+
+    /**
+     * Fans "token issued" / "profile created" events out to the session listeners provided by
+     * higher-layer modules (e.g. the wallet auto-provisioning). Listeners are resolved lazily.
+     */
+    @Bean
+    @ConditionalOnMissingBean(AuthenticatedSessionPublisher.class)
+    public AuthenticatedSessionPublisher authenticatedSessionPublisher(
+            ObjectProvider<com.yowyob.tiibntick.common.session.AuthenticatedSessionListener> listeners) {
+        return new AuthenticatedSessionPublisher(() -> listeners.orderedStream().toList());
     }
 
     /** Refuses {@code /api/v1/tenants/{tenantId}/...} when the URL tenant is not the caller's tenant. */

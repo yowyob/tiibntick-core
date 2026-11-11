@@ -283,6 +283,17 @@ tnt:
     # Short-TTL cache for the DB-backed client/scope lookup (decided 2026-07-08: TTL-only, no active invalidation broadcast)
     client-cache-ttl: ${TNT_PLATFORM_GATEWAY_CACHE_TTL:PT45S}
 
+  # ── Wallet auto-provisioning ────────────────────────────────────────────────
+  # The Kernel creates a wallet only for its authenticated owner, so the Core makes sure every
+  # user has one at the two moments it holds the user's own token: right after a login/refresh
+  # relayed by /api/v1/auth/** and right after the client/freelancer profile is created.
+  # Best-effort (never breaks the login). See docs/audits/remediation/wallet-auto-provisioning.md
+  wallet:
+    auto-provision:
+      enabled: ${TNT_WALLET_AUTO_PROVISION_ENABLED:true}
+      success-ttl: ${TNT_WALLET_AUTO_PROVISION_SUCCESS_TTL:PT1H}   # no new Kernel check for a user within this delay
+      failure-ttl: ${TNT_WALLET_AUTO_PROVISION_FAILURE_TTL:PT5M}   # retry delay after a Kernel failure
+
   # ── FreelancerOrganization configuration () ─────────────────────────────
   freelancer-org:
     max-sub-deliverers: 5

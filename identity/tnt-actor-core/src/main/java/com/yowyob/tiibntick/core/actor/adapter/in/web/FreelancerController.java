@@ -76,6 +76,21 @@ import java.util.UUID;
 @Tag(name = "Freelancers", description = "Freelancer profile management")
 public class FreelancerController {
 
+    private com.yowyob.tiibntick.common.session.AuthenticatedSessionPublisher sessionPublisher;
+
+    /**
+     * Tells session listeners (e.g. wallet auto-provisioning) that the caller's profile now
+     * exists; optional so hand-built controllers still work. Fire-and-forget, never fails the request.
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setSessionPublisher(com.yowyob.tiibntick.common.session.AuthenticatedSessionPublisher sessionPublisher) {
+        this.sessionPublisher = sessionPublisher;
+    }
+
+    private Mono<Void> announceProfileCreated() {
+        return sessionPublisher == null ? Mono.empty() : sessionPublisher.profileCreated();
+    }
+
     private ProfileLanguageSupport profileLanguage;
 
     /** Stores the language picked at creation on the account; optional so hand-built controllers still work. */
@@ -144,6 +159,7 @@ public class FreelancerController {
         .flatMap(profile -> identityUseCase.resolveCurrent()
                 .map(identity -> FreelancerProfileResponse.from(profile, identity))
                 .defaultIfEmpty(FreelancerProfileResponse.from(profile)))
+        .flatMap(r -> announceProfileCreated().thenReturn(r))
         .map(r -> ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(r)));
     }

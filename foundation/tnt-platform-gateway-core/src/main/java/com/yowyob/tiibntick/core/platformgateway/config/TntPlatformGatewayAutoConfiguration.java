@@ -158,8 +158,10 @@ public class TntPlatformGatewayAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean(ProxyKernelAuthUseCase.class)
-    public KernelAuthGatewayService kernelAuthGatewayService(IKernelAuthGatewayPort kernelAuthGatewayPort) {
-        return new KernelAuthGatewayService(kernelAuthGatewayPort);
+    public KernelAuthGatewayService kernelAuthGatewayService(
+            IKernelAuthGatewayPort kernelAuthGatewayPort,
+            org.springframework.beans.factory.ObjectProvider<com.yowyob.tiibntick.common.session.AuthenticatedSessionPublisher> sessionPublisher) {
+        return new KernelAuthGatewayService(kernelAuthGatewayPort, sessionPublisher.getIfAvailable());
     }
 
     @Bean

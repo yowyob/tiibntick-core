@@ -319,7 +319,24 @@ public class KernelBridgeConfig {
      * Falls back silently (no auth header added) when no JWT is present in context.
      */
     private ExchangeFilterFunction propagateBearerToken() {
-        return (request, next) -> ReactiveSecurityContextHolder.getContext()
+        return (request, next) -> Mono.deferContextual(reactorCtx -> {
+            // Explicit token (login-time hooks): the login request itself carries no JWT, so the
+            // listener hands the freshly issued access token over through the Reactor context.
+            String override = reactorCtx.getOrDefault(
+                    com.yowyob.tiibntick.common.session.AuthenticatedSessionListener.BEARER_OVERRIDE_CONTEXT_KEY, null);
+            if (override != null && !override.isBlank()) {
+                return next.exchange(ClientRequest.from(request)
+                        .headers(h -> h.set("Authorization", "Bearer " + override))
+                        .build());
+            }
+            return relaySecurityContextBearer(request, next);
+        });
+    }
+
+    private Mono<org.springframework.web.reactive.function.client.ClientResponse> relaySecurityContextBearer(
+            ClientRequest request,
+            org.springframework.web.reactive.function.client.ExchangeFunction next) {
+        return ReactiveSecurityContextHolder.getContext()
                 .map(ctx -> ctx.getAuthentication())
                 .filter(auth -> auth instanceof JwtAuthenticationToken)
                 .cast(JwtAuthenticationToken.class)

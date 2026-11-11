@@ -4,11 +4,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.yowyob.tiibntick.core.billing.wallet.adapter.out.kernel.KernelPaymentGatewayAdapter;
+import com.yowyob.tiibntick.core.billing.wallet.application.port.in.IKernelWalletUseCase;
 import com.yowyob.tiibntick.core.billing.wallet.application.port.out.IKernelPaymentGatewayPort;
+import com.yowyob.tiibntick.core.billing.wallet.application.service.WalletAutoProvisioningListener;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.r2dbc.repository.config.EnableR2dbcRepositories;
@@ -63,6 +66,20 @@ public class WalletModuleConfig {
     @ConditionalOnMissingBean
     public IKernelPaymentGatewayPort kernelPaymentGatewayPort(WebClient kernelPaymentWebClient) {
         return new KernelPaymentGatewayAdapter(kernelPaymentWebClient);
+    }
+
+    /**
+     * Gives every user a Kernel wallet as soon as the Core sees their session (login, refresh) or
+     * their profile creation. Disable with {@code tnt.wallet.auto-provision.enabled=false}.
+     */
+    @Bean
+    @ConditionalOnProperty(prefix = "tnt.wallet.auto-provision", name = "enabled", havingValue = "true", matchIfMissing = true)
+    public WalletAutoProvisioningListener walletAutoProvisioningListener(
+            IKernelWalletUseCase kernelWalletUseCase,
+            @Value("${tnt.wallet.auto-provision.success-ttl:PT1H}") java.time.Duration successTtl,
+            @Value("${tnt.wallet.auto-provision.failure-ttl:PT5M}") java.time.Duration failureTtl) {
+        return new WalletAutoProvisioningListener(kernelWalletUseCase, new ObjectMapper(),
+                successTtl, failureTtl, java.time.Clock.systemUTC());
     }
 
     @Bean
