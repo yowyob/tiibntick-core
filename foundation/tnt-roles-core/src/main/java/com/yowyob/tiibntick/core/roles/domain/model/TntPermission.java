@@ -39,6 +39,10 @@ public final class TntPermission {
     public static final String DELIVERY_CONFIRM = "delivery:confirm";
     public static final String DELIVERY_RETURN  = "delivery:return";
     public static final String DELIVERY_PROOF   = "delivery:proof";
+    /** Cancel a delivery: its sender, its assigned deliverer or an agency manager. */
+    public static final String DELIVERY_CANCEL  = "delivery:cancel";
+    /** Create a delivery directly, without publishing an announcement first (agency flow). */
+    public static final String DELIVERY_CREATE_DIRECT = "delivery:create-direct";
 
     // ─────────────────────────────────────────────────────────────
     // ANNOUNCEMENT — TiiBnPick delivery request announcements

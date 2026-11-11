@@ -63,16 +63,53 @@ public class DisputeQueryService implements IDisputeQueryUseCase {
         Objects.requireNonNull(query, "ListDisputesQuery must not be null");
         log.debug("Listing disputes for tenant={}, page={}, size={}", query.tenantId(), query.page(), query.size());
 
-        final Mono<Long> totalCount = repository.countAll(query);
-        final Flux<Dispute> disputes = repository.findAll(query)
-                .filter(dispute -> isVisible(dispute, query.requesterId(), query.privileged()));
-
-        return Mono.zip(disputes.collectList(), totalCount)
+        if (!query.privileged()) {
+            return listOwnDisputes(query);
+        }
+        return Mono.zip(repository.findAll(query).collectList(), repository.countAll(query))
                 .map(tuple -> {
                     final long total = tuple.getT2();
                     final int totalPages = (int) Math.ceil((double) total / query.size());
                     return new DisputePageResult(tuple.getT1(), query.page(), query.size(), total, totalPages);
                 });
+    }
+
+    /** A participant's most recent disputes considered per role (the repository caps a page at 100). */
+    private static final int OWN_DISPUTES_LIMIT = 100;
+
+    /**
+     * A participant lists only the disputes they are a party of. The repository pages over the whole
+     * tenant, so filtering its page afterwards would hand back arbitrary short or empty pages and
+     * leak the tenant-wide count; instead their own disputes (as claimant, then as respondent) are
+     * collected, merged, ordered newest first and paged here.
+     */
+    private Mono<DisputePageResult> listOwnDisputes(final ListDisputesQuery query) {
+        final String me = query.requesterId();
+        if (me == null) {
+            return Mono.just(new DisputePageResult(java.util.List.of(), query.page(), query.size(), 0, 0));
+        }
+        Flux<Dispute> asClaimant = collectAll(query, me, null);
+        Flux<Dispute> asRespondent = collectAll(query, null, me);
+        return Flux.concat(asClaimant, asRespondent)
+                .filter(d -> isVisible(d, me, false))
+                .collectMap(d -> d.getId().getValue(), d -> d)
+                .map(byId -> {
+                    final java.util.List<Dispute> all = new java.util.ArrayList<>(byId.values());
+                    all.sort(java.util.Comparator.comparing(Dispute::getFiledAt,
+                            java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())));
+                    final long total = all.size();
+                    final int from = (int) Math.min((long) query.page() * query.size(), total);
+                    final int to = (int) Math.min(from + (long) query.size(), total);
+                    final int totalPages = (int) Math.ceil((double) total / query.size());
+                    return new DisputePageResult(all.subList(from, to), query.page(), query.size(), total, totalPages);
+                });
+    }
+
+    private Flux<Dispute> collectAll(final ListDisputesQuery base, final String claimant, final String respondent) {
+        return repository.findAll(new ListDisputesQuery(
+                base.tenantId(), base.requesterId(), base.statusFilter(), base.priorityFilter(),
+                base.categoryFilter(), claimant, respondent, base.missionIdFilter(),
+                base.from(), base.to(), 0, OWN_DISPUTES_LIMIT, false));
     }
 
     @Override

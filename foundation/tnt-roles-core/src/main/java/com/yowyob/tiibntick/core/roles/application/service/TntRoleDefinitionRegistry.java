@@ -40,6 +40,7 @@ public class TntRoleDefinitionRegistry {
             TntRole.ORG_ADMIN,
             TntRole.AGENCY_MANAGER,
             TntRole.BRANCH_MANAGER,
+            TntRole.MEDIATOR,
             TntRole.SUPPORT_AGENT,
             TntRole.PERMANENT_DELIVERER,
             TntRole.AGENCY_HUB_OPERATOR,

@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.yowyob.kernel.event.application.port.in.PublishEventUseCase;
 import com.yowyob.kernel.event.application.port.out.EventEnvelopeRepository;
-import com.yowyob.kernel.event.application.port.out.OutboxPollerPort;
 import com.yowyob.kernel.event.config.YowEventKernelAutoConfiguration;
 import com.yowyob.kernel.event.domain.enums.EnvelopeStatus;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -64,6 +63,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.kafka.test.utils.KafkaTestUtils.getSingleRecord;
 
 /**
+ * <b>Current behaviour (outbox decommissioned 2026-09-18):</b> the event is persisted, then published
+ * directly to Kafka, and the envelope ends {@code PUBLISHED} ({@code FAILED} if the broker refuses it).
+ * The paragraphs below describe the original outbox migration and are kept for history.
+ *
  * End-to-end integration test for {@link GofpEventPublisherPortAdapter}, recreating the
  * coverage lost when the module was resynced with its BFF origin on 2026-07-23 (see
  * {@code docs/knowledge/known-issues.md} #23) — proves {@code publish(topic, payload)}
@@ -122,9 +125,6 @@ class GofpEventPublisherPortAdapterOutboxIntegrationTest {
     private GofpEventPublisherPortAdapter publisher;
 
     @Autowired
-    private OutboxPollerPort outboxPollerPort;
-
-    @Autowired
     private EventEnvelopeRepository envelopeRepository;
 
     @Autowired
@@ -137,9 +137,9 @@ class GofpEventPublisherPortAdapterOutboxIntegrationTest {
     }
 
     @Test
-    @DisplayName("publish(topic, payload) enqueues to the outbox (PENDING); the poller then "
-            + "delivers the raw payload JSON to the exact requested Kafka topic")
-    void publishEnqueuesToOutboxThenPollerDeliversToKafka() throws Exception {
+    @DisplayName("publish(topic, payload) publishes straight to Kafka (envelope PUBLISHED); the record is "
+            + "delivered the raw payload JSON to the exact requested Kafka topic")
+    void publishPublishesDirectlyToKafka() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
         String announcementId = UUID.randomUUID().toString();
@@ -148,13 +148,13 @@ class GofpEventPublisherPortAdapterOutboxIntegrationTest {
 
         publisher.publish(TEST_TOPIC, payload).block(Duration.ofSeconds(10));
 
-        // 1. The envelope is durably persisted PENDING — nothing sent to Kafka yet.
+        // 1. The envelope is persisted and already PUBLISHED: the event goes straight to Kafka (outbox decommissioned).
         StepVerifier.create(envelopeRepository.findByEventType(
                         "TestRankedCandidatesPayload", before, LocalDateTime.now().plusSeconds(5),
                         SOLUTION_CODE, 10))
                 .assertNext(envelope -> {
                     assertThat(envelope.getKafkaTopic()).isEqualTo(TEST_TOPIC);
-                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PENDING);
+                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED);
                 })
                 .verifyComplete();
 
@@ -166,12 +166,6 @@ class GofpEventPublisherPortAdapterOutboxIntegrationTest {
 
         try (Consumer<String, String> rawConsumer = new KafkaConsumer<>(consumerProps)) {
             embeddedKafka.consumeFromAnEmbeddedTopic(rawConsumer, TEST_TOPIC);
-
-            // 2. Trigger one poll cycle directly (what OutboxPollerService.scheduledPoll() does
-            //    on a fixed delay in production) — avoids waiting on real time in the test.
-            StepVerifier.create(outboxPollerPort.poll())
-                    .expectNextMatches(count -> count >= 1)
-                    .verifyComplete();
 
             ConsumerRecord<String, String> received =
                     getSingleRecord(rawConsumer, TEST_TOPIC, Duration.ofSeconds(15));

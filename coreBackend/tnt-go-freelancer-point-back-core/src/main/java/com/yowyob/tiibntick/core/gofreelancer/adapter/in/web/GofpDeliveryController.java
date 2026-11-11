@@ -108,6 +108,7 @@ public class GofpDeliveryController {
     @PatchMapping("/{id}/cancel")
     public Mono<ResponseEntity<DeliveryResponseDTO>> cancelDelivery(
             @PathVariable UUID id,
+            @RequestParam(required = false) String reason,
             @CurrentUser(required = false) TntSecurityContext ctx) {
         UUID callerActorId = callerId(ctx);
         if (callerActorId == null) {
@@ -115,7 +116,7 @@ public class GofpDeliveryController {
                     "Authentication required to cancel a delivery"));
         }
         return deliveryStatusApplicationService.assertCallerCanCancelDelivery(id, callerActorId)
-                .then(Mono.defer(() -> deliveryUseCase.cancelDelivery(id)))
+                .then(Mono.defer(() -> deliveryUseCase.cancelDelivery(id, callerActorId, reason)))
                 .map(ResponseEntity::ok);
     }
     @GetMapping("/delivery-need/{deliveryNeedId}")

@@ -40,6 +40,7 @@ public class IncidentCooperationController {
                            @PathVariable UUID incidentId,
                            @RequestParam UUID requestingAgencyId,
                            @Valid @RequestBody CooperationRequest req) {
+        IncidentAccess.requireManage(identity);
         return queryIncidentUseCase.getById(incidentId, contextOf(identity))
                 .flatMap(existing -> cooperationUseCase.request(RequestCooperationCommand.builder()
                         .incidentId(incidentId).requestingAgencyId(requestingAgencyId)
@@ -57,6 +58,7 @@ public class IncidentCooperationController {
                           @RequestParam UUID respondingAgencyId,
                           @RequestParam UUID respondedByActorId,
                           @RequestParam(required = false) String responseDetails) {
+        IncidentAccess.requireManage(identity);
         return queryIncidentUseCase.getById(incidentId, contextOf(identity))
                 .flatMap(existing -> cooperationUseCase.accept(RespondToCooperationCommand.builder()
                         .cooperationId(cooperationId).respondingAgencyId(respondingAgencyId)
@@ -71,6 +73,7 @@ public class IncidentCooperationController {
                           @RequestParam UUID respondingAgencyId,
                           @RequestParam UUID respondedByActorId,
                           @RequestParam String rejectionReason) {
+        IncidentAccess.requireManage(identity);
         return queryIncidentUseCase.getById(incidentId, contextOf(identity))
                 .flatMap(existing -> cooperationUseCase.reject(RespondToCooperationCommand.builder()
                         .cooperationId(cooperationId).respondingAgencyId(respondingAgencyId)
@@ -83,6 +86,7 @@ public class IncidentCooperationController {
                             @PathVariable UUID incidentId,
                             @PathVariable UUID cooperationId,
                             @RequestParam UUID completedByActorId) {
+        IncidentAccess.requireManage(identity);
         return queryIncidentUseCase.getById(incidentId, contextOf(identity))
                 .flatMap(existing -> cooperationUseCase.complete(RecordCooperationCompletionCommand.builder()
                         .cooperationId(cooperationId).completedByActorId(completedByActorId)

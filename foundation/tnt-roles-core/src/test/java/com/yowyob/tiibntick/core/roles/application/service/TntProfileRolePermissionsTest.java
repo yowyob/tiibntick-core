@@ -69,4 +69,58 @@ class TntProfileRolePermissionsTest {
     void clientStaysRestricted(String resource, String action) {
         StepVerifier.create(check("CLIENT", resource, action)).expectNext(false).verifyComplete();
     }
+
+    // ── Logistics layer: what the delivery / dispute / incident / media / geo screens actually call ──
+
+    @ParameterizedTest(name = "FREELANCER may {0}:{1} (logistics)")
+    @CsvSource({
+            "delivery,confirm", "mission,start", "mission,complete", "delivery,cancel", "delivery,proof",
+            "dispute,create", "dispute,read", "incident,create", "incident,read",
+            "media,upload", "media,read", "geo,read", "route,read", "announcement,respond",
+    })
+    void freelancerHasWhatTheLogisticsScreensNeed(String resource, String action) {
+        StepVerifier.create(check("FREELANCER", resource, action)).expectNext(true).verifyComplete();
+    }
+
+    @ParameterizedTest(name = "CLIENT may {0}:{1} (logistics)")
+    @CsvSource({
+            "announcement,create", "delivery,track", "delivery,cancel",
+            "dispute,create", "dispute,read", "media,upload", "geo,read", "route,read",
+    })
+    void clientHasWhatTheLogisticsScreensNeed(String resource, String action) {
+        StepVerifier.create(check("CLIENT", resource, action)).expectNext(true).verifyComplete();
+    }
+
+    /** Decision: a client contests through a dispute; only deliverers and relay staff report field incidents. */
+    @ParameterizedTest(name = "CLIENT may NOT {0}:{1} (logistics)")
+    @CsvSource({"incident,create", "incident,read", "incident,manage", "dispute,resolve", "delivery,create-direct"})
+    void clientCannotReportIncidentsNorArbitrate(String resource, String action) {
+        StepVerifier.create(check("CLIENT", resource, action)).expectNext(false).verifyComplete();
+    }
+
+    @ParameterizedTest(name = "FREELANCER may NOT {0}:{1} (logistics)")
+    @CsvSource({"dispute,resolve", "incident,manage", "delivery,create-direct", "mission,assign"})
+    void freelancerCannotArbitrateNorManage(String resource, String action) {
+        StepVerifier.create(check("FREELANCER", resource, action)).expectNext(false).verifyComplete();
+    }
+
+    @ParameterizedTest(name = "MEDIATOR may {0}:{1}")
+    @CsvSource({
+            "dispute,read", "dispute,resolve", "incident,read", "incident,manage",
+            "media,upload", "media,read", "delivery,read", "delivery,track", "actor,read",
+    })
+    @DisplayName("a MEDIATOR JWT alone is enough to arbitrate disputes and handle incidents")
+    void mediatorHasWhatArbitrationNeeds(String resource, String action) {
+        StepVerifier.create(check("MEDIATOR", resource, action)).expectNext(true).verifyComplete();
+    }
+
+    @ParameterizedTest(name = "MEDIATOR may NOT {0}:{1}")
+    @CsvSource({
+            "wallet,write", "payment,process", "admin,users", "announcement,create",
+            "mission,start", "mission,complete", "delivery,create-direct", "invoice,issue",
+    })
+    @DisplayName("a MEDIATOR cannot move money, run deliveries or administer users")
+    void mediatorStaysRestricted(String resource, String action) {
+        StepVerifier.create(check("MEDIATOR", resource, action)).expectNext(false).verifyComplete();
+    }
 }

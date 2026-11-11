@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
@@ -35,9 +36,10 @@ import java.util.UUID;
 public class NotificationStreamController {
 
     private final NotificationStreamPort notificationStreamPort;
+    private final NotificationStreamAccessGuard accessGuard;
 
     @GetMapping("/stream/{freelancerId}")
-    public ResponseEntity<Flux<ServerSentEvent<MatchingNotificationResponse>>> getNotificationStream(
+    public Mono<ResponseEntity<Flux<ServerSentEvent<MatchingNotificationResponse>>>> getNotificationStream(
             @PathVariable UUID freelancerId) {
         Flux<ServerSentEvent<MatchingNotificationResponse>> body = notificationStreamPort
                 .getNotificationStream(freelancerId)
@@ -50,8 +52,8 @@ public class NotificationStreamController {
                 .startWith(ServerSentEvent.<MatchingNotificationResponse>builder()
                         .comment("connected")
                         .build());
-        return ResponseEntity.ok()
+        return accessGuard.assertOwner(freelancerId).then(Mono.fromSupplier(() -> ResponseEntity.ok()
                 .contentType(MediaType.TEXT_EVENT_STREAM)
-                .body(body);
+                .body(body)));
     }
 }

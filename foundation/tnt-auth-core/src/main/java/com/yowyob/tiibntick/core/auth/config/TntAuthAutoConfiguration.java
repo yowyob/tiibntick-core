@@ -2,6 +2,7 @@ package com.yowyob.tiibntick.core.auth.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yowyob.tiibntick.core.auth.adapter.in.web.ReactiveSecurityContextExtractor;
+import com.yowyob.tiibntick.core.auth.adapter.in.web.TenantPathGuardWebFilter;
 import com.yowyob.tiibntick.core.auth.adapter.out.kernel.NoOpYowAuthTntAdapter;
 import com.yowyob.tiibntick.core.auth.application.port.in.ResolveCurrentUserUseCase;
 import com.yowyob.tiibntick.core.auth.application.port.in.ValidateTokenUseCase;
@@ -88,5 +89,12 @@ public class TntAuthAutoConfiguration {
     public ReactiveSecurityContextExtractor reactiveSecurityContextExtractor(
             ResolveCurrentUserUseCase resolveCurrentUserUseCase) {
         return new ReactiveSecurityContextExtractor(resolveCurrentUserUseCase);
+    }
+
+    /** Refuses {@code /api/v1/tenants/{tenantId}/...} when the URL tenant is not the caller's tenant. */
+    @Bean
+    @ConditionalOnMissingBean(TenantPathGuardWebFilter.class)
+    public TenantPathGuardWebFilter tenantPathGuardWebFilter(ResolveCurrentUserUseCase resolveCurrentUserUseCase) {
+        return new TenantPathGuardWebFilter(resolveCurrentUserUseCase);
     }
 }

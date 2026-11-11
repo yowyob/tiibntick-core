@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.yowyob.kernel.event.application.port.in.PublishEventUseCase;
 import com.yowyob.kernel.event.application.port.out.EventEnvelopeRepository;
-import com.yowyob.kernel.event.application.port.out.OutboxPollerPort;
 import com.yowyob.kernel.event.config.YowEventKernelAutoConfiguration;
 import com.yowyob.kernel.event.domain.enums.EnvelopeStatus;
 import com.yowyob.tiibntick.core.realtime.domain.event.ActorConnectedEvent;
@@ -71,6 +70,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.kafka.test.utils.KafkaTestUtils.getSingleRecord;
 
 /**
+ * <b>Current behaviour (outbox decommissioned 2026-09-18):</b> the event is persisted, then published
+ * directly to Kafka, and the envelope ends {@code PUBLISHED} ({@code FAILED} if the broker refuses it).
+ * The paragraphs below describe the original outbox migration and are kept for history.
+ *
  * End-to-end integration test proving the Chantier C · Audit n°3 · P5 migration:
  * {@link KafkaRealtimeEventPublisher} routes {@code GeofenceTriggerEvent} — the one business-
  * consequential event this adapter publishes — through the {@code yow-event-kernel}
@@ -130,18 +133,15 @@ class KafkaRealtimeEventPublisherOutboxIntegrationTest {
     private KafkaRealtimeEventPublisher publisher;
 
     @Autowired
-    private OutboxPollerPort outboxPollerPort;
-
-    @Autowired
     private EventEnvelopeRepository envelopeRepository;
 
     @Autowired
     private EmbeddedKafkaBroker embeddedKafka;
 
     @Test
-    @DisplayName("publish(GeofenceTriggerEvent) enqueues to the outbox (PENDING); the poller then "
-            + "delivers it to tnt.realtime.geofence.triggered with the raw event JSON")
-    void publishGeofenceTriggerGoesThroughOutbox() throws Exception {
+    @DisplayName("publish(GeofenceTriggerEvent) publishes straight to Kafka (envelope PUBLISHED); the record is "
+            + "delivered to tnt.realtime.geofence.triggered with the raw event JSON")
+    void publishGeofenceTriggerPublishesToKafka() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
         String tenantId = UUID.randomUUID().toString();
@@ -160,11 +160,11 @@ class KafkaRealtimeEventPublisherOutboxIntegrationTest {
 
         publisher.publish(event).block(Duration.ofSeconds(10));
 
-        // 1. Durably persisted PENDING — nothing on Kafka yet.
+        // 1. The envelope is persisted and already PUBLISHED: the event goes straight to Kafka (outbox decommissioned).
         StepVerifier.create(envelopeRepository.findByAggregateId(actorId, "Actor", tenantId))
                 .assertNext(envelope -> {
                     assertThat(envelope.getKafkaTopic()).isEqualTo(GEOFENCE_TOPIC);
-                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PENDING);
+                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED);
                     assertThat(envelope.getCorrelationId()).isEqualTo(event.getEventId());
                 })
                 .verifyComplete();
@@ -177,11 +177,6 @@ class KafkaRealtimeEventPublisherOutboxIntegrationTest {
 
         try (Consumer<String, String> rawConsumer = new KafkaConsumer<>(consumerProps)) {
             embeddedKafka.consumeFromAnEmbeddedTopic(rawConsumer, GEOFENCE_TOPIC);
-
-            // 2. One poll cycle relays it.
-            StepVerifier.create(outboxPollerPort.poll())
-                    .expectNextMatches(count -> count >= 1)
-                    .verifyComplete();
 
             ConsumerRecord<String, String> received =
                     getSingleRecord(rawConsumer, GEOFENCE_TOPIC, Duration.ofSeconds(15));
@@ -196,7 +191,7 @@ class KafkaRealtimeEventPublisherOutboxIntegrationTest {
             assertThat(wirePayload.get("trigger").get("direction").asText()).isEqualTo("ENTER");
         }
 
-        // 3. Envelope transitions to PUBLISHED.
+        // 2. The envelope stays PUBLISHED after the consumer has read the record.
         StepVerifier.create(envelopeRepository.findByAggregateId(actorId, "Actor", tenantId))
                 .assertNext(envelope -> assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED))
                 .verifyComplete();

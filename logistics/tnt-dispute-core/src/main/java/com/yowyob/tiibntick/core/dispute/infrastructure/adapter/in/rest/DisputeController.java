@@ -5,6 +5,7 @@ import com.yowyob.tiibntick.core.auth.domain.model.TntUserIdentity;
 import com.yowyob.tiibntick.core.dispute.application.command.OpenDisputeAgainstFreelancerOrgCommand;
 import com.yowyob.tiibntick.core.dispute.application.port.inbound.IDisputeCommandUseCase;
 import com.yowyob.tiibntick.core.dispute.application.port.inbound.IDisputeQueryUseCase;
+import com.yowyob.tiibntick.core.dispute.application.port.outbound.IDisputeParticipationPort;
 import com.yowyob.tiibntick.core.dispute.application.query.GetDisputeQuery;
 import com.yowyob.tiibntick.core.dispute.application.query.ListDisputesQuery;
 import com.yowyob.tiibntick.core.dispute.domain.enums.DisputeCategory;
@@ -60,9 +61,30 @@ public class DisputeController {
     private final IDisputeCommandUseCase commandUseCase;
     private final IDisputeQueryUseCase queryUseCase;
 
+    /** Accepts everyone until a layer that knows the deliveries provides the real check. */
+    private IDisputeParticipationPort participation = (tenant, mission, actor, org) -> Mono.just(true);
+
     public DisputeController(IDisputeCommandUseCase commandUseCase, IDisputeQueryUseCase queryUseCase) {
         this.commandUseCase = commandUseCase;
         this.queryUseCase = queryUseCase;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setParticipation(IDisputeParticipationPort participation) {
+        if (participation != null) {
+            this.participation = participation;
+        }
+    }
+
+    /** A non-mediator may only open a dispute on a mission they took part in. */
+    private <T> Mono<T> ifParticipant(TntUserIdentity currentUser, String missionId, java.util.function.Supplier<Mono<T>> action) {
+        if (isPrivileged(currentUser)) {
+            return action.get();
+        }
+        String org = currentUser.organizationId() != null ? currentUser.organizationId().toString() : null;
+        return participation.isParticipant(currentUser.tenantId().toString(), missionId,
+                        currentUser.actorId().toString(), org)
+                .flatMap(ok -> ok ? action.get() : Mono.error(TntRoleException.forbidden("dispute", "create")));
     }
 
     private boolean isPrivileged(TntUserIdentity currentUser) {
@@ -74,6 +96,15 @@ public class DisputeController {
         String self = currentUser.actorId() != null ? currentUser.actorId().toString() : null;
         if (!isPrivileged(currentUser) && (actorIdInPayload == null || !actorIdInPayload.equals(self))) {
             throw TntRoleException.forbidden("dispute", "create");
+        }
+    }
+
+    /** An organisation's disputes are for its own members and for mediators. */
+    private void assertOrgAccess(TntUserIdentity currentUser, String orgId) {
+        boolean member = currentUser.organizationId() != null
+                && currentUser.organizationId().toString().equalsIgnoreCase(orgId);
+        if (!isPrivileged(currentUser) && !member) {
+            throw TntRoleException.forbidden("dispute", "read");
         }
     }
 
@@ -90,7 +121,8 @@ public class DisputeController {
             @RequestBody DisputeRequests.OpenDisputeRequest request) {
         assertActingAsSelf(currentUser, request.claimantId());
         String tenantId = currentUser.tenantId().toString();
-        return commandUseCase.openDispute(DisputeRestMapper.toCommand(request, tenantId))
+        return ifParticipant(currentUser, request.missionId(),
+                () -> commandUseCase.openDispute(DisputeRestMapper.toCommand(request, tenantId)))
                 .map(DisputeRestMapper::toOpenedResponse);
     }
 
@@ -105,8 +137,9 @@ public class DisputeController {
             @PathVariable String id) {
         String tenantId = currentUser.tenantId().toString();
         String requesterId = currentUser.actorId() != null ? currentUser.actorId().toString() : null;
-        return queryUseCase.getDispute(new GetDisputeQuery(DisputeId.of(id), tenantId, requesterId, isPrivileged(currentUser)))
-                .map(DisputeRestMapper::toDetailResponse);
+        boolean privileged = isPrivileged(currentUser);
+        return queryUseCase.getDispute(new GetDisputeQuery(DisputeId.of(id), tenantId, requesterId, privileged))
+                .map(d -> DisputeRestMapper.toDetailResponse(d, privileged));
     }
 
     // =========================================================================
@@ -121,8 +154,9 @@ public class DisputeController {
             @PathVariable String reference) {
         String tenantId = currentUser.tenantId().toString();
         String requesterId = currentUser.actorId() != null ? currentUser.actorId().toString() : null;
-        return queryUseCase.getByReference(reference, tenantId, requesterId, isPrivileged(currentUser))
-                .map(DisputeRestMapper::toDetailResponse);
+        boolean privileged = isPrivileged(currentUser);
+        return queryUseCase.getByReference(reference, tenantId, requesterId, privileged)
+                .map(d -> DisputeRestMapper.toDetailResponse(d, privileged));
     }
 
     // =========================================================================
@@ -199,7 +233,7 @@ public class DisputeController {
             @RequestBody DisputeRequests.AssignMediatorRequest request) {
         String tenantId = currentUser.tenantId().toString();
         return commandUseCase.assignMediator(DisputeRestMapper.toCommand(request, id, tenantId))
-                .map(DisputeRestMapper::toDetailResponse);
+                .map(d -> DisputeRestMapper.toDetailResponse(d, true));
     }
 
     // =========================================================================
@@ -215,8 +249,19 @@ public class DisputeController {
             @RequestBody DisputeRequests.AddCommentRequest request) {
         assertActingAsSelf(currentUser, request.authorId());
         String tenantId = currentUser.tenantId().toString();
-        return commandUseCase.addComment(DisputeRestMapper.toCommand(request, id, tenantId))
-                .map(DisputeRestMapper::toDetailResponse);
+        boolean privileged = isPrivileged(currentUser);
+        // A party may only write on a dispute it can see, as its own side, never as an internal note.
+        Mono<DisputeRequests.AddCommentRequest> safeRequest = privileged
+                ? Mono.just(request)
+                : queryUseCase.getDispute(new GetDisputeQuery(DisputeId.of(id), tenantId, request.authorId(), false))
+                        .map(d -> new DisputeRequests.AddCommentRequest(
+                                request.authorId(),
+                                request.authorId().equals(d.getClaimantId()) ? "CLAIMANT" : "RESPONDENT",
+                                request.content(),
+                                false));
+        return safeRequest
+                .flatMap(r -> commandUseCase.addComment(DisputeRestMapper.toCommand(r, id, tenantId)))
+                .map(d -> DisputeRestMapper.toDetailResponse(d, privileged));
     }
 
     // =========================================================================
@@ -246,8 +291,12 @@ public class DisputeController {
             @PathVariable String id,
             @RequestBody DisputeRequests.CloseDisputeRequest request) {
         String tenantId = currentUser.tenantId().toString();
-        return commandUseCase.closeDispute(DisputeRestMapper.toCommand(request, id, tenantId))
-                .map(DisputeRestMapper::toDetailResponse);
+        // the closure is attributed to the authenticated mediator, never to a name taken from the payload
+        String closedBy = currentUser.actorId() != null ? currentUser.actorId().toString() : request.closedBy();
+        DisputeRequests.CloseDisputeRequest attributed =
+                new DisputeRequests.CloseDisputeRequest(request.closureType(), request.summary(), closedBy);
+        return commandUseCase.closeDispute(DisputeRestMapper.toCommand(attributed, id, tenantId))
+                .map(d -> DisputeRestMapper.toDetailResponse(d, true));
     }
 
     // =========================================================================
@@ -262,7 +311,7 @@ public class DisputeController {
             @RequestBody DisputeRequests.ProcessCompensationRequest request) {
         String tenantId = currentUser.tenantId().toString();
         return commandUseCase.processCompensation(DisputeRestMapper.toCommand(request, id, tenantId))
-                .map(DisputeRestMapper::toDetailResponse);
+                .map(d -> DisputeRestMapper.toDetailResponse(d, true));
     }
     // ── : FreelancerOrg dispute endpoints ─────────────────────────────────
 
@@ -284,7 +333,7 @@ public class DisputeController {
                 tenantId, cmd.claimantId(), cmd.claimantType(), cmd.freelancerOrgId(), cmd.freelancerOrgOwnerId(),
                 cmd.impliedSubDelivererId(), cmd.cause(), cmd.category(), cmd.priority(), cmd.missionId(),
                 cmd.packageId(), cmd.trackingCode(), cmd.description());
-        return commandUseCase.openAgainstFreelancerOrg(tenantSafeCmd)
+        return ifParticipant(currentUser, cmd.missionId(), () -> commandUseCase.openAgainstFreelancerOrg(tenantSafeCmd))
                 .map(DisputeRestMapper::toDetailResponse);
     }
 
@@ -298,6 +347,7 @@ public class DisputeController {
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @PathVariable String orgId,
             @RequestParam(required = false) String status) {
+        assertOrgAccess(currentUser, orgId);
         String tenantId = currentUser.tenantId().toString();
         return queryUseCase.findDisputesByFreelancerOrg(orgId, status, tenantId)
                 .map(DisputeRestMapper::toSummaryResponse);
@@ -312,6 +362,7 @@ public class DisputeController {
     public Mono<DisputeResponses.DisputeStatsResponse> getDisputeStatsByOrg(
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @PathVariable String orgId) {
+        assertOrgAccess(currentUser, orgId);
         String tenantId = currentUser.tenantId().toString();
         return queryUseCase.getDisputeStatsByOrg(orgId, tenantId)
                 .map(DisputeRestMapper::toStatsResponse);

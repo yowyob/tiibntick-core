@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.yowyob.kernel.event.application.port.in.PublishEventUseCase;
 import com.yowyob.kernel.event.application.port.out.EventEnvelopeRepository;
-import com.yowyob.kernel.event.application.port.out.OutboxPollerPort;
 import com.yowyob.kernel.event.config.YowEventKernelAutoConfiguration;
 import com.yowyob.kernel.event.domain.enums.EnvelopeStatus;
 import com.yowyob.tiibntick.core.billing.templates.domain.event.CustomTemplateSavedEvent;
@@ -67,6 +66,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.kafka.test.utils.KafkaTestUtils.getSingleRecord;
 
 /**
+ * <b>Current behaviour (outbox decommissioned 2026-09-18):</b> the event is persisted, then published
+ * directly to Kafka, and the envelope ends {@code PUBLISHED} ({@code FAILED} if the broker refuses it).
+ * The paragraphs below describe the original outbox migration and are kept for history.
+ *
  * End-to-end integration test proving the Chantier C · Audit n°3 · P5 migration:
  * {@link KafkaTemplateEventPublisher} now enqueues events into the {@code yow-event-kernel}
  * transactional outbox instead of sending to Kafka directly, and {@code OutboxPollerService}
@@ -127,18 +130,15 @@ class KafkaTemplateEventPublisherOutboxIntegrationTest {
     private KafkaTemplateEventPublisher publisher;
 
     @Autowired
-    private OutboxPollerPort outboxPollerPort;
-
-    @Autowired
     private EventEnvelopeRepository envelopeRepository;
 
     @Autowired
     private EmbeddedKafkaBroker embeddedKafka;
 
     @Test
-    @DisplayName("publishTemplateApplied() enqueues to the outbox (PENDING); the poller then "
-            + "delivers it keyed by ownerActorId with the raw-event wire format consumers expect")
-    void publishTemplateAppliedGoesThroughOutbox() throws Exception {
+    @DisplayName("publishTemplateApplied() publishes straight to Kafka (envelope PUBLISHED); the record is "
+            + "delivered keyed by ownerActorId with the raw-event wire format consumers expect")
+    void publishTemplateAppliedPublishesToKafka() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
         UUID tenantId = UUID.randomUUID();
@@ -157,12 +157,12 @@ class KafkaTemplateEventPublisherOutboxIntegrationTest {
 
         publisher.publishTemplateApplied(event).block(Duration.ofSeconds(10));
 
-        // 1. The envelope is durably persisted PENDING — nothing sent to Kafka yet.
+        // 1. The envelope is persisted and already PUBLISHED: the event goes straight to Kafka (outbox decommissioned).
         StepVerifier.create(envelopeRepository.findByAggregateId(
                         "TPL-FRAGILE", "PolicyTemplate", tenantId.toString()))
                 .assertNext(envelope -> {
                     assertThat(envelope.getKafkaTopic()).isEqualTo(TEMPLATE_APPLIED_TOPIC);
-                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PENDING);
+                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED);
                     assertThat(envelope.getKafkaPartitionKey()).isEqualTo(actorId);
                     assertThat(envelope.getCorrelationId()).isEqualTo(event.getEventId().toString());
                 })
@@ -176,12 +176,6 @@ class KafkaTemplateEventPublisherOutboxIntegrationTest {
 
         try (Consumer<String, String> rawConsumer = new KafkaConsumer<>(consumerProps)) {
             embeddedKafka.consumeFromAnEmbeddedTopic(rawConsumer, TEMPLATE_APPLIED_TOPIC);
-
-            // 2. Trigger one poll cycle directly (what OutboxPollerService.scheduledPoll() does
-            //    on a fixed delay in production).
-            StepVerifier.create(outboxPollerPort.poll())
-                    .expectNextMatches(count -> count >= 1)
-                    .verifyComplete();
 
             ConsumerRecord<String, String> received =
                     getSingleRecord(rawConsumer, TEMPLATE_APPLIED_TOPIC, Duration.ofSeconds(15));
@@ -206,7 +200,7 @@ class KafkaTemplateEventPublisherOutboxIntegrationTest {
 
     @Test
     @DisplayName("publishCustomTemplateSaved() routes to its own topic through the outbox")
-    void publishCustomTemplateSavedGoesThroughOutbox() throws Exception {
+    void publishCustomTemplateSavedPublishesToKafka() throws Exception {
         UUID tenantId = UUID.randomUUID();
         UUID customTemplateId = UUID.randomUUID();
         String actorId = "actor-" + UUID.randomUUID();
@@ -225,7 +219,7 @@ class KafkaTemplateEventPublisherOutboxIntegrationTest {
                         customTemplateId.toString(), "PolicyTemplate", tenantId.toString()))
                 .assertNext(envelope -> {
                     assertThat(envelope.getKafkaTopic()).isEqualTo(CUSTOM_TEMPLATE_SAVED_TOPIC);
-                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PENDING);
+                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED);
                     assertThat(envelope.getKafkaPartitionKey()).isEqualTo(actorId);
                 })
                 .verifyComplete();
@@ -238,10 +232,6 @@ class KafkaTemplateEventPublisherOutboxIntegrationTest {
 
         try (Consumer<String, String> rawConsumer = new KafkaConsumer<>(consumerProps)) {
             embeddedKafka.consumeFromAnEmbeddedTopic(rawConsumer, CUSTOM_TEMPLATE_SAVED_TOPIC);
-
-            StepVerifier.create(outboxPollerPort.poll())
-                    .expectNextMatches(count -> count >= 1)
-                    .verifyComplete();
 
             ConsumerRecord<String, String> received =
                     getSingleRecord(rawConsumer, CUSTOM_TEMPLATE_SAVED_TOPIC, Duration.ofSeconds(15));

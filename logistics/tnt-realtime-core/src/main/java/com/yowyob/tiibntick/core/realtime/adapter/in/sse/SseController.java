@@ -65,10 +65,16 @@ public class SseController {
      */
     @GetMapping(value = "/tracking/{trackingCode}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> trackPackage(
-            @PathVariable String trackingCode,
-            @org.springframework.web.bind.annotation.RequestHeader(
-                    value = "X-Tenant-Id", defaultValue = "default") String tenantId) {
-
+            @io.swagger.v3.oas.annotations.Parameter(hidden = true)
+            @com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser
+            com.yowyob.tiibntick.core.auth.domain.model.TntUserIdentity currentUser,
+            @PathVariable String trackingCode) {
+        if (currentUser == null) {
+            return Flux.error(new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.UNAUTHORIZED, "Authentication required"));
+        }
+        // The tenant comes from the verified token, never from a client header.
+        String tenantId = currentUser.tenantId().toString();
         log.debug("SSE tracking stream opened for code {} (tenant {})", trackingCode, tenantId);
 
         Flux<ServerSentEvent<String>> dataStream = sseDomainService
@@ -99,10 +105,17 @@ public class SseController {
      */
     @GetMapping(value = "/mission/{missionId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> trackMission(
-            @PathVariable String missionId,
-            @org.springframework.web.bind.annotation.RequestHeader(
-                    value = "X-Tenant-Id", defaultValue = "default") String tenantId) {
-
+            @io.swagger.v3.oas.annotations.Parameter(hidden = true)
+            @com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser
+            com.yowyob.tiibntick.core.auth.domain.model.TntUserIdentity currentUser,
+            @PathVariable String missionId) {
+        // The mission feed is the dispatcher view: clients and deliverers follow a parcel by tracking code.
+        if (currentUser == null || !currentUser.hasPermission("route", "compute")) {
+            return Flux.error(new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN,
+                    "The mission feed is reserved to fleet supervisors; follow a parcel by its tracking code"));
+        }
+        String tenantId = currentUser.tenantId().toString();
         log.debug("SSE mission stream opened for mission {} (tenant {})", missionId, tenantId);
 
         Flux<ServerSentEvent<String>> dataStream = sseDomainService
@@ -140,8 +153,19 @@ public class SseController {
             produces = org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE)
     public reactor.core.publisher.Flux<org.springframework.http.codec.ServerSentEvent<Object>>
             streamFreelancerOrgFleet(
-                    @org.springframework.web.bind.annotation.PathVariable String freelancerOrgId,
-                    @org.springframework.web.bind.annotation.RequestParam String tenantId) {
+                    @io.swagger.v3.oas.annotations.Parameter(hidden = true)
+                    @com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser
+                    com.yowyob.tiibntick.core.auth.domain.model.TntUserIdentity currentUser,
+                    @org.springframework.web.bind.annotation.PathVariable String freelancerOrgId) {
+        // Only the organisation's own members (or a fleet supervisor) may watch its livreurs' positions.
+        boolean member = currentUser != null && currentUser.organizationId() != null
+                && currentUser.organizationId().toString().equalsIgnoreCase(freelancerOrgId);
+        if (currentUser == null || !(member || currentUser.hasPermission("route", "compute"))) {
+            return reactor.core.publisher.Flux.error(new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN,
+                    "This fleet belongs to another organisation"));
+        }
+        String tenantId = currentUser.tenantId().toString();
 
         log.info("SSE fleet stream opened for FreelancerOrg={} tenant={}", freelancerOrgId, tenantId);
         return watchSubDeliverersUseCase.watchSubDeliverers(freelancerOrgId, tenantId)
@@ -168,7 +192,17 @@ public class SseController {
      * @param geohash the geohash tile code (precision 5-6, see {@code TntGeohashUtil})
      */
     @GetMapping(value = "/tile/{geohash}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<ServerSentEvent<Object>> streamTile(@PathVariable String geohash) {
+    public Flux<ServerSentEvent<Object>> streamTile(
+            @io.swagger.v3.oas.annotations.Parameter(hidden = true)
+            @com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser
+            com.yowyob.tiibntick.core.auth.domain.model.TntUserIdentity currentUser,
+            @PathVariable String geohash) {
+        // A tile carries the live position of every deliverer inside it: fleet supervision only.
+        if (currentUser == null || !currentUser.hasPermission("route", "compute")) {
+            return Flux.error(new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN,
+                    "Live fleet tiles are reserved to fleet supervisors"));
+        }
         log.debug("SSE tile stream opened for geohash={}", geohash);
         String topicPath = BroadcastTopic.forTile(geohash).path();
         return broadcaster.subscribeToTopic(topicPath)

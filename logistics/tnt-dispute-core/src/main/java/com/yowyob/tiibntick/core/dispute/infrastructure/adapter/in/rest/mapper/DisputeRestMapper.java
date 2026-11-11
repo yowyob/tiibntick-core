@@ -112,7 +112,13 @@ public final class DisputeRestMapper {
                 dispute.getDeadline());
     }
 
+    /** Detail as seen by a party: internal mediator notes are left out. */
     public static DisputeDetailResponse toDetailResponse(Dispute dispute) {
+        return toDetailResponse(dispute, false);
+    }
+
+    /** @param privileged {@code true} for mediators/administrators, who also see internal notes */
+    public static DisputeDetailResponse toDetailResponse(Dispute dispute, boolean privileged) {
         return new DisputeDetailResponse(
                 dispute.getId().getValue(),
                 dispute.getReference().getValue(),
@@ -138,7 +144,13 @@ public final class DisputeRestMapper {
                 toSlaResponse(dispute.getSlaPolicy(), dispute.getFiledAt()),
                 dispute.getRespondentOrgId(),
                 dispute.getImpliedSubDelivererId(),
-                dispute.getSubDelivererInvolved());
+                dispute.getSubDelivererInvolved(),
+                dispute.getComments().stream()
+                        .filter(c -> privileged || !c.isInternal())
+                        .map(c -> new CommentResponse(
+                                c.getId(), c.getAuthorId(), c.getAuthorType().name(),
+                                c.getContent(), c.isInternal(), c.getPostedAt()))
+                        .toList());
     }
 
     public static DisputeStatsResponse toStatsResponse(DisputeStats stats) {

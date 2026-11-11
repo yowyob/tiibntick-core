@@ -13,7 +13,9 @@ import io.micrometer.core.annotation.Timed;
 import io.swagger.v3.oas.annotations.Parameter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -59,6 +61,7 @@ public class SyncController {
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestHeader(value = "X-Device-Id", required = false, defaultValue = "unknown") String deviceId,
             @RequestBody SyncPushRequest request) {
+        assertSelf(userId, currentUser);
 
         log.debug("Push sync request from user={}, tenant={}, ops={}", userId, currentUser.tenantId().toString(),
                 request.hasOperations() ? request.operations().size() : 0);
@@ -81,6 +84,7 @@ public class SyncController {
             @RequestHeader(value = "X-Device-Id", required = false, defaultValue = "unknown") String deviceId,
             @RequestParam(value = "syncToken", required = false) String syncToken,
             @RequestParam(value = "filter", required = false) Set<String> filterAggregates) {
+        assertSelf(userId, currentUser);
 
         log.debug("Pull sync request from user={}, tenant={}, token={}", userId, currentUser.tenantId().toString(), syncToken);
 
@@ -100,6 +104,7 @@ public class SyncController {
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestHeader(value = "X-Device-Id", required = false, defaultValue = "unknown") String deviceId,
             @RequestParam(value = "filter", required = false) Set<String> filterAggregates) {
+        assertSelf(userId, currentUser);
 
         log.info("Bootstrap sync for user={}, tenant={}", userId, currentUser.tenantId().toString());
         return computeDelta.computeDelta(userId, currentUser.tenantId().toString(), deviceId, null, filterAggregates)
@@ -118,5 +123,16 @@ public class SyncController {
 
         return schemaProvider.getDdl(tenantId)
                 .map(ddl -> ResponseEntity.ok(new DuckDbSchemaResponse(ddl, "1.0", "TiiBnTick DuckDB-Wasm schema")));
+    }
+
+    /**
+     * The {@code X-User-Id} header is client-supplied: honouring it would let any authenticated user
+     * push as, or pull the data of, someone else. It must match the token's own user.
+     */
+    private static void assertSelf(String headerUserId, TntUserIdentity currentUser) {
+        if (currentUser.userId() == null || !currentUser.userId().toString().equals(headerUserId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "X-User-Id does not match the authenticated user");
+        }
     }
 }

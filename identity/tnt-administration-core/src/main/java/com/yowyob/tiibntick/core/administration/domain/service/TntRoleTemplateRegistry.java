@@ -136,6 +136,16 @@ public class TntRoleTemplateRegistry {
                         "trust:read", "trust:verify"),
                 false));
 
+        templates.add(new TntRoleTemplate("MEDIATOR", "Dispute Mediator", "TENANT",
+                Set.of("delivery:read", "delivery:track",
+                        "actor:read",
+                        "billing:read", "invoice:read",
+                        "dispute:read", "dispute:resolve",
+                        "incident:read", "incident:manage",
+                        "media:read", "media:upload",
+                        "trust:read", "trust:verify"),
+                false));
+
         templates.add(new TntRoleTemplate("ORG_ADMIN", "Organization Admin", "ORGANIZATION",
                 Set.of("org:admin",
                         "agency:read", "agency:write", "agency:manage",
@@ -304,17 +314,17 @@ public class TntRoleTemplateRegistry {
     }
 
     /**
-     * Returns only the 9 canonical TntRole templates (aligned with {@code TntRole} enum
+     * Returns only the 10 canonical TntRole templates (aligned with {@code TntRole} enum
      * in {@code tnt-roles-core}). Used by provisioning logic that specifically targets
      * the canonical role set rather than the full operational template catalog.
      *
-     * @return immutable list of the 9 canonical role templates
+     * @return immutable list of the 10 canonical role templates
      */
     public List<TntRoleTemplate> getCanonicalTemplates() {
         return getTemplates().stream()
                 .filter(t -> Set.of("AGENCY_MANAGER", "BRANCH_MANAGER", "PERMANENT_DELIVERER",
                         "FREELANCER", "RELAY_OPERATOR", "CLIENT",
-                        "SUPPORT_AGENT", "ORG_ADMIN", "TNT_ADMIN")
+                        "SUPPORT_AGENT", "MEDIATOR", "ORG_ADMIN", "TNT_ADMIN")
                         .contains(t.code()))
                 .toList();
     }

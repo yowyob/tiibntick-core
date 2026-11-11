@@ -19,7 +19,8 @@ public interface DeliveryUseCase {
     Flux<DeliveryResponseDTO> getDeliveriesByStatus(DeliveryStatus status);
     Mono<DeliveryResponseDTO> updateDelivery(UUID id, DeliveryUpdateDTO dto);
     Mono<DeliveryResponseDTO> updateStatus(UUID id, DeliveryStatusUpdateDTO dto);
-    Mono<DeliveryResponseDTO> cancelDelivery(UUID id);
+    /** Cancels the delivery in tnt-delivery-core (state machine decides) and projects the result. */
+    Mono<DeliveryResponseDTO> cancelDelivery(UUID id, UUID requesterId, String reason);
     Mono<DeliveryTrackingDTO> trackDelivery(UUID announcementId);
     Flux<DeliveryTrackingDTO> trackDeliveryStream(UUID announcementId);
     Mono<DeliveryTrackingDTO> trackDeliveryByNeed(UUID deliveryNeedId, UUID callerId);

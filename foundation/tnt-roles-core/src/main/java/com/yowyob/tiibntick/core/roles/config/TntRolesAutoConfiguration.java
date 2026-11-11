@@ -337,9 +337,13 @@ public class TntRolesAutoConfiguration {
         return new CachingReactivePermissionResolverDecorator(delegate, permissionCache);
     }
 
+    /**
+     * The permission DSL is a plain service that business code injects directly (e.g. row-level access
+     * policies), so it must exist whether or not the {@code @RequirePermission} aspect is switched on:
+     * {@code tnt.roles.aop-enabled} only gates {@link #tntPermissionAspect}.
+     */
     @Bean
     @ConditionalOnMissingBean({CheckPermissionUseCase.class, TntPermissionEvaluator.class})
-    @ConditionalOnProperty(prefix = "tnt.roles", name = "aop-enabled", havingValue = "true", matchIfMissing = true)
     public TntPermissionEvaluator tntPermissionEvaluator(
             ReactivePermissionResolver reactivePermissionResolver,
             TntRoleDefinitionRegistry registry) {

@@ -6,7 +6,8 @@ import com.yowyob.tiibntick.core.billing.wallet.domain.enums.CommissionStatus;
 import com.yowyob.tiibntick.core.billing.wallet.domain.enums.SettlementMethod;
 import com.yowyob.tiibntick.core.billing.wallet.domain.enums.SettlementStatus;
 import com.yowyob.tiibntick.core.billing.wallet.domain.model.WalletSettlement;
-import com.yowyob.tiibntick.core.delivery.application.port.in.DeliveryLifecycleUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryLifecyclePort;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryLifecyclePort.CoreDeliveryState;
 import com.yowyob.tiibntick.core.delivery.application.port.in.DeliveryQueryUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.DeliveryStatusUpdateDTO;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepository;
@@ -76,7 +77,7 @@ class DeliveredButUnpaidTest {
     @Mock private RecordMissionUseCase missionUseCase;
     @Mock private RecordPaymentUseCase paymentUseCase;
     @Mock private DeliveryQueryUseCase deliveryQueryUseCase;
-    @Mock private DeliveryLifecycleUseCase deliveryLifecycleUseCase;
+    @Mock private IDeliveryLifecyclePort lifecycle;
     @Mock private TenantContextHolder tenantContextHolder;
 
     private final UUID tenantId     = UUID.randomUUID();
@@ -115,6 +116,11 @@ class DeliveredButUnpaidTest {
         });
         when(deliveryOtpService.initOtpIfAbsent(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
         when(otpService.verifyOtp(eq(otp), eq("hash"))).thenReturn(true);
+        // delivery-core is the lifecycle authority: it sits in IN_TRANSIT and accepts the completion.
+        when(lifecycle.findState(tenantId, deliveryId)).thenReturn(Mono.just(new CoreDeliveryState(
+                deliveryId, "IN_TRANSIT", null, profileId, null, null)));
+        when(lifecycle.complete(eq(tenantId), eq(deliveryId), any())).thenReturn(Mono.just(new CoreDeliveryState(
+                deliveryId, "DELIVERED", null, profileId, null, java.time.Instant.now())));
         when(deliveryQueryUseCase.findDeliveryById(tenantId, deliveryId)).thenReturn(Mono.just(coreDelivery));
         when(deliveryQueryUseCase.resolveActorIdForDeliveryPerson(tenantId, profileId))
                 .thenReturn(Mono.just(courierActor));
@@ -209,7 +215,7 @@ class DeliveredButUnpaidTest {
                 pushNotificationPort, deliveryNeedRepository, announcementRepository,
                 otpService, deliveryOtpService, settlements,
                 custodyTransferUseCase, missionUseCase, paymentUseCase,
-                deliveryQueryUseCase, deliveryLifecycleUseCase, tenantContextHolder, meters);
+                deliveryQueryUseCase, lifecycle, tenantContextHolder, meters);
         s.initMetrics();
         return s;
     }

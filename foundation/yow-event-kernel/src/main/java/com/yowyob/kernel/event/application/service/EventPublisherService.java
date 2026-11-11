@@ -86,10 +86,14 @@ public class EventPublisherService implements PublishEventUseCase, PublishEventB
             throw new IllegalArgumentException("Cannot publish an empty batch");
         }
 
-        return envelopeRepository.saveAll(envelopes)
-            .flatMap(savedCount -> Flux.fromIterable(envelopes)
-                .flatMap(this::publishDirectly)
-                .then(Mono.just(savedCount)));
+        // Publish the envelopes AS PERSISTED, not the in-memory ones: the insert assigns the row its
+        // optimistic-lock version, and updateStatus only matches the persisted version. Using the
+        // originals left every batch-published envelope PENDING even though Kafka had the record.
+        return Flux.fromIterable(envelopes)
+            .concatMap(envelopeRepository::save)
+            .concatMap(saved -> publishDirectly(saved).thenReturn(saved))
+            .count()
+            .map(Long::intValue);
     }
 
     // ── Internal ──────────────────────────────────────────────────────────
@@ -102,7 +106,8 @@ public class EventPublisherService implements PublishEventUseCase, PublishEventB
     private Mono<Void> publishDirectly(final DomainEventEnvelope envelope) {
         long startMs = System.currentTimeMillis();
 
-        return kafkaPublisher.publish(envelope)
+        // Defer: a port that throws instead of signalling must still end as a FAILED envelope, not a failed publish.
+        return Mono.defer(() -> kafkaPublisher.publish(envelope))
             .then(Mono.defer(() -> {
                 long elapsed = System.currentTimeMillis() - startMs;
                 envelope.markPublished();

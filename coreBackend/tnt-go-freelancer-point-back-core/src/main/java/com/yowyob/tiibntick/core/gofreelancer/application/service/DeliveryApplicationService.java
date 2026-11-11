@@ -19,6 +19,7 @@ import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.Delive
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.DeliveryUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.CachePort;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryLifecyclePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -56,6 +57,7 @@ public class DeliveryApplicationService implements DeliveryUseCase {
     private final IGetPresenceUseCase getPresenceUseCase;
     private final CachePort cachePort;
     private final TenantContextHolder tenantContextHolder;
+    private final IDeliveryLifecyclePort lifecyclePort;
     private final GofpFreelancerRepository gofpFreelancerRepository;
 
     @Value("${tnt.gofp.ownership-guard.enabled:true}")
@@ -130,20 +132,18 @@ public class DeliveryApplicationService implements DeliveryUseCase {
     }
 
     @Override
-    public Mono<DeliveryResponseDTO> cancelDelivery(UUID id) {
-        return deliveryRepository.findById(id)
-                .switchIfEmpty(Mono.error(new IllegalArgumentException("Delivery not found: " + id)))
-                .flatMap(delivery -> {
-                    DeliveryStatus current = delivery.getStatus();
-                    if (current == DeliveryStatus.DELIVERED
-                            || current == DeliveryStatus.FAILED
-                            || current == DeliveryStatus.CANCELLED) {
-                        return Mono.error(new IllegalStateException(
-                                "Cannot cancel delivery in terminal state: " + current));
-                    }
-                    delivery.setStatus(DeliveryStatus.CANCELLED);
-                    return deliveryRepository.save(delivery);
-                })
+    public Mono<DeliveryResponseDTO> cancelDelivery(UUID id, UUID requesterId, String reason) {
+        return tenantContextHolder.currentTenantId()
+                .defaultIfEmpty(TenantContextHolder.SYSTEM_TENANT)
+                .flatMap(tenantId -> deliveryRepository.findById(id)
+                        .switchIfEmpty(Mono.error(new IllegalArgumentException("Delivery not found: " + id)))
+                        // The core state machine refuses a terminal/illegal state (409); nothing is written then.
+                        .flatMap(delivery -> lifecyclePort.cancel(tenantId, id, requesterId,
+                                        reason != null && !reason.isBlank() ? reason : "Cancelled by the requester")
+                                .flatMap(state -> {
+                                    CoreDeliveryProjection.apply(delivery, state);
+                                    return deliveryRepository.save(delivery);
+                                })))
                 .map(this::toResponseDTO);
     }
 
@@ -320,6 +320,8 @@ public class DeliveryApplicationService implements DeliveryUseCase {
             case DELIVERED -> "Livraison terminée.";
             case FAILED -> "Livraison échouée — demandez de l'assistance.";
             case CANCELLED -> "Livraison annulée.";
+            case PAUSED_BY_INCIDENT -> "Livraison suspendue suite à un incident — en attente de reprise.";
+            case TIMED_OUT, SLA_BREACHED -> "Délai dépassé — contactez le support si besoin.";
         };
     }
 

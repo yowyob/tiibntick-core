@@ -6,7 +6,6 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.yowyob.kernel.event.application.port.in.PublishEventBatchUseCase;
 import com.yowyob.kernel.event.application.port.in.PublishEventUseCase;
 import com.yowyob.kernel.event.application.port.out.EventEnvelopeRepository;
-import com.yowyob.kernel.event.application.port.out.OutboxPollerPort;
 import com.yowyob.kernel.event.config.YowEventKernelAutoConfiguration;
 import com.yowyob.kernel.event.domain.enums.EnvelopeStatus;
 import com.yowyob.tiibntick.core.billing.invoice.domain.event.InvoiceCancelled;
@@ -64,6 +63,10 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
+ * <b>Current behaviour (outbox decommissioned 2026-09-18):</b> the event is persisted, then published
+ * directly to Kafka, and the envelope ends {@code PUBLISHED} ({@code FAILED} if the broker refuses it).
+ * The paragraphs below describe the original outbox migration and are kept for history.
+ *
  * End-to-end integration test proving the Chantier C · Audit n°3 · P5 migration:
  * {@link KafkaInvoiceEventPublisher} now enqueues events into the {@code yow-event-kernel}
  * transactional outbox instead of sending to Kafka directly via {@code KafkaTemplate.send(...)},
@@ -125,18 +128,15 @@ class KafkaInvoiceEventPublisherOutboxIntegrationTest {
     private KafkaInvoiceEventPublisher publisher;
 
     @Autowired
-    private OutboxPollerPort outboxPollerPort;
-
-    @Autowired
     private EventEnvelopeRepository envelopeRepository;
 
     @Autowired
     private EmbeddedKafkaBroker embeddedKafka;
 
     @Test
-    @DisplayName("publish() enqueues to the outbox (PENDING, not yet on Kafka); the poller then "
-            + "delivers it to the exact topic/payload format consumers expect")
-    void publishEnqueuesToOutboxThenPollerDeliversToKafka() throws Exception {
+    @DisplayName("publish() publishes straight to Kafka (envelope PUBLISHED); the record is "
+            + "delivered to the exact topic/payload format consumers expect")
+    void publishPublishesDirectlyToKafka() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
         UUID invoiceId = UUID.randomUUID();
@@ -147,12 +147,12 @@ class KafkaInvoiceEventPublisherOutboxIntegrationTest {
 
         publisher.publish(event, tenantId).block(Duration.ofSeconds(10));
 
-        // 1. The envelope is durably persisted PENDING — nothing sent to Kafka yet.
+        // 1. The envelope is persisted and already PUBLISHED: the event goes straight to Kafka (outbox decommissioned).
         StepVerifier.create(envelopeRepository.findByAggregateId(
                         invoiceId.toString(), "Invoice", tenantId.toString()))
                 .assertNext(envelope -> {
                     assertThat(envelope.getKafkaTopic()).isEqualTo(INVOICE_EVENTS_TOPIC);
-                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PENDING);
+                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED);
                     assertThat(envelope.getTenantId()).isEqualTo(tenantId.toString());
                 })
                 .verifyComplete();
@@ -165,12 +165,6 @@ class KafkaInvoiceEventPublisherOutboxIntegrationTest {
 
         try (Consumer<String, String> rawConsumer = new KafkaConsumer<>(consumerProps)) {
             embeddedKafka.consumeFromAnEmbeddedTopic(rawConsumer, INVOICE_EVENTS_TOPIC);
-
-            // 2. Trigger one poll cycle directly (what OutboxPollerService.scheduledPoll() does
-            //    on a fixed delay in production) — avoids waiting on real time in the test.
-            StepVerifier.create(outboxPollerPort.poll())
-                    .expectNextMatches(count -> count >= 1)
-                    .verifyComplete();
 
             // Both tests in this class share the single tnt.billing.invoice.events topic, so
             // fetch all records and select ours by key (unlike the delivery pilot, whose two
@@ -198,7 +192,7 @@ class KafkaInvoiceEventPublisherOutboxIntegrationTest {
 
     @Test
     @DisplayName("publishAll() batches an InvoiceCancelled event through the outbox to the same topic")
-    void publishAllRoutesInvoiceCancelledToOutbox() throws Exception {
+    void publishAllRoutesInvoiceCancelledToKafka() throws Exception {
         UUID invoiceId = UUID.randomUUID();
         UUID tenantId = UUID.randomUUID();
         InvoiceCancelled event = new InvoiceCancelled(invoiceId, "client requested", Instant.now());
@@ -209,7 +203,7 @@ class KafkaInvoiceEventPublisherOutboxIntegrationTest {
                         invoiceId.toString(), "Invoice", tenantId.toString()))
                 .assertNext(envelope -> {
                     assertThat(envelope.getKafkaTopic()).isEqualTo(INVOICE_EVENTS_TOPIC);
-                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PENDING);
+                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED);
                     assertThat(envelope.getTenantId()).isEqualTo(tenantId.toString());
                 })
                 .verifyComplete();
@@ -222,10 +216,6 @@ class KafkaInvoiceEventPublisherOutboxIntegrationTest {
 
         try (Consumer<String, String> rawConsumer = new KafkaConsumer<>(consumerProps)) {
             embeddedKafka.consumeFromAnEmbeddedTopic(rawConsumer, INVOICE_EVENTS_TOPIC);
-
-            StepVerifier.create(outboxPollerPort.poll())
-                    .expectNextMatches(count -> count >= 1)
-                    .verifyComplete();
 
             ConsumerRecord<String, String> received = findRecordByKey(
                     rawConsumer, INVOICE_EVENTS_TOPIC, invoiceId.toString());
@@ -261,10 +251,6 @@ class KafkaInvoiceEventPublisherOutboxIntegrationTest {
 
         try (Consumer<String, String> rawConsumer = new KafkaConsumer<>(consumerProps)) {
             embeddedKafka.consumeFromAnEmbeddedTopic(rawConsumer, INVOICE_PAID_TOPIC);
-
-            StepVerifier.create(outboxPollerPort.poll())
-                    .expectNextMatches(count -> count >= 1)
-                    .verifyComplete();
 
             ConsumerRecord<String, String> received = KafkaTestUtils.getSingleRecord(
                     rawConsumer, INVOICE_PAID_TOPIC, Duration.ofSeconds(15));

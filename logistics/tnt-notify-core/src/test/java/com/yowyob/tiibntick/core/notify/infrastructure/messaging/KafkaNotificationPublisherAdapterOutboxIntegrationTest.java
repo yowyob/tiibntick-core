@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.yowyob.kernel.event.application.port.in.PublishEventUseCase;
 import com.yowyob.kernel.event.application.port.out.EventEnvelopeRepository;
-import com.yowyob.kernel.event.application.port.out.OutboxPollerPort;
 import com.yowyob.kernel.event.config.YowEventKernelAutoConfiguration;
 import com.yowyob.kernel.event.domain.enums.EnvelopeStatus;
 import com.yowyob.tiibntick.core.notify.config.NotifyProperties;
@@ -67,6 +66,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.kafka.test.utils.KafkaTestUtils.getSingleRecord;
 
 /**
+ * <b>Current behaviour (outbox decommissioned 2026-09-18):</b> the event is persisted, then published
+ * directly to Kafka, and the envelope ends {@code PUBLISHED} ({@code FAILED} if the broker refuses it).
+ * The paragraphs below describe the original outbox migration and are kept for history.
+ *
  * End-to-end integration test proving the Chantier C · Audit n°3 · P5 migration:
  * {@link KafkaNotificationPublisherAdapter} now enqueues events into the
  * {@code yow-event-kernel} transactional outbox instead of sending to Kafka directly, and
@@ -126,18 +129,15 @@ class KafkaNotificationPublisherAdapterOutboxIntegrationTest {
     private KafkaNotificationPublisherAdapter publisher;
 
     @Autowired
-    private OutboxPollerPort outboxPollerPort;
-
-    @Autowired
     private EventEnvelopeRepository envelopeRepository;
 
     @Autowired
     private EmbeddedKafkaBroker embeddedKafka;
 
     @Test
-    @DisplayName("publishNotificationSent() enqueues to the outbox (PENDING); the poller then "
-            + "delivers it to tnt.notifications.sent with the pre-migration JSON map wire format")
-    void publishNotificationSentGoesThroughOutbox() throws Exception {
+    @DisplayName("publishNotificationSent() publishes straight to Kafka (envelope PUBLISHED); the record is "
+            + "delivered to tnt.notifications.sent with the pre-migration JSON map wire format")
+    void publishNotificationSentPublishesToKafka() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
         String tenantId = UUID.randomUUID().toString();
@@ -148,12 +148,12 @@ class KafkaNotificationPublisherAdapterOutboxIntegrationTest {
 
         publisher.publishNotificationSent(notification).block(Duration.ofSeconds(10));
 
-        // 1. Durably persisted PENDING — nothing on Kafka yet.
+        // 1. The envelope is persisted and already PUBLISHED: the event goes straight to Kafka (outbox decommissioned).
         StepVerifier.create(envelopeRepository.findByAggregateId(
                         notification.getId().value(), "Notification", tenantId))
                 .assertNext(envelope -> {
                     assertThat(envelope.getKafkaTopic()).isEqualTo(SENT_TOPIC);
-                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PENDING);
+                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED);
                     assertThat(envelope.getEventType()).isEqualTo("NOTIFICATION_SENT");
                 })
                 .verifyComplete();
@@ -166,11 +166,6 @@ class KafkaNotificationPublisherAdapterOutboxIntegrationTest {
 
         try (Consumer<String, String> rawConsumer = new KafkaConsumer<>(consumerProps)) {
             embeddedKafka.consumeFromAnEmbeddedTopic(rawConsumer, SENT_TOPIC);
-
-            // 2. One poll cycle relays it.
-            StepVerifier.create(outboxPollerPort.poll())
-                    .expectNextMatches(count -> count >= 1)
-                    .verifyComplete();
 
             ConsumerRecord<String, String> received =
                     getSingleRecord(rawConsumer, SENT_TOPIC, Duration.ofSeconds(15));
@@ -188,7 +183,7 @@ class KafkaNotificationPublisherAdapterOutboxIntegrationTest {
             assertThat(wirePayload.get("status").asText()).isEqualTo("SENT");
         }
 
-        // 3. Envelope transitions to PUBLISHED.
+        // 2. The envelope stays PUBLISHED after the consumer has read the record.
         StepVerifier.create(envelopeRepository.findByAggregateId(
                         notification.getId().value(), "Notification", tenantId))
                 .assertNext(envelope -> assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED))
@@ -210,7 +205,7 @@ class KafkaNotificationPublisherAdapterOutboxIntegrationTest {
                         notification.getId().value(), "Notification", tenantId))
                 .assertNext(envelope -> {
                     assertThat(envelope.getKafkaTopic()).isEqualTo(FAILED_TOPIC);
-                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PENDING);
+                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED);
                 })
                 .verifyComplete();
     }

@@ -1,5 +1,14 @@
 package com.yowyob.kernel.event.integration;
 
+import com.github.dockerjava.api.model.ExposedPort;
+import com.github.dockerjava.api.model.PortBinding;
+import com.github.dockerjava.api.model.Ports;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.utility.DockerImageName;
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.time.Duration;
 import liquibase.Contexts;
 import liquibase.LabelExpression;
 import liquibase.Liquibase;
@@ -68,6 +77,39 @@ class YowEventKernelIntegrationTest {
             .withUsername("yow_test")
             .withPassword("yow_test_secret");
 
+    /**
+     * A real single-node Kafka (KRaft). The host port is chosen up front and announced as the advertised
+     * listener, so the producer can reach the broker through the mapped port.
+     */
+    static final int KAFKA_PORT = freePort();
+
+    @Container
+    @SuppressWarnings("resource")
+    static final GenericContainer<?> KAFKA = new GenericContainer<>(DockerImageName.parse("apache/kafka:3.8.0"))
+            .withEnv("KAFKA_NODE_ID", "1")
+            .withEnv("KAFKA_PROCESS_ROLES", "broker,controller")
+            .withEnv("KAFKA_LISTENERS", "PLAINTEXT://:9092,CONTROLLER://:9093")
+            .withEnv("KAFKA_ADVERTISED_LISTENERS", "PLAINTEXT://localhost:" + KAFKA_PORT)
+            .withEnv("KAFKA_CONTROLLER_LISTENER_NAMES", "CONTROLLER")
+            .withEnv("KAFKA_LISTENER_SECURITY_PROTOCOL_MAP", "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT")
+            .withEnv("KAFKA_CONTROLLER_QUORUM_VOTERS", "1@localhost:9093")
+            .withEnv("KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR", "1")
+            .withEnv("KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR", "1")
+            .withEnv("KAFKA_TRANSACTION_STATE_LOG_MIN_ISR", "1")
+            .withEnv("KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS", "0")
+            .withCreateContainerCmdModifier(cmd -> cmd.getHostConfig()
+                    .withPortBindings(new PortBinding(Ports.Binding.bindPort(KAFKA_PORT), new ExposedPort(9092))))
+            .waitingFor(Wait.forLogMessage(".*Kafka Server started.*", 1))
+            .withStartupTimeout(Duration.ofMinutes(2));
+
+    private static int freePort() {
+        try (ServerSocket socket = new ServerSocket(0)) {
+            return socket.getLocalPort();
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     @BeforeAll
     static void migrateSchema() throws Exception {
         try (Connection conn = DriverManager.getConnection(
@@ -89,7 +131,7 @@ class YowEventKernelIntegrationTest {
         registry.add("spring.r2dbc.username", POSTGRES::getUsername);
         registry.add("spring.r2dbc.password", POSTGRES::getPassword);
 
-        registry.add("spring.kafka.bootstrap-servers", () -> "localhost:1");
+        registry.add("spring.kafka.bootstrap-servers", () -> "localhost:" + KAFKA_PORT);
 
         registry.add("spring.data.redis.host", () -> "localhost");
         registry.add("spring.data.redis.port", () -> 1);
@@ -129,24 +171,42 @@ class YowEventKernelIntegrationTest {
         )
                 .assertNext(found -> {
                     assertThat(found.getId()).isEqualTo(envelope.getId());
-                    assertThat(found.getStatus()).isEqualTo(EnvelopeStatus.PENDING);
+                    // stored, then sent to the real broker: the transactional outbox is gone (2026-09-18), so PUBLISHED directly
+                    assertThat(found.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED);
                     assertThat(found.getPayload()).isEqualTo("{\"hello\":\"world\"}");
                     assertThat(found.getTenantId()).isEqualTo(TENANT_ID);
                     assertThat(found.getPayloadHash()).isEqualTo(envelope.getPayloadHash());
                 })
                 .verifyComplete();
 
-        // Second, independent read path: directly through the repository port
-        // (not just the use-case service), and via the associated outbox entry —
-        // both event_bus tables are populated by the same publish() call.
+        // Second, independent read path: directly through the repository port (not just the use-case service).
         StepVerifier.create(envelopeRepository.findById(envelope.getId(), TENANT_ID))
                 .assertNext(found -> assertThat(found.getEventType()).isEqualTo("IntegrationTestEvent"))
                 .verifyComplete();
 
-        StepVerifier.create(outboxEntryRepository.findByEnvelopeId(envelope.getId()))
-                .assertNext(entry -> assertThat(entry.getKafkaTopic())
-                        .isEqualTo("tnt.event-kernel.integration-test"))
-                .verifyComplete();
+        // The message really reached the broker, with the standard Yowyob headers.
+        try (var consumer = newConsumer()) {
+            consumer.subscribe(java.util.List.of("tnt.event-kernel.integration-test"));
+            var seen = new java.util.ArrayList<org.apache.kafka.clients.consumer.ConsumerRecord<String, String>>();
+            long deadline = System.currentTimeMillis() + 20_000;
+            while (seen.stream().noneMatch(r -> "{\"hello\":\"world\"}".equals(r.value())) && System.currentTimeMillis() < deadline) {
+                consumer.poll(Duration.ofMillis(500)).forEach(seen::add);
+            }
+            var record = seen.stream().filter(r -> "{\"hello\":\"world\"}".equals(r.value())).findFirst();
+            assertThat(record).as("message consumed from Kafka").isPresent();
+            assertThat(new String(record.get().headers().lastHeader("X-Yow-Tenant-Id").value())).isEqualTo(TENANT_ID);
+            assertThat(new String(record.get().headers().lastHeader("X-Yow-Envelope-Id").value())).isEqualTo(envelope.getId().value());
+        }
+    }
+
+    private static org.apache.kafka.clients.consumer.KafkaConsumer<String, String> newConsumer() {
+        var props = new java.util.Properties();
+        props.put(org.apache.kafka.clients.consumer.ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:" + KAFKA_PORT);
+        props.put(org.apache.kafka.clients.consumer.ConsumerConfig.GROUP_ID_CONFIG, "it-" + UUID.randomUUID());
+        props.put(org.apache.kafka.clients.consumer.ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        props.put(org.apache.kafka.clients.consumer.ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, org.apache.kafka.common.serialization.StringDeserializer.class);
+        props.put(org.apache.kafka.clients.consumer.ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, org.apache.kafka.common.serialization.StringDeserializer.class);
+        return new org.apache.kafka.clients.consumer.KafkaConsumer<>(props);
     }
 
     @Test

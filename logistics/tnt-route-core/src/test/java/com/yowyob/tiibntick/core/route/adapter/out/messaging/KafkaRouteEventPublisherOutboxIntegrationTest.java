@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.yowyob.kernel.event.application.port.in.PublishEventUseCase;
 import com.yowyob.kernel.event.application.port.out.EventEnvelopeRepository;
-import com.yowyob.kernel.event.application.port.out.OutboxPollerPort;
 import com.yowyob.kernel.event.config.YowEventKernelAutoConfiguration;
 import com.yowyob.kernel.event.domain.enums.EnvelopeStatus;
 import com.yowyob.tiibntick.core.route.domain.event.ReroutingTriggeredEvent;
@@ -65,6 +64,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.kafka.test.utils.KafkaTestUtils.getSingleRecord;
 
 /**
+ * <b>Current behaviour (outbox decommissioned 2026-09-18):</b> the event is persisted, then published
+ * directly to Kafka, and the envelope ends {@code PUBLISHED} ({@code FAILED} if the broker refuses it).
+ * The paragraphs below describe the original outbox migration and are kept for history.
+ *
  * End-to-end integration test proving the Chantier C · Audit n°3 · P5 migration:
  * {@link KafkaRouteEventPublisher} now enqueues {@code TourOptimizedEvent},
  * {@code ReroutingTriggeredEvent} and {@code VrpFallbackActivatedEvent} into the
@@ -128,18 +131,15 @@ class KafkaRouteEventPublisherOutboxIntegrationTest {
     private KafkaRouteEventPublisher publisher;
 
     @Autowired
-    private OutboxPollerPort outboxPollerPort;
-
-    @Autowired
     private EventEnvelopeRepository envelopeRepository;
 
     @Autowired
     private EmbeddedKafkaBroker embeddedKafka;
 
     @Test
-    @DisplayName("publishTourOptimized() enqueues to the outbox (PENDING); the poller then "
-            + "delivers it to tnt.route.tour.events with the raw event JSON")
-    void publishTourOptimizedGoesThroughOutbox() throws Exception {
+    @DisplayName("publishTourOptimized() publishes straight to Kafka (envelope PUBLISHED); the record is "
+            + "delivered to tnt.route.tour.events with the raw event JSON")
+    void publishTourOptimizedPublishesToKafka() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
         UUID tenantId = UUID.randomUUID();
@@ -148,12 +148,12 @@ class KafkaRouteEventPublisherOutboxIntegrationTest {
 
         publisher.publishTourOptimized(event).block(Duration.ofSeconds(10));
 
-        // 1. Durably persisted PENDING — nothing on Kafka yet.
+        // 1. The envelope is persisted and already PUBLISHED: the event goes straight to Kafka (outbox decommissioned).
         StepVerifier.create(envelopeRepository.findByAggregateId(
                         delivererId, "Tour", tenantId.toString()))
                 .assertNext(envelope -> {
                     assertThat(envelope.getKafkaTopic()).isEqualTo(TOUR_TOPIC);
-                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PENDING);
+                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED);
                     assertThat(envelope.getCorrelationId()).isEqualTo(event.eventId().toString());
                 })
                 .verifyComplete();
@@ -166,11 +166,6 @@ class KafkaRouteEventPublisherOutboxIntegrationTest {
 
         try (Consumer<String, String> rawConsumer = new KafkaConsumer<>(consumerProps)) {
             embeddedKafka.consumeFromAnEmbeddedTopic(rawConsumer, TOUR_TOPIC);
-
-            // 2. One poll cycle relays it.
-            StepVerifier.create(outboxPollerPort.poll())
-                    .expectNextMatches(count -> count >= 1)
-                    .verifyComplete();
 
             ConsumerRecord<String, String> received =
                     getSingleRecord(rawConsumer, TOUR_TOPIC, Duration.ofSeconds(15));
@@ -185,7 +180,7 @@ class KafkaRouteEventPublisherOutboxIntegrationTest {
             assertThat(wirePayload.get("stopCount").asInt()).isEqualTo(12);
         }
 
-        // 3. Envelope transitions to PUBLISHED.
+        // 2. The envelope stays PUBLISHED after the consumer has read the record.
         StepVerifier.create(envelopeRepository.findByAggregateId(
                         delivererId, "Tour", tenantId.toString()))
                 .assertNext(envelope -> assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED))
@@ -206,7 +201,7 @@ class KafkaRouteEventPublisherOutboxIntegrationTest {
                         missionId, "Mission", tenantId.toString()))
                 .assertNext(envelope -> {
                     assertThat(envelope.getKafkaTopic()).isEqualTo(REROUTE_TOPIC);
-                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PENDING);
+                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED);
                 })
                 .verifyComplete();
     }

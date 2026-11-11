@@ -2,7 +2,9 @@ package com.yowyob.tiibntick.core.dispute.infrastructure.adapter.in.rest;
 
 import com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser;
 import com.yowyob.tiibntick.core.auth.domain.model.TntUserIdentity;
+import com.yowyob.tiibntick.core.dispute.application.port.inbound.IDisputeQueryUseCase;
 import com.yowyob.tiibntick.core.dispute.application.port.inbound.IEvidenceUseCase;
+import com.yowyob.tiibntick.core.dispute.application.query.GetDisputeQuery;
 import com.yowyob.tiibntick.core.dispute.domain.model.DisputeId;
 import com.yowyob.tiibntick.core.dispute.infrastructure.adapter.in.rest.dto.request.DisputeRequests;
 import com.yowyob.tiibntick.core.dispute.infrastructure.adapter.in.rest.dto.response.DisputeResponses;
@@ -40,9 +42,22 @@ import reactor.core.publisher.Mono;
 public class EvidenceController {
 
     private final IEvidenceUseCase evidenceUseCase;
+    private final IDisputeQueryUseCase queryUseCase;
 
-    public EvidenceController(IEvidenceUseCase evidenceUseCase) {
+    public EvidenceController(IEvidenceUseCase evidenceUseCase, IDisputeQueryUseCase queryUseCase) {
         this.evidenceUseCase = evidenceUseCase;
+        this.queryUseCase = queryUseCase;
+    }
+
+    /** Completes only when the caller may see the dispute (party or mediator); otherwise 404 as for a missing one. */
+    private Mono<Void> assertCanSee(TntUserIdentity currentUser, String disputeId) {
+        if (isPrivileged(currentUser)) {
+            return Mono.empty();
+        }
+        String requesterId = currentUser.actorId() != null ? currentUser.actorId().toString() : null;
+        return queryUseCase.getDispute(new GetDisputeQuery(
+                        DisputeId.of(disputeId), currentUser.tenantId().toString(), requesterId, false))
+                .then();
     }
 
     private boolean isPrivileged(TntUserIdentity currentUser) {
@@ -67,8 +82,10 @@ public class EvidenceController {
             throw TntRoleException.forbidden("dispute", "create");
         }
         String tenantId = currentUser.tenantId().toString();
-        return evidenceUseCase.submitEvidence(DisputeRestMapper.toCommand(request, disputeId, tenantId))
-                .map(DisputeRestMapper::toDetailResponse);
+        return assertCanSee(currentUser, disputeId)
+                .then(Mono.defer(() -> evidenceUseCase.submitEvidence(
+                        DisputeRestMapper.toCommand(request, disputeId, tenantId))))
+                .map(d -> DisputeRestMapper.toDetailResponse(d, isPrivileged(currentUser)));
     }
 
     // =========================================================================
@@ -81,7 +98,8 @@ public class EvidenceController {
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @PathVariable String disputeId) {
         String tenantId = currentUser.tenantId().toString();
-        return evidenceUseCase.getEvidenceForDispute(DisputeId.of(disputeId), tenantId)
+        return assertCanSee(currentUser, disputeId)
+                .thenMany(Flux.defer(() -> evidenceUseCase.getEvidenceForDispute(DisputeId.of(disputeId), tenantId)))
                 .map(DisputeRestMapper::toEvidenceResponse);
     }
 
@@ -99,7 +117,7 @@ public class EvidenceController {
         String tenantId = currentUser.tenantId().toString();
         String actorId = currentUser.actorId() != null ? currentUser.actorId().toString() : null;
         return evidenceUseCase.requestEvidence(DisputeRestMapper.toCommand(request, disputeId, tenantId, actorId))
-                .map(DisputeRestMapper::toDetailResponse);
+                .map(d -> DisputeRestMapper.toDetailResponse(d, true));
     }
 
     // =========================================================================

@@ -236,7 +236,7 @@ public class DeliveryLifecycleService implements DeliveryLifecycleUseCase {
 
     @Override
     @Transactional
-    @RequirePermission(resource = "mission", action = "assign")
+    @RequirePermission(resource = "delivery", action = "cancel")
     public Mono<Delivery> cancelDelivery(CancelDeliveryCommand cmd) {
         log.info("Cancelling delivery={} by={} reason={}", cmd.deliveryId(), cmd.requesterId(), cmd.reason());
         return loadDelivery(cmd.tenantId(), cmd.deliveryId())

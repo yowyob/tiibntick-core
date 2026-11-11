@@ -230,6 +230,7 @@ public class TntSecurityConfig {
                 new SimpleGrantedAuthority("ROLE_BRANCH_MANAGER"),
                 new SimpleGrantedAuthority("ROLE_ORG_ADMIN"),
                 new SimpleGrantedAuthority("ROLE_SUPPORT_AGENT"),
+                new SimpleGrantedAuthority("ROLE_MEDIATOR"),
                 new SimpleGrantedAuthority("ROLE_PERMANENT_DELIVERER"),
                 new SimpleGrantedAuthority("ROLE_FREELANCER"),
                 new SimpleGrantedAuthority("ROLE_CLIENT"),
@@ -359,7 +360,7 @@ public class TntSecurityConfig {
                 if (isKernelOwner && ownsSystemTenant) {
                     // TiiBnTick business roles (checked via hasRole / @PreAuthorize)
                     List.of("ROLE_TNT_ADMIN", "ROLE_AGENCY_MANAGER", "ROLE_BRANCH_MANAGER",
-                            "ROLE_ORG_ADMIN", "ROLE_SUPPORT_AGENT",
+                            "ROLE_ORG_ADMIN", "ROLE_SUPPORT_AGENT", "ROLE_MEDIATOR",
                             "ROLE_PERMANENT_DELIVERER", "ROLE_FREELANCER", "ROLE_CLIENT",
                             "ROLE_RELAY_OPERATOR", "ROLE_FREELANCER_OWNER", "ROLE_FREELANCER_SUB")
                             .forEach(r -> authorities.add(new SimpleGrantedAuthority(r)));

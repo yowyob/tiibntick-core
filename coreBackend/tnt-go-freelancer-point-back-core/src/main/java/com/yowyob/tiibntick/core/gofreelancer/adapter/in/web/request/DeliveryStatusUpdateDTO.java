@@ -50,4 +50,6 @@ public class DeliveryStatusUpdateDTO {
      * Defaults to 0.0 if not provided.
      */
     private Double storageFee = 0.0;
+    /** Why the delivery failed or is cancelled (FAILED / CANCELLED only). */
+    private String reason;
 }

@@ -15,7 +15,12 @@ public enum DeliveryStatus {
     AT_RELAY_POINT("AT_RELAY_POINT"),
     DELIVERED("DELIVERED"),
     FAILED("FAILED"),
-    CANCELLED("CANCELLED");
+    CANCELLED("CANCELLED"),
+    // States owned by tnt-delivery-core (the lifecycle authority). gofp never sets them itself; it
+    // only mirrors them when an incident pauses a delivery or a deadline is missed.
+    PAUSED_BY_INCIDENT("PAUSED_BY_INCIDENT"),
+    TIMED_OUT("TIMED_OUT"),
+    SLA_BREACHED("SLA_BREACHED");
 
     private final String value;
 

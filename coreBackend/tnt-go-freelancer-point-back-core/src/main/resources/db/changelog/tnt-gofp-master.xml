@@ -428,4 +428,14 @@
                  relativeToChangelogFile="false"/>
     </changeSet>
 
+    <changeSet id="073-create-negotiation-messages" author="TiiBnTickTeam">
+        <sqlFile path="db/changelog/20261112_create_negotiation_messages.sql"
+                 relativeToChangelogFile="false"/>
+    </changeSet>
+
+    <changeSet id="074-create-delivery-proofs" author="TiiBnTickTeam">
+        <sqlFile path="db/changelog/20261113_create_delivery_proofs.sql"
+                 relativeToChangelogFile="false"/>
+    </changeSet>
+
 </databaseChangeLog>

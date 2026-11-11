@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.yowyob.kernel.event.application.port.in.PublishEventUseCase;
 import com.yowyob.kernel.event.application.port.out.EventEnvelopeRepository;
-import com.yowyob.kernel.event.application.port.out.OutboxPollerPort;
 import com.yowyob.kernel.event.config.YowEventKernelAutoConfiguration;
 import com.yowyob.kernel.event.domain.enums.EnvelopeStatus;
 import com.yowyob.tiibntick.core.inventory.domain.event.PackageDepositedEvent;
@@ -66,6 +65,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.kafka.test.utils.KafkaTestUtils.getSingleRecord;
 
 /**
+ * <b>Current behaviour (outbox decommissioned 2026-09-18):</b> the event is persisted, then published
+ * directly to Kafka, and the envelope ends {@code PUBLISHED} ({@code FAILED} if the broker refuses it).
+ * The paragraphs below describe the original outbox migration and are kept for history.
+ *
  * End-to-end integration test proving the Chantier C · Audit n°3 · P5 migration:
  * {@link InventoryKafkaEventPublisher} now enqueues events into the
  * {@code yow-event-kernel} transactional outbox instead of sending through
@@ -128,18 +131,15 @@ class InventoryKafkaEventPublisherOutboxIntegrationTest {
     private InventoryKafkaEventPublisher publisher;
 
     @Autowired
-    private OutboxPollerPort outboxPollerPort;
-
-    @Autowired
     private EventEnvelopeRepository envelopeRepository;
 
     @Autowired
     private EmbeddedKafkaBroker embeddedKafka;
 
     @Test
-    @DisplayName("publishStockLow() enqueues to the outbox (PENDING, not yet on Kafka); the poller "
-            + "then delivers it keyed by productId with the exact payload format consumers expect")
-    void publishStockLowEnqueuesToOutboxThenPollerDeliversToKafka() throws Exception {
+    @DisplayName("publishStockLow() publishes straight to Kafka (envelope PUBLISHED); the record "
+            + "then delivered keyed by productId with the exact payload format consumers expect")
+    void publishStockLowPublishesDirectlyToKafka() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
         UUID productId = UUID.randomUUID();
@@ -149,12 +149,12 @@ class InventoryKafkaEventPublisherOutboxIntegrationTest {
 
         publisher.publishStockLow(event).block(Duration.ofSeconds(10));
 
-        // 1. The envelope is durably persisted PENDING — nothing sent to Kafka yet.
+        // 1. The envelope is persisted and already PUBLISHED: the event goes straight to Kafka (outbox decommissioned).
         StepVerifier.create(envelopeRepository.findByAggregateId(
                         productId.toString(), "StockEntry", tenantId.toString()))
                 .assertNext(envelope -> {
                     assertThat(envelope.getKafkaTopic()).isEqualTo(STOCK_LOW_TOPIC);
-                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PENDING);
+                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED);
                     assertThat(envelope.getTenantId()).isEqualTo(tenantId.toString());
                 })
                 .verifyComplete();
@@ -167,12 +167,6 @@ class InventoryKafkaEventPublisherOutboxIntegrationTest {
 
         try (Consumer<String, String> rawConsumer = new KafkaConsumer<>(consumerProps)) {
             embeddedKafka.consumeFromAnEmbeddedTopic(rawConsumer, STOCK_LOW_TOPIC);
-
-            // 2. Trigger one poll cycle directly (what OutboxPollerService.scheduledPoll() does
-            //    on a fixed delay in production) — avoids waiting on real time in the test.
-            StepVerifier.create(outboxPollerPort.poll())
-                    .expectNextMatches(count -> count >= 1)
-                    .verifyComplete();
 
             ConsumerRecord<String, String> received =
                     getSingleRecord(rawConsumer, STOCK_LOW_TOPIC, Duration.ofSeconds(15));
@@ -199,7 +193,7 @@ class InventoryKafkaEventPublisherOutboxIntegrationTest {
     }
 
     @Test
-    @DisplayName("publishPackageDeposited() enqueues to the outbox; the poller then delivers it "
+    @DisplayName("publishPackageDeposited() publishes straight to Kafka (envelope PUBLISHED); the record is delivered "
             + "keyed by trackingCode (preserved from the old adapter) with the same payload")
     void publishPackageDepositedPreservesTrackingCodeKey() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
@@ -218,7 +212,7 @@ class InventoryKafkaEventPublisherOutboxIntegrationTest {
                         entryId.toString(), "HubPackageEntry", tenantId.toString()))
                 .assertNext(envelope -> {
                     assertThat(envelope.getKafkaTopic()).isEqualTo(PKG_DEPOSITED_TOPIC);
-                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PENDING);
+                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED);
                     assertThat(envelope.getKafkaPartitionKey()).isEqualTo(trackingCode);
                 })
                 .verifyComplete();
@@ -231,10 +225,6 @@ class InventoryKafkaEventPublisherOutboxIntegrationTest {
 
         try (Consumer<String, String> rawConsumer = new KafkaConsumer<>(consumerProps)) {
             embeddedKafka.consumeFromAnEmbeddedTopic(rawConsumer, PKG_DEPOSITED_TOPIC);
-
-            StepVerifier.create(outboxPollerPort.poll())
-                    .expectNextMatches(count -> count >= 1)
-                    .verifyComplete();
 
             ConsumerRecord<String, String> received =
                     getSingleRecord(rawConsumer, PKG_DEPOSITED_TOPIC, Duration.ofSeconds(15));

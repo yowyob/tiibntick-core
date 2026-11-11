@@ -56,7 +56,7 @@ public class MediationController {
         String mediatorId = currentUser.actorId() != null ? currentUser.actorId().toString() : null;
         return commandUseCase.startMediation(
                         new StartMediationCommand(DisputeId.of(disputeId), tenantId, mediatorId))
-                .map(DisputeRestMapper::toDetailResponse);
+                .map(d -> DisputeRestMapper.toDetailResponse(d, true));
     }
 
     // =========================================================================
@@ -74,7 +74,7 @@ public class MediationController {
         String tenantId = currentUser.tenantId().toString();
         String ruledBy = currentUser.actorId() != null ? currentUser.actorId().toString() : null;
         return commandUseCase.ruleDispute(DisputeRestMapper.toCommand(request, disputeId, tenantId, ruledBy))
-                .map(DisputeRestMapper::toDetailResponse);
+                .map(d -> DisputeRestMapper.toDetailResponse(d, true));
     }
 
     // =========================================================================
@@ -90,7 +90,11 @@ public class MediationController {
             @PathVariable String disputeId,
             @RequestBody DisputeRequests.EscalateDisputeRequest request) {
         String tenantId = currentUser.tenantId().toString();
-        return commandUseCase.escalateDispute(DisputeRestMapper.toCommand(request, disputeId, tenantId))
-                .map(DisputeRestMapper::toDetailResponse);
+        // the escalation is attributed to the authenticated mediator, never to a name taken from the payload
+        String escalatedBy = currentUser.actorId() != null ? currentUser.actorId().toString() : request.escalatedBy();
+        DisputeRequests.EscalateDisputeRequest attributed =
+                new DisputeRequests.EscalateDisputeRequest(escalatedBy, request.reason(), request.assignedTo());
+        return commandUseCase.escalateDispute(DisputeRestMapper.toCommand(attributed, disputeId, tenantId))
+                .map(d -> DisputeRestMapper.toDetailResponse(d, true));
     }
 }

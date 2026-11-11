@@ -35,6 +35,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class NotificationStreamControllerSseContractTest {
 
+    /** Access control is covered by NotificationStreamAccessGuardTest; this test pins the bytes. */
+    static final NotificationStreamAccessGuard ALLOW_ALL = new NotificationStreamAccessGuard(null, null) {
+        @Override public reactor.core.publisher.Mono<Void> assertOwner(UUID id) { return reactor.core.publisher.Mono.empty(); }
+    };
+
     static final UUID FREELANCER_ID = UUID.fromString("c21c21c2-0000-0000-0000-00000000f001");
     static final UUID ANNOUNCEMENT_ID = UUID.fromString("c21c21c2-0000-0000-0000-00000000a001");
 
@@ -58,7 +63,7 @@ class NotificationStreamControllerSseContractTest {
     private static String streamOneEvent(boolean appCodecs) {
         NotificationStreamAdapter stream = new NotificationStreamAdapter();
         MatchingNotificationConsumer consumer = new MatchingNotificationConsumer(stream);
-        NotificationStreamController controller = new NotificationStreamController(stream);
+        NotificationStreamController controller = new NotificationStreamController(stream, ALLOW_ALL);
 
         WebTestClient.ControllerSpec spec = WebTestClient.bindToController(controller);
         if (appCodecs) {

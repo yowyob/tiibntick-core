@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.yowyob.kernel.event.application.port.in.PublishEventUseCase;
 import com.yowyob.kernel.event.application.port.out.EventEnvelopeRepository;
-import com.yowyob.kernel.event.application.port.out.OutboxPollerPort;
 import com.yowyob.kernel.event.config.YowEventKernelAutoConfiguration;
 import com.yowyob.kernel.event.domain.enums.EnvelopeStatus;
 import com.yowyob.tiibntick.core.agency.compliance.application.port.out.ClaimEventPublisherPort;
@@ -63,6 +62,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.kafka.test.utils.KafkaTestUtils.getSingleRecord;
 
 /**
+ * <b>Current behaviour (outbox decommissioned 2026-09-18):</b> the event is persisted, then published
+ * directly to Kafka, and the envelope ends {@code PUBLISHED} ({@code FAILED} if the broker refuses it).
+ * The paragraphs below describe the original outbox migration and are kept for history.
+ *
  * End-to-end integration test proving the Chantier C · Audit n°3 · P5 migration:
  * {@link ClaimsKafkaPublisher} now enqueues claim submissions into the {@code yow-event-kernel}
  * transactional outbox instead of sending to Kafka directly, and {@code OutboxPollerService}
@@ -119,18 +122,15 @@ class ClaimsKafkaPublisherOutboxIntegrationTest {
     private ClaimsKafkaPublisher publisher;
 
     @Autowired
-    private OutboxPollerPort outboxPollerPort;
-
-    @Autowired
     private EventEnvelopeRepository envelopeRepository;
 
     @Autowired
     private EmbeddedKafkaBroker embeddedKafka;
 
     @Test
-    @DisplayName("submitClaim() enqueues to the outbox (PENDING, not yet on Kafka); the poller then "
-            + "delivers it to the exact topic/payload format consumers expect")
-    void submitClaimEnqueuesToOutboxThenPollerDeliversToKafka() throws Exception {
+    @DisplayName("submitClaim() publishes straight to Kafka (envelope PUBLISHED); the record is "
+            + "delivered to the exact topic/payload format consumers expect")
+    void submitClaimPublishesDirectlyToKafka() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
         UUID tenantId = UUID.randomUUID();
@@ -142,11 +142,11 @@ class ClaimsKafkaPublisherOutboxIntegrationTest {
         String claimRef = publisher.submitClaim(submission).block(Duration.ofSeconds(10));
         assertThat(claimRef).startsWith("CLM-");
 
-        // 1. The envelope is durably persisted PENDING — nothing sent to Kafka yet.
+        // 1. The envelope is persisted and already PUBLISHED: the event goes straight to Kafka (outbox decommissioned).
         StepVerifier.create(envelopeRepository.findByAggregateId(claimRef, "Claim", tenantId.toString()))
                 .assertNext(envelope -> {
                     assertThat(envelope.getKafkaTopic()).isEqualTo(CLAIMS_TOPIC);
-                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PENDING);
+                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED);
                     assertThat(envelope.getTenantId()).isEqualTo(tenantId.toString());
                     assertThat(envelope.getKafkaPartitionKey()).isEqualTo(tenantId.toString());
                 })
@@ -160,12 +160,6 @@ class ClaimsKafkaPublisherOutboxIntegrationTest {
 
         try (Consumer<String, String> rawConsumer = new KafkaConsumer<>(consumerProps)) {
             embeddedKafka.consumeFromAnEmbeddedTopic(rawConsumer, CLAIMS_TOPIC);
-
-            // 2. Trigger one poll cycle directly (what OutboxPollerService.scheduledPoll() does
-            //    on a fixed delay in production) — avoids waiting on real time in the test.
-            StepVerifier.create(outboxPollerPort.poll())
-                    .expectNextMatches(count -> count >= 1)
-                    .verifyComplete();
 
             ConsumerRecord<String, String> received =
                     getSingleRecord(rawConsumer, CLAIMS_TOPIC, Duration.ofSeconds(15));

@@ -35,6 +35,11 @@ public class GofpNotifyPushAdapter implements PushNotificationPort {
 
     @Override
     public Mono<Void> sendPushNotification(UUID userId, String title, String message) {
+        return sendPushNotification(null, userId, title, message);
+    }
+
+    @Override
+    public Mono<Void> sendPushNotification(UUID tenant, UUID userId, String title, String message) {
         String recipientId = userId.toString();
         NotificationModel inAppModel = new NotificationModel(
                 GofpNotificationTemplates.MESSAGE, FR,
@@ -45,7 +50,7 @@ public class GofpNotifyPushAdapter implements PushNotificationPort {
                 Map.of("title", title, "body", message),
                 NotificationPriority.HIGH);
 
-        String tenantId = defaultTenantId();
+        String tenantId = tenant != null ? tenant.toString() : defaultTenantId();
 
         Mono<Void> inApp = sendNotificationUseCase
                 .send(tenantId, null, recipientId, recipientId, inAppModel, NotificationChannel.IN_APP_WEBSOCKET)

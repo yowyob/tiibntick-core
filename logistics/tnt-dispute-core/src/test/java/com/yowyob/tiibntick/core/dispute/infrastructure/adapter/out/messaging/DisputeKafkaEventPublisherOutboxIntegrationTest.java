@@ -6,7 +6,6 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.yowyob.kernel.event.application.port.in.PublishEventBatchUseCase;
 import com.yowyob.kernel.event.application.port.in.PublishEventUseCase;
 import com.yowyob.kernel.event.application.port.out.EventEnvelopeRepository;
-import com.yowyob.kernel.event.application.port.out.OutboxPollerPort;
 import com.yowyob.kernel.event.config.YowEventKernelAutoConfiguration;
 import com.yowyob.kernel.event.domain.enums.EnvelopeStatus;
 import com.yowyob.tiibntick.core.dispute.domain.enums.DisputeCause;
@@ -70,6 +69,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.kafka.test.utils.KafkaTestUtils.getSingleRecord;
 
 /**
+ * <b>Current behaviour (outbox decommissioned 2026-09-18):</b> the event is persisted, then published
+ * directly to Kafka, and the envelope ends {@code PUBLISHED} ({@code FAILED} if the broker refuses it).
+ * The paragraphs below describe the original outbox migration and are kept for history.
+ *
  * End-to-end integration test proving the Chantier C · Audit n°3 · P5 migration:
  * {@link DisputeKafkaEventPublisher} now enqueues events into the {@code yow-event-kernel}
  * transactional outbox instead of sending to Kafka directly, and {@code OutboxPollerService}
@@ -131,18 +134,15 @@ class DisputeKafkaEventPublisherOutboxIntegrationTest {
     private DisputeKafkaEventPublisher publisher;
 
     @Autowired
-    private OutboxPollerPort outboxPollerPort;
-
-    @Autowired
     private EventEnvelopeRepository envelopeRepository;
 
     @Autowired
     private EmbeddedKafkaBroker embeddedKafka;
 
     @Test
-    @DisplayName("publishDisputeOpened() enqueues to the outbox (PENDING, not yet on Kafka); the "
-            + "poller then delivers it to the exact topic/payload format consumers expect")
-    void publishEnqueuesToOutboxThenPollerDeliversToKafka() throws Exception {
+    @DisplayName("publishDisputeOpened() publishes straight to Kafka (envelope PUBLISHED); the "
+            + "record is delivered to the exact topic/payload format consumers expect")
+    void publishPublishesDirectlyToKafka() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
         DisputeId disputeId = DisputeId.generate();
@@ -155,12 +155,12 @@ class DisputeKafkaEventPublisherOutboxIntegrationTest {
 
         publisher.publishDisputeOpened(event).block(Duration.ofSeconds(10));
 
-        // 1. The envelope is durably persisted PENDING — nothing sent to Kafka yet.
+        // 1. The envelope is persisted and already PUBLISHED: the event goes straight to Kafka (outbox decommissioned).
         StepVerifier.create(envelopeRepository.findByAggregateId(
                         disputeId.getValue(), "Dispute", tenantId))
                 .assertNext(envelope -> {
                     assertThat(envelope.getKafkaTopic()).isEqualTo(OPENED_TOPIC);
-                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PENDING);
+                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED);
                     assertThat(envelope.getTenantId()).isEqualTo(tenantId);
                 })
                 .verifyComplete();
@@ -173,12 +173,6 @@ class DisputeKafkaEventPublisherOutboxIntegrationTest {
 
         try (Consumer<String, String> rawConsumer = new KafkaConsumer<>(consumerProps)) {
             embeddedKafka.consumeFromAnEmbeddedTopic(rawConsumer, OPENED_TOPIC);
-
-            // 2. Trigger one poll cycle directly (what OutboxPollerService.scheduledPoll() does
-            //    on a fixed delay in production) — avoids waiting on real time in the test.
-            StepVerifier.create(outboxPollerPort.poll())
-                    .expectNextMatches(count -> count >= 1)
-                    .verifyComplete();
 
             ConsumerRecord<String, String> received =
                     getSingleRecord(rawConsumer, OPENED_TOPIC, Duration.ofSeconds(15));
@@ -214,7 +208,7 @@ class DisputeKafkaEventPublisherOutboxIntegrationTest {
                         disputeId.getValue(), "Dispute", tenantId))
                 .assertNext(envelope -> {
                     assertThat(envelope.getKafkaTopic()).isEqualTo(STATUS_CHANGED_TOPIC);
-                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PENDING);
+                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED);
                 })
                 .verifyComplete();
 
@@ -226,10 +220,6 @@ class DisputeKafkaEventPublisherOutboxIntegrationTest {
 
         try (Consumer<String, String> rawConsumer = new KafkaConsumer<>(consumerProps)) {
             embeddedKafka.consumeFromAnEmbeddedTopic(rawConsumer, STATUS_CHANGED_TOPIC);
-
-            StepVerifier.create(outboxPollerPort.poll())
-                    .expectNextMatches(count -> count >= 1)
-                    .verifyComplete();
 
             ConsumerRecord<String, String> received =
                     getSingleRecord(rawConsumer, STATUS_CHANGED_TOPIC, Duration.ofSeconds(15));

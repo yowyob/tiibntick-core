@@ -162,7 +162,7 @@ class DisputeControllersSecurityTest {
     @DisplayName("EvidenceController.submitEvidence() - non-privileged caller submitting as another party is rejected")
     void submitEvidence_impersonation_isRejected() {
         IEvidenceUseCase evidenceUseCase = mock(IEvidenceUseCase.class);
-        EvidenceController controller = new EvidenceController(evidenceUseCase);
+        EvidenceController controller = new EvidenceController(evidenceUseCase, org.mockito.Mockito.mock(com.yowyob.tiibntick.core.dispute.application.port.inbound.IDisputeQueryUseCase.class));
 
         DisputeRequests.AddEvidenceRequest request = new DisputeRequests.AddEvidenceRequest(
                 OTHER_ACTOR_ID.toString(), "CLAIMANT", "PHOTO", "file-key", "desc", "hash");

@@ -124,8 +124,9 @@ public class NotificationController {
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestHeader(value = "X-Organization-Id", required = false) UUID organizationId,
             @PathVariable String recipientId) {
-        return searchNotificationsUseCase.findByRecipientId(currentUser.tenantId().toString(),
-                orgOrNull(organizationId), recipientId);
+        return RecipientAccessGuard.check(currentUser, recipientId)
+                .thenMany(Flux.defer(() -> searchNotificationsUseCase.findByRecipientId(
+                        currentUser.tenantId().toString(), orgOrNull(organizationId), recipientId)));
     }
 
     @Operation(summary = "List pending (unread) notifications for a recipient")
@@ -135,8 +136,9 @@ public class NotificationController {
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestHeader(value = "X-Organization-Id", required = false) UUID organizationId,
             @PathVariable String recipientId) {
-        return searchNotificationsUseCase.findPendingByRecipient(currentUser.tenantId().toString(),
-                orgOrNull(organizationId), recipientId);
+        return RecipientAccessGuard.check(currentUser, recipientId)
+                .thenMany(Flux.defer(() -> searchNotificationsUseCase.findPendingByRecipient(
+                        currentUser.tenantId().toString(), orgOrNull(organizationId), recipientId)));
     }
 
     @Operation(summary = "List notifications filtered by delivery status")
@@ -159,7 +161,8 @@ public class NotificationController {
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
             @RequestHeader(value = "X-Organization-Id", required = false) UUID organizationId,
             @PathVariable String userId) {
-        return managePreferencesUseCase.getPreferences(currentUser.tenantId().toString(), orgOrNull(organizationId), userId);
+        return RecipientAccessGuard.check(currentUser, userId).then(Mono.defer(() ->
+                managePreferencesUseCase.getPreferences(currentUser.tenantId().toString(), orgOrNull(organizationId), userId)));
     }
 
     @Operation(summary = "Save or update notification preferences for a user")
@@ -177,7 +180,8 @@ public class NotificationController {
                 body.activeChannels() != null ? body.activeChannels() : java.util.Set.of(),
                 body.preferredLanguage(),
                 body.notificationsEnabled() != null ? body.notificationsEnabled() : true);
-        return managePreferencesUseCase.savePreferences(pref);
+        return RecipientAccessGuard.check(currentUser, userId)
+                .then(Mono.defer(() -> managePreferencesUseCase.savePreferences(pref)));
     }
 
     public record UpdatePreferencesRequest(
@@ -193,8 +197,9 @@ public class NotificationController {
             @RequestHeader(value = "X-Organization-Id", required = false) UUID organizationId,
             @PathVariable String userId,
             @PathVariable String channel) {
-        return managePreferencesUseCase.disableChannel(currentUser.tenantId().toString(), orgOrNull(organizationId), userId,
-                NotificationChannel.valueOf(channel));
+        return RecipientAccessGuard.check(currentUser, userId).then(Mono.defer(() ->
+                managePreferencesUseCase.disableChannel(currentUser.tenantId().toString(), orgOrNull(organizationId), userId,
+                        NotificationChannel.valueOf(channel))));
     }
 
     @Operation(summary = "Enable a notification channel for a user")
@@ -205,8 +210,9 @@ public class NotificationController {
             @RequestHeader(value = "X-Organization-Id", required = false) UUID organizationId,
             @PathVariable String userId,
             @PathVariable String channel) {
-        return managePreferencesUseCase.enableChannel(currentUser.tenantId().toString(), orgOrNull(organizationId), userId,
-                NotificationChannel.valueOf(channel));
+        return RecipientAccessGuard.check(currentUser, userId).then(Mono.defer(() ->
+                managePreferencesUseCase.enableChannel(currentUser.tenantId().toString(), orgOrNull(organizationId), userId,
+                        NotificationChannel.valueOf(channel))));
     }
 
     @Operation(summary = "Change the preferred notification language for a user")
@@ -217,8 +223,9 @@ public class NotificationController {
             @RequestHeader(value = "X-Organization-Id", required = false) UUID organizationId,
             @PathVariable String userId,
             @RequestParam String localeTag) {
-        return managePreferencesUseCase.changeLanguage(currentUser.tenantId().toString(), orgOrNull(organizationId), userId,
-                localeTag);
+        return RecipientAccessGuard.check(currentUser, userId).then(Mono.defer(() ->
+                managePreferencesUseCase.changeLanguage(currentUser.tenantId().toString(), orgOrNull(organizationId), userId,
+                        localeTag)));
     }
 
     // ─── Kernel notification engine administration ─────────────────────────────

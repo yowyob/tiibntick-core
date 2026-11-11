@@ -30,7 +30,7 @@ class TntRoleDefinitionRegistryTest {
                 .containsExactlyInAnyOrder(
                         "AGENCY_MANAGER", "BRANCH_MANAGER", "PERMANENT_DELIVERER",
                         "FREELANCER", "RELAY_OPERATOR", "AGENCY_HUB_OPERATOR", "CLIENT",
-                        "SUPPORT_AGENT", "ORG_ADMIN", "TNT_ADMIN"
+                        "SUPPORT_AGENT", "MEDIATOR", "ORG_ADMIN", "TNT_ADMIN"
                 );
     }
 

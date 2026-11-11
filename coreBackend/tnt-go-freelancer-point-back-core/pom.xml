@@ -215,6 +215,16 @@
             <groupId>com.yowyob.tiibntick.core</groupId>
             <artifactId>tnt-realtime-core</artifactId>
         </dependency>
+        <!-- Dispute Core: gofp tells it who took part in a delivery (IDisputeParticipationPort) -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-dispute-core</artifactId>
+        </dependency>
+        <!-- Sync Core: gofp plugs the real delivery use-cases into the offline push path (IOfflineOperationApplier) -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-sync-core</artifactId>
+        </dependency>
         <!-- TiiBnTick Trust (Blockchain) -->
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>

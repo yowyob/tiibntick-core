@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import com.yowyob.kernel.event.application.port.out.KafkaPublisherPort;
 import com.yowyob.kernel.event.domain.model.DomainEventEnvelope;
 
@@ -67,12 +68,21 @@ public class KafkaEventPublisher implements KafkaPublisherPort {
     public Mono<Void> publish(
             final DomainEventEnvelope envelope,
             final Map<String, String> extraHeaders) {
-        ProducerRecord<String, String> record = buildRecord(envelope, extraHeaders, false);
-        CompletableFuture<SendResult<String, String>> future = kafkaTemplate.send(record);
-        return Mono.fromFuture(future)
-            .doOnSuccess(result -> log.trace(
-                "Sent envelope {} to {}@{}", envelope.getId().value(),
-                result.getRecordMetadata().topic(), result.getRecordMetadata().offset()))
+        // Deferred and moved off the caller's thread: KafkaTemplate.send blocks (up to max.block.ms) while it
+        // waits for topic metadata and throws synchronously when the broker is unreachable. Done eagerly that
+        // escaped every onErrorResume downstream and stalled a Reactor thread; deferred, it is a normal
+        // error signal the publisher service turns into a FAILED envelope.
+        return Mono.defer(() -> {
+                ProducerRecord<String, String> record = buildRecord(envelope, extraHeaders, false);
+                return Mono.fromFuture(kafkaTemplate.send(record));
+            })
+            .subscribeOn(Schedulers.boundedElastic())
+            .doOnSuccess(result -> {
+                if (result != null) {
+                    log.trace("Sent envelope {} to {}@{}", envelope.getId().value(),
+                        result.getRecordMetadata().topic(), result.getRecordMetadata().offset());
+                }
+            })
             .doOnError(error -> log.error(
                 "Failed to send envelope {} to topic {}: {}",
                 envelope.getId().value(), envelope.getKafkaTopic(), error.getMessage()))
@@ -81,9 +91,9 @@ public class KafkaEventPublisher implements KafkaPublisherPort {
 
     @Override
     public Mono<Void> publishAsReplay(final DomainEventEnvelope envelope) {
-        ProducerRecord<String, String> record = buildRecord(envelope, Map.of(), true);
-        CompletableFuture<SendResult<String, String>> future = kafkaTemplate.send(record);
-        return Mono.fromFuture(future).then();
+        return Mono.defer(() -> Mono.fromFuture(kafkaTemplate.send(buildRecord(envelope, Map.of(), true))))
+            .subscribeOn(Schedulers.boundedElastic())
+            .then();
     }
 
     // ── Internal helpers ─────────────────────────────────────────────────────

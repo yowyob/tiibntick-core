@@ -189,6 +189,7 @@ public class IncidentController {
     public Mono<IncidentResponse> triage(@CurrentUser TntUserIdentity identity,
                                           @PathVariable UUID id,
                                           @Valid @RequestBody TriageRequest req) {
+        IncidentAccess.requireManage(identity);
         return queryIncidentUseCase.getById(id, contextOf(identity))
                 .flatMap(existing -> triageIncidentUseCase.execute(
                         TriageIncidentCommand.builder()
@@ -215,6 +216,7 @@ public class IncidentController {
      */
     @PostMapping("/{id}/auto-resolve")
     public Mono<IncidentResponse> startAutoResolution(@CurrentUser TntUserIdentity identity, @PathVariable UUID id) {
+        IncidentAccess.requireManage(identity);
         return queryIncidentUseCase.getById(id, contextOf(identity))
                 .flatMap(existing -> startAutoResolutionUseCase.execute(id))
                 .map(webMapper::toResponse);
@@ -231,6 +233,7 @@ public class IncidentController {
     public Mono<IncidentResponse> escalate(@CurrentUser TntUserIdentity identity,
                                             @PathVariable UUID id,
                                             @Valid @RequestBody EscalateRequest req) {
+        IncidentAccess.requireSelfUnlessManager(identity, req.getEscalatedByActorId());
         return queryIncidentUseCase.getById(id, contextOf(identity))
                 .flatMap(existing -> escalateIncidentUseCase.execute(
                         EscalateIncidentCommand.builder()
@@ -258,6 +261,7 @@ public class IncidentController {
     public Mono<IncidentResponse> resolve(@CurrentUser TntUserIdentity identity,
                                            @PathVariable UUID id,
                                            @Valid @RequestBody ResolveRequest req) {
+        IncidentAccess.requireManage(identity);
         return queryIncidentUseCase.getById(id, contextOf(identity))
                 .flatMap(existing -> resolveIncidentUseCase.execute(
                         ResolveIncidentCommand.builder()
@@ -281,6 +285,7 @@ public class IncidentController {
     public Mono<IncidentResponse> close(@CurrentUser TntUserIdentity identity,
                                          @PathVariable UUID id,
                                          @RequestParam UUID closedByActorId) {
+        IncidentAccess.requireManage(identity);
         return queryIncidentUseCase.getById(id, contextOf(identity))
                 .flatMap(existing -> closeIncidentUseCase.execute(id, closedByActorId))
                 .map(webMapper::toResponse);
@@ -299,6 +304,7 @@ public class IncidentController {
                                           @PathVariable UUID id,
                                           @RequestParam UUID cancelledByActorId,
                                           @RequestParam String reason) {
+        IncidentAccess.requireSelfUnlessManager(identity, cancelledByActorId);
         return queryIncidentUseCase.getById(id, contextOf(identity))
                 .flatMap(existing -> cancelIncidentUseCase.execute(id, cancelledByActorId, reason))
                 .map(webMapper::toResponse);
@@ -365,6 +371,7 @@ public class IncidentController {
     @GetMapping("/kpi")
     public Mono<AgencyIncidentKpiResponse> getKpi(@CurrentUser TntUserIdentity identity,
                                                    @RequestParam UUID agencyId, @RequestParam UUID tenantId) {
+        IncidentAccess.requireManage(identity);
         return queryIncidentUseCase.getAgencyKpi(agencyId, tenantId, contextOf(identity)).map(webMapper::toKpiResponse);
     }
 }

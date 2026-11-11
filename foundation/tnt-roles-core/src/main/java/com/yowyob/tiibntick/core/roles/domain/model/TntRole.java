@@ -40,7 +40,7 @@ public enum TntRole {
             true,
             Set.of(
                     MISSION_CREATE, MISSION_READ, MISSION_ASSIGN, MISSION_REASSIGN, MISSION_CANCEL,
-                    DELIVERY_READ, DELIVERY_TRACK, DELIVERY_RETURN,
+                    DELIVERY_READ, DELIVERY_TRACK, DELIVERY_RETURN, DELIVERY_CANCEL, DELIVERY_CREATE_DIRECT,
                     AGENCY_READ, AGENCY_WRITE, AGENCY_MANAGE,
                     BRANCH_READ, BRANCH_WRITE, BRANCH_MANAGE,
                     ACTOR_READ, ACTOR_WRITE, ACTOR_APPROVE, ACTOR_SUSPEND,
@@ -74,7 +74,7 @@ public enum TntRole {
             true,
             Set.of(
                     MISSION_CREATE, MISSION_READ, MISSION_ASSIGN, MISSION_REASSIGN, MISSION_CANCEL,
-                    DELIVERY_READ, DELIVERY_TRACK,
+                    DELIVERY_READ, DELIVERY_TRACK, DELIVERY_CANCEL, DELIVERY_CREATE_DIRECT,
                     AGENCY_READ,
                     BRANCH_READ, BRANCH_WRITE, BRANCH_MANAGE,
                     ACTOR_READ, ACTOR_WRITE,
@@ -126,7 +126,7 @@ public enum TntRole {
             true,
             Set.of(
                     MISSION_READ, MISSION_START, MISSION_COMPLETE,
-                    DELIVERY_READ, DELIVERY_TRACK, DELIVERY_CONFIRM, DELIVERY_PROOF,
+                    DELIVERY_READ, DELIVERY_TRACK, DELIVERY_CONFIRM, DELIVERY_PROOF, DELIVERY_CANCEL,
                     ANNOUNCEMENT_READ, ANNOUNCEMENT_RESPOND, ANNOUNCEMENT_ELECT,
                     ACTOR_READ,
                     FREELANCER_READ,
@@ -196,15 +196,16 @@ public enum TntRole {
             Set.of(
                     ANNOUNCEMENT_CREATE, ANNOUNCEMENT_READ, ANNOUNCEMENT_UPDATE,
                     ANNOUNCEMENT_DELETE, ANNOUNCEMENT_ELECT,
-                    DELIVERY_READ, DELIVERY_TRACK,
+                    DELIVERY_READ, DELIVERY_TRACK, DELIVERY_CANCEL,
                     BILLING_READ,
                     INVOICE_READ,
                     WALLET_READ, WALLET_WRITE,
                     PAYMENT_PROCESS,
                     TRUST_READ, TRUST_VERIFY,
-                    MEDIA_READ,
-                    DISPUTE_CREATE, DISPUTE_READ,
-                    INCIDENT_READ
+                    MEDIA_READ, MEDIA_UPLOAD,
+                    GEO_READ, ROUTE_READ,
+                    DISPUTE_CREATE, DISPUTE_READ
+                    // No INCIDENT_*: a client contests through a dispute, never reports a field incident.
             )
     ),
 
@@ -230,6 +231,31 @@ public enum TntRole {
                     INCIDENT_READ, INCIDENT_MANAGE,
                     ADMIN_AUDIT,
                     MEDIA_READ
+            )
+    ),
+
+    /**
+     * Platform mediator: arbitrates disputes between clients and deliverers and handles field
+     * incidents. Reads every dispute and incident of the tenant, takes a case, requests and
+     * verifies evidence, rules, sets a compensation and closes. Cannot move money directly nor
+     * administer users. Assigned by a platform administrator; never granted automatically.
+     * Scope: tenant.
+     */
+    MEDIATOR(
+            "MEDIATOR",
+            "Dispute Mediator",
+            RoleScopeType.TENANT,
+            true,
+            Set.of(
+                    MISSION_READ,
+                    DELIVERY_READ, DELIVERY_TRACK,
+                    ACTOR_READ,
+                    BILLING_READ,
+                    INVOICE_READ,
+                    TRUST_READ, TRUST_VERIFY,
+                    DISPUTE_READ, DISPUTE_RESOLVE,
+                    INCIDENT_READ, INCIDENT_MANAGE,
+                    MEDIA_READ, MEDIA_UPLOAD
             )
     ),
 

@@ -40,6 +40,7 @@ public class IncidentHandoverController {
     public Mono<?> assignDriver(@CurrentUser TntUserIdentity identity,
                                 @PathVariable UUID incidentId,
                                 @Valid @RequestBody AssignDriverRequest req) {
+        IncidentAccess.requireManage(identity);
         return queryIncidentUseCase.getById(incidentId, contextOf(identity))
                 .flatMap(existing -> assignDriverUseCase.execute(AssignReplacementDriverCommand.builder()
                         .incidentId(incidentId)
@@ -56,6 +57,7 @@ public class IncidentHandoverController {
                            @PathVariable UUID incidentId,
                            @RequestParam UUID actorId,
                            @RequestParam boolean confirmingAsOriginalDriver) {
+        IncidentAccess.requireSelfUnlessManager(identity, actorId);
         return queryIncidentUseCase.getById(incidentId, contextOf(identity))
                 .flatMap(existing -> confirmHandoverUseCase.execute(ConfirmHandoverCommand.builder()
                         .incidentId(incidentId)

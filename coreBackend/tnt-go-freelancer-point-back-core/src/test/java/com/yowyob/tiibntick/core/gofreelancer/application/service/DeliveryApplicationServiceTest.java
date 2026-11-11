@@ -69,6 +69,7 @@ class DeliveryApplicationServiceTest {
     @Mock private CachePort cachePort;
     @Mock private TenantContextHolder tenantContextHolder;
     @Mock private GofpFreelancerRepository gofpFreelancerRepository;
+    @Mock private com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryLifecyclePort lifecyclePort;
 
     private DeliveryApplicationService service;
 
@@ -88,7 +89,7 @@ class DeliveryApplicationServiceTest {
         service = new DeliveryApplicationService(
                 deliveryRepository, deliveryNeedRepository, announcementRepository,
                 addressRepository, getPresenceUseCase, cachePort, tenantContextHolder,
-                gofpFreelancerRepository);
+                lifecyclePort, gofpFreelancerRepository);
         // These tests verify tracking behaviour, not access control; the ownership guard
         // is tested separately in GofpDeliveryControllerTrackingGuardTest.
         ReflectionTestUtils.setField(service, "ownershipGuardEnabled", false);

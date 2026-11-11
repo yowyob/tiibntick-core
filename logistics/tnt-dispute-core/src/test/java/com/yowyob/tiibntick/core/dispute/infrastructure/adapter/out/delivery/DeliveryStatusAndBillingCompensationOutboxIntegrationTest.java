@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.yowyob.kernel.event.application.port.in.PublishEventUseCase;
 import com.yowyob.kernel.event.application.port.out.EventEnvelopeRepository;
-import com.yowyob.kernel.event.application.port.out.OutboxPollerPort;
 import com.yowyob.kernel.event.config.YowEventKernelAutoConfiguration;
 import com.yowyob.kernel.event.domain.enums.EnvelopeStatus;
 import com.yowyob.tiibntick.core.dispute.domain.model.CompensationDetails;
@@ -67,6 +66,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.kafka.test.utils.KafkaTestUtils.getSingleRecord;
 
 /**
+ * <b>Current behaviour (outbox decommissioned 2026-09-18):</b> the event is persisted, then published
+ * directly to Kafka, and the envelope ends {@code PUBLISHED} ({@code FAILED} if the broker refuses it).
+ * The paragraphs below describe the original outbox migration and are kept for history.
+ *
  * End-to-end integration test proving the Chantier C · Audit n°3 · P5 migration for
  * {@link DeliveryStatusAdapter} and {@link BillingCompensationAdapter} — both were found
  * unmigrated during post-merge verification (they live outside {@code DisputeKafkaEventPublisher}
@@ -128,18 +131,15 @@ class DeliveryStatusAndBillingCompensationOutboxIntegrationTest {
     private BillingCompensationAdapter billingCompensationAdapter;
 
     @Autowired
-    private OutboxPollerPort outboxPollerPort;
-
-    @Autowired
     private EventEnvelopeRepository envelopeRepository;
 
     @Autowired
     private EmbeddedKafkaBroker embeddedKafka;
 
     @Test
-    @DisplayName("markPackageAsDisputed() enqueues to the outbox; the poller delivers it to the "
+    @DisplayName("markPackageAsDisputed() publishes straight to Kafka (envelope PUBLISHED); the poller delivers it to the "
             + "exact topic/key/payload format tnt-delivery-core already expects")
-    void markPackageAsDisputedEnqueuesThenPollerDelivers() throws Exception {
+    void markPackageAsDisputedPublishesDirectly() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
         String packageId = "pkg-" + UUID.randomUUID();
         String disputeId = UUID.randomUUID().toString();
@@ -151,7 +151,7 @@ class DeliveryStatusAndBillingCompensationOutboxIntegrationTest {
         StepVerifier.create(envelopeRepository.findByAggregateId(packageId, "Package", tenantId))
                 .assertNext(envelope -> {
                     assertThat(envelope.getKafkaTopic()).isEqualTo(PACKAGE_DISPUTED_TOPIC);
-                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PENDING);
+                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED);
                     assertThat(envelope.getTenantId()).isEqualTo(tenantId);
                 })
                 .verifyComplete();
@@ -164,10 +164,6 @@ class DeliveryStatusAndBillingCompensationOutboxIntegrationTest {
 
         try (Consumer<String, String> rawConsumer = new KafkaConsumer<>(consumerProps)) {
             embeddedKafka.consumeFromAnEmbeddedTopic(rawConsumer, PACKAGE_DISPUTED_TOPIC);
-
-            StepVerifier.create(outboxPollerPort.poll())
-                    .expectNextMatches(count -> count >= 1)
-                    .verifyComplete();
 
             ConsumerRecord<String, String> received =
                     getSingleRecord(rawConsumer, PACKAGE_DISPUTED_TOPIC, Duration.ofSeconds(15));
@@ -185,9 +181,9 @@ class DeliveryStatusAndBillingCompensationOutboxIntegrationTest {
     }
 
     @Test
-    @DisplayName("initiateCompensationPayment() enqueues to the outbox and returns the payment "
-            + "reference synchronously; the poller then delivers it to the compensation topic")
-    void initiateCompensationPaymentEnqueuesThenPollerDelivers() throws Exception {
+    @DisplayName("initiateCompensationPayment() publishes straight to Kafka (envelope PUBLISHED) and returns the payment "
+            + "reference synchronously; the record is delivered to the compensation topic")
+    void initiateCompensationPaymentPublishesDirectly() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
         String disputeId = UUID.randomUUID().toString();
         String tenantId = UUID.randomUUID().toString();
@@ -203,7 +199,7 @@ class DeliveryStatusAndBillingCompensationOutboxIntegrationTest {
         StepVerifier.create(envelopeRepository.findByAggregateId(disputeId, "Dispute", tenantId))
                 .assertNext(envelope -> {
                     assertThat(envelope.getKafkaTopic()).isEqualTo(COMPENSATION_TOPIC);
-                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PENDING);
+                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED);
                 })
                 .verifyComplete();
 
@@ -215,10 +211,6 @@ class DeliveryStatusAndBillingCompensationOutboxIntegrationTest {
 
         try (Consumer<String, String> rawConsumer = new KafkaConsumer<>(consumerProps)) {
             embeddedKafka.consumeFromAnEmbeddedTopic(rawConsumer, COMPENSATION_TOPIC);
-
-            StepVerifier.create(outboxPollerPort.poll())
-                    .expectNextMatches(count -> count >= 1)
-                    .verifyComplete();
 
             ConsumerRecord<String, String> received =
                     getSingleRecord(rawConsumer, COMPENSATION_TOPIC, Duration.ofSeconds(15));

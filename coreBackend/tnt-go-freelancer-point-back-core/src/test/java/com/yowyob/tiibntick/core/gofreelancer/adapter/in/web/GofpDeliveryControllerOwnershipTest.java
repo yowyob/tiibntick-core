@@ -100,7 +100,7 @@ class GofpDeliveryControllerOwnershipTest {
         when(deliveryStatusApplicationService.assertCallerCanCancelDelivery(
                 eq(DELIVERY_ID), eq(ASSIGNED_ACTOR)))
                 .thenReturn(Mono.empty());
-        when(deliveryUseCase.cancelDelivery(DELIVERY_ID))
+        when(deliveryUseCase.cancelDelivery(eq(DELIVERY_ID), eq(ASSIGNED_ACTOR), any()))
                 .thenReturn(Mono.just(dto));
 
         clientFor(ASSIGNED_ACTOR)

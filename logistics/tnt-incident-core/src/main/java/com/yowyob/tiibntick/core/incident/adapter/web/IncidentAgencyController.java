@@ -36,6 +36,7 @@ public class IncidentAgencyController {
                                                  @RequestParam UUID initiatedByActorId,
                                                  @RequestParam(required = false) UUID assignedToActorId,
                                                  @RequestParam(required = false) String notes) {
+        IncidentAccess.requireManage(identity);
         IncidentRequesterContext ctx = new IncidentRequesterContext(
                 identity.actorId(), identity.tenantId(), identity.hasPermission("incident", "manage"));
         return queryIncidentUseCase.getById(incidentId, ctx)

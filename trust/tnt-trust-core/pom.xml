@@ -239,12 +239,9 @@
         </dependency>
 
         <!-- ── Testcontainers: Postgres integration tests (Liquibase changelog end-to-end) ── -->
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>testcontainers</artifactId>
-            <version>${testcontainers.version}</version>
-            <scope>test</scope>
-        </dependency>
+        <!-- Core `testcontainers` is deliberately NOT pinned here: pinning it to ${testcontainers.version} (1.19.8)
+             pulled docker-java 3.3.6 (API 1.32) which current Docker daemons refuse (min API 1.40). Like the
+             other modules, it resolves to the version managed by the Spring Boot BOM. -->
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>postgresql</artifactId>

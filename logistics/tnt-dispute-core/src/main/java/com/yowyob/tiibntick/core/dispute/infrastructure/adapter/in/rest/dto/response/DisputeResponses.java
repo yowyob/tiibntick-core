@@ -53,7 +53,17 @@ public final class DisputeResponses {
             SlaResponse sla,
             String respondentOrgId,
             String impliedSubDelivererId,
-            Boolean subDelivererInvolved) {}
+            Boolean subDelivererInvolved,
+            List<CommentResponse> comments) {}
+
+    /** A message on the dispute thread; internal notes are only ever returned to mediators. */
+    public record CommentResponse(
+            String id,
+            String authorId,
+            String authorType,
+            String content,
+            boolean internal,
+            LocalDateTime postedAt) {}
 
     public record DisputeStatsResponse(
             String orgId,
