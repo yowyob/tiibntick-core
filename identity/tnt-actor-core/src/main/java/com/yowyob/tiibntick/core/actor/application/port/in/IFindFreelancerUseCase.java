@@ -11,6 +11,9 @@ public interface IFindFreelancerUseCase {
 
     Mono<FreelancerProfile> findByActorId(UUID tenantId, UUID actorId);
 
+    /** The caller's own profile, whichever space it was created in (see {@code IFindClientUseCase#findMine}). */
+    Mono<FreelancerProfile> findMine(UUID tenantId, UUID actorId);
+
     Flux<FreelancerProfile> findAvailableInZone(UUID tenantId, ServiceZoneId serviceZoneId);
 
     Flux<FreelancerProfile> findByAssociatedAgency(UUID tenantId, UUID agencyId);

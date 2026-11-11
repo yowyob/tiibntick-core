@@ -14,4 +14,7 @@ import java.util.UUID;
 public interface IFindRelayOperatorUseCase {
 
     Mono<RelayOperatorProfile> findByActorId(UUID tenantId, UUID actorId);
+
+    /** The caller's own profile, whichever space it was created in (see {@code IFindClientUseCase#findMine}). */
+    Mono<RelayOperatorProfile> findMine(UUID tenantId, UUID actorId);
 }

@@ -10,6 +10,9 @@ public interface IFindDelivererUseCase {
 
     Mono<DelivererProfile> findByActorId(UUID tenantId, UUID actorId);
 
+    /** The caller's own profile, whichever space it was created in. */
+    Mono<DelivererProfile> findMine(UUID tenantId, UUID actorId);
+
     Flux<DelivererProfile> findByAgency(UUID tenantId, UUID agencyId);
 
     Flux<DelivererProfile> findByBranch(UUID tenantId, UUID branchId);

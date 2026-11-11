@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.core.incident.application.service;
 
+import java.util.Map;
 import com.yowyob.tiibntick.core.incident.application.command.*;
 import com.yowyob.tiibntick.core.incident.domain.event.IncidentDomainEvents.*;
 import com.yowyob.tiibntick.core.incident.domain.model.*;
@@ -85,7 +86,7 @@ public class IncidentInterAgencyService implements IInterAgencyCooperationUseCas
                                             return incidentRepository.save(inProgress).thenReturn(saved);
                                         });
                             })
-                            .flatMap(saved -> notifyRequestingAgency(saved, "Cooperation accepted"))
+                            .flatMap(saved -> notifyRequestingAgency(saved, "ACCEPTED", "Cooperation accepted", ""))
                             .flatMap(saved -> {
                                 IncidentInterAgencyCooperation active = saved.startProgress().markDriversNotified();
                                 return cooperationRepository.save(active);
@@ -106,7 +107,8 @@ public class IncidentInterAgencyService implements IInterAgencyCooperationUseCas
                 .flatMap(coop -> {
                     IncidentInterAgencyCooperation rejected = coop.reject(command.getRejectionReason());
                     return cooperationRepository.save(rejected)
-                            .flatMap(saved -> notifyRequestingAgency(saved, "Cooperation rejected: " + command.getRejectionReason()));
+                            .flatMap(saved -> notifyRequestingAgency(saved, "REJECTED", "Cooperation rejected: " + command.getRejectionReason(),
+                                    String.valueOf(command.getRejectionReason())));
                 });
     }
 
@@ -137,14 +139,18 @@ public class IncidentInterAgencyService implements IInterAgencyCooperationUseCas
                 coop.getRespondingAgencyId(),
                 "Inter-agency assistance requested",
                 "Type: " + coop.getCooperationType() + " | Details: " + coop.getRequestDetails(),
-                "INTERAGENCY_COOP_REQUESTED", coop.getIncidentId());
+                "INTERAGENCY_COOP_REQUESTED", coop.getIncidentId(),
+                Map.of("cooperationType", String.valueOf(coop.getCooperationType()),
+                        "details", String.valueOf(coop.getRequestDetails())));
     }
 
     private Mono<IncidentInterAgencyCooperation> notifyRequestingAgency(IncidentInterAgencyCooperation coop,
-                                                                          String message) {
+                                                                          String outcome, String message,
+                                                                          String reason) {
         return notificationPort.notifyAgency(
                 coop.getRequestingAgencyId(), "Cooperation update", message,
-                "INTERAGENCY_COOP_UPDATED", coop.getIncidentId()
+                "INTERAGENCY_COOP_" + outcome, coop.getIncidentId(),
+                Map.of("outcome", outcome, "reason", reason)
         ).thenReturn(coop);
     }
 

@@ -27,6 +27,7 @@ public interface INotificationDeliveryPort {
      * @param variables      template variables
      * @param body           ready-to-send text, required by the Kernel and used when the template cannot be applied
      * @param priority       business priority, forwarded as metadata
+     * @param subject        e-mail subject in the recipient's language, {@code null} on other channels
      */
     record OutboundMessage(NotificationChannel channel,
             String tenantId,
@@ -37,7 +38,16 @@ public interface INotificationDeliveryPort {
             String locale,
             Map<String, Object> variables,
             String body,
-            NotificationPriority priority) {
+            NotificationPriority priority,
+            String subject) {
+
+        /** Without a subject (every channel but e-mail). */
+        public OutboundMessage(NotificationChannel channel, String tenantId, String organizationId,
+                String recipientId, String destination, String templateCode, String locale,
+                Map<String, Object> variables, String body, NotificationPriority priority) {
+            this(channel, tenantId, organizationId, recipientId, destination, templateCode, locale, variables,
+                    body, priority, null);
+        }
     }
 
     /** Result of a hand-over to the Kernel: its delivery id and its own status string. */

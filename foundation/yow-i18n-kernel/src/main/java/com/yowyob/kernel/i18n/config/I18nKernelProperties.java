@@ -25,6 +25,17 @@ public class I18nKernelProperties {
      */
     private SupportedLanguage defaultLanguage = SupportedLanguage.FR_CM;
 
+    /** How often each instance checks whether the catalog changed in the database (0 disables polling). */
+    private java.time.Duration refreshInterval = java.time.Duration.ofSeconds(30);
+
+    /** Set to false to ignore the database and serve only the packaged JSON packs. */
+    private boolean catalogEnabled = true;
+
+    public java.time.Duration getRefreshInterval()                         { return refreshInterval; }
+    public void setRefreshInterval(java.time.Duration refreshInterval)     { this.refreshInterval = refreshInterval; }
+    public boolean isCatalogEnabled()                                      { return catalogEnabled; }
+    public void setCatalogEnabled(boolean catalogEnabled)                  { this.catalogEnabled = catalogEnabled; }
+
     public List<String> getLocales()               { return locales;          }
     public void setLocales(List<String> locales)   { this.locales = locales;  }
 

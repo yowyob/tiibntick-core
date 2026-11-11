@@ -35,6 +35,10 @@
             <groupId>com.yowyob.tiibntick.core</groupId>
             <artifactId>yow-i18n-kernel</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-i18n-core</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -130,6 +134,12 @@
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>
             <artifactId>tnt-roles-core</artifactId>
+        </dependency>
+
+        <!-- ── tnt-actor-core (L2 Identity ─ IProfileWelcomePort, implemented here) ── -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-actor-core</artifactId>
         </dependency>
 
         <!-- ── tnt-incident-core (L3 Logistics ─ INotificationPort) ── -->

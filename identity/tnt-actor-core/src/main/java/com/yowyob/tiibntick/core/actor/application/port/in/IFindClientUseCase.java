@@ -17,4 +17,11 @@ public interface IFindClientUseCase {
 
     /** Finds a client by its profile id (the {@code id} returned as {@code clientId}). */
     Mono<ClientProfile> findById(UUID tenantId, UUID profileId);
+
+    /**
+     * The caller's own profile: the one of the current space if there is one, otherwise the one the account
+     * created in another space. A profile belongs to the person, so signing in through a different space must
+     * not make it vanish (and must not invite the person to create it again).
+     */
+    Mono<ClientProfile> findMine(UUID tenantId, UUID actorId);
 }

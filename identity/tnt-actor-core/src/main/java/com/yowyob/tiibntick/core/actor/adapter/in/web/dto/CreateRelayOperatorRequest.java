@@ -9,5 +9,6 @@ import java.util.UUID;
 public record CreateRelayOperatorRequest(
         @NotNull UUID hubId,
         List<AvailabilitySlotDto> openingHours,
-        @PositiveOrZero int declaredCapacityParcels) {
+        @PositiveOrZero int declaredCapacityParcels,
+        String preferredLanguage) {
 }

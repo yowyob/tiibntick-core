@@ -105,9 +105,15 @@ public class IncidentNotificationPortAdapter implements INotificationPort {
     @Override
     public Mono<Void> notifyActor(UUID actorId, String title, String body,
             String type, UUID incidentId) {
+        return notifyActor(actorId, title, body, type, incidentId, Map.of());
+    }
+
+    @Override
+    public Mono<Void> notifyActor(UUID actorId, String title, String body,
+            String type, UUID incidentId, Map<String, Object> facts) {
         log.debug("Notifying actor={} incidentId={} type={}", actorId, incidentId, type);
 
-        Map<String, Object> params = buildParams(title, body, incidentId, type);
+        Map<String, Object> params = buildParams(title, body, incidentId, type, facts);
         NotificationModel model = buildModel(type, params, NotificationPriority.NORMAL);
         NotificationModel highModele = buildModel(type, params, NotificationPriority.HIGH);
 
@@ -148,13 +154,19 @@ public class IncidentNotificationPortAdapter implements INotificationPort {
     @Override
     public Mono<Void> notifyActors(List<UUID> actorIds, String title, String body,
             String type, UUID incidentId) {
+        return notifyActors(actorIds, title, body, type, incidentId, Map.of());
+    }
+
+    @Override
+    public Mono<Void> notifyActors(List<UUID> actorIds, String title, String body,
+            String type, UUID incidentId, Map<String, Object> facts) {
         if (actorIds == null || actorIds.isEmpty()) {
             return Mono.empty();
         }
         log.debug("Notifying {} actors for incidentId={} type={}", actorIds.size(), incidentId, type);
         return Mono.when(
                 actorIds.stream()
-                        .map(id -> notifyActor(id, title, body, type, incidentId))
+                        .map(id -> notifyActor(id, title, body, type, incidentId, facts))
                         .toList());
     }
 
@@ -176,18 +188,20 @@ public class IncidentNotificationPortAdapter implements INotificationPort {
     @Override
     public Mono<Void> notifyAgency(UUID agencyId, String title, String body,
             String type, UUID incidentId) {
+        return notifyAgency(agencyId, title, body, type, incidentId, Map.of());
+    }
+
+    @Override
+    public Mono<Void> notifyAgency(UUID agencyId, String title, String body,
+            String type, UUID incidentId, Map<String, Object> facts) {
         log.info("Notifying agency={} incidentId={} type={}", agencyId, incidentId, type);
 
         // Virtual agency topic — resolved by WebSocket session manager
         String agencyRecipientId = "agency:" + agencyId;
 
-        Map<String, Object> params = buildParams(title, body, incidentId, type);
-        params = Map.of(
-                "title", title,
-                "body", body,
-                "incidentId", incidentId.toString(),
-                "agencyId", agencyId.toString(),
-                "type", type);
+        Map<String, Object> params = new java.util.LinkedHashMap<>(
+                buildParams(title, body, incidentId, type, facts));
+        params.put("agencyId", agencyId.toString());
         NotificationModel model = buildModel(type, params, NotificationPriority.HIGH);
 
         return notificationUseCase
@@ -201,13 +215,22 @@ public class IncidentNotificationPortAdapter implements INotificationPort {
 
     // ── Private helpers ────────────────────────────────────────────────────────
 
+    /**
+     * The facts of the message (reference, level, severity...) plus the legacy {@code title}/{@code body}
+     * sentences. The catalog text uses the facts, so each recipient reads it in their own language; the
+     * legacy sentences only serve a catalog entry that has not been rewritten yet.
+     */
     private Map<String, Object> buildParams(String title, String body,
-            UUID incidentId, String type) {
-        return Map.of(
-                "title", title,
-                "body", body,
-                "incidentId", incidentId.toString(),
-                "type", type);
+            UUID incidentId, String type, Map<String, Object> facts) {
+        Map<String, Object> params = new java.util.LinkedHashMap<>();
+        if (facts != null) {
+            params.putAll(facts);
+        }
+        params.put("title", title);
+        params.put("body", body);
+        params.put("incidentId", incidentId.toString());
+        params.put("type", type);
+        return params;
     }
 
     /**

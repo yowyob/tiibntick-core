@@ -26,4 +26,10 @@ public class ClientProfileQueryService implements IFindClientUseCase {
     public Mono<ClientProfile> findById(UUID tenantId, UUID profileId) {
         return repository.findById(tenantId, profileId);
     }
+
+    @Override
+    public Mono<ClientProfile> findMine(UUID tenantId, UUID actorId) {
+        return repository.findByActorId(tenantId, actorId)
+                .switchIfEmpty(Mono.defer(() -> repository.findFirstByActorId(actorId)));
+    }
 }

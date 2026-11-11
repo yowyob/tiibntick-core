@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.core.notify.application.port.out;
 
+import com.yowyob.tiibntick.core.notify.domain.enums.NotificationChannel;
 import com.yowyob.tiibntick.core.notify.domain.vo.NotificationModel;
 import reactor.core.publisher.Mono;
 
@@ -18,6 +19,19 @@ public interface ITranslationPort {
      * @return the ready-to-send translated message
      */
     Mono<String> translate(NotificationModel model);
+
+    /**
+     * Same, in the flavour the channel needs (a short SMS, a push text, an e-mail body...). The default
+     * ignores the channel so existing implementations keep working.
+     */
+    default Mono<String> translate(NotificationModel model, NotificationChannel channel) {
+        return translate(model);
+    }
+
+    /** Subject line of the message on this channel (e-mail), empty when the channel has none or none is written. */
+    default Mono<String> translateSubject(NotificationModel model, NotificationChannel channel) {
+        return Mono.empty();
+    }
 
     /**
      * Returns the untranslated pattern of a template key (its {@code {{variable}}} placeholders left

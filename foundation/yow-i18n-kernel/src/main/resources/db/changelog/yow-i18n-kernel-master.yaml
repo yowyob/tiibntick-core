@@ -1,0 +1,17 @@
+databaseChangeLog:
+  # yow-i18n-kernel — message catalog (templates are data, owned by the platform, shared by every
+  # TiiBnTick product). New texts ship as NEW numbered seed files here; an already-applied changeset
+  # is never edited (its checksum is held by production databases) and admin edits are never overwritten
+  # because every seed insert is ON CONFLICT DO NOTHING.
+  - include:
+      file: db/changelog/changes/i18n-001-create-message-catalog.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/i18n-002-seed-existing-messages.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/i18n-003-seed-notification-scenarios.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/i18n-004-seed-profile-welcome.sql
+      relativeToChangelogFile: false

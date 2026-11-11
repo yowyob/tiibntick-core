@@ -51,6 +51,12 @@
             <artifactId>tnt-auth-core</artifactId>
         </dependency>
 
+        <!-- tnt-i18n-core : the account language every profile of the account shares -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-i18n-core</artifactId>
+        </dependency>
+
         <!-- tnt-roles-core : RBAC DSL — @RequirePermission on service methods -->
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>
@@ -156,6 +162,12 @@
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>r2dbc</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>mockwebserver</artifactId>
             <scope>test</scope>
         </dependency>
 

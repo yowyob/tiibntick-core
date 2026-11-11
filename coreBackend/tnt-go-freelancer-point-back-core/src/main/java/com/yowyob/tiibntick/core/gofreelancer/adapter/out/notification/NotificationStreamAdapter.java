@@ -24,8 +24,10 @@ public class NotificationStreamAdapter implements NotificationStreamPort {
     @Override
     public Flux<MatchingNotification> getNotificationStream(UUID freelancerId) {
         log.info("Client connected to notification stream: {}", freelancerId);
-        return userSinks.computeIfAbsent(freelancerId,
-                id -> Sinks.many().multicast().onBackpressureBuffer())
+        // directBestEffort: the sink outlives its subscribers. The former buffered multicast sink cancelled itself
+        // when the last client left, and every later connection of the same freelancer then completed at once
+        // (an SSE that opens and closes immediately, retried in a loop by the browser).
+        return userSinks.computeIfAbsent(freelancerId, id -> Sinks.many().multicast().<MatchingNotification>directBestEffort())
                 .asFlux();
     }
 
@@ -34,7 +36,14 @@ public class NotificationStreamAdapter implements NotificationStreamPort {
         Sinks.Many<MatchingNotification> sink = userSinks.get(event.freelancerId());
         if (sink != null) {
             log.info("Pushing real-time notification to client: {}", event.freelancerId());
-            sink.emitNext(event, Sinks.EmitFailureHandler.FAIL_FAST);
+            // Pushes can come from several consumer threads: retry only the "concurrent emission" failure.
+            Sinks.EmitResult result = sink.tryEmitNext(event);
+            for (int i = 0; result == Sinks.EmitResult.FAIL_NON_SERIALIZED && i < 100; i++) {
+                result = sink.tryEmitNext(event);
+            }
+            if (result.isFailure() && result != Sinks.EmitResult.FAIL_ZERO_SUBSCRIBER) {
+                log.warn("Notification for {} not delivered to the stream: {}", event.freelancerId(), result);
+            }
         } else {
             log.debug("No active stream for delivery person: {}", event.freelancerId());
         }

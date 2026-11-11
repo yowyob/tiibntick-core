@@ -59,7 +59,7 @@ public class KernelDeliveryAdapter implements INotificationDeliveryPort {
                 address,
                 kernelChannel,
                 useTemplate ? m.templateCode() : null,
-                null,
+                m.subject(),
                 m.body(),
                 useTemplate ? m.variables() : null,
                 m.priority() != null ? Map.of("priority", m.priority().name()) : null);

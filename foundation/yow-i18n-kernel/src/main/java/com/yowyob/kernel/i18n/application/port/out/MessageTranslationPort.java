@@ -21,4 +21,12 @@ public interface MessageTranslationPort {
      * @return the localized message, or empty if not found
      */
     Optional<LocalizedMessage> findByKeyAndLanguage(String key, String language);
+
+    /**
+     * Same lookup for a channel flavour ({@code SMS}, {@code PUSH}, {@code EMAIL_SUBJECT}…). Stores that
+     * know no variants ignore it and return the plain text.
+     */
+    default Optional<LocalizedMessage> findByKeyAndLanguage(String key, String language, String variant) {
+        return findByKeyAndLanguage(key, language);
+    }
 }

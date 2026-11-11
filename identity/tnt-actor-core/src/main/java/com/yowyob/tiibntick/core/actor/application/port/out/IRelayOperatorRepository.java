@@ -8,6 +8,9 @@ import java.util.UUID;
 
 public interface IRelayOperatorRepository {
 
+    /** The person's relay-operator profile in any tenant. */
+    Mono<RelayOperatorProfile> findFirstByActorId(UUID actorId);
+
     Mono<Boolean> existsByActorId(UUID tenantId, UUID actorId);
 
     Mono<RelayOperatorProfile> findById(UUID tenantId, UUID id);

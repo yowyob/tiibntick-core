@@ -22,6 +22,10 @@ public abstract sealed class TntActorProfile
     private final Instant createdAt;
     private final Instant updatedAt;
     private final String blockchainDid;
+    /** Language of the ACCOUNT (see {@link #preferredLanguage()}); attached at load time, never stored here. */
+    private volatile String preferredLanguage;
+    /** Kernel file id of the account's profile photo; attached when the identity is resolved, never stored here. */
+    private volatile UUID photoId;
 
     protected TntActorProfile(
             UUID id,
@@ -97,6 +101,35 @@ public abstract sealed class TntActorProfile
     /** Blockchain Decentralized Identifier anchored via tnt-trust, or null if not yet issued. */
     public String blockchainDid() {
         return blockchainDid;
+    }
+
+    /**
+     * The language of the account this profile belongs to ({@code fr} or {@code en}). It is NOT a profile
+     * column: a person may hold several TiiBnTick profiles (client, freelancer, deliverer, relay operator)
+     * and they all read the same value, because it comes from the single per-account preference
+     * ({@code tnt-i18n-core}, keyed by {@link #actorId()}). Changing it is done on the account
+     * ({@code PUT /api/v1/me/language}), never per profile.
+     *
+     * @return the account language, or {@code fr} (platform default) when it has not been attached
+     */
+    public String preferredLanguage() {
+        String language = preferredLanguage;
+        return language != null ? language : "fr";
+    }
+
+    /** Called by the persistence adapters right after loading; carries the account's language onto the profile. */
+    public void attachPreferredLanguage(String language) {
+        this.preferredLanguage = language;
+    }
+
+    /** Kernel file id of the profile photo, {@code null} when the person has none (or it is not loaded). */
+    public UUID photoId() {
+        return photoId;
+    }
+
+    /** Carries the account's Kernel photo onto the profile; the Kernel stays the owner of the file. */
+    public void attachPhotoId(UUID photoId) {
+        this.photoId = photoId;
     }
 
     public boolean isActive() {

@@ -4,6 +4,8 @@ import com.yowyob.kernel.i18n.application.port.in.TranslateMessageUseCase;
 import com.yowyob.kernel.i18n.config.I18nKernelProperties;
 import com.yowyob.kernel.i18n.domain.enums.SupportedLanguage;
 import com.yowyob.tiibntick.core.notify.application.port.out.ITranslationPort;
+import com.yowyob.tiibntick.core.notify.domain.enums.ChannelVariant;
+import com.yowyob.tiibntick.core.notify.domain.enums.NotificationChannel;
 import com.yowyob.tiibntick.core.notify.domain.vo.NotificationModel;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -63,10 +65,16 @@ public class I18nTranslationPortAdapter implements ITranslationPort {
 
     @Override
     public Mono<String> translate(NotificationModel model) {
+        return translate(model, null);
+    }
+
+    @Override
+    public Mono<String> translate(NotificationModel model, NotificationChannel channel) {
+        String variant = ChannelVariant.body(channel);
         String requestedLanguage = model.targetLanguage();
         String normalizedTag = normalize(requestedLanguage);
 
-        return lookup(model, normalizedTag)
+        return lookup(model, normalizedTag, variant)
                 .switchIfEmpty(Mono.defer(() -> {
                     if (defaultLanguageTag.equalsIgnoreCase(normalizedTag)) {
                         return Mono.empty();
@@ -74,7 +82,7 @@ public class I18nTranslationPortAdapter implements ITranslationPort {
                     log.warn("i18n: key '{}' not found for language '{}' (normalized to '{}'); "
                             + "retrying with default locale '{}'",
                             model.templateKey(), requestedLanguage, normalizedTag, defaultLanguageTag);
-                    return lookup(model, defaultLanguageTag);
+                    return lookup(model, defaultLanguageTag, variant);
                 }))
                 .switchIfEmpty(Mono.fromSupplier(() -> {
                     missingTranslationCounter.increment();
@@ -94,9 +102,23 @@ public class I18nTranslationPortAdapter implements ITranslationPort {
                         : Mono.justOrEmpty(translateMessageUseCase.translate(templateKey, defaultLanguageTag))));
     }
 
-    private Mono<String> lookup(NotificationModel model, String languageTag) {
-        return Mono.justOrEmpty(
-                translateMessageUseCase.translate(model.templateKey(), languageTag, model.parameters()));
+    @Override
+    public Mono<String> translateSubject(NotificationModel model, NotificationChannel channel) {
+        String variant = ChannelVariant.subject(channel);
+        if (variant == null) {
+            return Mono.empty();
+        }
+        String tag = normalize(model.targetLanguage());
+        // Only a subject that was really written: the plain text must never double as an e-mail subject.
+        return Mono.justOrEmpty(translateMessageUseCase.translate(model.templateKey(), tag, model.parameters(), variant))
+                .filter(subject -> !subject.equals(translateMessageUseCase
+                        .translate(model.templateKey(), tag, model.parameters()).orElse(null)));
+    }
+
+    private Mono<String> lookup(NotificationModel model, String languageTag, String variant) {
+        return Mono.justOrEmpty("DEFAULT".equals(variant)
+                ? translateMessageUseCase.translate(model.templateKey(), languageTag, model.parameters())
+                : translateMessageUseCase.translate(model.templateKey(), languageTag, model.parameters(), variant));
     }
 
     /**

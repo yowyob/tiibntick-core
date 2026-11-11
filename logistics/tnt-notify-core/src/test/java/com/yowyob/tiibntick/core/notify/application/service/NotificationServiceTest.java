@@ -53,7 +53,10 @@ class NotificationServiceTest {
     @BeforeEach
     void setUp() {
         service = new NotificationService(translationPort, deliveryPort, eventPort);
-        when(translationPort.translate(model)).thenReturn(Mono.just(TEXT));
+        when(translationPort.translate(any(NotificationModel.class), any(NotificationChannel.class)))
+                .thenReturn(Mono.just(TEXT));
+        when(translationPort.translateSubject(any(NotificationModel.class), any(NotificationChannel.class)))
+                .thenReturn(Mono.empty());
     }
 
     @Test

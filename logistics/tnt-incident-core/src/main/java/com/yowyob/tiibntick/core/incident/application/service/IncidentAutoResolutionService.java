@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.core.incident.application.service;
 
+import java.util.Map;
 import com.yowyob.tiibntick.core.incident.application.command.AssignReplacementDriverCommand;
 import com.yowyob.tiibntick.core.incident.domain.enums.*;
 import com.yowyob.tiibntick.core.incident.domain.event.IncidentDomainEvents.*;
@@ -123,7 +124,8 @@ public class IncidentAutoResolutionService implements IStartAutoResolutionUseCas
         return notificationPort.notifyActor(rep.getReplacementDriverId(),
                 "New delivery assignment",
                 "Emergency replacement needed for incident " + incident.getReferenceCode(),
-                "INCIDENT_DRIVER_PROPOSAL", incident.getId());
+                "INCIDENT_DRIVER_PROPOSAL", incident.getId(),
+                Map.of("reference", String.valueOf(incident.getReferenceCode())));
     }
 
     private Mono<Incident> handleNoDriverAvailable(Incident incident) {
@@ -132,7 +134,8 @@ public class IncidentAutoResolutionService implements IStartAutoResolutionUseCas
                 .flatMap(saved -> notificationPort.notifyAgency(saved.getAgencyId(),
                         "Auto-resolution failed: " + saved.getReferenceCode(),
                         "No replacement driver found. Manual intervention required.",
-                        "INCIDENT_AUTO_FAILED", saved.getId()).thenReturn(saved));
+                        "INCIDENT_AUTO_FAILED", saved.getId(),
+                        Map.of("reference", String.valueOf(saved.getReferenceCode()))).thenReturn(saved));
     }
 
     private Mono<Incident> startRerouting(Incident incident) {

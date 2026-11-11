@@ -31,5 +31,12 @@ public record KernelActorDto(
         String displayName,
         String phoneNumber,
         String email,
-        String type
-) {}
+        String type,
+        UUID photoId
+) {
+    /** Without the photo, for callers that only care about identity. */
+    public KernelActorDto(UUID id, UUID tenantId, UUID organizationId, String firstName, String lastName,
+                          String name, String displayName, String phoneNumber, String email, String type) {
+        this(id, tenantId, organizationId, firstName, lastName, name, displayName, phoneNumber, email, type, null);
+    }
+}

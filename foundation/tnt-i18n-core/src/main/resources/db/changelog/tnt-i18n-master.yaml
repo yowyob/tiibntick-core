@@ -1,0 +1,6 @@
+databaseChangeLog:
+  # tnt-i18n-core (L1) — per-account language preference. The message catalog itself belongs to
+  # yow-i18n-kernel (yow-i18n-kernel-master.yaml); this file only holds what is specific to TiiBnTick accounts.
+  - include:
+      file: db/changelog/changes/001-create-user-language-preference.sql
+      relativeToChangelogFile: false

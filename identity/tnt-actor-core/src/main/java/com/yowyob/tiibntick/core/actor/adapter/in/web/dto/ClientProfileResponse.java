@@ -13,6 +13,10 @@ import java.util.UUID;
  * itself, so it can be {@code null} if the Kernel is unreachable or does not
  * (yet) expose a by-id actor lookup.
  */
+/**
+ * {@code preferredLanguage} is the language of the ACCOUNT: identical on every profile of the same person,
+ * changed through {@code PUT /api/v1/me/language}, never per profile.
+ */
 public record ClientProfileResponse(
         UUID id,
         UUID tenantId,
@@ -26,6 +30,8 @@ public record ClientProfileResponse(
         String preferredPaymentMethod,
         Instant createdAt,
         Instant updatedAt,
+        String preferredLanguage,
+        UUID photoId,
         ActorIdentitySummary identity) {
 
     public static ClientProfileResponse from(ClientProfile p) {
@@ -38,6 +44,14 @@ public record ClientProfileResponse(
                 p.actorStatus().name(), p.kycStatus().name(),
                 p.rating().score(), p.rating().totalRatings(),
                 p.favoriteAddressIds(), p.loyaltyScore(), p.preferredPaymentMethod(),
-                p.createdAt(), p.updatedAt(), identity);
+                p.createdAt(), p.updatedAt(), p.preferredLanguage(), photoOf(p, identity), identity);
+    }
+
+    /** The photo comes from the Kernel (account avatar); it is put on the profile so every platform reads it there. */
+    private static UUID photoOf(com.yowyob.tiibntick.core.actor.domain.model.TntActorProfile p, ActorIdentitySummary identity) {
+        if (identity != null && identity.photoId() != null) {
+            p.attachPhotoId(identity.photoId());
+        }
+        return p.photoId();
     }
 }

@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.core.incident.application.service;
 
+import java.util.Map;
 import com.yowyob.tiibntick.core.incident.application.command.ConfirmHandoverCommand;
 import com.yowyob.tiibntick.core.incident.domain.enums.ActorRole;
 import com.yowyob.tiibntick.core.incident.domain.enums.ResolutionMode;
@@ -123,10 +124,12 @@ public class IncidentHandoverService implements IConfirmHandoverUseCase {
                 .then(eventPublisher.publish(handoverEvent))
                 .then(notificationPort.notifyActor(rep.getOriginalDriverId(),
                         "Handover confirmed", "Parcel transfer recorded on blockchain",
-                        "HANDOVER_CONFIRMED", incident.getId()))
+                        "HANDOVER_CONFIRMED", incident.getId(),
+                        Map.of("reference", String.valueOf(incident.getReferenceCode()))))
                 .then(notificationPort.notifyActor(rep.getReplacementDriverId(),
                         "Mission started", "You are now the assigned driver",
-                        "DRIVER_MISSION_ASSIGNED", incident.getId()));
+                        "DRIVER_MISSION_ASSIGNED", incident.getId(),
+                        Map.of("reference", String.valueOf(incident.getReferenceCode()))));
     }
 
     private Mono<Void> logPartialConfirmation(Incident incident, IncidentDriverReplacement rep,

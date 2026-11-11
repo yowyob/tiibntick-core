@@ -13,5 +13,8 @@ public interface IClientProfileRepository {
 
     Mono<ClientProfile> findById(UUID tenantId, UUID profileId);
 
+    /** Cross-tenant lookup: the actor's client profile whichever space it was created in. */
+    Mono<ClientProfile> findFirstByActorId(UUID actorId);
+
     Mono<ClientProfile> save(ClientProfile profile);
 }

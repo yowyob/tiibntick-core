@@ -22,6 +22,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.yowyob.tiibntick.common.api.ApiResponse;
@@ -49,6 +50,19 @@ import java.util.List;
 @Tag(name = "Relay Operators", description = "Relay operator profile management")
 public class RelayOperatorController {
 
+    private ProfileLanguageSupport profileLanguage;
+
+    /** Stores the language picked at creation on the account; optional so hand-built controllers still work. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setProfileLanguage(ProfileLanguageSupport profileLanguage) {
+        this.profileLanguage = profileLanguage;
+    }
+
+    private reactor.core.publisher.Mono<Void> recordLanguage(java.util.UUID userId, String chosen, String acceptLanguage) {
+        return profileLanguage == null ? reactor.core.publisher.Mono.empty()
+                : profileLanguage.record(userId, chosen, acceptLanguage);
+    }
+
     private final ICreateRelayOperatorProfileUseCase createUseCase;
     private final IFindRelayOperatorUseCase findUseCase;
     private final IResolveActorIdentityUseCase identityUseCase;
@@ -66,17 +80,19 @@ public class RelayOperatorController {
     @Operation(summary = "Create a relay operator profile for a user within the caller's tenant")
     public Mono<ResponseEntity<ApiResponse<RelayOperatorProfileResponse>>> createRelayOperatorProfile(
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
-            @Valid @RequestBody Mono<CreateRelayOperatorRequest> requestMono) {
+            @Valid @RequestBody Mono<CreateRelayOperatorRequest> requestMono,
+            @Parameter(hidden = true) @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
         return requestMono.flatMap(req -> {
             List<AvailabilitySlot> slots = req.openingHours() != null
                     ? req.openingHours().stream().map(AvailabilitySlotDto::toDomain).toList()
                     : List.of();
-            return createUseCase.createRelayOperatorProfile(new CreateRelayOperatorProfileCommand(
-                    currentUser.tenantId(),
-                    currentUser.userId(),
-                    req.hubId(),
-                    slots,
-                    req.declaredCapacityParcels()));
+            return recordLanguage(currentUser.userId(), req.preferredLanguage(), acceptLanguage)
+                    .then(Mono.defer(() -> createUseCase.createRelayOperatorProfile(new CreateRelayOperatorProfileCommand(
+                            currentUser.tenantId(),
+                            currentUser.userId(),
+                            req.hubId(),
+                            slots,
+                            req.declaredCapacityParcels()))));
         })
         .flatMap(profile -> identityUseCase.resolve(profile.actorId())
                 .map(identity -> RelayOperatorProfileResponse.from(profile, identity))
@@ -85,11 +101,11 @@ public class RelayOperatorController {
     }
 
     @GetMapping("/me")
-    @PreAuthorize("hasRole('RELAY_OPERATOR')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Get the relay operator profile of the authenticated relay operator")
     public Mono<ResponseEntity<ApiResponse<RelayOperatorProfileResponse>>> getMyProfile(
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
-        return findUseCase.findByActorId(currentUser.tenantId(), currentUser.userId())
+        return findUseCase.findMine(currentUser.tenantId(), currentUser.userId())
                 .switchIfEmpty(Mono.error(
                         new RelayOperatorNotFoundException(currentUser.tenantId(), currentUser.userId())))
                 .flatMap(profile -> identityUseCase.resolve(profile.actorId())

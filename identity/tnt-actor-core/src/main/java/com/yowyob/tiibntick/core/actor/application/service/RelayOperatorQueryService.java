@@ -21,4 +21,10 @@ public class RelayOperatorQueryService implements IFindRelayOperatorUseCase {
     public Mono<RelayOperatorProfile> findByActorId(UUID tenantId, UUID actorId) {
         return repository.findByActorId(tenantId, actorId);
     }
+
+    @Override
+    public Mono<RelayOperatorProfile> findMine(UUID tenantId, UUID actorId) {
+        return repository.findByActorId(tenantId, actorId)
+                .switchIfEmpty(Mono.defer(() -> repository.findFirstByActorId(actorId)));
+    }
 }

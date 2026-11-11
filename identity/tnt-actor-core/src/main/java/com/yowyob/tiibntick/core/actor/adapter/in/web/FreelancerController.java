@@ -41,6 +41,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -74,6 +75,19 @@ import java.util.UUID;
 @RequestMapping("/api/v1/freelancers")
 @Tag(name = "Freelancers", description = "Freelancer profile management")
 public class FreelancerController {
+
+    private ProfileLanguageSupport profileLanguage;
+
+    /** Stores the language picked at creation on the account; optional so hand-built controllers still work. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setProfileLanguage(ProfileLanguageSupport profileLanguage) {
+        this.profileLanguage = profileLanguage;
+    }
+
+    private reactor.core.publisher.Mono<Void> recordLanguage(java.util.UUID userId, String chosen, String acceptLanguage) {
+        return profileLanguage == null ? reactor.core.publisher.Mono.empty()
+                : profileLanguage.record(userId, chosen, acceptLanguage);
+    }
 
     private final ICreateFreelancerProfileUseCase createUseCase;
     private final IFindFreelancerUseCase findUseCase;
@@ -112,18 +126,20 @@ public class FreelancerController {
     @Operation(summary = "Create a freelancer profile for the authenticated user")
     public Mono<ResponseEntity<ApiResponse<FreelancerProfileResponse>>> createFreelancerProfile(
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
-            @Valid @RequestBody Mono<CreateFreelancerRequest> requestMono) {
+            @Valid @RequestBody Mono<CreateFreelancerRequest> requestMono,
+            @Parameter(hidden = true) @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
         return requestMono.flatMap(req -> {
             List<ServiceZoneId> zones = req.serviceZoneIds().stream()
                     .map(ServiceZoneId::of).toList();
             List<AvailabilitySlot> slots = req.availabilitySlots() != null
                     ? req.availabilitySlots().stream().map(dto -> dto.toDomain()).toList()
                     : List.of();
-            return createUseCase.createFreelancerProfile(new CreateFreelancerProfileCommand(
-                    currentUser.tenantId(),
-                    currentUser.userId(),
-                    zones, slots,
-                    req.pricingPolicyId()));
+            return recordLanguage(currentUser.userId(), req.preferredLanguage(), acceptLanguage)
+                    .then(Mono.defer(() -> createUseCase.createFreelancerProfile(new CreateFreelancerProfileCommand(
+                            currentUser.tenantId(),
+                            currentUser.userId(),
+                            zones, slots,
+                            req.pricingPolicyId()))));
         })
         .flatMap(profile -> identityUseCase.resolveCurrent()
                 .map(identity -> FreelancerProfileResponse.from(profile, identity))
@@ -133,11 +149,11 @@ public class FreelancerController {
     }
 
     @GetMapping("/me")
-    @RequirePermission(resource = "freelancer", action = "read")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Get the freelancer profile of the authenticated freelancer")
     public Mono<ResponseEntity<ApiResponse<FreelancerProfileResponse>>> getMyProfile(
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
-        return findUseCase.findByActorId(currentUser.tenantId(), currentUser.userId())
+        return findUseCase.findMine(currentUser.tenantId(), currentUser.userId())
                 .flatMap(profile -> identityUseCase.resolveCurrent()
                         .map(identity -> FreelancerProfileResponse.from(profile, identity))
                         .defaultIfEmpty(FreelancerProfileResponse.from(profile)))

@@ -8,5 +8,6 @@ import java.util.UUID;
 public record CreateFreelancerRequest(
         @NotNull List<UUID> serviceZoneIds,
         List<AvailabilitySlotDto> availabilitySlots,
-        UUID pricingPolicyId) {
+        UUID pricingPolicyId,
+        String preferredLanguage) {
 }

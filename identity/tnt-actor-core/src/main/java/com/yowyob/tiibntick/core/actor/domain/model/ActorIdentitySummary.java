@@ -19,17 +19,41 @@ public record ActorIdentitySummary(
         String phoneNumber,
         String email,
         String firstName,
-        String lastName
+        String lastName,
+        UUID photoId
 ) {
     /** Backward-compatible constructor (no first/last name). */
     public ActorIdentitySummary(UUID actorId, String displayName, String phoneNumber, String email) {
-        this(actorId, displayName, phoneNumber, email, null, null);
+        this(actorId, displayName, phoneNumber, email, null, null, null);
+    }
+
+    /** Backward-compatible constructor (no photo). */
+    public ActorIdentitySummary(UUID actorId, String displayName, String phoneNumber, String email,
+                                String firstName, String lastName) {
+        this(actorId, displayName, phoneNumber, email, firstName, lastName, null);
+    }
+
+    /**
+     * Completes this identity with the Kernel user account: the actor read from the business-actor endpoint
+     * carries neither the e-mail nor the names nor the photo, the account does.
+     */
+    public ActorIdentitySummary withAccount(KernelUserAccount account) {
+        if (account == null) {
+            return this;
+        }
+        return new ActorIdentitySummary(actorId,
+                displayName != null ? displayName : account.displayName(),
+                phoneNumber != null ? phoneNumber : account.phoneNumber(),
+                email != null ? email : account.email(),
+                firstName != null ? firstName : account.firstName(),
+                lastName != null ? lastName : account.lastName(),
+                account.avatarId() != null ? account.avatarId() : photoId);
     }
 
     public static ActorIdentitySummary from(KernelActorDto dto) {
         String display = dto.displayName() != null ? dto.displayName() : dto.name();
         return new ActorIdentitySummary(dto.id(), display, dto.phoneNumber(), dto.email(),
-                dto.firstName(), dto.lastName());
+                dto.firstName(), dto.lastName(), dto.photoId());
     }
 
     public static ActorIdentitySummary from(KernelBusinessActorDto dto) {

@@ -30,4 +30,11 @@ public interface TranslateMessageUseCase {
      * @return the translated and interpolated string, or empty if the key is not found
      */
     Optional<String> translate(String key, String language, Map<String, Object> parameters);
+
+    /**
+     * Channel-aware variant: tries {@code variant} first in each language of the fallback chain and
+     * falls back to the plain text of that language. Parameters, plural and typed formats are applied
+     * in the requested language.
+     */
+    Optional<String> translate(String key, String language, Map<String, Object> parameters, String variant);
 }

@@ -57,9 +57,10 @@ public class NotifyProperties {
 
         /**
          * Send {@code templateCode} + variables so the Kernel renders its registered template, and register
-         * the TiiBnTick templates in the Kernel on first use. When false only the ready-made body is sent.
+         * the TiiBnTick templates in the Kernel on first use. When false (default) only the body rendered for
+         * the recipient, in their own language, is sent.
          */
-        private boolean templatesEnabled = true;
+        private boolean templatesEnabled = false;
 
         public String getDefaultTenantId() {
             return defaultTenantId;

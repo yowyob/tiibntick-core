@@ -68,6 +68,7 @@ class FreelancerServiceRoleAssignmentTest {
     @DisplayName("T1 — creating a new profile triggers FREELANCER role assignment and returns the profile")
     void newProfile_triggersFreelancerRoleAssignment_andReturnsProfile() {
         when(freelancerRepository.existsByActorId(tenantId, actorId)).thenReturn(Mono.just(false));
+        when(freelancerRepository.findFirstByActorId(actorId)).thenReturn(Mono.empty());
         when(kernelActorPort.exists(actorId)).thenReturn(Mono.just(true));
         when(freelancerRepository.save(any())).thenReturn(Mono.just(profile));
         when(eventPublisher.publishActorStatusChanged(any())).thenReturn(Mono.empty());
@@ -135,6 +136,7 @@ class FreelancerServiceRoleAssignmentTest {
     @DisplayName("T4 — assignRole failure does not fail createFreelancerProfile (best-effort)")
     void assignRoleFailure_doesNotFailProfileCreation() {
         when(freelancerRepository.existsByActorId(tenantId, actorId)).thenReturn(Mono.just(false));
+        when(freelancerRepository.findFirstByActorId(actorId)).thenReturn(Mono.empty());
         when(kernelActorPort.exists(actorId)).thenReturn(Mono.just(true));
         when(freelancerRepository.save(any())).thenReturn(Mono.just(profile));
         when(eventPublisher.publishActorStatusChanged(any())).thenReturn(Mono.empty());

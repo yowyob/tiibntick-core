@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.util.UUID;
 
 /**
@@ -35,18 +36,25 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class NotificationStreamController {
 
+    private static final Duration HEARTBEAT = Duration.ofSeconds(15);
+
     private final NotificationStreamPort notificationStreamPort;
     private final NotificationStreamAccessGuard accessGuard;
 
     @GetMapping("/stream/{freelancerId}")
     public Mono<ResponseEntity<Flux<ServerSentEvent<MatchingNotificationResponse>>>> getNotificationStream(
             @PathVariable UUID freelancerId) {
-        Flux<ServerSentEvent<MatchingNotificationResponse>> body = notificationStreamPort
+        Flux<ServerSentEvent<MatchingNotificationResponse>> events = notificationStreamPort
                 .getNotificationStream(freelancerId)
                 .map(MatchingNotificationResponse::from)
                 .map(event -> ServerSentEvent.<MatchingNotificationResponse>builder(event)
                         .event("notification")
-                        .build())
+                        .build());
+        // A comment every 15 s: proxies and load balancers close a silent connection after a short idle time,
+        // which sent the browser into a reconnect loop.
+        Flux<ServerSentEvent<MatchingNotificationResponse>> heartbeat = Flux.interval(HEARTBEAT)
+                .map(tick -> ServerSentEvent.<MatchingNotificationResponse>builder().comment("keep-alive").build());
+        Flux<ServerSentEvent<MatchingNotificationResponse>> body = Flux.merge(events, heartbeat)
                 // Immediate comment keeps the SSE response open under strict Accept negotiation
                 // and avoids idle clients seeing a hung connection with no headers flushed.
                 .startWith(ServerSentEvent.<MatchingNotificationResponse>builder()

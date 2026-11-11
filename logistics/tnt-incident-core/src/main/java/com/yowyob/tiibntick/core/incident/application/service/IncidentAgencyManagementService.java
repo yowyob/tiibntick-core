@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.core.incident.application.service;
 
+import java.util.Map;
 import com.yowyob.tiibntick.core.incident.application.command.ResolveIncidentCommand;
 import com.yowyob.tiibntick.core.incident.application.command.StartAgencyHandlingCommand;
 import com.yowyob.tiibntick.core.incident.domain.enums.ActorRole;
@@ -90,7 +91,10 @@ public class IncidentAgencyManagementService implements IStartAgencyHandlingUseC
         return notificationPort.notifyAgency(command.getAgencyId(),
                 "Incident under agency handling: " + incident.getReferenceCode(),
                 "Assigned to: " + (command.getAssignedToActorId() != null ? command.getAssignedToActorId() : "agency"),
-                "AGENCY_HANDLING_STARTED", incident.getId()
+                "AGENCY_HANDLING_STARTED", incident.getId(),
+                Map.of("reference", String.valueOf(incident.getReferenceCode()),
+                        "assignedTo", command.getAssignedToActorId() != null
+                                ? command.getAssignedToActorId().toString() : "")
         ).thenReturn(incident);
     }
 

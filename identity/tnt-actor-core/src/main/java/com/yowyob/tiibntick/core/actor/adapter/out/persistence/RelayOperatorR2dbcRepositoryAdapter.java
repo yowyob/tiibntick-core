@@ -14,6 +14,15 @@ import java.util.UUID;
 @Component
 public class RelayOperatorR2dbcRepositoryAdapter implements IRelayOperatorRepository {
 
+    /** Carries the account language onto loaded profiles; optional so hand-built adapters (tests) still work. */
+    private ActorLanguageEnricher language = ActorLanguageEnricher.none();
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setLanguageEnricher(ActorLanguageEnricher enricher) {
+        this.language = enricher;
+    }
+
+
     private final RelayOperatorSpringDataRepository repository;
     private final R2dbcEntityTemplate entityTemplate;
 
@@ -30,32 +39,37 @@ public class RelayOperatorR2dbcRepositoryAdapter implements IRelayOperatorReposi
 
     @Override
     public Mono<RelayOperatorProfile> findById(UUID tenantId, UUID id) {
-        return repository.findById(id).map(this::toDomain);
+        return language.enrich(repository.findById(id).map(this::toDomain));
     }
 
     @Override
     public Mono<RelayOperatorProfile> findByActorId(UUID tenantId, UUID actorId) {
-        return repository.findByTenantIdAndActorId(tenantId, actorId).map(this::toDomain);
+        return language.enrich(repository.findByTenantIdAndActorId(tenantId, actorId).map(this::toDomain));
+    }
+
+    @Override
+    public Mono<RelayOperatorProfile> findFirstByActorId(UUID actorId) {
+        return language.enrich(repository.findFirstByActorId(actorId).map(this::toDomain));
     }
 
     @Override
     public Mono<RelayOperatorProfile> findByHubId(UUID tenantId, UUID hubId) {
-        return repository.findByTenantIdAndHubId(tenantId, hubId).map(this::toDomain);
+        return language.enrich(repository.findByTenantIdAndHubId(tenantId, hubId).map(this::toDomain));
     }
 
     @Override
     public Flux<RelayOperatorProfile> findByTenantId(UUID tenantId) {
-        return repository.findAllByTenantId(tenantId).map(this::toDomain);
+        return language.enrich(repository.findAllByTenantId(tenantId).map(this::toDomain));
     }
 
     @Override
     public Mono<RelayOperatorProfile> save(RelayOperatorProfile profile) {
         var entity = toEntity(profile);
-        return repository.existsById(entity.id())
+        return language.enrich(repository.existsById(entity.id())
                 .flatMap(exists -> exists
                         ? entityTemplate.update(entity)
                         : entityTemplate.insert(entity))
-                .map(this::toDomain);
+                .map(this::toDomain));
     }
 
     private RelayOperatorProfileEntity toEntity(RelayOperatorProfile p) {

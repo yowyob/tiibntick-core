@@ -23,7 +23,6 @@ import org.springframework.aop.aspectj.annotation.AspectJProxyFactory;
 import org.springframework.core.MethodParameter;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.reactive.BindingContext;
@@ -42,46 +41,31 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Proves that {@code @RequirePermission(resource = "freelancer", action = "read")} on
- * {@link FreelancerController#getMyProfile} is enforced at runtime and that a caller
- * without the {@code freelancer:read} authority receives HTTP 403, not 500 or 200.
+ * {@code GET /freelancers/me} must not depend on TiiBnTick roles in the token: the token does not carry them, so
+ * requiring {@code freelancer:read} there made an existing profile look absent and invited the person to create it
+ * again. The endpoint only authenticates, then looks the caller's own profile up across spaces.
  */
 class FreelancerMePermissionEnforcementTest {
 
     private static final UUID TENANT_ID = UUID.randomUUID();
 
     @Test
-    @DisplayName("/me is rejected with 403 for a caller lacking freelancer:read")
-    void getMyProfile_withoutPermission_returns403() {
+    @DisplayName("/me answers a caller who holds no freelancer:read authority, through findMine")
+    void getMyProfile_withoutTiiBnTickRole_isNotBlocked() {
         IFindFreelancerUseCase findUseCase = mock(IFindFreelancerUseCase.class);
-
-        var noPermission = new TestingAuthenticationToken("user", "n/a", List.of());
-        noPermission.setAuthenticated(true);
-
-        buildClient(findUseCase, noPermission)
-                .get().uri("/api/v1/freelancers/me")
-                .exchange()
-                .expectStatus().isForbidden();
-
-        verify(findUseCase, never()).findByActorId(any(), any());
-    }
-
-    @Test
-    @DisplayName("/me is not blocked by AOP guard once freelancer:read is granted")
-    void getMyProfile_withPermission_isNotBlockedByAop() {
-        IFindFreelancerUseCase findUseCase = mock(IFindFreelancerUseCase.class);
-        // Permission passes; domain throws FreelancerNotFoundException (no profile) → 404
-        when(findUseCase.findByActorId(any(), any()))
+        when(findUseCase.findMine(any(), any()))
                 .thenReturn(Mono.error(new FreelancerNotFoundException(TENANT_ID, UUID.randomUUID())));
 
-        var withPermission = new TestingAuthenticationToken(
-                "user", "n/a", List.of(new SimpleGrantedAuthority("freelancer:read")));
-        withPermission.setAuthenticated(true);
+        var noRole = new TestingAuthenticationToken("user", "n/a", List.of());
+        noRole.setAuthenticated(true);
 
-        buildClient(findUseCase, withPermission)
+        buildClient(findUseCase, noRole)
                 .get().uri("/api/v1/freelancers/me")
                 .exchange()
                 .expectStatus().isNotFound();
+
+        verify(findUseCase).findMine(any(), any());
+        verify(findUseCase, never()).findByActorId(any(), any());
     }
 
     private WebTestClient buildClient(IFindFreelancerUseCase findUseCase, Authentication authentication) {

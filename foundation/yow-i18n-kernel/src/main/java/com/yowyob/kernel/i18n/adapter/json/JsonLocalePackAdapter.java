@@ -3,6 +3,8 @@ package com.yowyob.kernel.i18n.adapter.json;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yowyob.kernel.i18n.application.port.out.MessageTranslationPort;
+import com.yowyob.kernel.i18n.domain.enums.SupportedLanguage;
+import com.yowyob.kernel.i18n.domain.vo.LanguageTags;
 import com.yowyob.kernel.i18n.domain.vo.LocalizedMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,11 +63,22 @@ public class JsonLocalePackAdapter implements MessageTranslationPort {
 
     @Override
     public Optional<LocalizedMessage> findByKeyAndLanguage(String key, String language) {
-        Map<String, String> dictionary = inMemoryTranslations.get(language);
-        if (dictionary != null && dictionary.containsKey(key)) {
-            return Optional.of(new LocalizedMessage(key, language, dictionary.get(key)));
+        // Exact tag first (legacy behaviour), then the pack of its public language ("en" -> en_CM). The
+        // platform-default fallback is the caller's job (MessageCatalog), so an unsupported language
+        // still answers "not found" here.
+        java.util.List<String> candidates = new java.util.ArrayList<>();
+        candidates.add(language);
+        String publicCode = LanguageTags.toPublicCode(language);
+        SupportedLanguage pack = publicCode != null ? SupportedLanguage.fromCode(publicCode) : null;
+        if (pack != null) {
+            candidates.add(pack.getTag());
         }
-        // Attempt fallback: if lang is "fr_CM" and not found, try "fr_FR"
+        for (String candidate : candidates) {
+            Map<String, String> dictionary = candidate == null ? null : inMemoryTranslations.get(candidate);
+            if (dictionary != null && dictionary.containsKey(key)) {
+                return Optional.of(new LocalizedMessage(key, language, dictionary.get(key)));
+            }
+        }
         return Optional.empty();
     }
 

@@ -33,11 +33,22 @@ databaseChangeLog:
       file: db/changelog/yow-event-kernel-master.yaml
       relativeToChangelogFile: false
 
+  # yow-i18n-kernel (L0) — message catalog (fr/en texts and notification templates as data,
+  # shared by every TiiBnTick product): i18n.message / i18n.message_history + seed.
+  - include:
+      file: db/changelog/yow-i18n-kernel-master.yaml
+      relativeToChangelogFile: false
+
   # ── L1 — Foundation ─────────────────────────────────────────────────────────
   # First L1/foundation module with its own schema — see
   # docs/auth/platform-client-management-design.md §2.0/§3.
   - include:
       file: db/changelog/tnt-platform-gateway-master.yaml
+      relativeToChangelogFile: false
+
+  # tnt-i18n-core — per-account language preference (i18n.user_language_preference).
+  - include:
+      file: db/changelog/tnt-i18n-master.yaml
       relativeToChangelogFile: false
 
   # tnt-roles-core — local RBAC persistence (tnt_roles / tnt_user_role_assignments /

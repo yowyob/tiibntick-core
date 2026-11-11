@@ -13,6 +13,15 @@ import java.util.UUID;
 @Component
 public class ClientProfileR2dbcRepositoryAdapter implements IClientProfileRepository {
 
+    /** Carries the account language onto loaded profiles; optional so hand-built adapters (tests) still work. */
+    private ActorLanguageEnricher language = ActorLanguageEnricher.none();
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setLanguageEnricher(ActorLanguageEnricher enricher) {
+        this.language = enricher;
+    }
+
+
     private final ClientProfileSpringDataRepository repository;
     private final R2dbcEntityTemplate entityTemplate;
 
@@ -29,22 +38,27 @@ public class ClientProfileR2dbcRepositoryAdapter implements IClientProfileReposi
 
     @Override
     public Mono<ClientProfile> findByActorId(UUID tenantId, UUID actorId) {
-        return repository.findByTenantIdAndActorId(tenantId, actorId).map(this::toDomain);
+        return language.enrich(repository.findByTenantIdAndActorId(tenantId, actorId).map(this::toDomain));
+    }
+
+    @Override
+    public Mono<ClientProfile> findFirstByActorId(UUID actorId) {
+        return language.enrich(repository.findFirstByActorId(actorId).map(this::toDomain));
     }
 
     @Override
     public Mono<ClientProfile> findById(UUID tenantId, UUID profileId) {
-        return repository.findByTenantIdAndId(tenantId, profileId).map(this::toDomain);
+        return language.enrich(repository.findByTenantIdAndId(tenantId, profileId).map(this::toDomain));
     }
 
     @Override
     public Mono<ClientProfile> save(ClientProfile profile) {
         var entity = toEntity(profile);
-        return repository.existsById(entity.id())
+        return language.enrich(repository.existsById(entity.id())
                 .flatMap(exists -> exists
                         ? entityTemplate.update(entity)
                         : entityTemplate.insert(entity))
-                .map(this::toDomain);
+                .map(this::toDomain));
     }
 
     private ClientProfileEntity toEntity(ClientProfile p) {

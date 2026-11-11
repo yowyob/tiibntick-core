@@ -126,6 +126,12 @@ public class TntModuleRegistry {
                 List.of(), List.of(), null);
 
         // ── L1 — Foundation (Security + RBAC) ─────────────────────────────────
+        register("tnt-i18n-core",
+                "I18n Core — account language, shared UI bundles, message admin API, recipient-language resolution",
+                ModuleLayer.FOUNDATION_L1, ModuleOrigin.TNT_EXCLUSIVE,
+                List.of("yow-i18n-kernel", "tnt-auth-core", "tnt-common-core"),
+                List.of(), "i18n");
+
         register("tnt-auth-core",
                 "Auth Core — Security bridge: Kernel JWT → TntSecurityContext + @CurrentUser",
                 ModuleLayer.FOUNDATION_L1, ModuleOrigin.TNT_EXTENSION,

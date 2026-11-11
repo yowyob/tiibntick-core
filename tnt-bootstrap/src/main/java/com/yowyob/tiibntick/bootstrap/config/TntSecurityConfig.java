@@ -82,7 +82,12 @@ public class TntSecurityConfig {
             // standards-compliant passthrough to the Kernel — must stay callable by any
             // OIDC/OAuth2 client library without TiiBnTick-specific headers.
             "/.well-known/**",
-            "/oauth2/**"
+            "/oauth2/**",
+            // UI texts and language list: the login page itself must be translated before any token
+            // exists. Only the namespaces allowed by tnt.i18n.public-namespaces are served; the
+            // account-language endpoint (/api/v1/me/language) stays on the authenticated chain.
+            "/api/v1/i18n/languages",
+            "/api/v1/i18n/bundles/**"
             // NOTE: /api/v1/auth/** and /api/v1/sso/** (platform → Core gateway) are NOT
             // listed here — they're handled by tnt-platform-gateway-core's
             // TntPlatformGatewaySecurityConfig.platformGatewaySecurityWebFilterChain (@Order(10)),

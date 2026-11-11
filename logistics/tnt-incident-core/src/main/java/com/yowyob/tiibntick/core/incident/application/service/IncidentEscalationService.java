@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.core.incident.application.service;
 
+import java.util.Map;
 import com.yowyob.tiibntick.core.incident.application.command.EscalateIncidentCommand;
 import com.yowyob.tiibntick.core.incident.domain.enums.ActorRole;
 import com.yowyob.tiibntick.core.incident.domain.event.IncidentDomainEvents.*;
@@ -161,12 +162,16 @@ public class IncidentEscalationService implements IEscalateIncidentUseCase,
 
     private Mono<Void> notifyEscalation(Incident incident, int level, UUID targetActorId) {
         String title = "Incident escalated (L" + level + "): " + incident.getReferenceCode();
+        Map<String, Object> params = Map.of(
+                "reference", String.valueOf(incident.getReferenceCode()),
+                "level", level,
+                "severity", String.valueOf(incident.getSeverity()));
         if (targetActorId != null) {
             return notificationPort.notifyActor(targetActorId, title,
-                    "Severity: " + incident.getSeverity(), "INCIDENT_ESCALATED", incident.getId());
+                    "Severity: " + incident.getSeverity(), "INCIDENT_ESCALATED", incident.getId(), params);
         }
         return notificationPort.notifyAgency(incident.getAgencyId(), title,
-                "Severity: " + incident.getSeverity(), "INCIDENT_ESCALATED", incident.getId());
+                "Severity: " + incident.getSeverity(), "INCIDENT_ESCALATED", incident.getId(), params);
     }
 
     private Mono<Incident> publishEscalated(Incident incident, int level) {

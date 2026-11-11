@@ -51,6 +51,11 @@
             <groupId>com.yowyob.tiibntick.core</groupId>
             <artifactId>tnt-roles-core</artifactId>
         </dependency>
+        <!-- Multilingual API: account language, UI bundles, message admin, recipient-language resolution -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-i18n-core</artifactId>
+        </dependency>
         <!-- Platform-to-Core gateway: Client-ID/API-Key auth, scope model, Bloc A/B/C proxy -->
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>

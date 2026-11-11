@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.core.incident.application.service;
 
+import java.util.Map;
 import com.yowyob.tiibntick.core.incident.application.command.ReportDriverWithdrawalCommand;
 import com.yowyob.tiibntick.core.incident.application.command.ReportIncidentCommand;
 import com.yowyob.tiibntick.core.incident.domain.enums.ActorRole;
@@ -140,7 +141,10 @@ public class IncidentReportingService implements IReportIncidentUseCase, IReport
                 "New Incident: " + incident.getReferenceCode(),
                 "Type: " + incident.getType() + " | Mission: " + incident.getMissionId(),
                 "INCIDENT_CREATED",
-                incident.getId()
+                incident.getId(),
+                Map.of("reference", String.valueOf(incident.getReferenceCode()),
+                        "incidentType", String.valueOf(incident.getType()),
+                        "missionId", String.valueOf(incident.getMissionId()))
         ).thenReturn(incident);
     }
 

@@ -11,6 +11,8 @@ import com.yowyob.tiibntick.core.actor.domain.model.ClientProfile;
 import com.yowyob.tiibntick.core.roles.application.port.in.AssignTntRoleUseCase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.yowyob.tiibntick.core.actor.application.port.out.IProfileWelcomePort;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Mono;
@@ -20,6 +22,14 @@ import java.util.UUID;
 
 @Service
 public class ClientProfileService implements ICreateClientProfileUseCase {
+
+    private ProfileCreationHooks creationHooks = ProfileCreationHooks.none();
+
+    /** Welcome notice and e-mail once a profile is really created; optional so hand-built services still work. */
+    @Autowired(required = false)
+    public void setCreationHooks(ProfileCreationHooks creationHooks) {
+        this.creationHooks = creationHooks;
+    }
 
     private static final Logger log = LoggerFactory.getLogger(ClientProfileService.class);
 
@@ -67,22 +77,31 @@ public class ClientProfileService implements ICreateClientProfileUseCase {
                     if (exists) {
                         return clientProfileRepository.findByActorId(command.tenantId(), command.actorId());
                     }
-                    return kernelActorPort.exists(command.actorId())
-                            .doOnNext(found -> {
-                                if (!found) {
-                                    log.warn("Kernel actor {} not found or unreachable — " +
-                                            "creating client profile without Kernel validation", command.actorId());
-                                }
-                            })
-                            .then(Mono.defer(() -> {
-                                ClientProfile profile = ClientProfile.create(command.tenantId(), command.actorId());
-                                return clientProfileRepository.save(profile)
-                                        .flatMap(saved -> eventPublisher.publishActorStatusChanged(
-                                                ActorStatusChangedEvent.of(saved.actorId(), saved.tenantId(),
-                                                        null, saved.actorStatus().name(), "client_profile_created"))
-                                                .thenReturn(saved));
-                            }));
+                    // A profile belongs to the person: one created from another space is returned, never duplicated.
+                    return clientProfileRepository.findFirstByActorId(command.actorId())
+                            .switchIfEmpty(Mono.defer(() -> createProfile(command)));
                 });
+    }
+
+    private Mono<ClientProfile> createProfile(CreateClientProfileCommand command) {
+        return kernelActorPort.exists(command.actorId())
+                .doOnNext(found -> {
+                    if (!found) {
+                        log.warn("Kernel actor {} not found or unreachable — " +
+                                "creating client profile without Kernel validation", command.actorId());
+                    }
+                })
+                .then(Mono.defer(() -> {
+                    ClientProfile profile = ClientProfile.create(command.tenantId(), command.actorId());
+                    return clientProfileRepository.save(profile)
+                            .flatMap(saved -> eventPublisher.publishActorStatusChanged(
+                                    ActorStatusChangedEvent.of(saved.actorId(), saved.tenantId(),
+                                            null, saved.actorStatus().name(), "client_profile_created"))
+                                    .thenReturn(saved))
+                            .flatMap(created -> creationHooks.profileCreated(
+                                    IProfileWelcomePort.Kind.CLIENT, created.tenantId(), created.actorId())
+                                    .thenReturn(created));
+                }));
     }
 
     public Mono<ClientProfile> findByActorId(UUID tenantId, UUID actorId) {

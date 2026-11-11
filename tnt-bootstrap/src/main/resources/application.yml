@@ -339,9 +339,12 @@ tnt:
       # Every notification (email, SMS, WhatsApp, push, in-app), the user preferences and the delivery
       # history are handled by the Kernel notification engine (/api/notifications/*). TiiBnTick has no
       # SMTP/SMS/FCM credentials of its own: provider setup lives in the Kernel.
-      # true (default): send templateCode + variables so the Kernel renders its template, and register
-      # the TiiBnTick templates in the Kernel on first use. false: send the ready-made body only.
-      templates-enabled: ${TNT_NOTIFY_KERNEL_TEMPLATES_ENABLED:true}
+      # false (default): TiiBnTick renders each message per recipient, in the recipient's own account
+      # language (message catalog, i18n schema) and sends the ready-made body, so a client reading English and
+      # a delivery person reading French get the same event in their own language.
+      # true: also send templateCode + variables so the Kernel renders its own registered template (one
+      # locale per template; it then ignores the per-recipient body) and register the TiiBnTick templates.
+      templates-enabled: ${TNT_NOTIFY_KERNEL_TEMPLATES_ENABLED:false}
       # Fallback X-Tenant-Id/X-Organization-Id for every caller that does not know them (Kafka
       # consumers, Market, Go-Freelancer, agency provisioning, incident notifications).
       # The Kernel notification engine rejects calls with no tenant context at all

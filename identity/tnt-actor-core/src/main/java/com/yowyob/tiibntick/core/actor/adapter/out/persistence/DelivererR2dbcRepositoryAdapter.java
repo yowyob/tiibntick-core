@@ -29,6 +29,15 @@ import java.util.UUID;
 @Component
 public class DelivererR2dbcRepositoryAdapter implements IDelivererRepository {
 
+    /** Carries the account language onto loaded profiles; optional so hand-built adapters (tests) still work. */
+    private ActorLanguageEnricher language = ActorLanguageEnricher.none();
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setLanguageEnricher(ActorLanguageEnricher enricher) {
+        this.language = enricher;
+    }
+
+
     private final DelivererSpringDataRepository repository;
     private final R2dbcEntityTemplate entityTemplate;
 
@@ -45,46 +54,46 @@ public class DelivererR2dbcRepositoryAdapter implements IDelivererRepository {
 
     @Override
     public Mono<DelivererProfile> findById(UUID tenantId, UUID id) {
-        return repository.findByIdAndTenantId(id, tenantId).map(this::toDomain);
+        return language.enrich(repository.findByIdAndTenantId(id, tenantId).map(this::toDomain));
     }
 
     @Override
     public Mono<DelivererProfile> findByActorId(UUID tenantId, UUID actorId) {
-        return repository.findByTenantIdAndActorId(tenantId, actorId).map(this::toDomain);
+        return language.enrich(repository.findByTenantIdAndActorId(tenantId, actorId).map(this::toDomain));
     }
 
     @Override
     public Flux<DelivererProfile> findByAgencyId(UUID tenantId, UUID agencyId) {
-        return repository.findAllByTenantIdAndAgencyId(tenantId, agencyId).map(this::toDomain);
+        return language.enrich(repository.findAllByTenantIdAndAgencyId(tenantId, agencyId).map(this::toDomain));
     }
 
     @Override
     public Flux<DelivererProfile> findByBranchId(UUID tenantId, UUID branchId) {
-        return repository.findAllByTenantIdAndBranchId(tenantId, branchId).map(this::toDomain);
+        return language.enrich(repository.findAllByTenantIdAndBranchId(tenantId, branchId).map(this::toDomain));
     }
 
     @Override
     public Flux<DelivererProfile> findAvailableByBranchId(UUID tenantId, UUID branchId) {
-        return repository.findAvailableByTenantIdAndBranchId(tenantId, branchId)
-                .map(this::toDomain);
+        return language.enrich(repository.findAvailableByTenantIdAndBranchId(tenantId, branchId)
+                .map(this::toDomain));
     }
 
     @Override
     public Flux<DelivererProfile> findAvailableNear(UUID tenantId, double latitude,
                                                      double longitude, double radiusKm,
                                                      double minCapacityKg) {
-        return repository.findAvailableNear(tenantId, latitude, longitude, radiusKm, minCapacityKg)
-                .map(this::toDomain);
+        return language.enrich(repository.findAvailableNear(tenantId, latitude, longitude, radiusKm, minCapacityKg)
+                .map(this::toDomain));
     }
 
     @Override
     public Mono<DelivererProfile> save(DelivererProfile profile) {
         var entity = toEntity(profile);
-        return repository.existsById(entity.id())
+        return language.enrich(repository.existsById(entity.id())
                 .flatMap(exists -> exists
                         ? entityTemplate.update(entity)
                         : entityTemplate.insert(entity))
-                .map(this::toDomain);
+                .map(this::toDomain));
     }
 
     // ── tnt-auth-core integration ──────────────────────────────────────────────
@@ -103,7 +112,7 @@ public class DelivererR2dbcRepositoryAdapter implements IDelivererRepository {
 
     @Override
     public Mono<DelivererProfile> findFirstByActorId(UUID actorId) {
-        return repository.findFirstByActorId(actorId).map(this::toDomain);
+        return language.enrich(repository.findFirstByActorId(actorId).map(this::toDomain));
     }
 
     @Override

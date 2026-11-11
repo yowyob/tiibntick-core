@@ -33,6 +33,15 @@ import java.util.UUID;
 @Component
 public class FreelancerR2dbcRepositoryAdapter implements IFreelancerRepository {
 
+    /** Carries the account language onto loaded profiles; optional so hand-built adapters (tests) still work. */
+    private ActorLanguageEnricher language = ActorLanguageEnricher.none();
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setLanguageEnricher(ActorLanguageEnricher enricher) {
+        this.language = enricher;
+    }
+
+
     private final FreelancerSpringDataRepository repository;
     private final R2dbcEntityTemplate entityTemplate;
 
@@ -49,39 +58,39 @@ public class FreelancerR2dbcRepositoryAdapter implements IFreelancerRepository {
 
     @Override
     public Mono<FreelancerProfile> findById(UUID tenantId, UUID id) {
-        return repository.findById(id).map(this::toDomain);
+        return language.enrich(repository.findById(id).map(this::toDomain));
     }
 
     @Override
     public Mono<FreelancerProfile> findByActorId(UUID tenantId, UUID actorId) {
-        return repository.findByTenantIdAndActorId(tenantId, actorId).map(this::toDomain);
+        return language.enrich(repository.findByTenantIdAndActorId(tenantId, actorId).map(this::toDomain));
     }
 
     @Override
     public Flux<FreelancerProfile> findActiveByServiceZone(UUID tenantId, UUID serviceZoneId) {
-        return repository.findActiveByServiceZone(tenantId, serviceZoneId).map(this::toDomain);
+        return language.enrich(repository.findActiveByServiceZone(tenantId, serviceZoneId).map(this::toDomain));
     }
 
     @Override
     public Flux<FreelancerProfile> findByAssociatedAgency(UUID tenantId, UUID agencyId) {
-        return repository.findByAssociatedAgency(tenantId, agencyId).map(this::toDomain);
+        return language.enrich(repository.findByAssociatedAgency(tenantId, agencyId).map(this::toDomain));
     }
 
     @Override
     public Mono<FreelancerProfile> save(FreelancerProfile profile) {
         var entity = toEntity(profile);
-        return repository.existsById(entity.id())
+        return language.enrich(repository.existsById(entity.id())
                 .flatMap(exists -> exists
                         ? entityTemplate.update(entity)
                         : entityTemplate.insert(entity))
-                .map(this::toDomain);
+                .map(this::toDomain));
     }
 
     // ── tnt-incident-core integration ──────────────────────────────────────────
 
     @Override
     public Mono<FreelancerProfile> findFirstByActorId(UUID actorId) {
-        return repository.findFirstByActorId(actorId).map(this::toDomain);
+        return language.enrich(repository.findFirstByActorId(actorId).map(this::toDomain));
     }
 
     @Override
@@ -93,17 +102,17 @@ public class FreelancerR2dbcRepositoryAdapter implements IFreelancerRepository {
 
     @Override
     public Flux<FreelancerProfile> findSubDeliverersByOrgId(UUID orgId) {
-        return repository.findSubDeliverersByOrgId(orgId).map(this::toDomain);
+        return language.enrich(repository.findSubDeliverersByOrgId(orgId).map(this::toDomain));
     }
 
     @Override
     public Mono<FreelancerProfile> findOwnerByOrgId(UUID orgId) {
-        return repository.findOwnerByOrgId(orgId).map(this::toDomain);
+        return language.enrich(repository.findOwnerByOrgId(orgId).map(this::toDomain));
     }
 
     @Override
     public Mono<FreelancerProfile> findByActorIdAndOrgId(UUID actorId, UUID orgId) {
-        return repository.findByActorIdAndFreelancerOrgId(actorId, orgId).map(this::toDomain);
+        return language.enrich(repository.findByActorIdAndFreelancerOrgId(actorId, orgId).map(this::toDomain));
     }
 
     @Override

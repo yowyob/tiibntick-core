@@ -11,5 +11,6 @@ public record CreateDelivererRequest(
         @NotNull UUID branchId,
         @Positive double capacityKg,
         DelivererType delivererType,
-        UUID contractId) {
+        UUID contractId,
+        String preferredLanguage) {
 }

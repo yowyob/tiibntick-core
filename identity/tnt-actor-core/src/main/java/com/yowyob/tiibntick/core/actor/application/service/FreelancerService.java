@@ -13,6 +13,8 @@ import com.yowyob.tiibntick.core.actor.domain.model.ServiceZoneId;
 import com.yowyob.tiibntick.core.roles.application.port.in.AssignTntRoleUseCase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.yowyob.tiibntick.core.actor.application.port.out.IProfileWelcomePort;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -23,6 +25,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class FreelancerService implements ICreateFreelancerProfileUseCase, IFindFreelancerUseCase {
+
+    private ProfileCreationHooks creationHooks = ProfileCreationHooks.none();
+
+    /** Welcome notice and e-mail once a profile is really created; optional so hand-built services still work. */
+    @Autowired(required = false)
+    public void setCreationHooks(ProfileCreationHooks creationHooks) {
+        this.creationHooks = creationHooks;
+    }
 
     private static final Logger log = LoggerFactory.getLogger(FreelancerService.class);
 
@@ -51,26 +61,41 @@ public class FreelancerService implements ICreateFreelancerProfileUseCase, IFind
                     if (exists) {
                         profileMono = freelancerRepository.findByActorId(command.tenantId(), command.actorId());
                     } else {
-                        profileMono = kernelActorPort.exists(command.actorId())
-                                .doOnNext(found -> {
-                                    if (!found) {
-                                        log.warn("Kernel actor {} not found or unreachable — " +
-                                                "creating freelancer profile without Kernel validation", command.actorId());
-                                    }
-                                })
-                                .then(Mono.defer(() -> {
-                                    FreelancerProfile profile = FreelancerProfile.create(
-                                            command.tenantId(), command.actorId(),
-                                            command.serviceZoneIds(), command.availabilitySlots());
-                                    return freelancerRepository.save(profile)
-                                            .flatMap(saved -> eventPublisher.publishActorStatusChanged(
-                                                    ActorStatusChangedEvent.of(saved.actorId(), saved.tenantId(),
-                                                            null, saved.actorStatus().name(), "freelancer_profile_created"))
-                                                    .thenReturn(saved));
-                                }));
+                        // A profile belongs to the person: one created from another space is returned, never duplicated.
+                        profileMono = freelancerRepository.findFirstByActorId(command.actorId())
+                                .switchIfEmpty(Mono.defer(() -> newProfile(command)));
                     }
                     return profileMono.flatMap(profile -> grantFreelancerRole(profile, command.tenantId(), command.actorId()));
                 });
+    }
+
+    private Mono<FreelancerProfile> newProfile(CreateFreelancerProfileCommand command) {
+        return kernelActorPort.exists(command.actorId())
+                .doOnNext(found -> {
+                    if (!found) {
+                        log.warn("Kernel actor {} not found or unreachable — " +
+                                "creating freelancer profile without Kernel validation", command.actorId());
+                    }
+                })
+                .then(Mono.defer(() -> {
+                    FreelancerProfile profile = FreelancerProfile.create(
+                            command.tenantId(), command.actorId(),
+                            command.serviceZoneIds(), command.availabilitySlots());
+                    return freelancerRepository.save(profile)
+                            .flatMap(saved -> eventPublisher.publishActorStatusChanged(
+                                    ActorStatusChangedEvent.of(saved.actorId(), saved.tenantId(),
+                                            null, saved.actorStatus().name(), "freelancer_profile_created"))
+                                    .thenReturn(saved))
+                            .flatMap(created -> creationHooks.profileCreated(
+                                    IProfileWelcomePort.Kind.FREELANCER, created.tenantId(), created.actorId())
+                                    .thenReturn(created));
+                }));
+    }
+
+    @Override
+    public Mono<FreelancerProfile> findMine(UUID tenantId, UUID actorId) {
+        return freelancerRepository.findByActorId(tenantId, actorId)
+                .switchIfEmpty(Mono.defer(() -> freelancerRepository.findFirstByActorId(actorId)));
     }
 
     private Mono<FreelancerProfile> grantFreelancerRole(FreelancerProfile profile, UUID tenantId, UUID userId) {

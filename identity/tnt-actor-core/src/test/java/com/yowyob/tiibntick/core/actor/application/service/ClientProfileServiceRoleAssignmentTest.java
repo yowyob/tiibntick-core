@@ -50,6 +50,7 @@ class ClientProfileServiceRoleAssignmentTest {
     @DisplayName("a new client profile triggers the CLIENT role grant")
     void newProfileGrantsClientRole() {
         when(repository.existsByActorId(tenantId, actorId)).thenReturn(Mono.just(false));
+        when(repository.findFirstByActorId(actorId)).thenReturn(Mono.empty());
         when(kernelActorPort.exists(actorId)).thenReturn(Mono.just(true));
         when(repository.save(any())).thenReturn(Mono.just(profile));
         when(eventPublisher.publishActorStatusChanged(any())).thenReturn(Mono.empty());

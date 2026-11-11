@@ -13,7 +13,10 @@ import com.yowyob.tiibntick.core.notify.application.port.out.INotificationRemind
 import com.yowyob.tiibntick.core.notify.application.port.out.INotificationTemplateAdminPort;
 import com.yowyob.tiibntick.core.notify.application.port.out.IPublishNotificationEventPort;
 import com.yowyob.tiibntick.core.notify.application.port.out.ISearchNotificationsPort;
+import com.yowyob.tiibntick.core.notify.application.port.out.IRecipientLanguagePort;
 import com.yowyob.tiibntick.core.notify.application.port.out.ITranslationPort;
+import com.yowyob.tiibntick.core.notify.infrastructure.adapter.i18n.AccountRecipientLanguageAdapter;
+import com.yowyob.tiibntick.core.i18n.application.port.in.ResolveRecipientLanguageUseCase;
 import com.yowyob.tiibntick.core.notify.application.service.ManagePreferencesService;
 import com.yowyob.tiibntick.core.notify.application.service.NotificationAdminService;
 import com.yowyob.tiibntick.core.notify.application.service.SearchNotificationsService;
@@ -80,8 +83,23 @@ public class NotifyCoreAutoConfiguration {
     public ISendNotificationUseCase sendNotificationUseCase(
             ITranslationPort translationPort,
             INotificationDeliveryPort deliveryPort,
-            IPublishNotificationEventPort eventPort) {
-        return new NotificationService(translationPort, deliveryPort, eventPort);
+            IPublishNotificationEventPort eventPort,
+            IRecipientLanguagePort recipientLanguagePort) {
+        return new NotificationService(translationPort, deliveryPort, eventPort, recipientLanguagePort);
+    }
+
+    /**
+     * The language each recipient reads, from their account (tnt-i18n-core). Without it the language carried
+     * by the notification model is used.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public IRecipientLanguagePort recipientLanguagePort(
+            org.springframework.beans.factory.ObjectProvider<ResolveRecipientLanguageUseCase> resolver) {
+        ResolveRecipientLanguageUseCase use = resolver.getIfAvailable();
+        return use != null
+                ? new AccountRecipientLanguageAdapter(use)
+                : (recipientId, hint) -> reactor.core.publisher.Mono.justOrEmpty(hint);
     }
 
     /**

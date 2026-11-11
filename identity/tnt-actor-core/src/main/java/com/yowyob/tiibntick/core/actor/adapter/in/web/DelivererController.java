@@ -33,6 +33,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -61,6 +62,19 @@ import java.util.UUID;
 @RequestMapping("/api/v1/deliverers")
 @Tag(name = "Deliverers", description = "Permanent deliverer profile management")
 public class DelivererController {
+
+    private ProfileLanguageSupport profileLanguage;
+
+    /** Stores the language picked at creation on the account; optional so hand-built controllers still work. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setProfileLanguage(ProfileLanguageSupport profileLanguage) {
+        this.profileLanguage = profileLanguage;
+    }
+
+    private reactor.core.publisher.Mono<Void> recordLanguage(java.util.UUID userId, String chosen, String acceptLanguage) {
+        return profileLanguage == null ? reactor.core.publisher.Mono.empty()
+                : profileLanguage.record(userId, chosen, acceptLanguage);
+    }
 
     private final ICreateDelivererProfileUseCase createUseCase;
     private final IFindDelivererUseCase findUseCase;
@@ -94,16 +108,18 @@ public class DelivererController {
     @Operation(summary = "Create a deliverer profile for a user within the caller's tenant")
     public Mono<ResponseEntity<ApiResponse<DelivererProfileResponse>>> createDelivererProfile(
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
-            @Valid @RequestBody Mono<CreateDelivererRequest> requestMono) {
+            @Valid @RequestBody Mono<CreateDelivererRequest> requestMono,
+            @Parameter(hidden = true) @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
         return requestMono.flatMap(req ->
-                createUseCase.createDelivererProfile(new CreateDelivererProfileCommand(
+                recordLanguage(currentUser.userId(), req.preferredLanguage(), acceptLanguage)
+                        .then(Mono.defer(() -> createUseCase.createDelivererProfile(new CreateDelivererProfileCommand(
                         currentUser.tenantId(),
                         currentUser.userId(),
                         req.agencyId(),
                         req.branchId(),
                         req.capacityKg(),
                         req.delivererType(),
-                        req.contractId())))
+                        req.contractId())))))
                 .flatMap(profile -> identityUseCase.resolve(profile.actorId())
                         .map(identity -> DelivererProfileResponse.from(profile, identity))
                         .defaultIfEmpty(DelivererProfileResponse.from(profile)))
@@ -112,11 +128,11 @@ public class DelivererController {
     }
 
     @GetMapping("/me")
-    @PreAuthorize("hasRole('PERMANENT_DELIVERER')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Get the deliverer profile of the authenticated deliverer")
     public Mono<ResponseEntity<ApiResponse<DelivererProfileResponse>>> getMyProfile(
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
-        return findUseCase.findByActorId(currentUser.tenantId(), currentUser.userId())
+        return findUseCase.findMine(currentUser.tenantId(), currentUser.userId())
                 .flatMap(profile -> identityUseCase.resolve(profile.actorId())
                         .map(identity -> DelivererProfileResponse.from(profile, identity))
                         .defaultIfEmpty(DelivererProfileResponse.from(profile)))
