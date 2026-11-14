@@ -68,6 +68,14 @@ public interface DeliveryQueryUseCase {
     Flux<DeliveryAnnouncement> findOpenAnnouncements(UUID tenantId);
 
     /**
+     * Annonces ouvertes visibles d'un livreur : dans le rayon de sa position, repli
+     * même ville quand une position manque ; s'il n'a ni position ni ville, toutes les annonces
+     * ouvertes (on ne lui cache pas le marché par manque de donnée).
+     */
+    Flux<DeliveryAnnouncement> findOpenAnnouncementsNear(UUID tenantId,
+            com.yowyob.tiibntick.core.delivery.application.port.in.query.NearbyAnnouncementQuery query);
+
+    /**
      * Returns {@code true} if {@code freelancerId} already has a response on the
      * given announcement, without loading the full announcement aggregate.
      * The {@code announcementId} is a globally-unique UUID PK, so tenant-scoping

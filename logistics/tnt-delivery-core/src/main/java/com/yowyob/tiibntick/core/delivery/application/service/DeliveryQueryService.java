@@ -87,6 +87,15 @@ public class DeliveryQueryService implements DeliveryQueryUseCase {
     }
 
     @Override
+    public Flux<DeliveryAnnouncement> findOpenAnnouncementsNear(UUID tenantId,
+            com.yowyob.tiibntick.core.delivery.application.port.in.query.NearbyAnnouncementQuery query) {
+        if (query.knowsNothing()) {
+            return announcementRepository.findOpenAnnouncements(tenantId);
+        }
+        return announcementRepository.findOpenAnnouncementsNear(tenantId, query);
+    }
+
+    @Override
     public Mono<Boolean> hasFreelancerResponded(UUID announcementId, UUID freelancerId) {
         return announcementRepository.hasResponse(announcementId, freelancerId);
     }

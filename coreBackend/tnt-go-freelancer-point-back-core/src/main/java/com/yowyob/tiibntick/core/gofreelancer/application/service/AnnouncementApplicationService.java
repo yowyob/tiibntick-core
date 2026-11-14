@@ -66,6 +66,14 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
     private final DeliveryOtpService deliveryOtpService;
     private final GofpDeliveryOtpProperties deliveryOtpProperties;
 
+    /** Lien annonce ↔ besoin Go (injection optionnelle, cf. DeliveryNeedApplicationService). */
+    private NeedAnnouncementService needAnnouncements;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setNeedAnnouncements(NeedAnnouncementService needAnnouncements) {
+        this.needAnnouncements = needAnnouncements;
+    }
+
     @Override
     @RequirePermission(resource = "announcement", action = "create")
     public Mono<AnnouncementResponseDTO> createAnnouncement(AnnouncementRequestDTO request) {
@@ -83,6 +91,16 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
     public Flux<AnnouncementResponseDTO> getAllAnnouncements() {
         return tenantContextHolder.currentTenantId()
                 .flatMapMany(deliveryAnnouncementPort::findOpenAnnouncements)
+                .map(this::toDTO)
+                .flatMap(this::enrichFromLocalMirror);
+    }
+
+    @Override
+    public Flux<AnnouncementResponseDTO> getNearbyAnnouncements(
+            com.yowyob.tiibntick.core.gofreelancer.application.port.in.query.NearbyCriteria criteria) {
+        // Mêmes champs que getAllAnnouncements : seul l'ensemble des annonces change.
+        return tenantContextHolder.currentTenantId()
+                .flatMapMany(tenantId -> deliveryAnnouncementPort.findOpenAnnouncementsNear(tenantId, criteria))
                 .map(this::toDTO)
                 .flatMap(this::enrichFromLocalMirror);
     }
@@ -246,6 +264,7 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
                                     tenantId, announcementId, clientId, responseId);
                         }))
                 .flatMap(assigned -> softMirrorAssigned(assigned)
+                        .then(syncLinkedNeed(assigned))
                         .then(softMirrorDeliveryAndInitOtp(assigned))
                         .flatMap(otpResult -> buildAssignResponse(assigned, otpResult)));
     }
@@ -323,6 +342,32 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
                 .then();
     }
 
+    /**
+     * Si l'annonce publie un besoin Go, le besoin passe ASSIGNED au même freelancer
+     * (même état que {@code DeliveryNeedApplicationService.assignFreelancer}). Les erreurs
+     * remontent : besoin et annonce ne doivent pas diverger.
+     */
+    private Mono<Void> syncLinkedNeed(AnnouncementSnapshot assigned) {
+        if (needAnnouncements == null) return Mono.empty();
+        return needAnnouncements.syncAssignment(assigned.id(), selectedFreelancer(assigned));
+    }
+
+    private static java.util.Optional<BigDecimal> selectedProposedPrice(AnnouncementSnapshot assigned) {
+        return assigned.responses().stream()
+                .filter(r -> r.id().equals(assigned.selectedResponseId()))
+                .map(AnnouncementResponseSnapshot::proposedPrice)
+                .filter(java.util.Objects::nonNull)
+                .findFirst();
+    }
+
+    private static UUID selectedFreelancer(AnnouncementSnapshot assigned) {
+        return assigned.responses().stream()
+                .filter(r -> r.id().equals(assigned.selectedResponseId()))
+                .map(AnnouncementResponseSnapshot::deliveryPersonId)
+                .findFirst()
+                .orElse(null);
+    }
+
     private Mono<Void> softMirrorAssigned(AnnouncementSnapshot assigned) {
         return announcementRepository.findById(assigned.id())
                 .flatMap(local -> {
@@ -356,11 +401,19 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
                 .orElse(null);
 
         Instant now = Instant.now();
-        return deliveryRepository.findById(deliveryId)
+        Mono<java.util.Optional<UUID>> linkedNeed = needAnnouncements == null
+                ? Mono.just(java.util.Optional.empty())
+                : needAnnouncements.needIdOf(assigned.id()).map(java.util.Optional::of)
+                        .defaultIfEmpty(java.util.Optional.empty());
+        return linkedNeed.flatMap(needId -> deliveryRepository.findById(deliveryId)
                 .switchIfEmpty(Mono.defer(() -> {
                     Delivery local = new Delivery();
                     local.setId(deliveryId);
                     local.setAnnouncementId(assigned.id());
+                    // Course issue d'un besoin Go : la livraison reste rattachée au besoin,
+                    // donc le paiement lit le mode du besoin (CASH → règlement espèces),
+                    // et le tarif est le prix proposé retenu (QUOTE_REQUEST n'a pas de prix offert).
+                    needId.ifPresent(local::setDeliveryNeedId);
                     local.setFreelancerId(freelancerId);
                     local.setStatus(DeliveryStatus.CREATED);
                     local.setPickupMinTime(now);
@@ -369,6 +422,8 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
                     local.setDeliveryMaxTime(now.plus(24, ChronoUnit.HOURS));
                     if (assigned.offeredAmount() != null) {
                         local.setTarif(assigned.offeredAmount().doubleValue());
+                    } else if (needId.isPresent()) {
+                        selectedProposedPrice(assigned).ifPresent(p -> local.setTarif(p.doubleValue()));
                     }
                     return deliveryRepository.save(local)
                             .onErrorResume(e -> {
@@ -377,7 +432,7 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
                                 return Mono.empty();
                             });
                 }))
-                .flatMap(deliveryOtpService::initOtpIfAbsentWithCodes)
+                .flatMap(deliveryOtpService::initOtpIfAbsentWithCodes))
                 .defaultIfEmpty(new OtpInitResult(null, null, null, false));
     }
 

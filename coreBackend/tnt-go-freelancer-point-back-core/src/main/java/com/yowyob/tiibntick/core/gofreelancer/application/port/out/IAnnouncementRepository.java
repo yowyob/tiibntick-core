@@ -24,5 +24,8 @@ public interface IAnnouncementRepository {
 
     Flux<Announcement> findAllByAssignedFreelancerId(UUID freelancerId);
 
+    /** L'annonce publiée pour ce besoin, s'il y en a une. */
+    Mono<Announcement> findByDeliveryNeedId(UUID deliveryNeedId);
+
     Mono<Void> deleteById(UUID id);
 }

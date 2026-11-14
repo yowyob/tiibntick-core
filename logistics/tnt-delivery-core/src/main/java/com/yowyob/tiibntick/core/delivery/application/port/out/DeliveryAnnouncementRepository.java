@@ -24,6 +24,10 @@ public interface DeliveryAnnouncementRepository {
 
     Flux<DeliveryAnnouncement> findOpenAnnouncements(UUID tenantId);
 
+    /** Annonces ouvertes visibles d'un livreur situé par {@code query} (filtre en base). */
+    Flux<DeliveryAnnouncement> findOpenAnnouncementsNear(UUID tenantId,
+            com.yowyob.tiibntick.core.delivery.application.port.in.query.NearbyAnnouncementQuery query);
+
     /**
      * Returns {@code true} if {@code freelancerId} already has a response on
      * {@code announcementId}, without loading the full announcement aggregate.

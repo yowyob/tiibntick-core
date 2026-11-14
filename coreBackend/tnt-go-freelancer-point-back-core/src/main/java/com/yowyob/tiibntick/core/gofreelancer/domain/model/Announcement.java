@@ -95,6 +95,10 @@ public class Announcement implements Persistable<UUID>, TntPersistableEntity {
     @Column("assigned_freelancer_id")
     private UUID assignedFreelancerId;
 
+    /** Besoin de livraison Go dont cette annonce est la publication (ou {@code null}). */
+    @Column("delivery_need_id")
+    private UUID deliveryNeedId;
+
     @Column("destination_relay_point_id")
     private UUID destinationRelayPointId;
 

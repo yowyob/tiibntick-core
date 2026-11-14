@@ -28,6 +28,7 @@ import java.util.UUID;
 public class AnnouncementController {
 
     private final AnnouncementUseCase announcementUseCase;
+    private final com.yowyob.tiibntick.core.gofreelancer.application.service.FreelancerWhereaboutsResolver whereabouts;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -38,6 +39,27 @@ public class AnnouncementController {
     @GetMapping
     public Flux<AnnouncementResponseDTO> getAllAnnouncements() {
         return announcementUseCase.getAllAnnouncements();
+    }
+
+    /**
+     * Annonces ouvertes visibles du livreur appelant : dans un rayon (15 km par défaut,
+     * {@code tnt.gofp.announcements.nearby-radius-km}) autour de {@code lat/lng} — ou, à défaut,
+     * de sa dernière position connue — avec repli « même ville » ({@code city}, ou la ville de son
+     * profil) quand une position manque. Sans position ni ville : toutes les annonces ouvertes.
+     * Mêmes champs que {@code GET /api/announcements} ; authentification exigée comme le reste
+     * de {@code /api/**}.
+     */
+    @GetMapping("/nearby")
+    public Flux<AnnouncementResponseDTO> getNearbyAnnouncements(
+            @RequestParam(required = false) Double lat,
+            @RequestParam(required = false) Double lng,
+            @RequestParam(required = false) Double radiusKm,
+            @RequestParam(required = false) String city,
+            @com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser(required = false)
+            com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext ctx) {
+        UUID caller = ctx != null ? ctx.userId() : null;
+        return whereabouts.resolve(lat, lng, radiusKm, city, caller)
+                .flatMapMany(announcementUseCase::getNearbyAnnouncements);
     }
 
     @GetMapping("/client/{clientId}")

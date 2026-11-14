@@ -50,6 +50,11 @@ public class AnnouncementRepositoryAdapter implements IAnnouncementRepository {
     }
 
     @Override
+    public Mono<Announcement> findByDeliveryNeedId(UUID deliveryNeedId) {
+        return r2dbcRepository.findByDeliveryNeedId(deliveryNeedId);
+    }
+
+    @Override
     public Mono<Void> deleteById(UUID id) {
         return r2dbcRepository.deleteById(id);
     }

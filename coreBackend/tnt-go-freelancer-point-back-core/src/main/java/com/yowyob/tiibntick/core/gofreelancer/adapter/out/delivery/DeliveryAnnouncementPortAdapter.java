@@ -103,6 +103,14 @@ public class DeliveryAnnouncementPortAdapter implements IDeliveryAnnouncementPor
     }
 
     @Override
+    public Flux<AnnouncementSnapshot> findOpenAnnouncementsNear(UUID tenantId,
+            com.yowyob.tiibntick.core.gofreelancer.application.port.in.query.NearbyCriteria criteria) {
+        var query = new com.yowyob.tiibntick.core.delivery.application.port.in.query.NearbyAnnouncementQuery(
+                criteria.latitude(), criteria.longitude(), criteria.radiusKm(), criteria.city());
+        return deliveryQueryUseCase.findOpenAnnouncementsNear(tenantId, query).map(this::toSnapshot);
+    }
+
+    @Override
     public Mono<AnnouncementSnapshot> findById(UUID tenantId, UUID announcementId) {
         return deliveryQueryUseCase.findAnnouncementById(tenantId, announcementId)
                 .map(this::toSnapshot)

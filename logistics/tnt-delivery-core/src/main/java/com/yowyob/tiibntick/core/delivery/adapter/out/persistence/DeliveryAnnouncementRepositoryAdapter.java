@@ -100,6 +100,22 @@ public class DeliveryAnnouncementRepositoryAdapter implements DeliveryAnnounceme
                 .flatMap(e -> hydrateFromEntity(e));
     }
 
+    @Override
+    public Flux<DeliveryAnnouncement> findOpenAnnouncementsNear(UUID tenantId,
+            com.yowyob.tiibntick.core.delivery.application.port.in.query.NearbyAnnouncementQuery query) {
+        boolean hasPoint = query.hasPoint();
+        double lat = hasPoint ? query.latitude() : 0.0;
+        double lng = hasPoint ? query.longitude() : 0.0;
+        // Boîte englobante du rayon (1° de latitude ≈ 111,2 km) : préfiltre avant la distance exacte.
+        double dLat = query.radiusKm() / 111.2;
+        double cosLat = Math.max(0.01, Math.cos(Math.toRadians(lat)));
+        double dLng = query.radiusKm() / (111.2 * cosLat);
+        return announcementRepo.findOpenNear(tenantId, hasPoint, lat, lng,
+                        lat - dLat, lat + dLat, lng - dLng, lng + dLng,
+                        query.radiusKm(), query.normalizedCity())
+                .flatMap(e -> hydrateFromEntity(e));
+    }
+
     // ── Private helpers ───────────────────────────────────────────────
 
     private Mono<DeliveryAnnouncement> hydrateFromEntity(

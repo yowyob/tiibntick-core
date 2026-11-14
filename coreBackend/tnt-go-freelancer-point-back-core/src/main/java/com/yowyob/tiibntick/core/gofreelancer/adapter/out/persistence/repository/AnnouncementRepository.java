@@ -5,6 +5,7 @@ import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.announcement.An
 import java.util.UUID;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 /**
  * Reactive R2DBC repository for Announcement entity.
@@ -16,4 +17,6 @@ public interface AnnouncementRepository extends ReactiveCrudRepository<Announcem
     Flux<Announcement> findAllByStatus(AnnouncementStatus status);
 
     Flux<Announcement> findAllByAssignedFreelancerId(UUID assignedFreelancerId);
+
+    Mono<Announcement> findByDeliveryNeedId(UUID deliveryNeedId);
 }

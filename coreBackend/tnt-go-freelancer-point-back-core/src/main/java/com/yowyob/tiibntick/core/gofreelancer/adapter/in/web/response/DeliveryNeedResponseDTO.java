@@ -51,6 +51,11 @@ public class DeliveryNeedResponseDTO {
     private UUID deliveryId;
     /** Freelancer retenu par le client (null tant que le besoin est PENDING). */
     private UUID assignedFreelancerId;
+    /**
+     * Annonce {@code QUOTE_REQUEST} publiée pour ce besoin (visible des livreurs de la
+     * zone), ou {@code null} si le besoin n'a pas d'annonce.
+     */
+    private UUID announcementId;
     private Instant createdAt;
     private Instant updatedAt;
     private java.time.LocalDateTime pickupDeadline;

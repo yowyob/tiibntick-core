@@ -23,6 +23,10 @@ public interface AnnouncementUseCase {
 
     Flux<AnnouncementResponseDTO> getAllAnnouncements();
 
+    /** Annonces ouvertes visibles d'un livreur situé par {@code criteria}. */
+    Flux<AnnouncementResponseDTO> getNearbyAnnouncements(
+            com.yowyob.tiibntick.core.gofreelancer.application.port.in.query.NearbyCriteria criteria);
+
     Mono<AnnouncementResponseDTO> getAnnouncement(UUID id);
 
     /**

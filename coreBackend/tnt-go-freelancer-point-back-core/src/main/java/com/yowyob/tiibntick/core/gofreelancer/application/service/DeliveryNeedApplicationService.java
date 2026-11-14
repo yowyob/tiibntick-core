@@ -59,6 +59,18 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
     private final DatabaseClient databaseClient;
 
     /**
+     * Publication du besoin en annonce. Injection optionnelle (setter) : absente, le
+     * besoin ne publie aucune annonce — c'est le cas des tests unitaires
+     * historiques qui construisent ce service à la main.
+     */
+    private NeedAnnouncementService needAnnouncements;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setNeedAnnouncements(NeedAnnouncementService needAnnouncements) {
+        this.needAnnouncements = needAnnouncements;
+    }
+
+    /**
      * Active la garde d'ownership. Défaut {@code true} : un déploiement qui oublie la variable
      * doit être protégé, pas ouvert — la configuration dangereuse ne doit jamais être celle
      * obtenue par omission. Le profil {@code test} la met à {@code false}.
@@ -115,6 +127,7 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional
     public Mono<DeliveryNeedResponseDTO> createDeliveryNeed(DeliveryNeedRequestDTO request, UUID callerId) {
         if (request == null) {
             return Mono.error(new IllegalArgumentException("Delivery need request is required"));
@@ -175,9 +188,27 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
                                     .build();
                             log.info("Creating DeliveryNeed {} for user {} (packetId={})",
                                     need.getId(), need.getUserId(), need.getPacketId());
-                            return deliveryNeedRepository.save(need);
+                            return deliveryNeedRepository.save(need)
+                                    .flatMap(saved -> publishAnnouncement(
+                                            saved, addresses.getT1(), addresses.getT2(), request.getPacket())
+                                            .thenReturn(saved));
                         }))
                 .flatMap(this::enrich);
+    }
+
+    /** Publie le besoin en annonce QUOTE_REQUEST (les erreurs remontent : un seul état). */
+    private Mono<Void> publishAnnouncement(DeliveryNeed need, AddressDTO pickup, AddressDTO delivery, PacketDTO packet) {
+        if (needAnnouncements == null) return Mono.empty();
+        NeedAnnouncementService.ParcelSpec parcel = packet == null ? null : new NeedAnnouncementService.ParcelSpec(
+                packet.getWeight(), packet.getWidth(), packet.getHeight(), packet.getLength(),
+                packet.getFragile(), packet.getIsPerishable(),
+                packet.getDescription() != null ? packet.getDescription() : packet.getDesignation());
+        return needAnnouncements.publishFor(need, pickup.getAddress(), delivery.getAddress(), parcel).then();
+    }
+
+    /** L'annonce du besoin n'est plus ouverte (besoin assigné directement, ou supprimé). */
+    private Mono<Void> withdrawAnnouncement(UUID deliveryNeedId) {
+        return needAnnouncements == null ? Mono.empty() : needAnnouncements.withdrawFor(deliveryNeedId);
     }
 
     /**
@@ -299,7 +330,7 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
         return deliveryNeedRepository.findById(id)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("DeliveryNeed not found: " + id)))
                 .flatMap(need -> requireOwnership(need, callerId, "deleteDeliveryNeed"))
-                .flatMap(need -> deliveryNeedRepository.deleteById(id));
+                .flatMap(need -> withdrawAnnouncement(id).then(deliveryNeedRepository.deleteById(id)));
     }
 
     /**
@@ -357,7 +388,9 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
 
                     log.info("Assigning freelancer {} to DeliveryNeed {}", freelancerId, deliveryNeedId);
 
-                    Mono<DeliveryNeed> saveNeed = deliveryNeedRepository.save(need);
+                    // Assignation directe : l'annonce du besoin ne doit plus rester ouverte.
+                    Mono<DeliveryNeed> saveNeed = deliveryNeedRepository.save(need)
+                            .flatMap(saved -> withdrawAnnouncement(saved.getId()).thenReturn(saved));
 
                     if (need.getTargetRelayPointId() != null) {
                         Mono<Void> notifyRelayPoint = adminRelayPointUseCase.getRelayPointDetails(need.getTargetRelayPointId())
@@ -614,7 +647,12 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
                     dto.setDeliveryAddress(ctx.getT2().orElse(null));
                     dto.setPacket(ctx.getT3().orElse(null));
                     return dto;
-                });
+                })
+                .flatMap(dto -> needAnnouncements == null ? Mono.just(dto)
+                        : needAnnouncements.announcementIdOf(need.getId())
+                                .doOnNext(dto::setAnnouncementId)
+                                .onErrorResume(e -> Mono.empty())
+                                .thenReturn(dto));
     }
 
     /**

@@ -60,6 +60,10 @@ public interface IDeliveryAnnouncementPort {
 
     Flux<AnnouncementSnapshot> findOpenAnnouncements(UUID tenantId);
 
+    /** Annonces ouvertes visibles d'un livreur (rayon, repli ville ; rien de connu → toutes). */
+    Flux<AnnouncementSnapshot> findOpenAnnouncementsNear(UUID tenantId,
+            com.yowyob.tiibntick.core.gofreelancer.application.port.in.query.NearbyCriteria criteria);
+
     Mono<AnnouncementSnapshot> findById(UUID tenantId, UUID announcementId);
 
     Flux<AnnouncementSnapshot> findByClient(UUID tenantId, UUID clientId);

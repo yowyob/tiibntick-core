@@ -438,4 +438,13 @@
                  relativeToChangelogFile="false"/>
     </changeSet>
 
+    <!-- Go delivery need published as an open QUOTE_REQUEST announcement: link column on the
+         local announcement mirror. Non-numeric id on purpose: it cannot collide with the NNN series.
+         The label only lets the upgrade test rebuild a database migrated by the previous version;
+         the application runs every changeset regardless of labels. -->
+    <changeSet id="c43-add-delivery-need-id-to-announcements" author="TiiBnTickTeam" labels="go-need-announcement">
+        <sqlFile path="db/changelog/20261112_c43_add_delivery_need_id_to_announcements.sql"
+                 relativeToChangelogFile="false"/>
+    </changeSet>
+
 </databaseChangeLog>
