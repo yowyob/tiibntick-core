@@ -2,6 +2,9 @@ package com.yowyob.tiibntick.bootstrap.config;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.springframework.beans.factory.BeanCreationException;
 import org.springframework.boot.test.util.TestPropertyValues;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -49,7 +52,7 @@ class TntProdSecretsGuardTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Refusing to start with profile PROD")
                 .hasMessageContaining("DB_PASSWORD")
-                .hasMessageContaining("MINIO_ACCESS_KEY")
+                .hasMessageNotContaining("MINIO_ACCESS_KEY")
                 .hasMessageContaining("MINIO_SECRET_KEY")
                 .hasMessageContaining("QR_HMAC_SECRET")
                 .hasMessageContaining("TNT_KERNEL_API_KEY");
@@ -75,7 +78,7 @@ class TntProdSecretsGuardTest {
                 .rootCause()
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("DB_PASSWORD")
-                .hasMessageContaining("MINIO_ACCESS_KEY")
+                .hasMessageNotContaining("MINIO_ACCESS_KEY")
                 .hasMessageContaining("MINIO_SECRET_KEY")
                 .hasMessageContaining("QR_HMAC_SECRET")
                 .hasMessageNotContaining("TNT_KERNEL_API_KEY is empty");
@@ -111,5 +114,86 @@ class TntProdSecretsGuardTest {
         context.refresh();
 
         assertThat(context.getBean(ApplicationProfile.class).isProduction()).isFalse();
+    }
+
+    // ── No declared profile (how production runs today) ──────────────────────
+
+    private static final String[] ALL_SECRETS_SET = {
+            "DB_PASSWORD=a-real-vault-issued-password",
+            "MINIO_SECRET_KEY=prod-minio-secret-key",
+            "QR_HMAC_SECRET=b6f1e2c3a4d5e6f7089a1b2c3d4e5f60718293a4b5c6d7e8f9001122334455",
+            "TNT_KERNEL_API_KEY=kernel-issued-api-key"};
+
+    private final MeterRegistry registry = new SimpleMeterRegistry();
+
+    private void startWith(String... properties) {
+        context = new AnnotationConfigApplicationContext();
+        TestPropertyValues.of(properties).applyTo(context);
+        context.registerBean(MeterRegistry.class, () -> registry);
+        context.register(ApplicationProfileConfig.class, TntProdSecretsGuard.class);
+        context.refresh();
+    }
+
+    private Gauge violationsGauge() {
+        return registry.find("tnt.secrets.guard.violations").gauge();
+    }
+
+    @Test
+    void countsDefaultSecretsWhenNoProfileIsDeclaredButKeepsStarting() {
+        startWith();
+
+        assertThat(violationsGauge()).as("violation gauge").isNotNull();
+        // DB_PASSWORD, MINIO_SECRET_KEY, QR_HMAC_SECRET, TNT_KERNEL_API_KEY — never MINIO_ACCESS_KEY.
+        assertThat(violationsGauge().value()).isEqualTo(4.0);
+        assertThat(violationsGauge().getId().getTags()).as("a bare number, nothing named").isEmpty();
+        assertThat(context.isActive()).isTrue();
+    }
+
+    @Test
+    void gaugeIsZeroWhenNoProfileIsDeclaredAndEverySecretIsSet() {
+        startWith(ALL_SECRETS_SET);
+
+        assertThat(violationsGauge()).isNotNull();
+        assertThat(violationsGauge().value()).isZero();
+    }
+
+    @Test
+    void factoryMinioAccessKeyIsAcceptedBecauseItIsAnIdentifier() {
+        String[] withFactoryAccessKey = java.util.stream.Stream.concat(
+                java.util.Arrays.stream(ALL_SECRETS_SET), java.util.stream.Stream.of("MINIO_ACCESS_KEY=minioadmin"))
+                .toArray(String[]::new);
+
+        startWith(withFactoryAccessKey);
+        assertThat(violationsGauge()).isNotNull();
+        assertThat(violationsGauge().value()).isZero();
+        context.close();
+
+        String[] prod = java.util.stream.Stream.concat(
+                java.util.Arrays.stream(withFactoryAccessKey), java.util.stream.Stream.of("spring.profiles.active=prod"))
+                .toArray(String[]::new);
+        startWith(prod);
+        assertThat(context.getBean(ApplicationProfile.class).isProduction()).isTrue();
+    }
+
+    @Test
+    void refusesToStartWithoutProfileOnlyWhenFailOnUndeclaredIsTrue() {
+        context = new AnnotationConfigApplicationContext();
+        TestPropertyValues.of("tnt.security.secrets-guard.fail-on-undeclared=true").applyTo(context);
+        context.register(ApplicationProfileConfig.class, TntProdSecretsGuard.class);
+
+        assertThatThrownBy(context::refresh)
+                .isInstanceOf(BeanCreationException.class)
+                .rootCause()
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("no Spring profile")
+                .hasMessageNotContaining("MINIO_ACCESS_KEY");
+    }
+
+    @Test
+    void anExplicitNonProdProfileIsNotCheckedAndSaysSo() {
+        startWith("spring.profiles.active=dev");
+
+        assertThat(violationsGauge()).isNotNull();
+        assertThat(violationsGauge().value()).as("-1 = check skipped").isEqualTo(-1.0);
     }
 }

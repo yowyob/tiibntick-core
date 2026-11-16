@@ -1,13 +1,17 @@
 package com.yowyob.tiibntick.bootstrap.config;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Fail-fast guard against shipping TiiBnTick Core to production with any of the
@@ -31,6 +35,20 @@ import java.util.List;
  * {@code SpringApplication.run()} never returns and no request is ever served on
  * insecure defaults.
  *
+ * <p>Production is also run <em>without any declared Spring profile</em>, in which case
+ * {@link ApplicationProfileConfig} falls back to {@code DEV} and a PROD-only check would
+ * never run. The guard therefore also checks when no profile is declared. Because the
+ * operator cannot always see the server's variables, a profile-less violation only
+ * refuses to start when {@code tnt.security.secrets-guard.fail-on-undeclared=true}
+ * (default {@code false}: the violations are logged and the app keeps starting). In every
+ * case the number of violations is published as the gauge
+ * {@code tnt.secrets.guard.violations} (no tag, no variable name, no value; {@code -1}
+ * when an explicit non-PROD profile skips the check) so it can be read from the metrics
+ * endpoint without server access.
+ *
+ * <p>{@code MINIO_ACCESS_KEY} is deliberately not checked: it is an identifier shared
+ * with the Kernel's own containers, not a secret; {@code MINIO_SECRET_KEY} still is.
+ *
  * @author MANFOUO Braun
  */
 @Slf4j
@@ -38,7 +56,15 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TntProdSecretsGuard {
 
+    /** Exposed by Prometheus as {@code tnt_secrets_guard_violations}. */
+    static final String VIOLATIONS_GAUGE = "tnt.secrets.guard.violations";
+
     private final ApplicationProfile applicationProfile;
+    private final Environment environment;
+    private final ObjectProvider<MeterRegistry> meterRegistry;
+
+    /** Strong reference kept by the bean: Micrometer gauges only hold weak references. */
+    private final AtomicInteger violationCount = new AtomicInteger(-1);
 
     // ── Mirrors the exact default expressions used elsewhere in the app ────────
     // (TntDataSourceConfig for DB_PASSWORD, application.yml's tnt.media.* / tnt.kernel.*
@@ -47,9 +73,6 @@ public class TntProdSecretsGuard {
 
     @Value("${DB_PASSWORD:tiibntick_pass}")
     private String dbPassword;
-
-    @Value("${MINIO_ACCESS_KEY:minioadmin}")
-    private String minioAccessKey;
 
     @Value("${MINIO_SECRET_KEY:minioadmin123}")
     private String minioSecretKey;
@@ -60,9 +83,19 @@ public class TntProdSecretsGuard {
     @Value("${TNT_KERNEL_API_KEY:}")
     private String kernelApiKey;
 
+    @Value("${tnt.security.secrets-guard.fail-on-undeclared:false}")
+    private boolean failOnUndeclared;
+
     @PostConstruct
     void validate() {
-        if (!applicationProfile.isProduction()) {
+        MeterRegistry registry = meterRegistry.getIfAvailable();
+        if (registry != null) {
+            registry.gauge(VIOLATIONS_GAUGE, violationCount);
+        }
+
+        boolean production = applicationProfile.isProduction();
+        boolean undeclared = environment.getActiveProfiles().length == 0;
+        if (!production && !undeclared) {
             log.debug("TntProdSecretsGuard: profile {} is not PROD — skipping default-secret check.",
                     applicationProfile);
             return;
@@ -72,8 +105,6 @@ public class TntProdSecretsGuard {
 
         checkDefault(violations, "DB_PASSWORD", dbPassword, "tiibntick_pass",
                 "provision the DBA-issued credential (see tnt-bootstrap/.env.prod.example)");
-        checkDefault(violations, "MINIO_ACCESS_KEY", minioAccessKey, "minioadmin",
-                "create a dedicated production MinIO access key");
         checkDefault(violations, "MINIO_SECRET_KEY", minioSecretKey, "minioadmin123",
                 "create a dedicated production MinIO secret key");
         checkDefault(violations, "QR_HMAC_SECRET", qrHmacSecret,
@@ -83,15 +114,29 @@ public class TntProdSecretsGuard {
         if (kernelApiKey == null || kernelApiKey.isBlank()) {
             violations.add("TNT_KERNEL_API_KEY is empty — the Kernel bridge cannot authenticate without it");
         }
+        violationCount.set(violations.size());
 
-        if (!violations.isEmpty()) {
-            String message = "Refusing to start with profile PROD: " + violations.size()
-                    + " insecure/default secret(s) detected:\n  - " + String.join("\n  - ", violations);
+        if (violations.isEmpty()) {
+            log.info("TntProdSecretsGuard: no insecure default secrets detected ({}).",
+                    production ? "profile PROD" : "no Spring profile declared");
+            return;
+        }
+
+        String detail = violations.size() + " insecure/default secret(s) detected:\n  - "
+                + String.join("\n  - ", violations);
+        if (production) {
+            String message = "Refusing to start with profile PROD: " + detail;
             log.error(message);
             throw new IllegalStateException(message);
         }
-
-        log.info("TntProdSecretsGuard: no insecure default secrets detected for profile PROD.");
+        if (failOnUndeclared) {
+            String message = "Refusing to start with no Spring profile declared "
+                    + "(tnt.security.secrets-guard.fail-on-undeclared=true): " + detail;
+            log.error(message);
+            throw new IllegalStateException(message);
+        }
+        log.error("No Spring profile declared and {} — starting anyway because "
+                + "tnt.security.secrets-guard.fail-on-undeclared is false.", detail);
     }
 
     private void checkDefault(List<String> violations, String envVar, String actualValue,
