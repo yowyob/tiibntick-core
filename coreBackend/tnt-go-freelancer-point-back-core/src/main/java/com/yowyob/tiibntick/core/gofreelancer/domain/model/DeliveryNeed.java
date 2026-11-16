@@ -55,10 +55,11 @@ public class DeliveryNeed implements Persistable<UUID>, TntPersistableEntity {
     @Column("packet_id")
     private UUID packetId;
 
-    @Transient
+    /** Destination relay point chosen by the sender (gofp relay point id or its hub id), if any. */
+    @Column("target_relay_point_id")
     private UUID targetRelayPointId;
 
-    @Transient
+    @Column("requested_storage_days")
     private Integer requestedStorageDays;
 
     @Transient

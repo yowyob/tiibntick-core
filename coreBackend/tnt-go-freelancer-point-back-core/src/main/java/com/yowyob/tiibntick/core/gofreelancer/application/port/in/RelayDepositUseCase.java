@@ -26,4 +26,7 @@ public interface RelayDepositUseCase {
     Flux<RelayDeposit> getDepositsByRelayPointId(UUID relayPointId);
     Flux<RelayDeposit> getDepositsByClientId(UUID clientId);
     Mono<RelayDeposit> markAsRetrieved(UUID id, String otpCode);
+
+    /** One deposit by id (empty when unknown). */
+    Mono<RelayDeposit> findById(UUID id);
 }

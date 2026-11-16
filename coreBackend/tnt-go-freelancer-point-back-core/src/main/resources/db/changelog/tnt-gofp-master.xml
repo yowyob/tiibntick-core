@@ -447,4 +447,11 @@
                  relativeToChangelogFile="false"/>
     </changeSet>
 
+    <!-- Lot C-48: store the destination relay point of a Go delivery need. Non-numeric id, labelled
+         only so the upgrade test can rebuild a database migrated by the previous version. -->
+    <changeSet id="c48-add-target-relay-point-to-delivery-needs" author="TiiBnTickTeam" labels="relay-target">
+        <sqlFile path="db/changelog/20261116_c48_add_target_relay_point_to_delivery_needs.sql"
+                 relativeToChangelogFile="false"/>
+    </changeSet>
+
 </databaseChangeLog>

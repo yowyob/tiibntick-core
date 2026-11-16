@@ -45,6 +45,11 @@ public class DeliveryNeedRepositoryAdapter implements IDeliveryNeedRepository {
     }
 
     @Override
+    public Flux<DeliveryNeed> findAllByTargetRelayPointIdIn(java.util.Collection<UUID> relayPointIds) {
+        return r2dbcRepository.findAllByTargetRelayPointIdIn(relayPointIds);
+    }
+
+    @Override
     public Mono<Void> deleteById(UUID id) {
         return r2dbcRepository.deleteById(id);
     }

@@ -22,5 +22,8 @@ public interface IDeliveryNeedRepository {
 
     Flux<DeliveryNeed> findAllByStatus(DeliveryNeedStatus status);
 
+    /** Delivery needs whose destination relay point is one of the given ids. */
+    Flux<DeliveryNeed> findAllByTargetRelayPointIdIn(java.util.Collection<UUID> relayPointIds);
+
     Mono<Void> deleteById(UUID id);
 }

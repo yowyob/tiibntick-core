@@ -28,6 +28,7 @@ public class RelayDepositUseCaseImpl implements RelayDepositUseCase {
     }
 
     @Override public Flux<RelayDeposit> getDepositsByRelayPointId(UUID id) { return relayDepositService.getDepositsByRelayPointId(id); }
+    @Override public Mono<RelayDeposit> findById(UUID id) { return relayDepositService.findById(id); }
     @Override public Flux<RelayDeposit> getDepositsByClientId(UUID id) { return relayDepositService.getDepositsByClientId(id); }
     @Override public Mono<RelayDeposit> markAsRetrieved(UUID id, String otpCode) { return relayDepositService.markAsRetrieved(id, otpCode); }
 }

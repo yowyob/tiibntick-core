@@ -14,4 +14,6 @@ public interface DeliveryNeedRepository extends ReactiveCrudRepository<DeliveryN
     Flux<DeliveryNeed> findAllByUserId(UUID userId);
 
     Flux<DeliveryNeed> findAllByStatus(DeliveryNeedStatus status);
+
+    Flux<DeliveryNeed> findAllByTargetRelayPointIdIn(java.util.Collection<UUID> targetRelayPointIds);
 }

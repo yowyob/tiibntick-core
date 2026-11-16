@@ -150,6 +150,10 @@ public class RelayDepositService {
         return relayDepositRepository.findByRelayPointId(relayPointId);
     }
 
+    public Mono<RelayDeposit> findById(UUID id) {
+        return relayDepositRepository.findById(id);
+    }
+
     public Flux<RelayDeposit> getDepositsByClientId(UUID clientId) {
         return relayDepositRepository.findByClientId(clientId);
     }
