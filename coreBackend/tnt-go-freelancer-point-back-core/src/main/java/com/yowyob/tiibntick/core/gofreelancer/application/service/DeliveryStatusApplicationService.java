@@ -638,4 +638,105 @@ public class DeliveryStatusApplicationService {
                 .onErrorResume(e -> Mono.empty())
                 .then();
     }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Lot C-45 — who may read a delivery, who may change its price
+    // ══════════════════════════════════════════════════════════════════════
+
+    /** Platform staff: may read any delivery and is the only one allowed to change a price. */
+    public static boolean isStaff(com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext ctx) {
+        return ctx != null && (ctx.hasRole("TNT_ADMIN") || ctx.hasRole("SUPPORT_AGENT"));
+    }
+
+    /**
+     * A delivery is readable by its client (announcement {@code clientId} or delivery-need
+     * {@code userId}), its assigned delivery person, or staff. Unknown delivery → 404.
+     */
+    public Mono<Void> assertCallerCanReadDelivery(UUID deliveryId,
+            com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext ctx) {
+        return deliveryRepository.findById(deliveryId)
+                .switchIfEmpty(Mono.error(new IllegalArgumentException("Delivery not found: " + deliveryId)))
+                .flatMap(delivery -> assertParty(delivery, ctx));
+    }
+
+    /** Same rule, the delivery being found through its announcement. */
+    public Mono<Void> assertCallerCanReadDeliveryOfAnnouncement(UUID announcementId,
+            com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext ctx) {
+        return deliveryRepository.findByAnnouncementId(announcementId)
+                .switchIfEmpty(Mono.error(new IllegalArgumentException(
+                        "Delivery not found for announcement: " + announcementId)))
+                .flatMap(delivery -> assertParty(delivery, ctx));
+    }
+
+    /** Same rule, the delivery being found through its delivery need. */
+    public Mono<Void> assertCallerCanReadDeliveryOfNeed(UUID deliveryNeedId,
+            com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext ctx) {
+        return deliveryRepository.findByDeliveryNeedId(deliveryNeedId)
+                .switchIfEmpty(Mono.error(new IllegalArgumentException(
+                        "Delivery not found for delivery need: " + deliveryNeedId)))
+                .flatMap(delivery -> assertParty(delivery, ctx));
+    }
+
+    /**
+     * Price ({@code tarif}): staff only, and never once a payment has started — the delivery person
+     * generated a receive code, or a settlement exists for this delivery. Other editable fields
+     * (time windows) stay open to the parties of the delivery and staff.
+     */
+    public Mono<Void> assertCallerCanUpdateDelivery(UUID deliveryId, boolean changesPrice,
+            com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext ctx) {
+        return deliveryRepository.findById(deliveryId)
+                .switchIfEmpty(Mono.error(new IllegalArgumentException("Delivery not found: " + deliveryId)))
+                .flatMap(delivery -> {
+                    if (!changesPrice) {
+                        return assertParty(delivery, ctx);
+                    }
+                    if (!isStaff(ctx)) {
+                        return Mono.<Void>error(new AccessDeniedException(
+                                "Only platform staff can change the price of a delivery"));
+                    }
+                    if (delivery.getReceiveCode() != null) {
+                        return Mono.<Void>error(paymentStarted(deliveryId));
+                    }
+                    return tenantContextHolder.currentTenantId()
+                            .defaultIfEmpty(TenantContextHolder.SYSTEM_TENANT)
+                            .flatMap(tenantId -> settlements.find(tenantId,
+                                    DeliveryPaymentApplicationService.REFERENCE_TYPE, deliveryId))
+                            .hasElement()
+                            .flatMap(settled -> settled
+                                    ? Mono.<Void>error(paymentStarted(deliveryId))
+                                    : Mono.<Void>empty());
+                });
+    }
+
+    private static org.springframework.web.server.ResponseStatusException paymentStarted(UUID deliveryId) {
+        return new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.CONFLICT,
+                "The payment of delivery " + deliveryId + " has started: its price can no longer change");
+    }
+
+    private Mono<Void> assertParty(Delivery delivery,
+            com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext ctx) {
+        if (isStaff(ctx)) {
+            return Mono.empty();
+        }
+        UUID caller = ctx != null ? ctx.userId() : null;
+        if (caller == null) {
+            return Mono.error(new AccessDeniedException("Authentication required to read a delivery"));
+        }
+        Mono<Boolean> viaAnnouncement = delivery.getAnnouncementId() == null ? Mono.just(false)
+                : announcementRepository.findById(delivery.getAnnouncementId())
+                        .map(a -> caller.equals(a.getClientId())).defaultIfEmpty(false);
+        Mono<Boolean> viaNeed = delivery.getDeliveryNeedId() == null ? Mono.just(false)
+                : deliveryNeedRepository.findById(delivery.getDeliveryNeedId())
+                        .map(n -> caller.equals(n.getUserId())).defaultIfEmpty(false);
+        Mono<Boolean> courier = Mono.defer(() -> assertCallerIsAssignedDeliveryPerson(delivery.getId(), caller)
+                .thenReturn(true)
+                .onErrorReturn(false));
+        return viaAnnouncement.zipWith(viaNeed, (a, n) -> a || n)
+                .flatMap(client -> client ? Mono.just(true) : courier)
+                .flatMap(allowed -> allowed ? Mono.<Void>empty()
+                        : Mono.<Void>error(new AccessDeniedException(
+                                "Only the client, the assigned delivery person or staff can access delivery "
+                                        + delivery.getId())));
+    }
 }
