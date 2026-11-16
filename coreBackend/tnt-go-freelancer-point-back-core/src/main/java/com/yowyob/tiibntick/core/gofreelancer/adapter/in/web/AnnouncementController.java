@@ -29,11 +29,17 @@ public class AnnouncementController {
 
     private final AnnouncementUseCase announcementUseCase;
     private final com.yowyob.tiibntick.core.gofreelancer.application.service.FreelancerWhereaboutsResolver whereabouts;
+    private final com.yowyob.tiibntick.core.gofreelancer.application.service.AnnouncementAccessGuard access;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public Mono<AnnouncementResponseDTO> createAnnouncement(@RequestBody AnnouncementRequestDTO request) {
-        return announcementUseCase.createAnnouncement(request);
+    public Mono<AnnouncementResponseDTO> createAnnouncement(@RequestBody AnnouncementRequestDTO request,
+            @com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser(required = false) com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext ctx) {
+        return access.clientIdFor(request.getClientId(), ctx)
+                .flatMap(clientId -> {
+                    request.setClientId(clientId);
+                    return announcementUseCase.createAnnouncement(request);
+                });
     }
 
     @GetMapping
@@ -79,14 +85,16 @@ public class AnnouncementController {
 
     @PutMapping("/{id}")
     public Mono<AnnouncementResponseDTO> updateAnnouncement(
-            @PathVariable UUID id, @RequestBody AnnouncementRequestDTO request) {
-        return announcementUseCase.updateAnnouncement(id, request);
+            @PathVariable UUID id, @RequestBody AnnouncementRequestDTO request,
+            @com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser(required = false) com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext ctx) {
+        return access.requireOwner(id, ctx).then(Mono.defer(() -> announcementUseCase.updateAnnouncement(id, request)));
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public Mono<Void> deleteAnnouncement(@PathVariable UUID id) {
-        return announcementUseCase.deleteAnnouncement(id);
+    public Mono<Void> deleteAnnouncement(@PathVariable UUID id,
+            @com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser(required = false) com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext ctx) {
+        return access.requireOwner(id, ctx).then(Mono.defer(() -> announcementUseCase.deleteAnnouncement(id)));
     }
 
     @PatchMapping("/{id}/publish")
@@ -98,17 +106,26 @@ public class AnnouncementController {
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<AnnouncementResponseDTO> respond(
             @PathVariable("id") UUID announcementId,
-            @RequestBody RespondAnnouncementRequestDTO request) {
-        return announcementUseCase.respondToAnnouncement(announcementId, request);
+            @RequestBody RespondAnnouncementRequestDTO request,
+            @com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser(required = false) com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext ctx) {
+        return access.courierIdFor(request.getFreelancerId(), ctx)
+                .flatMap(freelancerId -> {
+                    request.setFreelancerId(freelancerId);
+                    return announcementUseCase.respondToAnnouncement(announcementId, request);
+                });
     }
 
     @PostMapping("/{id}/subscribe")
     public Mono<ResponseEntity<Void>> subscribe(
             @PathVariable("id") UUID announcementId,
-            @RequestBody SubscriptionRequestDTO request) {
-        RespondAnnouncementRequestDTO respond = new RespondAnnouncementRequestDTO();
-        respond.setFreelancerId(request.getFreelancerId());
-        return announcementUseCase.respondToAnnouncement(announcementId, respond)
+            @RequestBody SubscriptionRequestDTO request,
+            @com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser(required = false) com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext ctx) {
+        return access.courierIdFor(request.getFreelancerId(), ctx)
+                .flatMap(freelancerId -> {
+                    RespondAnnouncementRequestDTO respond = new RespondAnnouncementRequestDTO();
+                    respond.setFreelancerId(freelancerId);
+                    return announcementUseCase.respondToAnnouncement(announcementId, respond);
+                })
                 .then(Mono.just(ResponseEntity.accepted().<Void>build()));
     }
 
@@ -120,13 +137,13 @@ public class AnnouncementController {
     @PostMapping("/{id}/assign")
     public Mono<ResponseEntity<AnnouncementResponseDTO>> assignFreelancer(
             @PathVariable("id") UUID announcementId,
-            @RequestBody AssignFreelancerRequestDTO request) {
-        if (request.getResponseId() != null && request.getClientId() != null) {
-            return announcementUseCase
-                    .assignResponse(announcementId, request.getClientId(), request.getResponseId())
-                    .map(ResponseEntity::ok);
-        }
-        return announcementUseCase.assignFreelancer(announcementId, request.getFreelancerId())
+            @RequestBody AssignFreelancerRequestDTO request,
+            @com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser(required = false) com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext ctx) {
+        // Lot C-46 : le client est celui de l'annonce, jamais celui du corps.
+        return access.requireCanElect(announcementId, request.getResponseId(), request.getFreelancerId(), ctx)
+                .flatMap(announcement -> request.getResponseId() != null
+                        ? announcementUseCase.assignResponse(announcementId, announcement.clientId(), request.getResponseId())
+                        : announcementUseCase.assignFreelancer(announcementId, request.getFreelancerId()))
                 .map(ResponseEntity::ok);
     }
 

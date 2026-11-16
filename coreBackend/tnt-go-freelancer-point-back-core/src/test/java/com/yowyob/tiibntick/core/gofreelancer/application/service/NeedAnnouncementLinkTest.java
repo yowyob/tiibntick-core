@@ -75,6 +75,8 @@ class NeedAnnouncementLinkTest {
     private final Map<UUID, Announcement> mirror = new HashMap<>();
     private final Map<UUID, DeliveryNeed> needStore = new HashMap<>();
 
+    private final FreelancerPriceQuoteUseCase quotes = mock(FreelancerPriceQuoteUseCase.class);
+
     private DeliveryNeedApplicationService needService;
     private AnnouncementApplicationService announcementService;
 
@@ -106,7 +108,7 @@ class NeedAnnouncementLinkTest {
         needService = new DeliveryNeedApplicationService(
                 needs, mock(AdminRelayPointUseCase.class), mock(PushNotificationPort.class),
                 mock(MatchingUseCase.class), addressUseCase, users,
-                freelancers, mock(FreelancerPriceQuoteUseCase.class), mock(FreelancerEligibilityUseCase.class),
+                freelancers, quotes, mock(FreelancerEligibilityUseCase.class),
                 legacyUserExists());
         needService.setNeedAnnouncements(link);
 
@@ -116,6 +118,7 @@ class NeedAnnouncementLinkTest {
                 freelancers, mock(GofpUserRepository.class), deliveries, deliveryOtp,
                 mock(GofpDeliveryOtpProperties.class));
         announcementService.setNeedAnnouncements(link);
+        needService.setAnnouncements(announcementService);
 
         when(addressUseCase.createAddress(any())).thenAnswer(inv -> {
             AddressDTO in = inv.getArgument(0);
@@ -286,16 +289,135 @@ class NeedAnnouncementLinkTest {
         assertThat(mirror.get(announcementId).getStatus()).isEqualTo(AnnouncementStatus.CANCELLED);
     }
 
+    // ── assignation directe (lot C-46) : elle passe par l'annonce → livraison payable ─────────
+
+    private GofpFreelancer assignableCourier() {
+        GofpFreelancer f = GofpFreelancer.builder().id(gofpFreelancerId).coreFreelancerId(freelancerId)
+                .status(FreelancerStatus.APPROVED).isActive(true).build();
+        when(freelancers.findById(gofpFreelancerId)).thenReturn(Mono.just(f));
+        when(freelancers.findByCoreFreelancerId(freelancerId)).thenReturn(Mono.just(f));
+        return f;
+    }
+
+    private AnnouncementResponseSnapshot responseAt(String price) {
+        return new AnnouncementResponseSnapshot(responseId, freelancerId, new BigDecimal(price), "XAF",
+                "SENT", Instant.now());
+    }
+
+    /** L'annonce n'a encore aucune réponse ; respond l'ajoute ; selectResponse crée la livraison. */
+    private void openAnnouncementWithoutResponse() {
+        java.util.concurrent.atomic.AtomicBoolean responded = new java.util.concurrent.atomic.AtomicBoolean();
+        when(port.findById(eq(tenantId), eq(announcementId))).thenAnswer(inv -> Mono.just(
+                snapshot(ownerId, "QUOTE_REQUEST", null, null,
+                        responded.get() ? List.of(responseAt("3000")) : List.of())));
+        when(port.respond(any())).thenAnswer(inv -> {
+            responded.set(true);
+            return Mono.just(snapshot(ownerId, "QUOTE_REQUEST", null, null, List.of(responseAt("3000"))));
+        });
+        when(port.selectResponse(tenantId, announcementId, ownerId, responseId)).thenReturn(Mono.just(
+                snapshot(ownerId, "QUOTE_REQUEST", responseId, deliveryId, List.of(responseAt("3000")))));
+    }
+
+    private void serverQuote(double price) {
+        when(quotes.quote(any(), any())).thenReturn(Mono.just(
+                new FreelancerPriceQuoteUseCase.Quote(price, "XAF", "grille", "TEST", null)));
+    }
+
     @Test
-    @DisplayName("assigner le besoin directement (sans l'annonce) retire aussi l'annonce")
-    void directAssignment_withdrawsAnnouncement() {
+    @DisplayName("assigner directement un livreur crée la livraison payable, rattachée au besoin, au prix calculé par le serveur")
+    void directAssignment_createsPayableDeliveryPricedByServer() {
         UUID needId = createNeed();
-        when(freelancers.findById(freelancerId)).thenReturn(Mono.just(GofpFreelancer.builder()
-                .id(freelancerId).status(FreelancerStatus.APPROVED).isActive(true).build()));
+        assignableCourier();
+        openAnnouncementWithoutResponse();
+        serverQuote(3000);
 
-        needService.assignFreelancer(needId, freelancerId, ownerId).block();
+        needService.assignFreelancer(needId, gofpFreelancerId, ownerId).block();
 
-        verify(port).cancel(tenantId, announcementId, ownerId);
-        assertThat(mirror.get(announcementId).getStatus()).isEqualTo(AnnouncementStatus.CANCELLED);
+        ArgumentCaptor<com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.RespondToAnnouncementPortCommand> respond =
+                ArgumentCaptor.forClass(com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.RespondToAnnouncementPortCommand.class);
+        verify(port).respond(respond.capture());
+        assertThat(respond.getValue().freelancerId()).as("réponse au nom du livreur (id profil)").isEqualTo(freelancerId);
+        assertThat(respond.getValue().proposedPrice()).as("prix = devis du serveur").isEqualByComparingTo("3000");
+        verify(port).selectResponse(tenantId, announcementId, ownerId, responseId);
+
+        ArgumentCaptor<Delivery> created = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveries).save(created.capture());
+        assertThat(created.getValue().getDeliveryNeedId()).isEqualTo(needId);
+        assertThat(created.getValue().getTarif()).isEqualTo(3000.0);
+        assertThat(needStore.get(needId).getStatus()).isEqualTo(DeliveryNeedStatus.ASSIGNED);
+        assertThat(needStore.get(needId).getAssignedFreelancerId()).isEqualTo(gofpFreelancerId);
+        verify(port, never()).cancel(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("rejouer l'assignation directe ne crée pas une seconde livraison")
+    void directAssignment_replayed_noDuplicateDelivery() {
+        UUID needId = createNeed();
+        assignableCourier();
+        openAnnouncementWithoutResponse();
+        serverQuote(3000);
+
+        needService.assignFreelancer(needId, gofpFreelancerId, ownerId).block();
+        needService.assignFreelancer(needId, gofpFreelancerId, ownerId).block();
+
+        verify(port, times(1)).selectResponse(any(), any(), any(), any());
+        verify(deliveries, times(1)).save(any());
+    }
+
+    @Test
+    @DisplayName("devis indisponible → assignation refusée, aucun tarif à 0, rien n'est créé")
+    void directAssignment_quoteUnavailable_refused() {
+        UUID needId = createNeed();
+        assignableCourier();
+        openAnnouncementWithoutResponse();
+        when(quotes.quote(any(), any())).thenReturn(Mono.error(new IllegalStateException("no pricing")));
+
+        StepVerifier.create(needService.assignFreelancer(needId, gofpFreelancerId, ownerId))
+                .expectErrorMatches(e -> e instanceof org.springframework.web.server.ResponseStatusException r
+                        && r.getStatusCode().value() == 409)
+                .verify();
+        verify(port, never()).respond(any());
+        verify(deliveries, never()).save(any());
+        assertThat(needStore.get(needId).getStatus()).isNotEqualTo(DeliveryNeedStatus.ASSIGNED);
+    }
+
+    @Test
+    @DisplayName("le livreur a déjà proposé un autre prix → refus : le tarif ne vient jamais d'une requête")
+    void directAssignment_existingResponseAtOtherPrice_refused() {
+        UUID needId = createNeed();
+        assignableCourier();
+        when(port.findById(eq(tenantId), eq(announcementId))).thenAnswer(inv -> Mono.just(
+                snapshot(ownerId, "QUOTE_REQUEST", null, null, List.of(responseAt("500")))));
+        serverQuote(3000);
+
+        StepVerifier.create(needService.assignFreelancer(needId, gofpFreelancerId, ownerId))
+                .expectErrorMatches(e -> e instanceof org.springframework.web.server.ResponseStatusException r
+                        && r.getStatusCode().value() == 409)
+                .verify();
+        verify(port, never()).selectResponse(any(), any(), any(), any());
+        verify(deliveries, never()).save(any());
+    }
+
+    // ── PUT d'annonce (lot C-46) ────────────────────────────────────────────
+
+    @Test
+    @DisplayName("annonce attribuée : son mode de paiement et son prix ne changent plus (409) ; avant, ils changent")
+    void assignedAnnouncement_paymentFrozen() {
+        createNeed();
+        Announcement local = mirror.get(announcementId);
+        var toCash = new com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.AnnouncementRequestDTO();
+        toCash.setPaymentMethod("WALLET");
+
+        StepVerifier.create(announcementService.updateAnnouncement(announcementId, toCash)).expectNextCount(1).verifyComplete();
+        assertThat(local.getPaymentMethod()).isEqualTo("WALLET");
+
+        local.setStatus(AnnouncementStatus.ASSIGNED);
+        local.setAssignedFreelancerId(gofpFreelancerId);
+        toCash.setPaymentMethod("CASH");
+        StepVerifier.create(announcementService.updateAnnouncement(announcementId, toCash))
+                .expectErrorMatches(e -> e instanceof org.springframework.web.server.ResponseStatusException r
+                        && r.getStatusCode().value() == 409)
+                .verify();
+        assertThat(local.getPaymentMethod()).isEqualTo("WALLET");
     }
 }

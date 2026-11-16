@@ -71,6 +71,18 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
     }
 
     /**
+     * Élection d'une réponse sur l'annonce du besoin (lot C-46) : l'assignation directe passe par
+     * le même chemin que le choix d'une candidature, qui crée la livraison payable. Injection
+     * optionnelle (setter), comme {@link #setNeedAnnouncements}.
+     */
+    private com.yowyob.tiibntick.core.gofreelancer.application.port.in.AnnouncementUseCase announcements;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setAnnouncements(com.yowyob.tiibntick.core.gofreelancer.application.port.in.AnnouncementUseCase announcements) {
+        this.announcements = announcements;
+    }
+
+    /**
      * Active la garde d'ownership. Défaut {@code true} : un déploiement qui oublie la variable
      * doit être protégé, pas ouvert — la configuration dangereuse ne doit jamais être celle
      * obtenue par omission. Le profil {@code test} la met à {@code false}.
@@ -380,37 +392,87 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
         return deliveryNeedRepository.findById(deliveryNeedId)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("DeliveryNeed not found: " + deliveryNeedId)))
                 .flatMap(need -> requireOwnership(need, callerId, "assignFreelancer"))
-                .flatMap(need -> requireAssignableFreelancer(freelancerId).thenReturn(need))
-                .flatMap(need -> {
-                    need.setAssignedFreelancerId(freelancerId);
-                    need.setStatus(DeliveryNeedStatus.ASSIGNED);
-                    need.setUpdatedAt(Instant.now());
-
-                    log.info("Assigning freelancer {} to DeliveryNeed {}", freelancerId, deliveryNeedId);
-
-                    // Assignation directe : l'annonce du besoin ne doit plus rester ouverte.
-                    Mono<DeliveryNeed> saveNeed = deliveryNeedRepository.save(need)
-                            .flatMap(saved -> withdrawAnnouncement(saved.getId()).thenReturn(saved));
-
-                    if (need.getTargetRelayPointId() != null) {
-                        Mono<Void> notifyRelayPoint = adminRelayPointUseCase.getRelayPointDetails(need.getTargetRelayPointId())
-                                .flatMap(relayPoint -> pushNotificationPort.sendPushNotification(
-                                        relayPoint.getFreelancerId(),
-                                        "Nouvelle Livraison Prévue !",
-                                        "Un livreur vient d'accepter une course à destination de votre point relais. " +
-                                                "Préparez-vous à recevoir le colis."
-                                ))
-                                .onErrorResume(e -> {
-                                    log.error("Failed to notify relay point owner upon assignment", e);
-                                    return Mono.empty();
-                                });
-
-                        return saveNeed.flatMap(saved -> notifyRelayPoint.thenReturn(saved));
-                    }
-
-                    return saveNeed;
-                })
+                .flatMap(need -> requireAssignableFreelancer(freelancerId)
+                        .flatMap(freelancer -> electThroughAnnouncement(need, freelancer)
+                                .switchIfEmpty(Mono.defer(() -> assignWithoutAnnouncement(need, freelancerId)))))
+                .flatMap(saved -> notifyRelayPoint(saved).thenReturn(saved))
                 .flatMap(this::enrich);
+    }
+
+    /**
+     * Lot C-46 — le besoin a encore son annonce ouverte (C-43) : l'assignation directe y inscrit le
+     * livreur au prix calculé par le serveur, puis l'élit par le même chemin que le choix d'une
+     * candidature ({@link AnnouncementUseCase#assignResponse}) — celui qui crée la livraison
+     * delivery-core, sa copie gofp payable (tarif = ce prix, lien vers le besoin), les codes de
+     * remise, et passe le besoin ASSIGNED. Vide si le besoin n'a pas d'annonce ouverte (besoin
+     * antérieur à C-43, ou déjà assigné : rejouer l'assignation ne crée pas de seconde livraison).
+     */
+    private Mono<DeliveryNeed> electThroughAnnouncement(DeliveryNeed need, GofpFreelancer freelancer) {
+        if (needAnnouncements == null || announcements == null) {
+            return Mono.empty();
+        }
+        UUID responderId = freelancer.getCoreFreelancerId() != null
+                ? freelancer.getCoreFreelancerId() : freelancer.getId();
+        return needAnnouncements.openAnnouncementOf(need.getId())
+                .flatMap(announcement -> serverPrice(need, freelancer)
+                        .flatMap(quote -> needAnnouncements.responseAt(announcement.getId(), responderId,
+                                java.math.BigDecimal.valueOf(quote.totalPrice()), quote.currency()))
+                        .flatMap(responseId -> announcements.assignResponse(
+                                announcement.getId(), need.getUserId(), responseId))
+                        .then(deliveryNeedRepository.findById(need.getId())));
+    }
+
+    /**
+     * Prix de ce livreur pour ce besoin, par le même moteur que la liste des candidats
+     * ({@link FreelancerPriceQuoteUseCase}). Devis indisponible ou nul → 409 : jamais un tarif à 0.
+     */
+    private Mono<FreelancerPriceQuoteUseCase.Quote> serverPrice(DeliveryNeed need, GofpFreelancer freelancer) {
+        List<UUID> ownerIds = new java.util.ArrayList<>();
+        if (freelancer.getCoreFreelancerId() != null) ownerIds.add(freelancer.getCoreFreelancerId());
+        if (freelancer.getCoreUserId() != null) ownerIds.add(freelancer.getCoreUserId());
+        ownerIds.add(freelancer.getId());
+        double distanceKm = need.getDistance() != null ? need.getDistance() : 0.0;
+        return loadPacketMetrics(need.getPacketId())
+                .flatMap(packet -> freelancerPriceQuoteUseCase.quote(ownerIds,
+                        new FreelancerPriceQuoteUseCase.QuoteInput(distanceKm, packet.weightKg(), packet.volumeM3(),
+                                packet.fragile(), packet.perishable(), null, null, need.getPickupDeadline(),
+                                need.getPaymentMethod(), null)))
+                .filter(q -> q.totalPrice() > 0)
+                .onErrorMap(e -> !(e instanceof org.springframework.web.server.ResponseStatusException),
+                        e -> new org.springframework.web.server.ResponseStatusException(
+                                org.springframework.http.HttpStatus.CONFLICT,
+                                "The price of this courier cannot be computed now", e))
+                .switchIfEmpty(Mono.error(new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.CONFLICT,
+                        "The price of this courier cannot be computed now")));
+    }
+
+    /** Ancien chemin, sans annonce ouverte : le besoin est assigné, l'annonce éventuelle retirée. */
+    private Mono<DeliveryNeed> assignWithoutAnnouncement(DeliveryNeed need, UUID freelancerId) {
+        need.setAssignedFreelancerId(freelancerId);
+        need.setStatus(DeliveryNeedStatus.ASSIGNED);
+        need.setUpdatedAt(Instant.now());
+        log.info("Assigning freelancer {} to DeliveryNeed {} (no open announcement)", freelancerId, need.getId());
+        return deliveryNeedRepository.save(need)
+                .flatMap(saved -> withdrawAnnouncement(saved.getId()).thenReturn(saved));
+    }
+
+    private Mono<Void> notifyRelayPoint(DeliveryNeed need) {
+        if (need.getTargetRelayPointId() == null) {
+            return Mono.empty();
+        }
+        return adminRelayPointUseCase.getRelayPointDetails(need.getTargetRelayPointId())
+                .flatMap(relayPoint -> pushNotificationPort.sendPushNotification(
+                        relayPoint.getFreelancerId(),
+                        "Nouvelle Livraison Prévue !",
+                        "Un livreur vient d'accepter une course à destination de votre point relais. " +
+                                "Préparez-vous à recevoir le colis."
+                ))
+                .onErrorResume(e -> {
+                    log.error("Failed to notify relay point owner upon assignment", e);
+                    return Mono.empty();
+                })
+                .then();
     }
 
     @Override

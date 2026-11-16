@@ -140,6 +140,20 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
                         "Local announcement mirror not found: " + id
                                 + " — prefer cancel + republish via delivery-core")))
                 .flatMap(a -> {
+                    // Lot C-46 : une fois un livreur retenu (livraison créée), le mode de paiement et le
+                    // prix ne bougent plus — le paiement de la course les lit.
+                    boolean locked = a.getAssignedFreelancerId() != null
+                            || (a.getStatus() != null && a.getStatus() != AnnouncementStatus.DRAFT
+                                && a.getStatus() != AnnouncementStatus.PUBLISHED
+                                && a.getStatus() != AnnouncementStatus.IN_NEGOTIATION);
+                    boolean changesPayment = (request.getPaymentMethod() != null
+                                && !request.getPaymentMethod().equals(a.getPaymentMethod()))
+                            || (request.getAmount() != null && !request.getAmount().equals(a.getAmount()));
+                    if (locked && changesPayment) {
+                        return Mono.error(new org.springframework.web.server.ResponseStatusException(
+                                org.springframework.http.HttpStatus.CONFLICT,
+                                "The payment method and price of an assigned announcement can no longer change"));
+                    }
                     if (request.getPaymentMethod() != null) a.setPaymentMethod(request.getPaymentMethod());
                     if (request.getTransportMethod() != null) a.setTransportMethod(request.getTransportMethod());
                     if (request.getDistance() != null) a.setDistance(request.getDistance());

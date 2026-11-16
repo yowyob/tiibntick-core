@@ -116,6 +116,51 @@ public class NeedAnnouncementService {
                 .flatMap(a -> Mono.justOrEmpty(a.getDeliveryNeedId()));
     }
 
+    /** Annonce encore ouverte (PUBLISHED ou IN_NEGOTIATION) publiée pour ce besoin, ou vide. */
+    public Mono<Announcement> openAnnouncementOf(UUID deliveryNeedId) {
+        return announcementRepository.findByDeliveryNeedId(deliveryNeedId)
+                .filter(a -> a.getStatus() == AnnouncementStatus.PUBLISHED
+                        || a.getStatus() == AnnouncementStatus.IN_NEGOTIATION);
+    }
+
+    /**
+     * Réponse du livreur {@code responderId} sur l'annonce, au prix {@code serverPrice} calculé par
+     * le serveur (lot C-46) : créée si absente ; réutilisée si elle existe au même prix ; refusée
+     * (409) si le livreur a déjà proposé un autre prix — le tarif ne vient jamais d'une requête.
+     */
+    public Mono<UUID> responseAt(UUID announcementId, UUID responderId, java.math.BigDecimal serverPrice,
+                                 String currency) {
+        return tenantContextHolder.currentTenantId()
+                .flatMap(tenantId -> deliveryAnnouncementPort.findById(tenantId, announcementId)
+                        .switchIfEmpty(Mono.error(new IllegalArgumentException(
+                                "Announcement not found: " + announcementId)))
+                        .flatMap(a -> {
+                            java.util.Optional<com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.AnnouncementResponseSnapshot> existing =
+                                    a.responses().stream()
+                                            .filter(r -> responderId.equals(r.deliveryPersonId()))
+                                            .findFirst();
+                            if (existing.isPresent()) {
+                                java.math.BigDecimal proposed = existing.get().proposedPrice();
+                                if (proposed == null || proposed.compareTo(serverPrice) != 0) {
+                                    return Mono.error(new org.springframework.web.server.ResponseStatusException(
+                                            org.springframework.http.HttpStatus.CONFLICT,
+                                            "This courier already proposed another price: choose them among the applicants"));
+                                }
+                                return Mono.just(existing.get().id());
+                            }
+                            return deliveryAnnouncementPort.respond(
+                                            new com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.RespondToAnnouncementPortCommand(
+                                                    tenantId, announcementId, responderId,
+                                                    Instant.now().plusSeconds(1800), null, serverPrice, currency))
+                                    .flatMap(saved -> Mono.justOrEmpty(saved.responses().stream()
+                                            .filter(r -> responderId.equals(r.deliveryPersonId()))
+                                            .map(com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.AnnouncementResponseSnapshot::id)
+                                            .findFirst()))
+                                    .switchIfEmpty(Mono.error(new IllegalStateException(
+                                            "Response of " + responderId + " not recorded on " + announcementId)));
+                        }));
+    }
+
     /** Annonce publiée pour ce besoin, ou vide. */
     public Mono<UUID> announcementIdOf(UUID deliveryNeedId) {
         return announcementRepository.findByDeliveryNeedId(deliveryNeedId).map(Announcement::getId);
