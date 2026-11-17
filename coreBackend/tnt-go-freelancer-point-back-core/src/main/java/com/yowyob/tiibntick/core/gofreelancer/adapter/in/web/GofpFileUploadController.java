@@ -27,6 +27,8 @@ import java.util.UUID;
 public class GofpFileUploadController {
 
     private final GofpFileUploadService uploadService;
+    /** Lot C-49: the photos of a relay point are uploaded by its owner or by staff. */
+    private final com.yowyob.tiibntick.core.gofreelancer.application.service.RelayPointAccessGuard relayPointGuard;
 
     // ── User profile photo ────────────────────────────────────────────────────
 
@@ -156,8 +158,11 @@ public class GofpFileUploadController {
                  consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Mono<ResponseEntity<RelayPointVisuals>> uploadStorefrontPhoto(
             @PathVariable UUID coreRelayPointId,
-            @RequestPart("file") FilePart file) {
-        return uploadService.uploadStorefrontPhoto(coreRelayPointId, file)
+            @RequestPart("file") FilePart file,
+            @com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser(required = false)
+            com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext ctx) {
+        return relayPointGuard.requireOwnerOrStaff(coreRelayPointId, ctx)
+                .flatMap(rp -> uploadService.uploadStorefrontPhoto(rp.getCoreRelayPointId(), file))
                 .map(ResponseEntity::ok)
                 .onErrorResume(IllegalArgumentException.class,
                         e -> Mono.just(ResponseEntity.notFound().build()));
@@ -170,8 +175,11 @@ public class GofpFileUploadController {
                  consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Mono<ResponseEntity<RelayPointVisuals>> uploadShopPhoto(
             @PathVariable UUID coreRelayPointId,
-            @RequestPart("file") FilePart file) {
-        return uploadService.uploadShopPhoto(coreRelayPointId, file)
+            @RequestPart("file") FilePart file,
+            @com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser(required = false)
+            com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext ctx) {
+        return relayPointGuard.requireOwnerOrStaff(coreRelayPointId, ctx)
+                .flatMap(rp -> uploadService.uploadShopPhoto(rp.getCoreRelayPointId(), file))
                 .map(ResponseEntity::ok)
                 .onErrorResume(IllegalArgumentException.class,
                         e -> Mono.just(ResponseEntity.notFound().build()));

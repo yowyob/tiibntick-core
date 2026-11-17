@@ -15,6 +15,7 @@ import com.yowyob.tiibntick.core.gofreelancer.application.port.out.PushNotificat
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpRelayPoint;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryStatus;
+import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.relaypoint.RelayPointStatus;
 import com.yowyob.tiibntick.core.trust.application.port.in.RecordCustodyTransferUseCase;
 import com.yowyob.tiibntick.core.trust.application.port.in.RecordMissionUseCase;
 import com.yowyob.tiibntick.core.trust.application.port.in.RecordPaymentUseCase;
@@ -246,31 +247,74 @@ public class DeliveryStatusApplicationService {
                         .thenReturn(saved));
     }
 
+    /**
+     * Deposit at a relay point. The parcel is deposited only at the relay point the sender chose
+     * ({@code DeliveryNeed.targetRelayPointId}), only if that relay point is approved and active, and
+     * the deposit is recorded for the owner of the delivery need — the request never names who will
+     * collect the parcel. (The caller is the assigned delivery person: checked by the controller.)
+     */
     private Mono<Delivery> depositAtRelay(UUID tenantId, Delivery delivery, CoreDeliveryState core, UUID driver,
                                           DeliveryStatusUpdateDTO dto) {
         UUID deliveryId = delivery.getId();
-        if (dto.getClientId() == null) {
-            return Mono.error(new IllegalArgumentException("clientId is required when delivering to a relay point"));
+        UUID needId = delivery.getDeliveryNeedId();
+        if (needId == null) {
+            return Mono.error(new IllegalArgumentException(
+                    "Only a delivery created from a delivery need can be deposited at a relay point"));
         }
-        UUID packetId = delivery.getDeliveryNeedId() != null ? delivery.getDeliveryNeedId() : deliveryId;
-        return resolveHubId(dto.getRelayPointId()).flatMap(hubId ->
-                // The core refuses the deposit unless the parcel is in transit; nothing is written then.
-                project(delivery, ensureInTransit(tenantId, deliveryId, core, driver)
-                        .then(Mono.defer(() -> lifecycle.depositAtRelayPoint(tenantId, deliveryId, driver, hubId))))
-                        .flatMap(saved -> {
-                            Mono<Void> createDeposit = relayDepositService
-                                    .createRelayDeposit(packetId, dto.getClientId(), hubId, dto.getStorageFee(), driver)
-                                    .doOnSuccess(deposit -> log.info("RelayDeposit mirror {} for delivery {} hub={}",
-                                            deposit.getId(), deliveryId, hubId))
-                                    .flatMap(deposit -> notifyRelayDeposit(hubId, dto.getClientId(), packetId,
-                                            delivery.getDeliveryNeedId()))
-                                    .then();
-                            return Mono.when(createDeposit,
-                                            processDeliveryPayment(saved, driver, tenantId),
-                                            anchorMissionCompleted(deliveryId, driver),
-                                            anchorCustodyTransferToHub(deliveryId, driver, packetId, hubId))
-                                    .thenReturn(saved);
-                        }));
+        return deliveryNeedRepository.findById(needId)
+                .switchIfEmpty(Mono.error(new IllegalArgumentException("Delivery need not found: " + needId)))
+                .flatMap(need -> {
+                    if (need.getTargetRelayPointId() == null) {
+                        return Mono.error(new IllegalArgumentException(
+                                "The sender did not choose a relay point for this delivery"));
+                    }
+                    if (need.getUserId() == null) {
+                        return Mono.error(new IllegalArgumentException(
+                                "The delivery need has no owner to collect the parcel"));
+                    }
+                    return findRelayPoint(dto.getRelayPointId())
+                            .flatMap(rp -> checkDepositTarget(rp, need.getTargetRelayPointId()))
+                            .flatMap(hubId -> depositAt(tenantId, delivery, core, driver, dto, needId,
+                                    need.getUserId(), hubId));
+                });
+    }
+
+    /** The relay point must be the one chosen by the sender, approved and active; returns its hub id. */
+    static Mono<UUID> checkDepositTarget(GofpRelayPoint rp, UUID target) {
+        boolean chosen = target.equals(rp.getId()) || target.equals(rp.getCoreRelayPointId());
+        if (!chosen) {
+            return Mono.error(new IllegalArgumentException(
+                    "The parcel must be deposited at the relay point chosen by the sender"));
+        }
+        if (rp.getStatus() != RelayPointStatus.APPROVED || !Boolean.TRUE.equals(rp.getIsActive())) {
+            return Mono.error(new IllegalArgumentException("This relay point does not accept deposits"));
+        }
+        if (rp.getCoreRelayPointId() == null) {
+            return Mono.error(new IllegalArgumentException("This relay point has no hub yet"));
+        }
+        return Mono.just(rp.getCoreRelayPointId());
+    }
+
+    private Mono<Delivery> depositAt(UUID tenantId, Delivery delivery, CoreDeliveryState core, UUID driver,
+                                     DeliveryStatusUpdateDTO dto, UUID packetId, UUID clientId, UUID hubId) {
+        UUID deliveryId = delivery.getId();
+        // The core refuses the deposit unless the parcel is in transit; nothing is written then.
+        return project(delivery, ensureInTransit(tenantId, deliveryId, core, driver)
+                .then(Mono.defer(() -> lifecycle.depositAtRelayPoint(tenantId, deliveryId, driver, hubId))))
+                .flatMap(saved -> {
+                    Mono<Void> createDeposit = relayDepositService
+                            .createRelayDeposit(packetId, clientId, hubId, dto.getStorageFee(), driver)
+                            .doOnSuccess(deposit -> log.info("RelayDeposit mirror {} for delivery {} hub={}",
+                                    deposit.getId(), deliveryId, hubId))
+                            .flatMap(deposit -> notifyRelayDeposit(hubId, clientId, packetId,
+                                    delivery.getDeliveryNeedId()))
+                            .then();
+                    return Mono.when(createDeposit,
+                                    processDeliveryPayment(saved, driver, tenantId),
+                                    anchorMissionCompleted(deliveryId, driver),
+                                    anchorCustodyTransferToHub(deliveryId, driver, packetId, hubId))
+                            .thenReturn(saved);
+                });
     }
 
     private Mono<Void> anchorMissionCompleted(UUID deliveryId, UUID driver) {
@@ -283,10 +327,9 @@ public class DeliveryStatusApplicationService {
                 .then();
     }
 
-    private Mono<UUID> resolveHubId(UUID relayPointId) {
+    private Mono<GofpRelayPoint> findRelayPoint(UUID relayPointId) {
         return gofpRelayPointRepository.findByCoreRelayPointId(relayPointId)
                 .switchIfEmpty(gofpRelayPointRepository.findById(relayPointId))
-                .map(GofpRelayPoint::getCoreRelayPointId)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException(
                         "No GofpRelayPoint found for id/coreRelayPointId: " + relayPointId)));
     }

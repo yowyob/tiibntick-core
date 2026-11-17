@@ -4,6 +4,7 @@ import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.Delive
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryUrgency;
 import java.time.Instant;
 import java.util.UUID;
+import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.response.RelayPointPublicView;
 import lombok.Data;
 
 /**
@@ -36,4 +37,9 @@ public class DeliveryResponseDTO {
     private String freelancerFirstName;
     private String freelancerLastName;
     private String freelancerPhone;
+
+    /** Relay point chosen by the sender for this delivery ({@code null}: delivered to the recipient). */
+    private UUID targetRelayPointId;
+    /** Public view of that relay point (name, address, position — no data about its owner). */
+    private RelayPointPublicView targetRelayPoint;
 }

@@ -90,7 +90,8 @@ class GofpFreelancerProvisioningFilterTest {
     @ParameterizedTest
     @ValueSource(strings = {"/api/announcements", "/api/announcements/123/subscribe", "/api/freelancers/123/policies",
             "/api/v1/gofp/freelancer-profiles/by-core-user/123", "/api/v1/gofp/relay-point-profiles/mine",
-            "/api/relay-deposits/mine"})
+            "/api/relay-deposits/mine", "/api/v1/gofp/files/relay-points/123/shop-photo",
+            "/api/relay-points/123/subscription", "/api/relay-points/123/subscription/eligible"})
     void requiresProjection_freelancerJourneyRoutes(String path) {
         assertThat(GofpFreelancerProvisioningFilter.requiresProjection(PathContainer.parsePath(path))).isTrue();
     }

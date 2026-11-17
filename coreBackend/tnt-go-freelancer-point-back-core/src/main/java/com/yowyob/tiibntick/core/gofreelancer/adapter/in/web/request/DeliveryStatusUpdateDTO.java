@@ -40,8 +40,8 @@ public class DeliveryStatusUpdateDTO {
     private UUID relayPointId;
 
     /**
-     * UUID of the client who will pick up the parcel at the relay point.
-     * Required when relayPointId is provided.
+     * Ignored. Kept so that existing clients sending it are not rejected: the client who will pick
+     * up the parcel is always the owner of the delivery need, never a value from the request.
      */
     private UUID clientId;
 

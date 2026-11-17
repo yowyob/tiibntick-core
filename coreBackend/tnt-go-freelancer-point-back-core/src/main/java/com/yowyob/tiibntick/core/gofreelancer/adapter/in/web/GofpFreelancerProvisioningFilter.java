@@ -71,7 +71,9 @@ public class GofpFreelancerProvisioningFilter implements WebFilter {
             PathPatternParser.defaultInstance.parse("/api/v1/gofp/freelancer-profiles/**"),
             // Lot C-48: a relay point is owned through the caller's gofp freelancer row.
             PathPatternParser.defaultInstance.parse("/api/v1/gofp/relay-point-profiles/**"),
-            PathPatternParser.defaultInstance.parse("/api/relay-deposits/**"));
+            PathPatternParser.defaultInstance.parse("/api/relay-deposits/**"),
+            PathPatternParser.defaultInstance.parse("/api/v1/gofp/files/relay-points/**"),
+            PathPatternParser.defaultInstance.parse("/api/relay-points/*/subscription/**"));
 
     private final GofpFreelancerProjectionService projectionService;
     private final TenantContextHolder tenantContextHolder;

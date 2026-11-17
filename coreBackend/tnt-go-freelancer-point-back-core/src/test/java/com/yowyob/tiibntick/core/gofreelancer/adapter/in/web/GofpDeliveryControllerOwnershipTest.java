@@ -91,6 +91,24 @@ class GofpDeliveryControllerOwnershipTest {
                 .expectStatus().isForbidden();
     }
 
+    @Test
+    @DisplayName("relay deposit by an actor who is not the assigned delivery person → 403, nothing deposited")
+    void relayDeposit_unassignedActorGets403() {
+        when(deliveryStatusApplicationService.assertCallerIsAssignedDeliveryPerson(
+                eq(DELIVERY_ID), eq(UNASSIGNED_ACTOR)))
+                .thenReturn(Mono.error(new AccessDeniedException(
+                        "Caller " + UNASSIGNED_ACTOR + " is not the assigned delivery person")));
+
+        clientFor(UNASSIGNED_ACTOR)
+                .patch().uri("/api/v1/deliveries/{id}/status", DELIVERY_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"status\":\"AT_RELAY_POINT\",\"relayPointId\":\"" + UUID.randomUUID() + "\"}")
+                .exchange()
+                .expectStatus().isForbidden();
+        org.mockito.Mockito.verify(deliveryStatusApplicationService, org.mockito.Mockito.never())
+                .updateStatus(any(), any());
+    }
+
     // ── cancel: livreur assigné OR expéditeur ────────────────────────────────
 
     @Test

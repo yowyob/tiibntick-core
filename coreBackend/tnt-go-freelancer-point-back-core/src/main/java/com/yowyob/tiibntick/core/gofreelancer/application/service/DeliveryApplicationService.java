@@ -60,6 +60,14 @@ public class DeliveryApplicationService implements DeliveryUseCase {
     private final IDeliveryLifecyclePort lifecyclePort;
     private final GofpFreelancerRepository gofpFreelancerRepository;
 
+    /** Optional so that the service stays constructible without it; Spring always injects it. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private RelayTargetResolver relayTargets;
+
+    private Mono<DeliveryResponseDTO> withRelayTarget(DeliveryResponseDTO dto) {
+        return relayTargets == null ? Mono.just(dto) : relayTargets.withTarget(dto);
+    }
+
     @Value("${tnt.gofp.ownership-guard.enabled:true}")
     private boolean ownershipGuardEnabled = true;
 
@@ -73,6 +81,7 @@ public class DeliveryApplicationService implements DeliveryUseCase {
     public Mono<DeliveryResponseDTO> getDeliveryById(UUID id) {
         return deliveryRepository.findById(id)
                 .map(this::toResponseDTO)
+                .flatMap(this::withRelayTarget)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("Delivery not found: " + id)));
     }
 
@@ -80,6 +89,7 @@ public class DeliveryApplicationService implements DeliveryUseCase {
     public Mono<DeliveryResponseDTO> getDeliveryByAnnouncementId(UUID announcementId) {
         return deliveryRepository.findByAnnouncementId(announcementId)
                 .map(this::toResponseDTO)
+                .flatMap(this::withRelayTarget)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException(
                         "Delivery not found for announcement: " + announcementId)));
     }
@@ -88,6 +98,7 @@ public class DeliveryApplicationService implements DeliveryUseCase {
     public Mono<DeliveryResponseDTO> getDeliveryByDeliveryNeedId(UUID deliveryNeedId) {
         return deliveryRepository.findByDeliveryNeedId(deliveryNeedId)
                 .map(this::toResponseDTO)
+                .flatMap(this::withRelayTarget)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException(
                         "Delivery not found for delivery need: " + deliveryNeedId)));
     }
@@ -95,7 +106,8 @@ public class DeliveryApplicationService implements DeliveryUseCase {
     @Override
     public Flux<DeliveryResponseDTO> getDeliveriesByFreelancerId(UUID freelancerId) {
         return deliveryRepository.findAllByFreelancerId(freelancerId)
-                .map(this::toResponseDTO);
+                .map(this::toResponseDTO)
+                .concatMap(this::withRelayTarget);
     }
 
     @Override

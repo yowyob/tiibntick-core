@@ -454,4 +454,12 @@
                  relativeToChangelogFile="false"/>
     </changeSet>
 
+    <!-- Lot C-49: opening hours of a relay point, in the table the OpeningHours entity reads.
+         Non-numeric id, labelled only so the upgrade test can rebuild a database migrated by the
+         previous version. -->
+    <changeSet id="c49-relay-point-opening-hours" author="TiiBnTickTeam" labels="relay-opening-hours">
+        <sqlFile path="db/changelog/20261116_c49_relay_point_opening_hours.sql"
+                 relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
 </databaseChangeLog>
