@@ -158,7 +158,10 @@ public class KernelRoleProvisioningAdapter implements ITntRoleProvisioningPort {
         KernelCreateRoleRequest request = KernelCreateRoleRequest.from(definition);
         return kernelWebClient
                 .post()
-                .uri("/api/roles")
+                // /api/roles exige un administrateur d'ORGANISATION cote noyau et rattache le role
+                // a cette organisation. Un satellite n'a pas d'organisation : il declare des roles
+                // d'ESPACE, via l'endpoint prevu pour cela.
+                .uri("/api/roles/solution")
                 .header("X-Tenant-Id", tenantId.toString())
                 .bodyValue(request)
                 .retrieve()

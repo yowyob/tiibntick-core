@@ -193,14 +193,29 @@ public class TntRolesAutoConfiguration {
      * Provisions TiiBnTick roles into the Kernel via HTTP. Called only by
      * {@link KernelRoleSyncWorker}/{@link KernelRoleReconciliationJob} now — application
      * services write locally and enqueue an outbox entry instead of calling this directly.
-     * Uses the shared {@code kernelWebClient} bean — no Kernel Spring beans injected here.
+     * <p>Utilise {@code kernelServiceAccountWebClient} lorsque ce bean est présent : le noyau exige
+     * un contexte UTILISATEUR pour déclarer des rôles, et une clé d'API nue y répond 403 — c'était
+     * la cause des entrées {@code DEAD} de l'outbox. À défaut (tests, ou déploiement sans compte de
+     * service configuré), on retombe sur {@code kernelWebClient} : rien n'est cassé, le défaut
+     * n'est simplement pas corrigé.</p>
      */
     @Bean
     @ConditionalOnMissingBean(ITntRoleProvisioningPort.class)
     public KernelRoleProvisioningAdapter kernelRoleProvisioningAdapter(
-            @Qualifier("kernelWebClient") WebClient kernelWebClient) {
-        return new KernelRoleProvisioningAdapter(kernelWebClient);
+            @Qualifier("kernelWebClient") WebClient kernelWebClient,
+            org.springframework.beans.factory.BeanFactory beanFactory) {
+        WebClient client = kernelWebClient;
+        try {
+            client = beanFactory.getBean("kernelServiceAccountWebClient", WebClient.class);
+        } catch (org.springframework.beans.factory.NoSuchBeanDefinitionException absent) {
+            LOG_PROVISIONING.warn("Bean 'kernelServiceAccountWebClient' absent : la declaration des "
+                    + "roles au noyau restera en 403 (cle d'API sans contexte utilisateur).");
+        }
+        return new KernelRoleProvisioningAdapter(client);
     }
+
+    private static final org.slf4j.Logger LOG_PROVISIONING =
+            org.slf4j.LoggerFactory.getLogger(TntRolesAutoConfiguration.class);
 
     /**
      * Assigns/revokes TiiBnTick canonical roles against the Kernel on behalf of the sync

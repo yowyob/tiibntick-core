@@ -86,6 +86,21 @@ public class KernelBridgeConfig {
     @Value("${tnt.kernel.client-id:tibntick-backend}")
     private String kernelClientId;
 
+    /**
+     * Compte de service aupres du noyau. Sans lui, les appels qui exigent un contexte UTILISATEUR
+     * (declaration des roles de la solution) repondent 403 : la porte du noyau refuse une cle d'API
+     * nue. Vide par defaut, la synchronisation des roles est alors simplement inactive.
+     */
+    @Value("${tnt.kernel.service-account.username:}")
+    private String serviceAccountUsername;
+
+    @Value("${tnt.kernel.service-account.password:}")
+    private String serviceAccountPassword;
+
+    /** Même espace que celui où le role-sync déclare ses rôles ({@code tnt.roles.system-tenant-id}). */
+    @Value("${tnt.roles.system-tenant-id:00000000-0000-0000-0000-000000000001}")
+    private UUID serviceAccountTenantId;
+
     @Value("${tnt.kernel.connect-timeout-ms:2000}")
     private int kernelConnectTimeoutMs;
 
@@ -113,6 +128,67 @@ public class KernelBridgeConfig {
                 .filter(logRequest())
                 .filter(logResponse())
                 .build();
+    }
+
+    /**
+     * Fournisseur du jeton du compte de service. Il se connecte avec le WebClient primaire (clé
+     * d'API seule), ce qui suffit pour {@code /api/auth/login}.
+     */
+    @Bean
+    public KernelServiceAccountTokenProvider kernelServiceAccountTokenProvider(
+            @org.springframework.beans.factory.annotation.Qualifier("kernelWebClient") WebClient kernelWebClient) {
+        KernelServiceAccountTokenProvider provider = new KernelServiceAccountTokenProvider(
+                kernelWebClient, serviceAccountUsername, serviceAccountPassword, serviceAccountTenantId);
+        if (!provider.estConfigure()) {
+            log.warn("Aucun compte de service noyau configure (tnt.kernel.service-account.*) : la "
+                    + "declaration des roles de la solution restera en 403 cote noyau.");
+        }
+        return provider;
+    }
+
+    /**
+     * WebClient DÉDIÉ aux appels qui exigent un contexte utilisateur côté noyau — aujourd'hui la
+     * seule déclaration des rôles de la solution.
+     *
+     * <p>Pourquoi un bean à part plutôt qu'un filtre sur {@code kernelWebClient} : celui-ci est
+     * partagé par une vingtaine d'adaptateurs, dont des appels faits <b>pour le compte d'un
+     * utilisateur réel</b>. Y poser le jeton du compte de service changerait l'identité de
+     * l'appelant sur tous ces flux — exactement le genre de confusion de droits qu'on cherche à
+     * éviter.</p>
+     */
+    @Bean("kernelServiceAccountWebClient")
+    public WebClient kernelServiceAccountWebClient(
+            WebClient.Builder builder,
+            CircuitBreakerRegistry circuitBreakerRegistry,
+            TimeLimiterRegistry timeLimiterRegistry,
+            RetryRegistry retryRegistry,
+            KernelServiceAccountTokenProvider tokenProvider) {
+        return builder.clone()
+                .baseUrl(kernelBaseUrl)
+                .defaultHeader("X-Api-Key", kernelApiKey)
+                .defaultHeader("X-Client-Id", kernelClientId)
+                .defaultHeader("X-Solution-Code", "TNT")
+                .clientConnector(timeoutConnector())
+                .filter(resilience("kernelServiceAccountWebClient", circuitBreakerRegistry, timeLimiterRegistry,
+                        retryRegistry))
+                .filter(propagateServiceAccountToken(tokenProvider))
+                .filter(logRequest())
+                .filter(logResponse())
+                .build();
+    }
+
+    /**
+     * Ajoute le jeton du compte de service. S'il n'y en a pas, la requête part sans en-tête
+     * d'autorisation : le noyau répondra 403 et le worker réessaiera, ce qui est préférable à une
+     * exception qui ferait tomber l'appelant.
+     */
+    private ExchangeFilterFunction propagateServiceAccountToken(KernelServiceAccountTokenProvider tokenProvider) {
+        return (request, next) -> tokenProvider.accessToken()
+                .map(token -> ClientRequest.from(request)
+                        .header("Authorization", "Bearer " + token)
+                        .build())
+                .defaultIfEmpty(request)
+                .flatMap(next::exchange);
     }
 
     /**

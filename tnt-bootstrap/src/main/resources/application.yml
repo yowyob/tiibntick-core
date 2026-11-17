@@ -683,6 +683,12 @@ tnt:
     base-url: ${TNT_KERNEL_BASE_URL:https://kernel-core.yowyob.com/kernel-api}
     api-key: ${TNT_KERNEL_API_KEY:}
     client-id: ${TNT_KERNEL_CLIENT_ID:}
+    # Compte de service aupres du noyau. Sans lui, declarer les roles de la solution repond 403 :
+    # la porte du noyau exige un contexte UTILISATEUR, une cle d'API nue ne suffit pas. Vide par
+    # defaut -- la synchronisation des roles reste alors inactive, sans rien casser d'autre.
+    service-account:
+      username: ${TNT_KERNEL_SERVICE_ACCOUNT_USERNAME:}
+      password: ${TNT_KERNEL_SERVICE_ACCOUNT_PASSWORD:}
     # Chantier D · Audit n°6 · S4 — no Kernel call may block indefinitely.
     connect-timeout-ms: ${TNT_KERNEL_CONNECT_TIMEOUT_MS:2000}
     response-timeout-ms: ${TNT_KERNEL_RESPONSE_TIMEOUT_MS:5000}
