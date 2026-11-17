@@ -218,18 +218,35 @@ public class TntRolesAutoConfiguration {
             org.slf4j.LoggerFactory.getLogger(TntRolesAutoConfiguration.class);
 
     /**
-     * Assigns/revokes TiiBnTick canonical roles against the Kernel on behalf of the sync
-     * worker/reconciliation job. Uses {@code kernelTpWebClient} so the request is
-     * authenticated as the calling admin (bearer forwarding) captured at enqueue time —
-     * see {@code KernelRoleAssignmentAdapter}.
+     * Assigns/revokes TiiBnTick canonical roles against the Kernel.
+     *
+     * <p>DEUX chemins, et la distinction est la correction elle-même. Une attribution demandée
+     * par un administrateur part avec SON jeton, propagé depuis la requête en cours
+     * ({@code kernelTpWebClient}) : l'appelant reste celui qu'il est. Une attribution rejouée par
+     * le worker n'a aucun appelant — le contexte réactif est vide — et part donc avec le jeton du
+     * compte de service, par la route réservée aux solutions.</p>
+     *
+     * <p>Confondre les deux reviendrait à faire passer toute attribution pour celle du compte de
+     * service, y compris celles d'un administrateur en chair et en os.</p>
      */
     @Bean
     @ConditionalOnMissingBean(ITntRoleAssignmentPort.class)
     public KernelRoleAssignmentAdapter kernelRoleAssignmentAdapter(
             @Qualifier("kernelTpWebClient") WebClient kernelTpWebClient,
             ITntRoleProvisioningPort provisioningPort,
-            TntRolesProperties properties) {
-        return new KernelRoleAssignmentAdapter(kernelTpWebClient, provisioningPort, properties.getSystemTenantId());
+            TntRolesProperties properties,
+            org.springframework.beans.factory.BeanFactory beanFactory) {
+        // Même résolution par nom que pour le provisionnement : le bean dédié vit dans
+        // tnt-bootstrap, ce module ne peut pas l'exiger sans se rendre indéployable sans lui.
+        WebClient clientSolution = kernelTpWebClient;
+        try {
+            clientSolution = beanFactory.getBean("kernelServiceAccountWebClient", WebClient.class);
+        } catch (org.springframework.beans.factory.NoSuchBeanDefinitionException absent) {
+            LOG_PROVISIONING.warn("Bean 'kernelServiceAccountWebClient' absent : les attributions "
+                    + "rejouees par le worker resteront refusees en 403 faute de porteur.");
+        }
+        return new KernelRoleAssignmentAdapter(kernelTpWebClient, provisioningPort,
+                properties.getSystemTenantId(), clientSolution);
     }
 
     @Bean

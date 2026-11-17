@@ -218,6 +218,7 @@ resilience4j:
       kernelOrganizationWebClient: *kernelCircuitBreaker
       kernelTpWebClient: *kernelCircuitBreaker
       kernelPaymentWebClient: *kernelCircuitBreaker
+      kernelServiceAccountWebClient: *kernelCircuitBreaker
   timelimiter:
     instances:
       trustEventGatewayRead:
@@ -227,6 +228,11 @@ resilience4j:
       kernelOrganizationWebClient: *kernelTimeLimiter
       kernelTpWebClient: *kernelTimeLimiter
       kernelPaymentWebClient: *kernelTimeLimiter
+      # Plus large que les autres, et ce n'est pas un confort : cet appel peut inclure
+      # l'ouverture de session du compte de service. Sans declaration, Resilience4j
+      # appliquait son defaut de 1 s -- trop court, tout echouait en TimeoutException.
+      kernelServiceAccountWebClient:
+        timeout-duration: 10s
   retry:
     instances:
       kernelWebClient: &kernelRetry
@@ -246,6 +252,9 @@ resilience4j:
         max-attempts: 1
         ignore-exceptions:
           - io.github.resilience4j.circuitbreaker.CallNotPermittedException
+      # Rejouer est sans danger ici : declarer un role est idempotent cote noyau, et la file
+      # d'attente garde la trace de ce qui reste a faire.
+      kernelServiceAccountWebClient: *kernelRetry
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TNT — Module-level properties

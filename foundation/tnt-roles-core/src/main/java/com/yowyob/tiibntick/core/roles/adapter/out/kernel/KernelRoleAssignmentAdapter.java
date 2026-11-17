@@ -34,12 +34,24 @@ public class KernelRoleAssignmentAdapter implements ITntRoleAssignmentPort {
     private final ITntRoleProvisioningPort provisioningPort;
     private final UUID systemTenantId;
 
+    private final WebClient kernelSolutionWebClient;
+
     public KernelRoleAssignmentAdapter(WebClient kernelTpWebClient,
                                         ITntRoleProvisioningPort provisioningPort,
                                         UUID systemTenantId) {
+        // Sans client dédié, le chemin « solution » retombe sur le client de l'appelant : le
+        // comportement reste celui d'avant, le défaut n'est simplement pas corrigé.
+        this(kernelTpWebClient, provisioningPort, systemTenantId, kernelTpWebClient);
+    }
+
+    public KernelRoleAssignmentAdapter(WebClient kernelTpWebClient,
+                                        ITntRoleProvisioningPort provisioningPort,
+                                        UUID systemTenantId,
+                                        WebClient kernelSolutionWebClient) {
         this.kernelTpWebClient = kernelTpWebClient;
         this.provisioningPort = provisioningPort;
         this.systemTenantId = systemTenantId;
+        this.kernelSolutionWebClient = kernelSolutionWebClient;
     }
 
     @Override
@@ -51,12 +63,27 @@ public class KernelRoleAssignmentAdapter implements ITntRoleAssignmentPort {
                 .flatMap(roleId -> doAssign(targetUserId, roleId, scopeType, scopeId));
     }
 
+    @Override
+    public Mono<UUID> assignRoleAsSolution(UUID targetUserId, String roleCode, String scopeType,
+                                           UUID scopeId) {
+        return provisioningPort.findRoleId(systemTenantId, roleCode)
+                .switchIfEmpty(Mono.error(TntRoleException.roleNotFoundInKernel(roleCode)))
+                .flatMap(roleId -> doAssign(targetUserId, roleId, scopeType, scopeId,
+                        kernelSolutionWebClient, "/api/roles/solution/assignments"));
+    }
+
     private Mono<UUID> doAssign(UUID targetUserId, UUID roleId, String scopeType, UUID scopeId) {
+        return doAssign(targetUserId, roleId, scopeType, scopeId, kernelTpWebClient,
+                "/api/roles/assignments");
+    }
+
+    private Mono<UUID> doAssign(UUID targetUserId, UUID roleId, String scopeType, UUID scopeId,
+                                WebClient client, String uri) {
         KernelAssignRoleRequest request = new KernelAssignRoleRequest(
                 targetUserId, roleId, scopeType, scopeId, scopeType + ":" + scopeId);
-        var responseSpec = kernelTpWebClient
+        var responseSpec = client
                 .post()
-                .uri("/api/roles/assignments")
+                .uri(uri)
                 .bodyValue(request)
                 .retrieve();
         return KernelResponses.unwrapObjectOrPropagate(responseSpec, KernelUserRoleAssignmentResponse.class)

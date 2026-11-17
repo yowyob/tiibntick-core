@@ -39,7 +39,20 @@ public class KernelServiceAccountTokenProvider {
     private final String username;
     private final String password;
     private final UUID tenantId;
-    private final AtomicReference<JetonEnCache> cache = new AtomicReference<>(null);
+    /**
+     * La session, mise en cache ET partagée.
+     *
+     * <p>{@code cacheInvalidateIf} fait deux choses, et les deux sont nécessaires : il garde le
+     * jeton jusqu'à son renouvellement, et il <strong>réunit les abonnements concurrents sur une
+     * seule exécution</strong>. Sans ce second point, chaque appel ouvrait sa propre session :
+     * rejouer vingt entrées de la file déclenchait vingt connexions simultanées, chacune avec son
+     * hachage de mot de passe à vérifier côté noyau. Aucune n'avait le temps d'aboutir dans le
+     * budget de l'appel qui la portait, le cache ne se remplissait donc jamais, et le
+     * disjoncteur finissait par s'ouvrir — en masquant la cause derrière des
+     * {@code CallNotPermittedException}.</p>
+     */
+    private final Mono<JetonEnCache> session = Mono.defer(this::ouvrirSession)
+            .cacheInvalidateIf(JetonEnCache::doitEtreRenouvele);
 
     public KernelServiceAccountTokenProvider(WebClient kernelWebClient, String username, String password,
             UUID tenantId) {
@@ -54,18 +67,14 @@ public class KernelServiceAccountTokenProvider {
         if (!estConfigure()) {
             return Mono.empty();
         }
-        JetonEnCache courant = cache.get();
-        if (courant != null && courant.estEncoreValide()) {
-            return Mono.just(courant.accessToken());
-        }
-        return seConnecter();
+        return session.map(JetonEnCache::accessToken);
     }
 
     public boolean estConfigure() {
         return username != null && !username.isBlank() && password != null && !password.isBlank();
     }
 
-    private Mono<String> seConnecter() {
+    private Mono<JetonEnCache> ouvrirSession() {
         return kernelWebClient.post()
                 .uri("/api/auth/login")
                 .header("X-Tenant-Id", tenantId.toString())
@@ -82,9 +91,8 @@ public class KernelServiceAccountTokenProvider {
                         return Mono.empty();
                     }
                     long duree = reponse.dureeSecondes() > 0 ? reponse.dureeSecondes() : 3600L;
-                    cache.set(new JetonEnCache(jeton, Instant.now().plusSeconds(duree)));
                     log.info("Session du compte de service '{}' ouverte aupres du noyau ({} s).", username, duree);
-                    return Mono.just(jeton);
+                    return Mono.just(new JetonEnCache(jeton, Instant.now().plusSeconds(duree)));
                 })
                 .onErrorResume(exception -> {
                     log.error("Connexion du compte de service '{}' au noyau impossible : {}",
@@ -94,8 +102,9 @@ public class KernelServiceAccountTokenProvider {
     }
 
     private record JetonEnCache(String accessToken, Instant expiration) {
-        boolean estEncoreValide() {
-            return Instant.now().isBefore(expiration.minus(MARGE_RENOUVELLEMENT));
+        /** Vrai quand le jeton doit être réouvert : le cache partagé s'invalide alors seul. */
+        boolean doitEtreRenouvele() {
+            return !Instant.now().isBefore(expiration.minus(MARGE_RENOUVELLEMENT));
         }
     }
 

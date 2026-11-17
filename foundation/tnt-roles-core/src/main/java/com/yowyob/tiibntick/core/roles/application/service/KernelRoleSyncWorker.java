@@ -202,7 +202,10 @@ public class KernelRoleSyncWorker {
         String scopeType = payload.get("scopeType").asText();
         UUID scopeId = UUID.fromString(payload.get("scopeId").asText());
 
-        return assignmentPort.assignRole(userId, roleCode, scopeType, scopeId)
+        // Chemin SOLUTION, et non celui de l'appelant : ici il n'y a pas d'appelant. Le worker
+        // tourne en arrière-plan, le contexte réactif est vide, aucun jeton n'est propagé — d'où
+        // les 403 et les sept entrées mortes depuis le 3 octobre 2026.
+        return assignmentPort.assignRoleAsSolution(userId, roleCode, scopeType, scopeId)
                 .flatMap(kernelAssignmentId -> assignmentRepository
                         .markKernelAssignmentId(entry.tenantId(), entry.aggregateId(), kernelAssignmentId)
                         .then(Mono.defer(() -> outboxRepository.save(entry.asProvisioned(kernelAssignmentId)))))

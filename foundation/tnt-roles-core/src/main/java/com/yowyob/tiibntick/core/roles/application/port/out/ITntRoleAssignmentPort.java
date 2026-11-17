@@ -28,6 +28,22 @@ public interface ITntRoleAssignmentPort {
     Mono<UUID> assignRole(UUID targetUserId, String roleCode, String scopeType, UUID scopeId);
 
     /**
+     * Attribue un rôle AU NOM DE LA SOLUTION, sans appelant humain.
+     *
+     * <p>{@link #assignRole} s'appuie sur le jeton de l'appelant propagé depuis la requête en
+     * cours. Le worker qui rejoue la file d'attente n'a pas d'appelant : son jeton est vide, le
+     * noyau ne voit aucun porteur et refuse en 403. Cette méthode emprunte le chemin réservé aux
+     * solutions, avec le jeton du compte de service.</p>
+     *
+     * <p>Par défaut elle délègue à {@link #assignRole} : une implémentation qui ne distingue pas
+     * les deux cas garde son comportement, elle ne gagne simplement pas le correctif.</p>
+     */
+    default Mono<UUID> assignRoleAsSolution(UUID targetUserId, String roleCode, String scopeType,
+                                            UUID scopeId) {
+        return assignRole(targetUserId, roleCode, scopeType, scopeId);
+    }
+
+    /**
      * Assigns a TiiBnTick role to a user inside <strong>the tenant of the calling JWT</strong>,
      * using the caller's own bearer token (relayed by the Kernel web client).
      *
