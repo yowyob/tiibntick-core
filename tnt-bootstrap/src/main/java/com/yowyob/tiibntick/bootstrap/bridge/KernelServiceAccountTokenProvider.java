@@ -52,6 +52,13 @@ public class KernelServiceAccountTokenProvider {
      * {@code CallNotPermittedException}.</p>
      */
     private final Mono<JetonEnCache> session = Mono.defer(this::ouvrirSession)
+            // Jamais vide : cacheInvalidateIf LÈVE sur une source vide
+            // (« cacheInvalidateWhen expects a value, source completed empty »), et une ouverture
+            // de session refusée complète précisément à vide. Sans cette sentinelle, un simple
+            // 401 du noyau se transformait en erreur de transport, comptée par le disjoncteur,
+            // qui s'ouvrait et masquait le refus d'origine : les journaux ne montraient plus que
+            // des CallNotPermittedException, sans dire que l'identifiant était rejeté.
+            .defaultIfEmpty(JetonEnCache.ECHEC)
             .cacheInvalidateIf(JetonEnCache::doitEtreRenouvele);
 
     public KernelServiceAccountTokenProvider(WebClient kernelWebClient, String username, String password,
@@ -67,7 +74,9 @@ public class KernelServiceAccountTokenProvider {
         if (!estConfigure()) {
             return Mono.empty();
         }
-        return session.map(JetonEnCache::accessToken);
+        // Mono vide sur la sentinelle : l'appel part sans en-tête d'autorisation et le worker
+        // réessaiera, ce qui vaut mieux qu'une erreur de transport imputée au noyau.
+        return session.flatMap(jeton -> Mono.justOrEmpty(jeton.accessToken()));
     }
 
     public boolean estConfigure() {
@@ -102,6 +111,10 @@ public class KernelServiceAccountTokenProvider {
     }
 
     private record JetonEnCache(String accessToken, Instant expiration) {
+
+        /** Échec d'ouverture : déjà périmée, donc réessayée au prochain abonnement. */
+        private static final JetonEnCache ECHEC = new JetonEnCache(null, Instant.EPOCH);
+
         /** Vrai quand le jeton doit être réouvert : le cache partagé s'invalide alors seul. */
         boolean doitEtreRenouvele() {
             return !Instant.now().isBefore(expiration.minus(MARGE_RENOUVELLEMENT));
