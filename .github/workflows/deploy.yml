@@ -40,6 +40,13 @@ jobs:
             set -e
             cd '${{ vars.DEPLOY_DIR }}'
             export APP_IMAGE='${APP_IMAGE}'
+            # Persiste l'image dans .env AVANT le up. Sans cela APP_IMAGE ne vit que le temps
+            # de cette session SSH : le .env garde une valeur PERIMEE, et toute recreation
+            # ulterieure du conteneur -- un 'compose up' manuel, un redemarrage de l'hote --
+            # ramene silencieusement l'ancienne image en se declarant reussie.
+            touch .env
+            sed -i '/^APP_IMAGE=/d' .env
+            echo \"APP_IMAGE=\$APP_IMAGE\" >> .env
             docker pull \"\$APP_IMAGE\"
             docker compose -f docker-compose.prod.yml up -d
             docker compose -f docker-compose.prod.yml ps
