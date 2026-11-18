@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -125,6 +126,12 @@ public class KernelServiceAccountTokenProvider {
      * Le noyau enveloppe sa reponse dans {@code ApiResponse}, d'ou le niveau {@code data}. On ne lit
      * que les deux champs utiles ; tout le reste du profil est ignore.
      */
+    // Tolerance aux champs inconnus OBLIGATOIRE, et pas par confort : LoginResponse porte une
+    // trentaine de champs (profil, onboarding, verifications, MFA, refresh) et l'enveloppe en
+    // ajoute trois. Sans cela Jackson refusait la reponse entiere -- « JSON decoding error:
+    // Unrecognized field » -- alors que la session etait bel et bien accordee. Le symptome
+    // ressemblait a un refus d'authentification; c'etait un refus de lecture.
+    @JsonIgnoreProperties(ignoreUnknown = true)
     private record ReponseConnexion(Donnees data) {
         String jetonAcces() {
             return data == null ? null : data.accessToken();
@@ -134,6 +141,7 @@ public class KernelServiceAccountTokenProvider {
             return data == null ? 0L : data.expiresInSeconds();
         }
 
+        @JsonIgnoreProperties(ignoreUnknown = true)
         private record Donnees(String accessToken, long expiresInSeconds) {
         }
     }
