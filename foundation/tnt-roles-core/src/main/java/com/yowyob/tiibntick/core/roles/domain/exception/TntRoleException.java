@@ -50,9 +50,31 @@ public class TntRoleException extends RuntimeException {
     public static TntRoleException provisioningFailed(String role, Throwable cause) {
         return new TntRoleException(
                 "ROLE_PROVISIONING_FAILED",
-                "Failed to provision TiiBnTick role '" + role + "': " + cause.getMessage(),
+                "Failed to provision TiiBnTick role '" + role + "': " + describe(cause),
                 cause
         );
+    }
+
+    /**
+     * Décrit une cause en conservant le CORPS d'une réponse d'erreur HTTP.
+     *
+     * <p>{@code WebClientResponseException.getMessage()} ne rend que le statut et l'URL : « 400 Bad
+     * Request from POST … ». Or c'est le corps qui porte le motif — le noyau y énumère par exemple
+     * les permissions qu'il refuse. Sans lui, un 4xx ne dit que son numéro, et il faut deviner ;
+     * avec lui, le journal et {@code last_error} contiennent la réponse à la question.</p>
+     */
+    private static String describe(Throwable cause) {
+        if (cause == null) {
+            return "(cause inconnue)";
+        }
+        if (cause instanceof org.springframework.web.reactive.function.client.WebClientResponseException http) {
+            String corps = http.getResponseBodyAsString();
+            if (corps != null && !corps.isBlank()) {
+                String abrege = corps.length() > 600 ? corps.substring(0, 600) + "…(tronque)" : corps;
+                return http.getMessage() + " — " + abrege;
+            }
+        }
+        return cause.getMessage();
     }
 
     public static TntRoleException missingContext() {

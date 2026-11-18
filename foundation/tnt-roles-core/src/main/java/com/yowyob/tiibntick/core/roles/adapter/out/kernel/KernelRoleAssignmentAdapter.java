@@ -111,8 +111,13 @@ public class KernelRoleAssignmentAdapter implements ITntRoleAssignmentPort {
                     log.info("Role '{}' missing in the caller's tenant — provisioning it on demand", definition.code());
                     var request = new KernelCreateRoleRequest(definition.code(), definition.name(),
                             definition.scopeTypeCode(), java.util.List.copyOf(definition.defaultPermissions()));
-                    var spec = kernelTpWebClient.post().uri("/api/roles").bodyValue(request).retrieve();
-                    return readObject(spec, KernelRoleResponse.class)
+                    // Ce chemin crée un rôle lui aussi : il porte les mêmes permissions métier, et
+                    // se heurtait donc au même refus. Le vocabulaire est déclaré une fois par
+                    // tenant, côté port — le redemander ici ne coûte rien.
+                    return provisioningPort.declareSolutionVocabulary(systemTenantId)
+                            .then(Mono.defer(() -> readObject(
+                                    kernelTpWebClient.post().uri("/api/roles").bodyValue(request).retrieve(),
+                                    KernelRoleResponse.class)))
                             .map(KernelRoleResponse::id)
                             .onErrorResume(WebClientResponseException.Conflict.class,
                                     e -> listCallerTenantRoles()

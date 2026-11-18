@@ -3,6 +3,7 @@ package com.yowyob.tiibntick.core.roles.adapter.out.kernel;
 import com.yowyob.tiibntick.common.kernel.KernelResponses;
 import com.yowyob.tiibntick.core.roles.application.port.out.ITntRoleProvisioningPort;
 import com.yowyob.tiibntick.core.roles.domain.exception.TntRoleException;
+import com.yowyob.tiibntick.core.roles.domain.model.TntRole;
 import com.yowyob.tiibntick.core.roles.domain.model.TntRoleDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,6 +14,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 /**
@@ -47,7 +49,7 @@ public class KernelRoleProvisioningAdapter implements ITntRoleProvisioningPort {
                         log.debug("Role '{}' already exists for tenant {} — skipping.", definition.code(), tenantId);
                         return Mono.<Void>empty();
                     }
-                    return doProvision(tenantId, definition);
+                    return declarerVocabulaire(tenantId).then(doProvision(tenantId, definition));
                 });
     }
 
@@ -153,6 +155,70 @@ public class KernelRoleProvisioningAdapter implements ITntRoleProvisioningPort {
     }
 
     // ─── Private helpers ─────────────────────────────────────────────────────
+
+    /**
+     * Déclare au noyau le vocabulaire de permissions de TiiBnTick, une fois pour toutes.
+     *
+     * <p>Le noyau refuse un rôle portant une permission qu'il ne connaît pas, et il a raison de le
+     * faire : une permission inconnue ne lève aucune erreur ensuite, elle ne satisfait simplement
+     * aucun contrôle, et son titulaire croit détenir un droit qu'il n'a pas. Mais le catalogue du
+     * noyau décrit le noyau — il ignore {@code MISSION_CREATE}. Faute de cette déclaration, les
+     * neuf rôles étaient refusés en 400, sans qu'aucune des deux parties n'ait tort.</p>
+     *
+     * <p>Mise en cache : les rôles se provisionnent un par un, et le vocabulaire est le même pour
+     * tous. Le déclarer à chaque rôle ferait neuf appels identiques. {@code cache()} retient aussi
+     * l'échec — un vocabulaire refusé le reste jusqu'au redémarrage, ce qui est le comportement
+     * voulu : rien ne sert de rejouer une déclaration que le noyau vient d'interdire.</p>
+     */
+    private final java.util.Map<UUID, Mono<Void>> vocabulaireParTenant = new java.util.concurrent.ConcurrentHashMap<>();
+
+    @Override
+    public Mono<Void> declareSolutionVocabulary(UUID tenantId) {
+        return declarerVocabulaire(tenantId);
+    }
+
+    private Mono<Void> declarerVocabulaire(UUID tenantId) {
+        // Un cache PAR tenant, et non un champ partagé : le tenant fait partie de la requête, et le
+        // faire voyager dans un champ mutable rendrait le résultat dépendant de l'ordre des appels.
+        return vocabulaireParTenant.computeIfAbsent(tenantId,
+                tenant -> Mono.defer(() -> envoyerVocabulaire(tenant)).cache());
+    }
+
+    private Mono<Void> envoyerVocabulaire(UUID tenantId) {
+        List<PermissionDeclaree> permissions = java.util.Arrays.stream(TntRole.values())
+                .flatMap(role -> role.defaultPermissions().stream())
+                .distinct()
+                .sorted()
+                .map(code -> new PermissionDeclaree(code, libelle(code),
+                        "Permission métier TiiBnTick.", "TIIBNTICK", null))
+                .toList();
+        if (permissions.isEmpty()) {
+            return Mono.empty();
+        }
+        return kernelWebClient
+                .post()
+                .uri("/api/permissions/solution")
+                .header("X-Tenant-Id", tenantId.toString())
+                .bodyValue(new DeclarationVocabulaire("TNT", permissions))
+                .retrieve()
+                .bodyToMono(Void.class)
+                .doOnSuccess(v -> log.info("Vocabulaire TiiBnTick declare au noyau ({} permissions).",
+                        permissions.size()))
+                .onErrorMap(cause -> TntRoleException.provisioningFailed("<vocabulaire>", cause));
+    }
+
+    /** « MISSION_CREATE » → « Mission create » : un code nu est illisible en relecture de droits. */
+    private static String libelle(String code) {
+        String texte = code.replace('_', ' ').toLowerCase(Locale.ROOT).trim();
+        return texte.isEmpty() ? code : Character.toUpperCase(texte.charAt(0)) + texte.substring(1);
+    }
+
+    /** Corps attendu par {@code POST /api/permissions/solution}. */
+    record DeclarationVocabulaire(String solutionCode, List<PermissionDeclaree> permissions) {
+    }
+
+    record PermissionDeclaree(String code, String name, String description, String module, String scope) {
+    }
 
     private Mono<Void> doProvision(UUID tenantId, TntRoleDefinition definition) {
         KernelCreateRoleRequest request = KernelCreateRoleRequest.from(definition);

@@ -40,7 +40,13 @@ class KernelRoleAssignmentAdapterTest {
                 .baseUrl(mockWebServer.url("/").toString())
                 .build();
         // provisioningPort/systemTenantId are unused by revokeAssignment — a mock is enough.
-        adapter = new KernelRoleAssignmentAdapter(webClient, mock(ITntRoleProvisioningPort.class), UUID.randomUUID());
+        ITntRoleProvisioningPort provisioningPort = mock(ITntRoleProvisioningPort.class);
+        // La declaration du vocabulaire DOIT etre stubbee : la methode du port a un defaut neutre,
+        // mais un mock remplace ce defaut et rend null -- un defaut d'interface n'est pas un filet
+        // de securite face a un double.
+        org.mockito.Mockito.when(provisioningPort.declareSolutionVocabulary(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(reactor.core.publisher.Mono.empty());
+        adapter = new KernelRoleAssignmentAdapter(webClient, provisioningPort, UUID.randomUUID());
     }
 
     @AfterEach

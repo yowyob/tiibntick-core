@@ -90,4 +90,19 @@ public interface ITntRoleProvisioningPort {
      *         existence check itself failed transiently.
      */
     Mono<Boolean> roleExistsById(UUID tenantId, UUID kernelRoleId);
+
+    /**
+     * Déclare au noyau le vocabulaire de permissions de la solution.
+     *
+     * <p>Le noyau refuse un rôle portant une permission qu'il ne connaît pas. Son catalogue décrit
+     * le noyau : il ignore les permissions métier d'une solution, et n'a aucune raison de les
+     * connaître à l'avance. Cette déclaration comble ce chaînon manquant — sans elle, tout rôle
+     * de la solution est refusé en 400.</p>
+     *
+     * <p>Le défaut ne fait rien : une implémentation qui ne parle pas au noyau (un double de test)
+     * n'a rien à déclarer, et n'a pas à connaître cette étape.</p>
+     */
+    default reactor.core.publisher.Mono<Void> declareSolutionVocabulary(java.util.UUID tenantId) {
+        return reactor.core.publisher.Mono.empty();
+    }
 }

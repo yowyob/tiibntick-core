@@ -166,7 +166,9 @@ class KernelRoleSyncWorkerTest {
         RoleSyncOutboxEntry entry = entryFor(RoleSyncOperation.ASSIGN_ROLE, RoleSyncAggregateType.ASSIGNMENT, payload);
 
         when(outboxRepository.fetchPendingBatch(50)).thenReturn(reactor.core.publisher.Flux.just(entry));
-        when(assignmentPort.assignRole(userId, "AGENCY_MANAGER", "TENANT", scopeId))
+        // Le worker passe par la voie SOLUTION : une attribution rejouee n'a plus de requete
+        // utilisateur pour porter son jeton, et c'est le compte de service qui l'emet.
+        when(assignmentPort.assignRoleAsSolution(userId, "AGENCY_MANAGER", "TENANT", scopeId))
                 .thenReturn(Mono.just(kernelAssignmentId));
         when(assignmentRepository.markKernelAssignmentId(TENANT_ID, AGGREGATE_ID, kernelAssignmentId))
                 .thenReturn(Mono.empty());
@@ -175,7 +177,7 @@ class KernelRoleSyncWorkerTest {
                 .expectNext(1)
                 .verifyComplete();
 
-        verify(assignmentPort).assignRole(userId, "AGENCY_MANAGER", "TENANT", scopeId);
+        verify(assignmentPort).assignRoleAsSolution(userId, "AGENCY_MANAGER", "TENANT", scopeId);
         verify(assignmentRepository).markKernelAssignmentId(TENANT_ID, AGGREGATE_ID, kernelAssignmentId);
 
         ArgumentCaptor<RoleSyncOutboxEntry> savedCaptor = ArgumentCaptor.forClass(RoleSyncOutboxEntry.class);
