@@ -153,17 +153,9 @@ public class KernelRoleAssignmentAdapter implements ITntRoleAssignmentPort {
      * HTTP errors propagate (a swallowed error here would read as "role missing" and trigger a
      * pointless create).
      */
+    /** Délègue au lecteur unique : deux lecteurs pour un même endpoint ont déjà divergé une fois. */
     private static <T> reactor.core.publisher.Flux<T> readList(WebClient.ResponseSpec spec, Class<T> type) {
-        return parseBody(spec)
-                .flatMapMany(node -> {
-                    com.fasterxml.jackson.databind.JsonNode items = node.isArray() ? node : node.path("data");
-                    if (!items.isArray()) {
-                        return reactor.core.publisher.Flux.empty();
-                    }
-                    java.util.List<T> out = new java.util.ArrayList<>();
-                    items.forEach(n -> out.add(LENIENT_MAPPER.convertValue(n, type)));
-                    return reactor.core.publisher.Flux.fromIterable(out);
-                });
+        return KernelRoleLists.readList(spec, type);
     }
 
     /** Reads the raw body and parses it here, so the result does not depend on the client's codecs. */

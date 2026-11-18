@@ -76,7 +76,7 @@ public class KernelRoleProvisioningAdapter implements ITntRoleProvisioningPort {
                 .uri("/api/roles")
                 .header("X-Tenant-Id", tenantId.toString())
                 .retrieve();
-        return KernelResponses.unwrapList(responseSpec, KernelRoleResponse.class, log, "roleExists " + roleCode)
+        return KernelRoleLists.readList(responseSpec, KernelRoleResponse.class)
                 .any(r -> roleCode.equals(r.code()))
                 .onErrorResume(WebClientResponseException.class, e -> {
                     log.warn("Could not check role existence for '{}': HTTP {} — assuming not found",
@@ -97,7 +97,10 @@ public class KernelRoleProvisioningAdapter implements ITntRoleProvisioningPort {
                 .uri("/api/roles")
                 .header("X-Tenant-Id", tenantId.toString())
                 .retrieve();
-        return KernelResponses.unwrapList(responseSpec, KernelRoleResponse.class, log, "findRoleId " + roleCode)
+        // Accepte le tableau nu comme l'enveloppe, et laisse les erreurs remonter : ici une liste
+        // vide fait conclure « role non provisionne », verdict qu'un echec de decodage ne doit pas
+        // pouvoir prononcer.
+        return KernelRoleLists.readList(responseSpec, KernelRoleResponse.class)
                 .filter(r -> roleCode.equals(r.code()))
                 .map(KernelRoleResponse::id)
                 .next();
