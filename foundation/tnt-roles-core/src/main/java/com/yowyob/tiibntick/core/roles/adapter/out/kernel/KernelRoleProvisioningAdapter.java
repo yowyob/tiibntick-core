@@ -169,9 +169,18 @@ public class KernelRoleProvisioningAdapter implements ITntRoleProvisioningPort {
      * neuf rôles étaient refusés en 400, sans qu'aucune des deux parties n'ait tort.</p>
      *
      * <p>Mise en cache : les rôles se provisionnent un par un, et le vocabulaire est le même pour
-     * tous. Le déclarer à chaque rôle ferait neuf appels identiques. {@code cache()} retient aussi
-     * l'échec — un vocabulaire refusé le reste jusqu'au redémarrage, ce qui est le comportement
-     * voulu : rien ne sert de rejouer une déclaration que le noyau vient d'interdire.</p>
+     * tous. Le déclarer à chaque rôle ferait neuf appels identiques, d'où le {@code cache()}.</p>
+     *
+     * <p>Mais {@code cache()} retient aussi l'échec, et tous les échecs ne se valent pas. Un refus
+     * de FOND — 400 pour une permission inconnue, 403 pour un préfixe réservé — ne changera pas en
+     * rejouant : le cacher est juste. Un échec TRANSITOIRE — 401 parce que la session du compte de
+     * service a expiré, 5xx, une coupure réseau — n'exprime aucune décision du noyau, et le cacher
+     * condamne le tenant jusqu'au prochain redémarrage.</p>
+     *
+     * <p>C'est ce qui est arrivé : onze entrées sont restées mortes sur
+     * {@code 401 Unauthorized from POST /api/permissions/solution} alors que le vocabulaire était
+     * accepté pour les autres tenants. Un seul 401 au mauvais moment suffisait. Les échecs
+     * transitoires sont donc retirés du cache, et seuls les refus de fond y restent.</p>
      */
     private final java.util.Map<UUID, Mono<Void>> vocabulaireParTenant = new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -184,7 +193,38 @@ public class KernelRoleProvisioningAdapter implements ITntRoleProvisioningPort {
         // Un cache PAR tenant, et non un champ partagé : le tenant fait partie de la requête, et le
         // faire voyager dans un champ mutable rendrait le résultat dépendant de l'ordre des appels.
         return vocabulaireParTenant.computeIfAbsent(tenantId,
-                tenant -> Mono.defer(() -> envoyerVocabulaire(tenant)).cache());
+                tenant -> Mono.defer(() -> envoyerVocabulaire(tenant))
+                        .cache()
+                        .doOnError(erreur -> {
+                            if (estEchecTransitoire(erreur)) {
+                                // Le Mono caché porte l'erreur a jamais : on retire l'entree pour
+                                // que la tentative suivante en reconstruise un neuf.
+                                vocabulaireParTenant.remove(tenant);
+                            }
+                        }));
+    }
+
+    /**
+     * Un echec transitoire n'exprime aucune decision du noyau sur le vocabulaire : il faut pouvoir
+     * le rejouer. Seuls 400 (permission inconnue) et 403 (prefixe reserve) sont des refus de fond,
+     * que le noyau reprendra a l'identique. Tout le reste — 401 de session expiree, 408, 429, 5xx,
+     * reseau, decodage — est tenu pour transitoire : devant un doute, mieux vaut un appel de trop
+     * qu'un tenant condamne jusqu'au redemarrage.
+     */
+    private static boolean estEchecTransitoire(Throwable erreur) {
+        // envoyerVocabulaire enveloppe deja l'echec dans une TntRoleException : le code HTTP n'est
+        // donc pas sur l'exception recue mais sur sa CAUSE. Chercher seulement en surface ferait
+        // passer un 400 pour transitoire, et le vocabulaire serait redeclare a chaque role.
+        for (Throwable niveau = erreur; niveau != null; niveau = niveau.getCause()) {
+            if (niveau instanceof org.springframework.web.reactive.function.client.WebClientResponseException http) {
+                int code = http.getStatusCode().value();
+                return code != 400 && code != 403;
+            }
+            if (niveau.getCause() == niveau) {
+                break;
+            }
+        }
+        return true;
     }
 
     private Mono<Void> envoyerVocabulaire(UUID tenantId) {

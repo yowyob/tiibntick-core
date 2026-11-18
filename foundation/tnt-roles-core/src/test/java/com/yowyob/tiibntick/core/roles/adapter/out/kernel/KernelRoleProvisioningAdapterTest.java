@@ -78,4 +78,41 @@ class KernelRoleProvisioningAdapterTest {
                         && ((TntRoleException) e).getCode().equals("ROLE_DELETION_FAILED"))
                 .verify();
     }
+    @Test
+    @DisplayName("Un 401 sur la declaration du vocabulaire n'est PAS cache : la tentative suivante rejoue l'appel")
+    void unEchecTransitoireNestPasCache() throws InterruptedException {
+        UUID tenantId = UUID.randomUUID();
+        // Premiere tentative : le noyau repond 401, comme lorsque la session du compte de service
+        // a expire. Rien n'a ete decide sur le vocabulaire lui-meme.
+        mockWebServer.enqueue(new MockResponse().setResponseCode(401));
+        // Seconde tentative : la session est de nouveau valide, la declaration passe.
+        mockWebServer.enqueue(new MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json").setBody("{\"success\":true}"));
+
+        StepVerifier.create(adapter.declareSolutionVocabulary(tenantId))
+                .expectError().verify(java.time.Duration.ofSeconds(10));
+        StepVerifier.create(adapter.declareSolutionVocabulary(tenantId))
+                .expectComplete().verify(java.time.Duration.ofSeconds(10));
+
+        // Deux requetes, et non une : le 401 cache aurait renvoye l'erreur sans rappeler le noyau,
+        // condamnant le tenant jusqu'au redemarrage. C'est ce qui bloquait onze entrees de la file.
+        assertThat(mockWebServer.getRequestCount()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("Un 400 EST cache : un refus de fond ne se rejoue pas")
+    void unRefusDeFondResteCache() {
+        UUID tenantId = UUID.randomUUID();
+        mockWebServer.enqueue(new MockResponse().setResponseCode(400));
+
+        StepVerifier.create(adapter.declareSolutionVocabulary(tenantId))
+                .expectError().verify(java.time.Duration.ofSeconds(10));
+        StepVerifier.create(adapter.declareSolutionVocabulary(tenantId))
+                .expectError().verify(java.time.Duration.ofSeconds(10));
+
+        // Une seule requete : le noyau a tranche sur le vocabulaire, le rejouer ne changerait rien
+        // et ferait un appel par role provisionne.
+        assertThat(mockWebServer.getRequestCount()).isEqualTo(1);
+    }
+
 }
