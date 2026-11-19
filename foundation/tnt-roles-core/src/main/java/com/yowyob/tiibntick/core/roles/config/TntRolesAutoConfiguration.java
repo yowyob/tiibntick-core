@@ -203,6 +203,7 @@ public class TntRolesAutoConfiguration {
     @ConditionalOnMissingBean(ITntRoleProvisioningPort.class)
     public KernelRoleProvisioningAdapter kernelRoleProvisioningAdapter(
             @Qualifier("kernelWebClient") WebClient kernelWebClient,
+            TntRolesProperties properties,
             org.springframework.beans.factory.BeanFactory beanFactory) {
         WebClient client = kernelWebClient;
         try {
@@ -211,7 +212,7 @@ public class TntRolesAutoConfiguration {
             LOG_PROVISIONING.warn("Bean 'kernelServiceAccountWebClient' absent : la declaration des "
                     + "roles au noyau restera en 403 (cle d'API sans contexte utilisateur).");
         }
-        return new KernelRoleProvisioningAdapter(client);
+        return new KernelRoleProvisioningAdapter(client, properties.getSystemTenantId());
     }
 
     private static final org.slf4j.Logger LOG_PROVISIONING =

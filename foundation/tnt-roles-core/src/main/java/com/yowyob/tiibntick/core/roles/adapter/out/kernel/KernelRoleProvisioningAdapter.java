@@ -38,7 +38,19 @@ public class KernelRoleProvisioningAdapter implements ITntRoleProvisioningPort {
     private final WebClient kernelWebClient;
 
     public KernelRoleProvisioningAdapter(WebClient kernelWebClient) {
+        this(kernelWebClient, null);
+    }
+
+    /**
+     * @param systemTenantId le tenant sous lequel DECLARER le vocabulaire. Les permissions d'une
+     *     solution ne dependent pas du tenant : elles decrivent TNT, pas un locataire. Les declarer
+     *     sous le tenant de chaque role etait un contresens, et le noyau le refusait en 401 des que
+     *     ce tenant n'etait pas celui ou le compte de service a sa session. Null (essais) retombe
+     *     sur le tenant de l'appel, c'est-a-dire le comportement precedent.
+     */
+    public KernelRoleProvisioningAdapter(WebClient kernelWebClient, UUID systemTenantId) {
         this.kernelWebClient = kernelWebClient;
+        this.systemTenantId = systemTenantId;
     }
 
     @Override
@@ -49,7 +61,10 @@ public class KernelRoleProvisioningAdapter implements ITntRoleProvisioningPort {
                         log.debug("Role '{}' already exists for tenant {} — skipping.", definition.code(), tenantId);
                         return Mono.<Void>empty();
                     }
-                    return declarerVocabulaire(tenantId).then(doProvision(tenantId, definition));
+                    // Le vocabulaire se declare sous le tenant SYSTEME, le role sous le sien :
+                    // confondre les deux refusait la declaration en 401 pour tout autre tenant.
+                    return declarerVocabulaire(tenantDeclaration(tenantId))
+                            .then(doProvision(tenantId, definition));
                 });
     }
 
@@ -184,9 +199,17 @@ public class KernelRoleProvisioningAdapter implements ITntRoleProvisioningPort {
      */
     private final java.util.Map<UUID, Mono<Void>> vocabulaireParTenant = new java.util.concurrent.ConcurrentHashMap<>();
 
+    /** Tenant de DECLARATION du vocabulaire ; null en essais, voir le constructeur. */
+    private final UUID systemTenantId;
+
     @Override
     public Mono<Void> declareSolutionVocabulary(UUID tenantId) {
         return declarerVocabulaire(tenantId);
+    }
+
+    /** Le tenant sous lequel declarer : le tenant systeme s'il est connu, sinon celui de l'appel. */
+    private UUID tenantDeclaration(UUID tenantAppel) {
+        return systemTenantId != null ? systemTenantId : tenantAppel;
     }
 
     private Mono<Void> declarerVocabulaire(UUID tenantId) {
