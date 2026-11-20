@@ -49,4 +49,12 @@ public interface DeliveryRepository extends ReactiveCrudRepository<Delivery, UUI
               AND d.status IN ('PICKED_UP', 'IN_TRANSIT')
             """)
     Mono<Double> sumOccupiedVolumeM3ByFreelancerId(UUID freelancerId);
+
+    /** Deliveries of these courier ids that are neither delivered, cancelled nor failed (lot C-52). */
+    @Query("""
+            SELECT COUNT(*) FROM deliveries
+            WHERE freelancer_id IN (:freelancerIds)
+              AND status NOT IN ('DELIVERED', 'CANCELLED', 'FAILED')
+            """)
+    Mono<Long> countUnfinishedByFreelancerIds(java.util.Collection<UUID> freelancerIds);
 }

@@ -83,6 +83,17 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
     }
 
     /**
+     * Lot C-52 — livraisons gofp, pour marquer « en course » un candidat qui a une livraison non
+     * terminée. Injection optionnelle (setter) : absente, tout candidat est {@code AVAILABLE}.
+     */
+    private com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepository deliveries;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setDeliveries(com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepository deliveries) {
+        this.deliveries = deliveries;
+    }
+
+    /**
      * Active la garde d'ownership. Défaut {@code true} : un déploiement qui oublie la variable
      * doit être protégé, pas ouvert — la configuration dangereuse ne doit jamais être celle
      * obtenue par omission. Le profil {@code test} la met à {@code false}.
@@ -389,14 +400,72 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
      */
     @Override
     public Mono<DeliveryNeedResponseDTO> assignFreelancer(UUID deliveryNeedId, UUID freelancerId, UUID callerId) {
+        return assignFreelancer(deliveryNeedId, freelancerId, callerId, false);
+    }
+
+    /**
+     * Lot C-52 — l'assignation directe n'est plus un moyen d'imposer une course : hors personnel,
+     * elle n'élit qu'un livreur qui a <em>déjà postulé</em> sur l'annonce du besoin (il a dit oui).
+     * Pour un livreur qui n'a pas postulé, le client l'invite ({@code /invite}) : 409 ici.
+     */
+    @Override
+    public Mono<DeliveryNeedResponseDTO> assignFreelancer(UUID deliveryNeedId, UUID freelancerId, UUID callerId,
+                                                          boolean callerIsStaff) {
         return deliveryNeedRepository.findById(deliveryNeedId)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("DeliveryNeed not found: " + deliveryNeedId)))
-                .flatMap(need -> requireOwnership(need, callerId, "assignFreelancer"))
+                .flatMap(need -> callerIsStaff ? Mono.just(need) : requireOwnership(need, callerId, "assignFreelancer"))
                 .flatMap(need -> requireAssignableFreelancer(freelancerId)
-                        .flatMap(freelancer -> electThroughAnnouncement(need, freelancer)
-                                .switchIfEmpty(Mono.defer(() -> assignWithoutAnnouncement(need, freelancerId)))))
+                        .flatMap(freelancer -> (callerIsStaff ? Mono.<Void>empty() : requireApplied(need, freelancer))
+                                .then(Mono.defer(() -> completeAssignment(need, freelancer)))));
+    }
+
+    /**
+     * Élit ce livreur sur ce besoin par le chemin unique (C-46) : annonce ouverte → réponse au prix
+     * serveur puis {@code assignResponse} (livraison payable, mode de paiement du besoin) ; sans
+     * annonce, ancien chemin. Partagé par l'assignation et l'acceptation d'une invitation (C-52).
+     */
+    public Mono<DeliveryNeedResponseDTO> completeAssignment(DeliveryNeed need, GofpFreelancer freelancer) {
+        return electThroughAnnouncement(need, freelancer)
+                .switchIfEmpty(Mono.defer(() -> assignWithoutAnnouncement(need, freelancer.getId())))
                 .flatMap(saved -> notifyRelayPoint(saved).thenReturn(saved))
                 .flatMap(this::enrich);
+    }
+
+    /** Vue d'un besoin pour un tiers déjà autorisé (le livreur invité) : sans contrôle de propriété. */
+    public Mono<DeliveryNeedResponseDTO> view(DeliveryNeed need) {
+        return enrich(need);
+    }
+
+    /** Le livreur a une réponse (candidature) sur l'annonce ouverte du besoin, sinon 409 « invitez-le ». */
+    private Mono<Void> requireApplied(DeliveryNeed need, GofpFreelancer freelancer) {
+        Mono<Boolean> applied = needAnnouncements == null
+                ? Mono.just(false)
+                : needAnnouncements.openAnnouncementOf(need.getId())
+                        .flatMap(a -> needAnnouncements.hasResponseFrom(a.getId(), responderIds(freelancer)))
+                        .defaultIfEmpty(false);
+        return applied.flatMap(ok -> ok ? Mono.<Void>empty()
+                : Mono.error(new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.CONFLICT,
+                        "This courier has not applied: invite them instead")));
+    }
+
+    private static List<UUID> responderIds(GofpFreelancer f) {
+        List<UUID> ids = new java.util.ArrayList<>();
+        if (f.getCoreFreelancerId() != null) ids.add(f.getCoreFreelancerId());
+        ids.add(f.getId());
+        return ids;
+    }
+
+    /** Statut d'un candidat : {@code BUSY} s'il a une livraison ni livrée, ni annulée, ni échouée. */
+    private Mono<String> courierStatus(GofpFreelancer freelancer, UUID wireId) {
+        if (deliveries == null) {
+            return Mono.just(FreelancerCandidateDTO.AVAILABLE);
+        }
+        List<UUID> ids = freelancer != null ? responderIds(freelancer) : List.of(wireId);
+        return deliveries.countUnfinishedByFreelancerIds(ids)
+                .map(n -> n > 0 ? FreelancerCandidateDTO.BUSY : FreelancerCandidateDTO.AVAILABLE)
+                .defaultIfEmpty(FreelancerCandidateDTO.AVAILABLE)
+                .onErrorReturn(FreelancerCandidateDTO.AVAILABLE);
     }
 
     /**
@@ -599,7 +668,7 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
                 .defaultIfEmpty(new String[]{"Freelancer", ""})
                 .onErrorReturn(new String[]{"Freelancer", ""});
 
-        return Mono.zip(quoteMono, nameMono)
+        return Mono.zip(quoteMono, nameMono, courierStatus(freelancer, freelancerId))
                 .map(t -> FreelancerCandidateDTO.builder()
                         .freelancerId(freelancerId)
                         .firstName(t.getT2()[0])
@@ -607,6 +676,7 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
                         .rating(candidate.getRating())
                         .estimatedPrice(t.getT1().totalPrice())
                         .priceBreakdown(t.getT1().breakdown())
+                        .status(t.getT3())
                         .build());
     }
 

@@ -331,7 +331,7 @@ class NeedAnnouncementLinkTest {
         openAnnouncementWithoutResponse();
         serverQuote(3000);
 
-        needService.assignFreelancer(needId, gofpFreelancerId, ownerId).block();
+        needService.assignFreelancer(needId, gofpFreelancerId, ownerId, true).block();
 
         ArgumentCaptor<com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.RespondToAnnouncementPortCommand> respond =
                 ArgumentCaptor.forClass(com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.RespondToAnnouncementPortCommand.class);
@@ -357,8 +357,8 @@ class NeedAnnouncementLinkTest {
         openAnnouncementWithoutResponse();
         serverQuote(3000);
 
-        needService.assignFreelancer(needId, gofpFreelancerId, ownerId).block();
-        needService.assignFreelancer(needId, gofpFreelancerId, ownerId).block();
+        needService.assignFreelancer(needId, gofpFreelancerId, ownerId, true).block();
+        needService.assignFreelancer(needId, gofpFreelancerId, ownerId, true).block();
 
         verify(port, times(1)).selectResponse(any(), any(), any(), any());
         verify(deliveries, times(1)).save(any());
@@ -372,7 +372,7 @@ class NeedAnnouncementLinkTest {
         openAnnouncementWithoutResponse();
         when(quotes.quote(any(), any())).thenReturn(Mono.error(new IllegalStateException("no pricing")));
 
-        StepVerifier.create(needService.assignFreelancer(needId, gofpFreelancerId, ownerId))
+        StepVerifier.create(needService.assignFreelancer(needId, gofpFreelancerId, ownerId, true))
                 .expectErrorMatches(e -> e instanceof org.springframework.web.server.ResponseStatusException r
                         && r.getStatusCode().value() == 409)
                 .verify();
@@ -419,5 +419,118 @@ class NeedAnnouncementLinkTest {
                         && r.getStatusCode().value() == 409)
                 .verify();
         assertThat(local.getPaymentMethod()).isEqualTo("WALLET");
+    }
+
+    // ── lot C-52 : invitation au lieu d'assignation forcée ──────────────────
+
+    @Test
+    @DisplayName("C-52 : l'expéditeur ne peut plus assigner un livreur qui n'a pas postulé → 409, rien n'est créé")
+    void clientAssign_nonApplicant_refused() {
+        UUID needId = createNeed();
+        assignableCourier();
+        openAnnouncementWithoutResponse();
+        serverQuote(3000);
+
+        StepVerifier.create(needService.assignFreelancer(needId, gofpFreelancerId, ownerId, false))
+                .expectErrorMatches(e -> e instanceof org.springframework.web.server.ResponseStatusException r
+                        && r.getStatusCode().value() == 409)
+                .verify();
+        verify(port, never()).respond(any());
+        verify(port, never()).selectResponse(any(), any(), any(), any());
+        verify(deliveries, never()).save(any());
+        assertThat(needStore.get(needId).getStatus()).isNotEqualTo(DeliveryNeedStatus.ASSIGNED);
+    }
+
+    @Test
+    @DisplayName("C-52 : l'expéditeur élit un livreur qui a postulé (au prix serveur) → livraison créée")
+    void clientAssign_applicant_ok() {
+        UUID needId = createNeed();
+        assignableCourier();
+        when(port.findById(eq(tenantId), eq(announcementId))).thenAnswer(inv -> Mono.just(
+                snapshot(ownerId, "QUOTE_REQUEST", null, null, List.of(responseAt("3000")))));
+        when(port.selectResponse(tenantId, announcementId, ownerId, responseId)).thenReturn(Mono.just(
+                snapshot(ownerId, "QUOTE_REQUEST", responseId, deliveryId, List.of(responseAt("3000")))));
+        serverQuote(3000);
+
+        needService.assignFreelancer(needId, gofpFreelancerId, ownerId, false).block();
+
+        verify(port).selectResponse(tenantId, announcementId, ownerId, responseId);
+        assertThat(needStore.get(needId).getStatus()).isEqualTo(DeliveryNeedStatus.ASSIGNED);
+    }
+
+    private final UUID courierUserId = UUID.randomUUID();
+
+    private NeedInvitationService invitationService(Map<UUID, com.yowyob.tiibntick.core.gofreelancer.domain.model.NeedInvitation> store) {
+        NeedInvitationRepository repo = new NeedInvitationRepository() {
+            @Override public Mono<com.yowyob.tiibntick.core.gofreelancer.domain.model.NeedInvitation> save(
+                    com.yowyob.tiibntick.core.gofreelancer.domain.model.NeedInvitation i) {
+                store.put(i.getId(), i);
+                return Mono.just(i);
+            }
+            @Override public Mono<com.yowyob.tiibntick.core.gofreelancer.domain.model.NeedInvitation> findById(UUID id) {
+                return Mono.justOrEmpty(store.get(id));
+            }
+            @Override public reactor.core.publisher.Flux<com.yowyob.tiibntick.core.gofreelancer.domain.model.NeedInvitation> findAllByDeliveryNeedId(UUID n) {
+                return reactor.core.publisher.Flux.fromIterable(store.values()).filter(i -> n.equals(i.getDeliveryNeedId()));
+            }
+            @Override public reactor.core.publisher.Flux<com.yowyob.tiibntick.core.gofreelancer.domain.model.NeedInvitation> findAllByFreelancerIdAndStatus(UUID f, String st) {
+                return reactor.core.publisher.Flux.fromIterable(store.values())
+                        .filter(i -> f.equals(i.getFreelancerId()) && st.equals(i.getStatus()));
+            }
+        };
+        return new NeedInvitationService(needs, freelancers, repo, needService);
+    }
+
+    private UUID openInvitation(Map<UUID, com.yowyob.tiibntick.core.gofreelancer.domain.model.NeedInvitation> store, UUID needId) {
+        UUID id = UUID.randomUUID();
+        store.put(id, com.yowyob.tiibntick.core.gofreelancer.domain.model.NeedInvitation.builder()
+                .id(id).deliveryNeedId(needId).freelancerId(gofpFreelancerId).invitedBy(ownerId)
+                .status("OPEN").expiresAt(Instant.now().plusSeconds(600)).createdAt(Instant.now()).build());
+        return id;
+    }
+
+    @Test
+    @DisplayName("C-52 : invitation acceptée → même livraison payable qu'une assignation C-46 (besoin lié, prix serveur, mode du besoin)")
+    void invitationAccepted_createsPayableDelivery() {
+        UUID needId = createNeed();
+        GofpFreelancer courier = assignableCourier();
+        courier.setCoreUserId(courierUserId);
+        when(freelancers.findByCoreUserId(courierUserId)).thenReturn(Mono.just(courier));
+        openAnnouncementWithoutResponse();
+        serverQuote(3000);
+        Map<UUID, com.yowyob.tiibntick.core.gofreelancer.domain.model.NeedInvitation> store = new HashMap<>();
+        UUID invId = openInvitation(store, needId);
+
+        invitationService(store).accept(invId, courierUserId).block();
+
+        verify(port).selectResponse(tenantId, announcementId, ownerId, responseId);
+        ArgumentCaptor<Delivery> created = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveries).save(created.capture());
+        assertThat(created.getValue().getDeliveryNeedId())
+                .as("livraison rattachée au besoin → le paiement (portefeuille ou espèces) lit le mode du besoin")
+                .isEqualTo(needId);
+        assertThat(created.getValue().getTarif()).isEqualTo(3000.0);
+        assertThat(needStore.get(needId).getStatus()).isEqualTo(DeliveryNeedStatus.ASSIGNED);
+        assertThat(needStore.get(needId).getPaymentMethod()).isEqualTo("CASH");
+        assertThat(store.get(invId).getStatus()).isEqualTo("ACCEPTED");
+    }
+
+    @Test
+    @DisplayName("C-52 : invitation refusée → l'annonce reste publiée, le besoin reste en attente")
+    void invitationDeclined_announcementStaysPublished() {
+        UUID needId = createNeed();
+        GofpFreelancer courier = assignableCourier();
+        courier.setCoreUserId(courierUserId);
+        when(freelancers.findByCoreUserId(courierUserId)).thenReturn(Mono.just(courier));
+        Map<UUID, com.yowyob.tiibntick.core.gofreelancer.domain.model.NeedInvitation> store = new HashMap<>();
+        UUID invId = openInvitation(store, needId);
+
+        invitationService(store).decline(invId, courierUserId, "pas dispo").block();
+
+        assertThat(store.get(invId).getStatus()).isEqualTo("DECLINED");
+        assertThat(mirror.get(announcementId).getStatus()).isEqualTo(AnnouncementStatus.PUBLISHED);
+        verify(port, never()).cancel(any(), any(), any());
+        verify(port, never()).selectResponse(any(), any(), any(), any());
+        assertThat(needStore.get(needId).getStatus()).isEqualTo(DeliveryNeedStatus.PENDING);
     }
 }

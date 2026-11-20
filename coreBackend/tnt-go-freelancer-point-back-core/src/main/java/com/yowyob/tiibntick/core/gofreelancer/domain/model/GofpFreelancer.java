@@ -152,6 +152,23 @@ public class GofpFreelancer implements Persistable<UUID>, TntPersistableEntity {
     @Column("longitude_gps")
     private Float longitudeGps;
 
+    /**
+     * Availability chosen by the courier: {@code AVAILABLE} (default, also when null) or
+     * {@code PAUSED}. A paused courier is left out of candidate matching and stops sending
+     * its position; "busy" is never stored, it is computed from unfinished deliveries.
+     */
+    @Column("availability_status")
+    private String availabilityStatus;
+
+    public static final String AVAILABILITY_AVAILABLE = "AVAILABLE";
+    public static final String AVAILABILITY_PAUSED = "PAUSED";
+
+    /** True when the courier chose to pause (null and unknown values count as available). */
+    @JsonIgnore
+    public boolean isPaused() {
+        return AVAILABILITY_PAUSED.equals(availabilityStatus);
+    }
+
     // ── Double address ────────────────────────────────────────────────────
 
     /**

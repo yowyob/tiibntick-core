@@ -231,4 +231,51 @@ class DeliveryNeedApplicationServiceCandidatesTest {
                 .expectError(IllegalArgumentException.class)
                 .verify();
     }
+
+    @org.junit.jupiter.api.Test
+    @org.junit.jupiter.api.DisplayName("C-52 : un candidat avec une livraison non terminée est marqué BUSY, les autres AVAILABLE")
+    void getCandidatesWithPricing_marksBusyCourier() {
+        DeliveryNeed need = DeliveryNeed.builder().id(deliveryNeedId).userId(ownerId)
+                .pickupAddressId(pickupAddressId).deliveryAddressId(deliveryAddressId)
+                .status(DeliveryNeedStatus.PENDING).build();
+        AddressDTO dto = AddressDTO.builder().address(Address.builder().landmark("Warda").city("Yaoundé").country("CM")
+                .coordinates(GeoCoordinates.of(PICKUP_LAT, PICKUP_LON)).build()).build();
+        UUID busyId = UUID.randomUUID();
+        UUID freeId = UUID.randomUUID();
+        UUID busyCore = UUID.randomUUID();
+        com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpFreelancer busy =
+                com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpFreelancer.builder()
+                        .id(busyId).coreFreelancerId(busyCore).build();
+        com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepository deliveries =
+                org.mockito.Mockito.mock(com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepository.class);
+        service.setDeliveries(deliveries);
+
+        when(deliveryNeedRepository.findById(deliveryNeedId)).thenReturn(Mono.just(need));
+        when(addressUseCase.getAddressById(any())).thenReturn(Mono.just(dto));
+        when(matchingUseCase.processMatchingForDeliveryNeed(
+                any(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), any()))
+                .thenReturn(Mono.just(List.of(
+                        TopsisRankingUseCase.FreelancerCandidate.builder().freelancerId(busyId).rating(4.0).build(),
+                        TopsisRankingUseCase.FreelancerCandidate.builder().freelancerId(freeId).rating(4.0).build())));
+        when(gofpFreelancerRepository.findById(busyId)).thenReturn(Mono.just(busy));
+        when(gofpFreelancerRepository.findById(freeId)).thenReturn(Mono.empty());
+        when(gofpFreelancerRepository.findByCoreFreelancerId(freeId)).thenReturn(Mono.empty());
+        when(freelancerEligibilityUseCase.isEligible(any(), any())).thenReturn(Mono.just(true));
+        when(freelancerPriceQuoteUseCase.quote(any(), any())).thenReturn(Mono.just(
+                new FreelancerPriceQuoteUseCase.Quote(1700.0, "XAF", "Base", "PLATFORM_DEFAULT", null)));
+        when(gofpUserRepository.findByCoreUserId(any())).thenReturn(Mono.empty());
+        // la course en cours a été enregistrée sous l'id core du livreur (id du répondant élu)
+        when(deliveries.countUnfinishedByFreelancerIds(List.of(busyCore, busyId))).thenReturn(Mono.just(1L));
+        when(deliveries.countUnfinishedByFreelancerIds(List.of(freeId))).thenReturn(Mono.just(0L));
+
+        StepVerifier.create(service.getCandidatesWithPricing(deliveryNeedId, ownerId).collectList())
+                .assertNext(list -> {
+                    assertThat(list).hasSize(2);
+                    java.util.Map<UUID, String> byId = new java.util.HashMap<>();
+                    list.forEach(c -> byId.put(c.getFreelancerId(), c.getStatus()));
+                    assertThat(byId.get(busyId)).isEqualTo("BUSY");
+                    assertThat(byId.get(freeId)).isEqualTo("AVAILABLE");
+                })
+                .verifyComplete();
+    }
 }

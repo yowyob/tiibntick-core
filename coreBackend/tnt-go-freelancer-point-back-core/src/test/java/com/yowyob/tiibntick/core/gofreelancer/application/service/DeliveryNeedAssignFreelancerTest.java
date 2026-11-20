@@ -95,7 +95,9 @@ class DeliveryNeedAssignFreelancerTest {
 
         // USER_ID is the owner — ownership guard is inactive (ownershipGuardEnabled defaults
         // to false in unit tests since @Value is not processed without a Spring context)
-        Mono<DeliveryNeedResponseDTO> result = service.assignFreelancer(NEED_ID, FREELANCER_ID, USER_ID);
+        // Lot C-52: a client may only elect a courier who applied; this legacy path (no announcement)
+        // stays open to staff, which is what is exercised here.
+        Mono<DeliveryNeedResponseDTO> result = service.assignFreelancer(NEED_ID, FREELANCER_ID, USER_ID, true);
 
         StepVerifier.create(result)
                 .assertNext(dto -> {

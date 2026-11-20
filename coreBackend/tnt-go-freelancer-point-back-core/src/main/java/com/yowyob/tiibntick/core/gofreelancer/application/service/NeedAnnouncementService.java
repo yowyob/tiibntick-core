@@ -161,6 +161,14 @@ public class NeedAnnouncementService {
                         }));
     }
 
+    /** Lot C-52 — l'un de ces livreurs a-t-il déjà répondu (postulé) sur cette annonce ? */
+    public Mono<Boolean> hasResponseFrom(UUID announcementId, java.util.Collection<UUID> responderIds) {
+        return tenantContextHolder.currentTenantId()
+                .flatMap(tenantId -> deliveryAnnouncementPort.findById(tenantId, announcementId))
+                .map(a -> a.responses().stream().anyMatch(r -> responderIds.contains(r.deliveryPersonId())))
+                .defaultIfEmpty(false);
+    }
+
     /** Annonce publiée pour ce besoin, ou vide. */
     public Mono<UUID> announcementIdOf(UUID deliveryNeedId) {
         return announcementRepository.findByDeliveryNeedId(deliveryNeedId).map(Announcement::getId);

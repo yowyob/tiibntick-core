@@ -28,6 +28,35 @@ import java.util.UUID;
 public class GofpFreelancerProfileController {
 
     private final GofpFreelancerUseCase freelancerUseCase;
+    private final com.yowyob.tiibntick.core.gofreelancer.application.service.CourierPresenceService presence;
+
+    /** Body of {@code PUT /me/location}. */
+    public record LocationBody(Double latitude, Double longitude) {}
+
+    /** Body and answer of {@code /me/availability}: {@code AVAILABLE} or {@code PAUSED}. */
+    public record AvailabilityBody(String status) {}
+
+    /** Lot C-52 — the caller's own position (profile resolved from the token). */
+    @PutMapping("/me/location")
+    public Mono<ResponseEntity<Void>> updateMyLocation(
+            @RequestBody LocationBody body,
+            @CurrentUser(required = false) TntSecurityContext ctx) {
+        return presence.updateMyLocation(ctx, body == null ? null : body.latitude(),
+                        body == null ? null : body.longitude())
+                .then(Mono.just(ResponseEntity.noContent().<Void>build()));
+    }
+
+    @GetMapping("/me/availability")
+    public Mono<AvailabilityBody> myAvailability(@CurrentUser(required = false) TntSecurityContext ctx) {
+        return presence.myAvailability(ctx).map(AvailabilityBody::new);
+    }
+
+    @PutMapping("/me/availability")
+    public Mono<AvailabilityBody> setMyAvailability(
+            @RequestBody AvailabilityBody body,
+            @CurrentUser(required = false) TntSecurityContext ctx) {
+        return presence.setMyAvailability(ctx, body == null ? null : body.status()).map(AvailabilityBody::new);
+    }
 
     @PostMapping
     public Mono<ResponseEntity<GofpFreelancer>> createOrUpdate(
@@ -104,15 +133,15 @@ public class GofpFreelancerProfileController {
                         e -> Mono.just(ResponseEntity.notFound().build()));
     }
 
+    /** Lot C-52 — that courier himself or staff only (403 otherwise); bounds checked (400). */
     @PatchMapping("/by-core-freelancer/{coreFreelancerId}/location")
     public Mono<ResponseEntity<Void>> updateLocation(
             @PathVariable UUID coreFreelancerId,
-            @RequestParam Float lat,
-            @RequestParam Float lng) {
-        return freelancerUseCase.updateLocation(coreFreelancerId, lat, lng)
-                .then(Mono.just(ResponseEntity.ok().<Void>build()))
-                .onErrorResume(IllegalArgumentException.class,
-                        e -> Mono.just(ResponseEntity.notFound().build()));
+            @RequestParam Double lat,
+            @RequestParam Double lng,
+            @CurrentUser(required = false) TntSecurityContext ctx) {
+        return presence.updateLocationOf(coreFreelancerId, ctx, lat, lng)
+                .then(Mono.just(ResponseEntity.ok().<Void>build()));
     }
 
     @PostMapping("/by-core-freelancer/{coreFreelancerId}/record-delivery-success")

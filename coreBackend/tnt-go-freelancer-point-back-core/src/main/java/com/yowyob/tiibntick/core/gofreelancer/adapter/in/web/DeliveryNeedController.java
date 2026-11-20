@@ -86,7 +86,8 @@ public class DeliveryNeedController {
             @PathVariable UUID id,
             @RequestBody AssignFreelancerRequestDTO request,
             @CurrentUser(required = false) TntSecurityContext ctx) {
-        return deliveryNeedUseCase.assignFreelancer(id, request.getFreelancerId(), callerId(ctx))
+        return deliveryNeedUseCase.assignFreelancer(id, request.getFreelancerId(), callerId(ctx),
+                        com.yowyob.tiibntick.core.gofreelancer.application.service.RelayPointAccessGuard.isStaff(ctx))
                 .map(ResponseEntity::ok);
     }
 }

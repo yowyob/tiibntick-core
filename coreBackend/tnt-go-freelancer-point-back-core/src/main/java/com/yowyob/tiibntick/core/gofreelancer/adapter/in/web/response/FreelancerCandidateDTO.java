@@ -17,4 +17,12 @@ public class FreelancerCandidateDTO {
     private Double rating;
     private Double estimatedPrice;
     private String priceBreakdown;
+    /**
+     * Lot C-52 — {@code AVAILABLE}: can be invited; {@code BUSY}: has an unfinished delivery, shown
+     * but not invitable. Paused couriers are never listed.
+     */
+    private String status;
+
+    public static final String AVAILABLE = "AVAILABLE";
+    public static final String BUSY = "BUSY";
 }

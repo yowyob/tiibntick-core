@@ -30,42 +30,61 @@ public class FreelancerProviderAdapter implements IFreelancerProviderPort {
     private final GofpFreelancerRepository gofpFreelancerRepository;
     private final ObjectProvider<FreelancerSearchRepository> searchRepositoryProvider;
 
+    /**
+     * Lot C-52 — SQL is the source of truth for positions: the only writer of a courier's position
+     * ({@code CourierPresenceService}) updates {@code gofp_freelancers}, and nothing in this module
+     * indexes {@link FreelancerDocument}s. Elasticsearch results, when the search is enabled, are
+     * therefore merged with the SQL ones instead of replacing them — otherwise a courier positioned
+     * in SQL but unknown to the index would be missed as soon as the index returns anyone. Paused
+     * couriers are left out on both paths.
+     */
     @Override
     public Mono<List<FreelancerCandidate>> findActiveCandidatesNear(
             double latitude, double longitude, double radiusKm) {
 
         FreelancerSearchRepository searchRepo = searchRepositoryProvider.getIfAvailable();
-        if (searchRepo != null) {
-            return searchRepo
-                    .findByIsAvailableTrueAndIsActiveTrueAndLocationNear(
-                            new GeoPoint(latitude, longitude),
-                            new Distance(radiusKm, Metrics.KILOMETERS))
-                    .map(this::fromDocument)
-                    .collectList()
-                    .flatMap(list -> {
-                        if (!list.isEmpty()) {
-                            return Mono.just(list);
-                        }
-                        log.debug("[FreelancerProvider] ES returned empty — falling back to SQL");
-                        return sqlFallback(latitude, longitude, radiusKm);
-                    })
-                    .onErrorResume(e -> {
-                        log.warn("[FreelancerProvider] ES lookup failed ({}), SQL fallback", e.getMessage());
-                        return sqlFallback(latitude, longitude, radiusKm);
-                    });
+        Mono<List<FreelancerCandidate>> sql = sqlFallback(latitude, longitude, radiusKm);
+        if (searchRepo == null) {
+            return sql;
         }
-        return sqlFallback(latitude, longitude, radiusKm);
+        Mono<List<FreelancerCandidate>> es = searchRepo
+                .findByIsAvailableTrueAndIsActiveTrueAndLocationNear(
+                        new GeoPoint(latitude, longitude),
+                        new Distance(radiusKm, Metrics.KILOMETERS))
+                .map(this::fromDocument)
+                .filterWhen(this::notPausedInSql)
+                .collectList()
+                .onErrorResume(e -> {
+                    log.warn("[FreelancerProvider] ES lookup failed ({}), SQL only", e.getMessage());
+                    return Mono.just(List.of());
+                });
+        return Mono.zip(sql, es).map(t -> {
+            java.util.Map<java.util.UUID, FreelancerCandidate> merged = new java.util.LinkedHashMap<>();
+            t.getT1().forEach(c -> merged.put(c.getFreelancerId(), c));
+            t.getT2().forEach(c -> merged.putIfAbsent(c.getFreelancerId(), c));
+            return List.copyOf(merged.values());
+        });
+    }
+
+    /** An index hit is kept unless its SQL row says the courier paused (unknown row → kept). */
+    private Mono<Boolean> notPausedInSql(FreelancerCandidate c) {
+        return gofpFreelancerRepository.findById(c.getFreelancerId())
+                .switchIfEmpty(Mono.defer(() -> gofpFreelancerRepository.findByCoreFreelancerId(c.getFreelancerId())))
+                .map(f -> !f.isPaused())
+                .defaultIfEmpty(true)
+                .onErrorReturn(true);
     }
 
     private Mono<List<FreelancerCandidate>> sqlFallback(
             double latitude, double longitude, double radiusKm) {
         return gofpFreelancerRepository.findAllByIsActive(true)
                 .filter(f -> f.getLatitudeGps() != null && f.getLongitudeGps() != null)
+                .filter(f -> !f.isPaused())
                 .map(this::fromGofp)
                 .filter(c -> haversine(c.getLatitude(), c.getLongitude(), latitude, longitude) <= radiusKm)
                 .collectList()
                 .doOnNext(list -> log.info(
-                        "[FreelancerProvider] SQL fallback returned {} candidates within {}km",
+                        "[FreelancerProvider] SQL returned {} candidates within {}km",
                         list.size(), radiusKm));
     }
 

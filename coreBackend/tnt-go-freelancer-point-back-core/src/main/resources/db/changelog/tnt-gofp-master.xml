@@ -462,4 +462,12 @@
                  relativeToChangelogFile="false" splitStatements="false"/>
     </changeSet>
 
+    <!-- Lot C-52: courier availability (AVAILABLE/PAUSED) and invitations to a delivery need.
+         Non-numeric id, labelled only so the upgrade test can rebuild a database migrated by the
+         previous version. -->
+    <changeSet id="c52-courier-availability-and-invitations" author="TiiBnTickTeam" labels="courier-invitations">
+        <sqlFile path="db/changelog/20261119_c52_courier_availability_and_invitations.sql"
+                 relativeToChangelogFile="false" splitStatements="true"/>
+    </changeSet>
+
 </databaseChangeLog>
