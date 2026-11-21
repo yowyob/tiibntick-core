@@ -69,6 +69,14 @@ public class GofpDeliveryRepositoryAdapter implements DeliveryRepository {
     }
 
     @Override
+    public Mono<Long> countDeliveredByFreelancerIds(java.util.Collection<UUID> freelancerIds) {
+        if (freelancerIds == null || freelancerIds.isEmpty()) {
+            return Mono.just(0L);
+        }
+        return r2dbcRepository.countDeliveredByFreelancerIds(freelancerIds).defaultIfEmpty(0L);
+    }
+
+    @Override
     public Mono<Double> sumOccupiedVolumeM3ByFreelancerId(UUID freelancerId) {
         return r2dbcRepository.sumOccupiedVolumeM3ByFreelancerId(freelancerId)
                 .defaultIfEmpty(0.0);

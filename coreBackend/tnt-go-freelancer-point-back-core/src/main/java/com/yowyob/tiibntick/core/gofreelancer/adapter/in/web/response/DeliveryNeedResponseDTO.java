@@ -47,6 +47,8 @@ public class DeliveryNeedResponseDTO {
     private String signatureUrl;
     private String paymentMethod;
     private String transportMethod;
+    /** Lot C-54 — moto, tricycle, taxi, camion, bus (or the core type names); absent / "ANY" = any vehicle. */
+    private String requiredVehicleType;
     private Double distance;
     private UUID deliveryId;
     /** Freelancer retenu par le client (null tant que le besoin est PENDING). */

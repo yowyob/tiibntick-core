@@ -21,6 +21,7 @@ import com.yowyob.tiibntick.core.trust.application.port.in.RecordMissionUseCase;
 import com.yowyob.tiibntick.core.trust.application.port.in.RecordPaymentUseCase;
 import com.yowyob.tiibntick.core.trust.domain.model.enums.CustodyTransferType;
 import com.yowyob.tiibntick.core.trust.domain.model.valueobject.CustodyTransferRecord;
+import com.yowyob.tiibntick.core.gofreelancer.domain.exception.InvalidHandoverCodeException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
@@ -163,7 +164,7 @@ public class DeliveryStatusApplicationService {
                     "Demandez le code à l'expéditeur."));
         }
         if (!otpService.verifyOtp(dto.getConfirmationCode(), delivery.getPickupOtpHash())) {
-            return Mono.error(new IllegalArgumentException(
+            return Mono.error(new InvalidHandoverCodeException(
                     "Code de confirmation incorrect. Vérifiez le code auprès de l'expéditeur."));
         }
         log.info("Pickup OTP verified for delivery {} — confirming pickup in delivery-core", deliveryId);
@@ -232,7 +233,7 @@ public class DeliveryStatusApplicationService {
                             + "Demandez le code au destinataire."));
         }
         if (!otpService.verifyOtp(dto.getConfirmationCode(), delivery.getDeliveryOtpHash())) {
-            return Mono.error(new IllegalArgumentException(
+            return Mono.error(new InvalidHandoverCodeException(
                     "Code de confirmation incorrect. Vérifiez le code auprès du destinataire."));
         }
         log.info("Delivery OTP verified for delivery {} — completing in delivery-core (direct)", deliveryId);

@@ -470,4 +470,16 @@
                  relativeToChangelogFile="false" splitStatements="true"/>
     </changeSet>
 
+    <!-- Lot C-53: handover codes kept encrypted, readable again by the owner of the delivery need. -->
+    <changeSet id="c53-handover-codes" author="TiiBnTickTeam" labels="handover-codes">
+        <sqlFile path="db/changelog/20261120_c53_handover_codes.sql"
+                 relativeToChangelogFile="false" splitStatements="true"/>
+    </changeSet>
+
+    <!-- Lot C-54: the courier's vehicle (type, plate, photos) and the vehicle a sender may require. -->
+    <changeSet id="c54-vehicle-card-and-required-type" author="TiiBnTickTeam" labels="vehicle-card">
+        <sqlFile path="db/changelog/20261121_c54_vehicle_card_and_required_type.sql"
+                 relativeToChangelogFile="false" splitStatements="true"/>
+    </changeSet>
+
 </databaseChangeLog>

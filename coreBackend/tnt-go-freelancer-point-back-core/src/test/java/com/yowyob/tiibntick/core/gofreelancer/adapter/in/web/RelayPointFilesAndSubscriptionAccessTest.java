@@ -86,7 +86,8 @@ class RelayPointFilesAndSubscriptionAccessTest {
                 .authenticated(true).roles(Set.of(roles)).build();
         RelayPointAccessGuard guard = new RelayPointAccessGuard(relayPoints, freelancers);
         return WebTestClient.bindToController(
-                        new GofpFileUploadController(uploads, guard),
+                        new GofpFileUploadController(uploads, guard,
+                                mock(com.yowyob.tiibntick.core.gofreelancer.application.service.CourierVehicleService.class)),
                         new RelayPointSubscriptionController(subscriptions, guard))
                 .controllerAdvice(new GlobalExceptionHandler())
                 .argumentResolvers(cfg -> cfg.addCustomResolver(new RelayPointAccessControllerTest.FixedContextResolver(ctx)))

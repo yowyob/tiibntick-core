@@ -65,7 +65,7 @@ public class AnnouncementController {
             com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext ctx) {
         UUID caller = ctx != null ? ctx.userId() : null;
         return whereabouts.resolve(lat, lng, radiusKm, city, caller)
-                .flatMapMany(announcementUseCase::getNearbyAnnouncements);
+                .flatMapMany(criteria -> announcementUseCase.getNearbyAnnouncementsFor(criteria, caller));
     }
 
     @GetMapping("/client/{clientId}")
@@ -129,9 +129,14 @@ public class AnnouncementController {
                 .then(Mono.just(ResponseEntity.accepted().<Void>build()));
     }
 
+    /** Lot C-54b — owner of the announcement, owner of its delivery need, or staff (403 otherwise, 404 if unknown). */
     @GetMapping("/{id}/subscriptions")
-    public Flux<SubscriptionResponseDTO> getSubscriptions(@PathVariable("id") UUID announcementId) {
-        return announcementUseCase.getSubscriptionsForAnnouncement(announcementId);
+    public Flux<SubscriptionResponseDTO> getSubscriptions(
+            @PathVariable("id") UUID announcementId,
+            @com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser(required = false)
+            com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext ctx) {
+        return access.requireCanReadApplications(announcementId, ctx)
+                .thenMany(Flux.defer(() -> announcementUseCase.getSubscriptionsForAnnouncement(announcementId)));
     }
 
     @PostMapping("/{id}/assign")
@@ -149,7 +154,11 @@ public class AnnouncementController {
 
     @GetMapping("/subscriptions/freelancer/{freelancerId}")
     public Flux<AnnouncementResponseDTO> getFreelancerSubscriptions(
-            @PathVariable UUID freelancerId) {
-        return announcementUseCase.getSubscriptionsByFreelancerId(freelancerId);
+            @PathVariable UUID freelancerId,
+            @com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser(required = false)
+            com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext ctx) {
+        // Lot C-54b — that courier himself (gofp or core id) or staff.
+        return access.requireSelfCourierOrStaff(freelancerId, ctx)
+                .thenMany(Flux.defer(() -> announcementUseCase.getSubscriptionsByFreelancerId(freelancerId)));
     }
 }

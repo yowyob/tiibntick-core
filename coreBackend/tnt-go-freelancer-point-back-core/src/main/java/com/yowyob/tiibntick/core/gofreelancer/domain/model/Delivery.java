@@ -2,6 +2,7 @@ package com.yowyob.tiibntick.core.gofreelancer.domain.model;
 
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryStatus;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryUrgency;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
 import java.util.UUID;
@@ -82,13 +83,25 @@ public class Delivery implements Persistable<UUID>, TntPersistableEntity {
 
     /** BCrypt hash of the 6-digit code given to the shipper at parcel creation.
      *  The delivery person must provide this code to transition to PICKED_UP. */
+    @JsonIgnore
     @Column("pickup_otp_hash")
     private String pickupOtpHash;
 
     /** BCrypt hash of the 6-digit code sent to the recipient at parcel creation.
      *  The delivery person must provide this code to transition to DELIVERED (direct). */
+    @JsonIgnore
     @Column("delivery_otp_hash")
     private String deliveryOtpHash;
+
+    /** Lot C-53 — pickup code encrypted (AES-256-GCM), readable again by the owner of the need only. */
+    @JsonIgnore
+    @Column("pickup_code_enc")
+    private String pickupCodeEnc;
+
+    /** Lot C-53 — delivery code encrypted (AES-256-GCM), readable again by the owner of the need only. */
+    @JsonIgnore
+    @Column("delivery_code_enc")
+    private String deliveryCodeEnc;
 
     /** Timestamp when the delivery person physically collected the parcel (PICKED_UP confirmed). */
     @Column("actual_pickup_time")

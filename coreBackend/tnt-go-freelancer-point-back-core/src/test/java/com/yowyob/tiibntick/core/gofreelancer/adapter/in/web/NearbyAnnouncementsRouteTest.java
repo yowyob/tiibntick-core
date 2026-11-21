@@ -43,6 +43,7 @@ class NearbyAnnouncementsRouteTest {
 
     private WebTestClient client() {
         when(useCase.getNearbyAnnouncements(any())).thenReturn(Flux.just(new AnnouncementResponseDTO()));
+        when(useCase.getNearbyAnnouncementsFor(any(), any())).thenCallRealMethod(); // lot C-54
         var controller = new AnnouncementController(useCase, new FreelancerWhereaboutsResolver(freelancers, addresses, 15),
                 mock(com.yowyob.tiibntick.core.gofreelancer.application.service.AnnouncementAccessGuard.class));
         TntSecurityContext ctx = TntSecurityContext.builder().userId(caller).build();

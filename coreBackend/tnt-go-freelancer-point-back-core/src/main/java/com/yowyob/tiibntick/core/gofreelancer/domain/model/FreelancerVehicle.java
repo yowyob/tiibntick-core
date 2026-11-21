@@ -60,4 +60,30 @@ public class FreelancerVehicle implements Persistable<UUID>, TntPersistableEntit
 
     @Column("trunk_dimension_unit")
     private String trunkDimensionUnit;
+
+    /** Lot C-54 — canonical {@code VehicleType} name declared by the courier (MOTORBIKE, TRICYCLE, CAR, TRUCK, BUS…). */
+    @Column("vehicle_type")
+    private String vehicleType;
+
+    /** Lot C-54 — registration plate, upper-cased. */
+    @Column("plate_number")
+    private String plateNumber;
+
+    /** Lot C-54 — up to four photo paths, one per line (served under {@code /uploads/**}). */
+    @Column("photo_urls")
+    private String photoUrls;
+
+    /** The stored photos, oldest first ({@code front/back} photos of the older upload routes included). */
+    public java.util.List<String> photoUrlList() {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (photoUrls != null) {
+            for (String line : photoUrls.split("\\n")) {
+                if (!line.isBlank() && !out.contains(line.trim())) out.add(line.trim());
+            }
+        }
+        for (String legacy : new String[]{frontPhotoUrl, backPhotoUrl}) {
+            if (legacy != null && !legacy.isBlank() && !out.contains(legacy)) out.add(legacy);
+        }
+        return out;
+    }
 }

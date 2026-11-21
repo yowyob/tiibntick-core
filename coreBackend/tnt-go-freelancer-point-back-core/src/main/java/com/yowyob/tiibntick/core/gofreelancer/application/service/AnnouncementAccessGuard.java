@@ -34,6 +34,26 @@ public class AnnouncementAccessGuard {
     private final TenantContextHolder tenantContextHolder;
     private final GofpFreelancerRepository gofpFreelancerRepository;
 
+    /**
+     * Lot C-54b — local announcement mirror (link announcement → delivery need) and delivery needs, to let
+     * the owner of the linked need read the applications. Optional (setter): absent, only the
+     * announcement's client and staff can.
+     */
+    private com.yowyob.tiibntick.core.gofreelancer.application.port.out.IAnnouncementRepository announcementMirror;
+    private com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryNeedRepository deliveryNeeds;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setAnnouncementMirror(
+            com.yowyob.tiibntick.core.gofreelancer.application.port.out.IAnnouncementRepository announcementMirror) {
+        this.announcementMirror = announcementMirror;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setDeliveryNeeds(
+            com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryNeedRepository deliveryNeeds) {
+        this.deliveryNeeds = deliveryNeeds;
+    }
+
     /** The client of a new announcement: the caller. A different id in the body is refused (staff excepted). */
     public Mono<UUID> clientIdFor(UUID requestedClientId, TntSecurityContext ctx) {
         return caller(ctx).flatMap(caller -> {
@@ -70,6 +90,48 @@ public class AnnouncementAccessGuard {
             return Mono.<AnnouncementSnapshot>error(new AccessDeniedException(
                     "Only the client who published this announcement can do this"));
         }));
+    }
+
+    /**
+     * Lot C-54b — reading the applications of an announcement (courier phone, name, plate, vehicle
+     * photos): the client who published it, the owner of the delivery need it was published for, or
+     * staff. Anyone else → 403; unknown announcement → 404. Strict: not driven by
+     * {@code tnt.gofp.ownership-guard.enabled}.
+     */
+    public Mono<AnnouncementSnapshot> requireCanReadApplications(UUID announcementId, TntSecurityContext ctx) {
+        return caller(ctx).flatMap(caller -> snapshot(announcementId).flatMap(a -> {
+            if (caller.equals(a.clientId()) || DeliveryStatusApplicationService.isStaff(ctx)) {
+                return Mono.just(a);
+            }
+            return isOwnerOfLinkedNeed(announcementId, caller)
+                    .flatMap(owner -> owner ? Mono.just(a) : Mono.<AnnouncementSnapshot>error(new AccessDeniedException(
+                            "Only the client who published this announcement can read its applications")));
+        }));
+    }
+
+    /**
+     * Lot C-54b — the announcements a courier applied to: that courier (one of his ids) or staff, else 403.
+     */
+    public Mono<UUID> requireSelfCourierOrStaff(UUID freelancerId, TntSecurityContext ctx) {
+        return caller(ctx).flatMap(caller -> {
+            if (DeliveryStatusApplicationService.isStaff(ctx)) {
+                return Mono.just(freelancerId);
+            }
+            return courierIdsOf(ctx).flatMap(ids -> ids.contains(freelancerId)
+                    ? Mono.just(freelancerId)
+                    : Mono.<UUID>error(new AccessDeniedException(
+                            "A courier can only list the announcements he applied to")));
+        });
+    }
+
+    private Mono<Boolean> isOwnerOfLinkedNeed(UUID announcementId, UUID caller) {
+        if (announcementMirror == null || deliveryNeeds == null) return Mono.just(false);
+        return announcementMirror.findById(announcementId)
+                .flatMap(local -> local.getDeliveryNeedId() == null ? Mono.<Boolean>empty()
+                        : deliveryNeeds.findById(local.getDeliveryNeedId())
+                                .map(need -> caller.equals(need.getUserId())))
+                .defaultIfEmpty(false)
+                .onErrorReturn(false);
     }
 
     /**

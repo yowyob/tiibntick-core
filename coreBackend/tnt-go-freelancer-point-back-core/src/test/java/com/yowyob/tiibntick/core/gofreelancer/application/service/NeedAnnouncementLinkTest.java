@@ -319,7 +319,7 @@ class NeedAnnouncementLinkTest {
     }
 
     private void serverQuote(double price) {
-        when(quotes.quote(any(), any())).thenReturn(Mono.just(
+        when(quotes.quote(any(), any(), any())).thenReturn(Mono.just(
                 new FreelancerPriceQuoteUseCase.Quote(price, "XAF", "grille", "TEST", null)));
     }
 
@@ -370,7 +370,7 @@ class NeedAnnouncementLinkTest {
         UUID needId = createNeed();
         assignableCourier();
         openAnnouncementWithoutResponse();
-        when(quotes.quote(any(), any())).thenReturn(Mono.error(new IllegalStateException("no pricing")));
+        when(quotes.quote(any(), any(), any())).thenReturn(Mono.error(new IllegalStateException("no pricing")));
 
         StepVerifier.create(needService.assignFreelancer(needId, gofpFreelancerId, ownerId, true))
                 .expectErrorMatches(e -> e instanceof org.springframework.web.server.ResponseStatusException r
@@ -532,5 +532,25 @@ class NeedAnnouncementLinkTest {
         verify(port, never()).cancel(any(), any(), any());
         verify(port, never()).selectResponse(any(), any(), any(), any());
         assertThat(needStore.get(needId).getStatus()).isEqualTo(DeliveryNeedStatus.PENDING);
+    }
+
+    @Test
+    @DisplayName("C-53 : l'élection crée les codes de remise de la livraison (pas le premier appui du livreur)")
+    void election_createsHandoverCodes() {
+        UUID needId = createNeed();
+        assignableCourier();
+        openAnnouncementWithoutResponse();
+        serverQuote(3000);
+        Delivery created = new Delivery();
+        created.setId(deliveryId);
+        created.setDeliveryNeedId(needId);
+        when(deliveries.findByDeliveryNeedId(needId)).thenReturn(Mono.just(created));
+        when(deliveryOtp.initOtpIfAbsent(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        needService.setDeliveries(deliveries);
+        needService.setDeliveryOtp(deliveryOtp);
+
+        needService.assignFreelancer(needId, gofpFreelancerId, ownerId, true).block();
+
+        verify(deliveryOtp).initOtpIfAbsent(created);
     }
 }

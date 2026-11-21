@@ -1,5 +1,7 @@
 package com.yowyob.tiibntick.core.gofreelancer.application.service;
 
+import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.response.FreelancerCandidateDTO;
+import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.vehicle.VehicleCategory;
 import com.yowyob.tiibntick.common.vo.Address;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.AddressDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.AnnouncementRequestDTO;
@@ -36,6 +38,7 @@ import reactor.core.publisher.Mono;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -74,6 +77,17 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
         this.needAnnouncements = needAnnouncements;
     }
 
+    /**
+     * Lot C-54 — fiche du livreur sur chaque candidature, tri des candidatures, filtre véhicule des
+     * annonces proches. Injection optionnelle (setter) : absente, fiches vides et ordre du core.
+     */
+    private CourierCardService courierCards;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setCourierCards(CourierCardService courierCards) {
+        this.courierCards = courierCards;
+    }
+
     @Override
     @RequirePermission(resource = "announcement", action = "create")
     public Mono<AnnouncementResponseDTO> createAnnouncement(AnnouncementRequestDTO request) {
@@ -103,6 +117,28 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
                 .flatMapMany(tenantId -> deliveryAnnouncementPort.findOpenAnnouncementsNear(tenantId, criteria))
                 .map(this::toDTO)
                 .flatMap(this::enrichFromLocalMirror);
+    }
+
+    @Override
+    public Flux<AnnouncementResponseDTO> getNearbyAnnouncementsFor(
+            com.yowyob.tiibntick.core.gofreelancer.application.port.in.query.NearbyCriteria criteria,
+            UUID viewerUserId) {
+        Mono<VehicleCategory> viewerCategory = viewerCategory(viewerUserId).cache();
+        return getNearbyAnnouncements(criteria)
+                .filterWhen(dto -> {
+                    VehicleCategory required = VehicleCategory.parse(dto.getRequiredVehicleType());
+                    if (required == null) return Mono.just(true);
+                    return viewerCategory.map(required::equals).defaultIfEmpty(false);
+                });
+    }
+
+    /** Vehicle category of the courier behind this core user id; empty when unknown. */
+    private Mono<VehicleCategory> viewerCategory(UUID viewerUserId) {
+        if (viewerUserId == null || courierCards == null) return Mono.empty();
+        return gofpFreelancerRepository.findByCoreUserId(viewerUserId)
+                .flatMap(courierCards::cardOf)
+                .flatMap(card -> Mono.justOrEmpty(VehicleCategory.parse(card.vehicleType())))
+                .onErrorResume(e -> Mono.empty());
     }
 
     @Override
@@ -244,6 +280,82 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
 
     @Override
     public Flux<SubscriptionResponseDTO> getSubscriptionsForAnnouncement(UUID announcementId) {
+        return rankSubscriptions(rawSubscriptions(announcementId));
+    }
+
+    /**
+     * Lot C-54 — courier card on each application, then: available couriers first, then busy (an
+     * unfinished delivery), then paused; inside each group the highest loyalty score first. The score
+     * itself (and the profile creation date it comes from) never leaves the server.
+     */
+    Flux<SubscriptionResponseDTO> rankSubscriptions(Flux<SubscriptionResponseDTO> subscriptions) {
+        if (courierCards == null) return subscriptions;
+        return subscriptions
+                .concatMap(this::withCard)
+                .collectList()
+                .flatMapMany(list -> {
+                    List<RankedSubscription> sorted = new java.util.ArrayList<>(list);
+                    sorted.sort(java.util.Comparator
+                            .comparingInt((RankedSubscription r) -> statusRank(r.dto().getCourierStatus()))
+                            .thenComparing(java.util.Comparator.comparingDouble(RankedSubscription::loyalty).reversed()));
+                    return Flux.fromIterable(sorted).map(RankedSubscription::dto);
+                });
+    }
+
+    private record RankedSubscription(SubscriptionResponseDTO dto, double loyalty) { }
+
+    static int statusRank(String status) {
+        if (FreelancerCandidateDTO.AVAILABLE.equals(status)) return 0;
+        if (FreelancerCandidateDTO.BUSY.equals(status)) return 1;
+        return 2;
+    }
+
+    private Mono<RankedSubscription> withCard(SubscriptionResponseDTO dto) {
+        if (dto.getFreelancerId() == null) {
+            dto.setCourierStatus(GofpFreelancer.AVAILABILITY_PAUSED);
+            return Mono.just(new RankedSubscription(dto, 0));
+        }
+        return findFreelancer(dto.getFreelancerId())
+                .map(java.util.Optional::of)
+                .defaultIfEmpty(java.util.Optional.empty())
+                .onErrorReturn(java.util.Optional.empty())
+                .flatMap(gofp -> {
+                    Mono<CourierCardService.Card> card = gofp.isPresent()
+                            ? courierCards.cardOf(gofp.get()) : courierCards.cardOfWireId(dto.getFreelancerId());
+                    return Mono.zip(card.defaultIfEmpty(CourierCardService.Card.UNKNOWN),
+                                    courierStatusOf(gofp.orElse(null), dto.getFreelancerId()))
+                            .map(t -> {
+                                CourierCardService.Card c = t.getT1();
+                                dto.setVehicleType(c.vehicleType());
+                                dto.setVehiclePlate(c.vehiclePlate());
+                                dto.setVehiclePhotoUrls(c.vehiclePhotoUrls());
+                                dto.setDeliveredCount(c.deliveredCount());
+                                dto.setBadge(c.badge());
+                                dto.setCourierStatus(t.getT2());
+                                return new RankedSubscription(dto, c.loyaltyScore());
+                            });
+                })
+                .onErrorResume(e -> Mono.just(new RankedSubscription(dto, 0)));
+    }
+
+    private Mono<String> courierStatusOf(GofpFreelancer gofp, UUID wireId) {
+        if (gofp != null && gofp.isPaused()) return Mono.just(GofpFreelancer.AVAILABILITY_PAUSED);
+        if (deliveryRepository == null) return Mono.just(FreelancerCandidateDTO.AVAILABLE);
+        List<UUID> ids = new java.util.ArrayList<>();
+        ids.add(wireId);
+        if (gofp != null) {
+            if (gofp.getId() != null && !ids.contains(gofp.getId())) ids.add(gofp.getId());
+            if (gofp.getCoreFreelancerId() != null && !ids.contains(gofp.getCoreFreelancerId())) {
+                ids.add(gofp.getCoreFreelancerId());
+            }
+        }
+        return deliveryRepository.countUnfinishedByFreelancerIds(ids)
+                .map(n -> n > 0 ? FreelancerCandidateDTO.BUSY : FreelancerCandidateDTO.AVAILABLE)
+                .defaultIfEmpty(FreelancerCandidateDTO.AVAILABLE)
+                .onErrorReturn(FreelancerCandidateDTO.AVAILABLE);
+    }
+
+    private Flux<SubscriptionResponseDTO> rawSubscriptions(UUID announcementId) {
         return tenantContextHolder.currentTenantId()
                 .flatMap(tenantId -> deliveryAnnouncementPort.findById(tenantId, announcementId))
                 .flatMapMany(a -> Flux.fromIterable(a.responses()))

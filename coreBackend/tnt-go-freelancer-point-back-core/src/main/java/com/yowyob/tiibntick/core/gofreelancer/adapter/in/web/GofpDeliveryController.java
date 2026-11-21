@@ -107,7 +107,11 @@ public class GofpDeliveryController {
         return deliveryStatusApplicationService.assertCallerIsAssignedDeliveryPerson(id, callerActorId)
                 .then(Mono.defer(() -> deliveryStatusApplicationService.updateStatus(id, dto)))
                 .map(ResponseEntity::ok)
-                .onErrorResume(IllegalArgumentException.class,
+                // Lot C-53: a wrong handover code keeps its body (code INVALID_HANDOVER_CODE) so the
+                // courier app can say "wrong code" instead of a generic failure.
+                .onErrorResume(e -> e instanceof IllegalArgumentException
+                                && !(e instanceof com.yowyob.tiibntick.core.gofreelancer.domain.exception
+                                        .InvalidHandoverCodeException),
                         e -> Mono.just(ResponseEntity.badRequest().<Delivery>build()));
     }
 

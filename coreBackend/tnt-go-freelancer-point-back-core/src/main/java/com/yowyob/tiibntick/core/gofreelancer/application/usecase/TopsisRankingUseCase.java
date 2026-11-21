@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.core.gofreelancer.application.usecase;
 
+import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.vehicle.VehicleCategory;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.vehicle.VehicleType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,11 +37,17 @@ public class TopsisRankingUseCase {
 
     private static final double EARTH_RADIUS_KM = 6371.0;
 
-    // AHP weights — aligned with ATANGA, must sum to 1.0
-    private static final double W_DISTANCE     = 0.558;
-    private static final double W_RATING       = 0.264;
-    private static final double W_CAPACITY     = 0.122;  // available trunk volume in m³
-    private static final double W_VEHICLE_TYPE = 0.057;  // ordinal score by vehicle type
+    // AHP weights — must sum to 1.0.
+    // Lot C-54: a fifth criterion, loyalty (C5, seniority + parcels delivered, bounded in [0, 1]), gets
+    // 0.080; the four ATANGA weights (0.558 / 0.264 / 0.122 / 0.057 — they summed to 1.001) are scaled
+    // by 0.92 so their ratios are kept. Loyalty stays well below the distance (0.513) and the rating
+    // (0.243): a loyal courier far away never overtakes a near one, it only breaks near-ties.
+    static final double W_DISTANCE     = 0.513;
+    static final double W_RATING       = 0.243;
+    static final double W_CAPACITY     = 0.112;  // available trunk volume in m³
+    static final double W_VEHICLE_TYPE = 0.052;  // ordinal score by vehicle type
+    static final double W_LOYALTY      = 0.080;  // lot C-54 — CourierCardService#loyaltyScore
+    private static final int CRITERIA = 5;
 
     // ── Public API ─────────────────────────────────────────────────────────────
 
@@ -82,7 +89,8 @@ public class TopsisRankingUseCase {
                 : candidates.stream()
                         .filter(c -> {
                             VehicleType ct = parseVehicleType(c.getVehicleType());
-                            boolean match = requiredType == ct;
+                            // Lot C-54: same category (a VAN serves a TRUCK request, a SCOOTER a MOTORBIKE one).
+                            boolean match = ct != null && VehicleCategory.of(requiredType) == VehicleCategory.of(ct);
                             if (!match) log.debug("TOPSIS: candidate {} eliminated — type {} required, found {}",
                                     c.getFreelancerId(), requiredType, ct);
                             return match;
@@ -113,7 +121,7 @@ public class TopsisRankingUseCase {
         int n = candidates.size();
 
         // ── Step 1 : Build raw decision matrix ─────────────────────────────────
-        double[][] matrix = new double[n][4];
+        double[][] matrix = new double[n][CRITERIA];
         for (int i = 0; i < n; i++) {
             FreelancerCandidate c = candidates.get(i);
             matrix[i][0] = haversine(pickupLat, pickupLon, c.getLatitude(), c.getLongitude()); // C1
@@ -123,28 +131,30 @@ public class TopsisRankingUseCase {
             // C4 — vehicle type ordinal score (same scale as ATANGA)
             // When a type is required and all survivors have it, score = 1.0 for all → neutral
             matrix[i][3] = requiredType != null ? 1.0 : vehicleTypeScore(c.getVehicleType());  // C4
+            matrix[i][4] = c.getLoyaltyScore() != null
+                    ? Math.max(0.0, Math.min(1.0, c.getLoyaltyScore())) : 0.0;                   // C5
         }
 
         // ── Step 2 : Normalise (vector normalisation) ──────────────────────
-        double[] colNorm = new double[4];
-        for (int j = 0; j < 4; j++) {
+        double[] colNorm = new double[CRITERIA];
+        for (int j = 0; j < CRITERIA; j++) {
             double sumSq = 0;
             for (int i = 0; i < n; i++) sumSq += matrix[i][j] * matrix[i][j];
             colNorm[j] = Math.sqrt(sumSq);
         }
 
-        double[][] norm = new double[n][4];
+        double[][] norm = new double[n][CRITERIA];
         for (int i = 0; i < n; i++) {
-            for (int j = 0; j < 4; j++) {
+            for (int j = 0; j < CRITERIA; j++) {
                 norm[i][j] = colNorm[j] == 0 ? 0 : matrix[i][j] / colNorm[j];
             }
         }
 
         // ── Step 3 : Weighted normalised matrix ────────────────────────────
-        double[] weights = {W_DISTANCE, W_RATING, W_CAPACITY, W_VEHICLE_TYPE};
-        double[][] weighted = new double[n][4];
+        double[] weights = {W_DISTANCE, W_RATING, W_CAPACITY, W_VEHICLE_TYPE, W_LOYALTY};
+        double[][] weighted = new double[n][CRITERIA];
         for (int i = 0; i < n; i++) {
-            for (int j = 0; j < 4; j++) {
+            for (int j = 0; j < CRITERIA; j++) {
                 weighted[i][j] = norm[i][j] * weights[j];
             }
         }
@@ -152,8 +162,8 @@ public class TopsisRankingUseCase {
         // ── Step 4 : Ideal best / worst ────────────────────────────────────
         // C1 (distance) is a cost criterion (lower = better)
         // C2, C3, C4 are benefit criteria (higher = better)
-        double[] idealBest  = new double[4];
-        double[] idealWorst = new double[4];
+        double[] idealBest  = new double[CRITERIA];
+        double[] idealWorst = new double[CRITERIA];
 
         // C1 — cost
         idealBest[0]  = Double.MAX_VALUE;
@@ -163,8 +173,8 @@ public class TopsisRankingUseCase {
             if (weighted[i][0] > idealWorst[0]) idealWorst[0] = weighted[i][0];
         }
 
-        // C2, C3, C4 — benefit
-        for (int j = 1; j < 4; j++) {
+        // C2, C3, C4, C5 — benefit
+        for (int j = 1; j < CRITERIA; j++) {
             idealBest[j]  = Double.MIN_VALUE;
             idealWorst[j] = Double.MAX_VALUE;
             for (int i = 0; i < n; i++) {
@@ -177,7 +187,7 @@ public class TopsisRankingUseCase {
         List<ScoredCandidate> scored = new ArrayList<>();
         for (int i = 0; i < n; i++) {
             double dBest = 0, dWorst = 0;
-            for (int j = 0; j < 4; j++) {
+            for (int j = 0; j < CRITERIA; j++) {
                 dBest  += Math.pow(weighted[i][j] - idealBest[j],  2);
                 dWorst += Math.pow(weighted[i][j] - idealWorst[j], 2);
             }
@@ -222,8 +232,10 @@ public class TopsisRankingUseCase {
         if (vehicleType == null) return 0.0;
         return switch (vehicleType.toUpperCase()) {
             case "TRUCK"    -> 4.0;
+            case "BUS"      -> 3.5;  // lot C-54
             case "VAN"      -> 3.0;
             case "CAR"      -> 2.0;
+            case "TRICYCLE" -> 1.8;  // lot C-54
             case "MOTORBIKE", "SCOOTER" -> 1.5;
             case "BIKE"     -> 1.0;
             default         -> 1.0;
@@ -273,6 +285,8 @@ public class TopsisRankingUseCase {
          * Used as criterion C3. Null-safe: treated as 0.0 if absent.
          */
         private Double availableTrunkVolumeM3;
+        /** Lot C-54 — loyalty in [0, 1] (CourierCardService#loyaltyScore), criterion C5. Null = 0. */
+        private Double loyaltyScore;
         private Double topsisScore;       // filled in after ranking
     }
 }

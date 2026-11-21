@@ -29,4 +29,13 @@ public class SubscriptionResponseDTO {
     private java.math.BigDecimal proposedPrice;
     /** Currency of {@link #proposedPrice}. */
     private String currency;
+
+    // ── Lot C-54 — courier card (same fields as FreelancerCandidateDTO). ──
+    private String vehicleType;
+    private String vehiclePlate;
+    private java.util.List<String> vehiclePhotoUrls;
+    private Long deliveredCount;
+    private String badge;
+    /** {@code AVAILABLE}, {@code BUSY} (unfinished delivery) or {@code PAUSED}: the sort key, then loyalty. */
+    private String courierStatus;
 }

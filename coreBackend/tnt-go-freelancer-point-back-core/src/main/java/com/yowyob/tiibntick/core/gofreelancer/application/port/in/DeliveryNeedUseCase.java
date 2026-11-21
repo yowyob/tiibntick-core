@@ -32,4 +32,16 @@ public interface DeliveryNeedUseCase {
     /** Lot C-52 — staff may assign anyone; a client only a courier who applied (409 otherwise). */
     Mono<DeliveryNeedResponseDTO> assignFreelancer(UUID deliveryNeedId, UUID freelancerId, UUID callerId,
                                                    boolean callerIsStaff);
+
+    /**
+     * Lot C-54 — indicative platform price, for the calling courier's vehicle, of the parcel behind an
+     * open announcement (shown above the price field of "Apply"; not a ceiling).
+     */
+    record PlatformPrice(java.util.UUID announcementId, String vehicleType, String vehicleCategory,
+                         double totalPrice, String currency, String breakdown) { }
+
+    default reactor.core.publisher.Mono<PlatformPrice> platformPriceForCourier(java.util.UUID announcementId,
+                                                                               java.util.UUID callerUserId) {
+        return reactor.core.publisher.Mono.error(new UnsupportedOperationException("platform price"));
+    }
 }

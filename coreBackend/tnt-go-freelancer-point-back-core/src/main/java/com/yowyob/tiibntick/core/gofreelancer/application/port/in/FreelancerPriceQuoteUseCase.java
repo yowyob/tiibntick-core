@@ -23,6 +23,22 @@ public interface FreelancerPriceQuoteUseCase {
      */
     Mono<Quote> quote(List<UUID> ownerIds, QuoteInput input);
 
+    /**
+     * Lot C-54 — same resolution, but the platform fallback is the grid of this vehicle (either
+     * vocabulary; {@code null}/unknown = moto). A personal active policy still wins.
+     */
+    default Mono<Quote> quote(List<UUID> ownerIds, QuoteInput input, String vehicleType) {
+        return quote(ownerIds, input);
+    }
+
+    /**
+     * Lot C-54 — the platform price of this vehicle only (no personal policy): the indicative price
+     * shown to a courier applying to an announcement.
+     */
+    default Mono<Quote> platformQuote(String vehicleType, QuoteInput input) {
+        return quote(List.of(), input, vehicleType);
+    }
+
     /** What is being delivered, and when. Every field is optional except the metrics (defaults to 0). */
     record QuoteInput(
             double distanceKm,

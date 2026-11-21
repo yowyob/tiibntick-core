@@ -11,6 +11,8 @@ import com.yowyob.tiibntick.core.billing.pricing.domain.port.in.IPricingUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.FreelancerPricingDTO;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.FreelancerPriceQuoteUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.FreelancerPricingRepository;
+import com.yowyob.tiibntick.core.gofreelancer.config.GofpCourierPricingProperties;
+import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.vehicle.VehicleCategory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -47,8 +49,34 @@ public class FreelancerPriceQuoteService implements FreelancerPriceQuoteUseCase 
     private final IPricingUseCase pricingEngine;
     private final FreelancerPricingRepository legacyPricingRepository;
 
+    /**
+     * Lot C-54 — platform grid of each vehicle. Optional (setter): absent, the defaults of
+     * {@link GofpCourierPricingProperties} apply — the same values as {@code application.yml}.
+     */
+    private GofpCourierPricingProperties courierPricing = new GofpCourierPricingProperties();
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setCourierPricing(GofpCourierPricingProperties courierPricing) {
+        if (courierPricing != null) this.courierPricing = courierPricing;
+    }
+
     @Override
     public Mono<Quote> quote(List<UUID> ownerIds, QuoteInput input) {
+        return quote(ownerIds, input, null);
+    }
+
+    @Override
+    public Mono<Quote> platformQuote(String vehicleType, QuoteInput input) {
+        return priceGrid(List.of(), platformGrid(vehicleType), toContext(input), "PLATFORM_DEFAULT");
+    }
+
+    /** The platform grid of this vehicle (either vocabulary; unknown or absent = moto). */
+    FreelancerPricingDTO platformGrid(String vehicleType) {
+        return courierPricing.gridFor(VehicleCategory.parse(vehicleType));
+    }
+
+    @Override
+    public Mono<Quote> quote(List<UUID> ownerIds, QuoteInput input, String vehicleType) {
         List<UUID> owners = new ArrayList<>(new LinkedHashSet<>(ownerIds));
         PricingContext ctx = toContext(input);
 
@@ -74,7 +102,7 @@ public class FreelancerPriceQuoteService implements FreelancerPriceQuoteUseCase 
             return fromPolicy
                     .switchIfEmpty(Mono.defer(() -> fromLegacy))
                     .switchIfEmpty(Mono.defer(() -> priceGrid(owners,
-                            FreelancerGridPolicyMapper.PLATFORM_DEFAULT_GRID, ctx, "PLATFORM_DEFAULT")));
+                            platformGrid(vehicleType), ctx, "PLATFORM_DEFAULT")));
         });
     }
 

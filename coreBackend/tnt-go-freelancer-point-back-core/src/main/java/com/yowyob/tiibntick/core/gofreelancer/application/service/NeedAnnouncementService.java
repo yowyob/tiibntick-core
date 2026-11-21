@@ -67,6 +67,7 @@ public class NeedAnnouncementService {
                     local.setStatus(AnnouncementStatus.PUBLISHED);
                     local.setPaymentMethod(need.getPaymentMethod());
                     local.setTransportMethod(need.getTransportMethod());
+                    local.setRequiredVehicleType(need.getRequiredVehicleType()); // lot C-54
                     local.setDistance(need.getDistance());
                     local.setCurrency(published.currency());
                     local.setDeliveryNeedId(need.getId());

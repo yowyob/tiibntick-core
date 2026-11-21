@@ -26,8 +26,9 @@ import java.util.UUID;
  *       {@code PATCH /deliveries/{id}/status} with {@code status=DELIVERED} (direct, no relay point).</li>
  * </ul>
  *
- * <p>Only the BCrypt hash is persisted; the plain-text code is communicated once
- * (via push notification and/or email) and never stored.
+ * <p>The BCrypt hash is the reference for verification. Since lot C-53 each code is also kept
+ * encrypted ({@link HandoverCodeCipher}, AES-256-GCM) so that the owner of the delivery need can
+ * read it again in the app ({@link #readHandoverCodes}); the plain code is never stored nor logged.
  *
  * @author MANFOUO BRAUN
  */
@@ -42,6 +43,10 @@ public class DeliveryOtpService {
     private final IAnnouncementRepository announcementRepository;
     private final PushNotificationPort pushNotificationPort;
     private final EmailPort emailPort;
+    private final HandoverCodeCipher cipher;
+
+    /** The plain codes still useful for a delivery; {@code null} for a code that is no longer needed. */
+    public record HandoverCodes(String pickupCode, String deliveryCode) { }
 
     /**
      * Initialises OTP codes for the given delivery if they have not been set yet (lazy-init).
@@ -70,10 +75,51 @@ public class DeliveryOtpService {
 
         delivery.setPickupOtpHash(otpService.hashOtp(pickupOtp));
         delivery.setDeliveryOtpHash(otpService.hashOtp(deliveryOtp));
+        delivery.setPickupCodeEnc(cipher.encrypt(pickupOtp));
+        delivery.setDeliveryCodeEnc(cipher.encrypt(deliveryOtp));
 
         return deliveryRepository.save(delivery)
                 .flatMap(saved -> sendOtpNotifications(saved, pickupOtp, deliveryOtp)
                         .thenReturn(new OtpInitResult(saved, pickupOtp, deliveryOtp, true)));
+    }
+
+    /**
+     * Lot C-53 — the plain codes the owner of the need still needs: the pickup code when
+     * {@code pickupUseful}, the delivery code when {@code deliveryUseful}. A code that is useful but
+     * cannot be read back (delivery created before C-53: hash only; or the key changed) is
+     * regenerated — new hash and new encrypted value, saved — so the owner always gets a code that
+     * the verification accepts. Codes are created first when the delivery has none yet.
+     */
+    public Mono<HandoverCodes> readHandoverCodes(Delivery delivery, boolean pickupUseful, boolean deliveryUseful) {
+        return initOtpIfAbsent(delivery).flatMap(d -> {
+            boolean changed = false;
+            String pickup = null;
+            String deliveryCode = null;
+            if (pickupUseful) {
+                pickup = cipher.decrypt(d.getPickupCodeEnc());
+                if (pickup == null) {
+                    pickup = otpService.generateOtp();
+                    d.setPickupOtpHash(otpService.hashOtp(pickup));
+                    d.setPickupCodeEnc(cipher.encrypt(pickup));
+                    changed = true;
+                }
+            }
+            if (deliveryUseful) {
+                deliveryCode = cipher.decrypt(d.getDeliveryCodeEnc());
+                if (deliveryCode == null) {
+                    deliveryCode = otpService.generateOtp();
+                    d.setDeliveryOtpHash(otpService.hashOtp(deliveryCode));
+                    d.setDeliveryCodeEnc(cipher.encrypt(deliveryCode));
+                    changed = true;
+                }
+            }
+            HandoverCodes codes = new HandoverCodes(pickup, deliveryCode);
+            if (!changed) {
+                return Mono.just(codes);
+            }
+            log.info("Handover codes re-issued for delivery {} (no readable copy)", d.getId());
+            return deliveryRepository.save(d).thenReturn(codes);
+        });
     }
 
     private Mono<Delivery> sendOtpNotifications(Delivery delivery, String pickupOtp, String deliveryOtp) {

@@ -5,7 +5,11 @@ package com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.vehicle;
  */
 public enum VehicleType {
 
-    BIKE, MOTORBIKE, CAR, VAN, TRUCK, SCOOTER;
+    BIKE, MOTORBIKE, CAR, VAN, TRUCK, SCOOTER,
+    /** Lot C-54 — motorised tricycle (cargo or passenger), priced on its own platform grid. */
+    TRICYCLE,
+    /** Lot C-54 — bus / minibus, priced on its own platform grid. */
+    BUS;
 
     public String getValue() { return name(); }
 

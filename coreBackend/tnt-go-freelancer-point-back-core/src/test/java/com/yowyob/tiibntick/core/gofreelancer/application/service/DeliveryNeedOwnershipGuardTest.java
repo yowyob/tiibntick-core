@@ -140,12 +140,12 @@ class DeliveryNeedOwnershipGuardTest {
         when(deliveryNeedRepository.findById(NEED_ID)).thenReturn(Mono.just(needOwnedByOwner));
         when(addressUseCase.getAddressById(any())).thenReturn(Mono.just(addr));
         when(matchingUseCase.processMatchingForDeliveryNeed(
-                any(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), any()))
+                any(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), any(), any()))
                 .thenReturn(Mono.just(List.of(candidate)));
         when(gofpFreelancerRepository.findById(any(UUID.class))).thenReturn(Mono.empty());
         when(gofpFreelancerRepository.findByCoreFreelancerId(any(UUID.class))).thenReturn(Mono.empty());
         when(freelancerEligibilityUseCase.isEligible(any(), any())).thenReturn(Mono.just(true));
-        when(freelancerPriceQuoteUseCase.quote(any(), any())).thenReturn(Mono.just(
+        when(freelancerPriceQuoteUseCase.quote(any(), any(), any())).thenReturn(Mono.just(
                 new FreelancerPriceQuoteUseCase.Quote(1700.0, "XAF", "Base 500 = 1700 XAF", "PLATFORM_DEFAULT", null)));
         when(gofpUserRepository.findByCoreUserId(any())).thenReturn(Mono.empty());
 

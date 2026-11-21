@@ -59,6 +59,14 @@ public class MatchingUseCase {
     private final NotificationService notificationService;
     private final ObjectMapper objectMapper;
 
+    /** Lot C-54 — loyalty of each candidate (TOPSIS C5). Optional (setter): absent, every score is 0. */
+    private com.yowyob.tiibntick.core.gofreelancer.application.service.CourierCardService courierCards;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setCourierCards(com.yowyob.tiibntick.core.gofreelancer.application.service.CourierCardService courierCards) {
+        this.courierCards = courierCards;
+    }
+
     private static final double INITIAL_DELTA_KM = 1.5;
     private static final double DELTA_INCREMENT_KM = 0.5;
     private static final double MAX_DELTA_KM = 10.0;
@@ -259,9 +267,24 @@ public class MatchingUseCase {
             double deliveryLat, double deliveryLon,
             double packetVolumeM3,
             java.time.LocalDateTime pickupDeadline) {
+        return processMatchingForDeliveryNeed(deliveryNeedId, pickupLat, pickupLon, deliveryLat, deliveryLon,
+                packetVolumeM3, pickupDeadline, null);
+    }
+
+    /**
+     * Lot C-54 — {@code requiredVehicleType} (either vocabulary; null = any): only couriers whose
+     * vehicle is of that category are kept, before the radius stops growing, and TOPSIS filters on it.
+     */
+    public Mono<List<FreelancerCandidate>> processMatchingForDeliveryNeed(
+            UUID deliveryNeedId,
+            double pickupLat, double pickupLon,
+            double deliveryLat, double deliveryLon,
+            double packetVolumeM3,
+            java.time.LocalDateTime pickupDeadline,
+            String requiredVehicleType) {
         return runMatchingForNeed(
                 deliveryNeedId, pickupLat, pickupLon, deliveryLat, deliveryLon,
-                packetVolumeM3, pickupDeadline, INITIAL_DELTA_KM);
+                packetVolumeM3, pickupDeadline, requiredVehicleType, INITIAL_DELTA_KM);
     }
 
     private Mono<List<FreelancerCandidate>> runMatchingForNeed(
@@ -270,7 +293,11 @@ public class MatchingUseCase {
             double deliveryLat, double deliveryLon,
             double packetVolumeM3,
             java.time.LocalDateTime pickupDeadline,
+            String requiredVehicleType,
             double delta) {
+        com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.vehicle.VehicleCategory required =
+                com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.vehicle.VehicleCategory
+                        .parse(requiredVehicleType);
 
         double distF1F2 = TopsisRankingUseCase.haversine(pickupLat, pickupLon, deliveryLat, deliveryLon);
         double dMax = distF1F2 + 2 * delta;
@@ -292,7 +319,7 @@ public class MatchingUseCase {
                         if (delta < MAX_DELTA_KM) {
                             return runMatchingForNeed(
                                     deliveryNeedId, pickupLat, pickupLon, deliveryLat, deliveryLon,
-                                    packetVolumeM3, pickupDeadline, delta + DELTA_INCREMENT_KM);
+                                    packetVolumeM3, pickupDeadline, requiredVehicleType, delta + DELTA_INCREMENT_KM);
                         }
                         return Mono.just(List.of());
                     }
@@ -306,7 +333,10 @@ public class MatchingUseCase {
                                             boolean fitsVolume = packetVolumeM3 <= 0 || available >= packetVolumeM3;
                                             boolean hasQuota = c.getRemainingDeliveries() != null
                                                     && c.getRemainingDeliveries() > 0;
-                                            return fitsVolume && hasQuota;
+                                            boolean rightVehicle = required == null || required ==
+                                                    com.yowyob.tiibntick.core.gofreelancer.domain.model.enums
+                                                            .vehicle.VehicleCategory.parse(c.getVehicleType());
+                                            return fitsVolume && hasQuota && rightVehicle;
                                         })
                                         .toList();
 
@@ -314,12 +344,13 @@ public class MatchingUseCase {
                                     if (delta < MAX_DELTA_KM) {
                                         return runMatchingForNeed(
                                                 deliveryNeedId, pickupLat, pickupLon, deliveryLat, deliveryLon,
-                                                packetVolumeM3, pickupDeadline, delta + DELTA_INCREMENT_KM);
+                                                packetVolumeM3, pickupDeadline, requiredVehicleType, delta + DELTA_INCREMENT_KM);
                                     }
                                     return Mono.just(List.of());
                                 }
 
-                                return topsisRankingUseCase.rankCandidates(eligible, pickupLat, pickupLon);
+                                return topsisRankingUseCase.rankCandidates(eligible, pickupLat, pickupLon,
+                                        required == null ? null : required.canonical().name());
                             });
                 });
     }
@@ -352,6 +383,7 @@ public class MatchingUseCase {
                                         vehicle.getTrunkLength(), vehicle.getTrunkWidth(),
                                         vehicle.getTrunkHeight(), vehicle.getTrunkDimensionUnit());
                                 candidate.setAvailableTrunkVolumeM3(Math.max(0.0, trunkTotal - occupied));
+                                if (vehicle.getVehicleType() != null) candidate.setVehicleType(vehicle.getVehicleType());
 
                                 if (gofp != null && gofp.getRating() != null) {
                                     candidate.setRating(gofp.getRating());
@@ -369,6 +401,9 @@ public class MatchingUseCase {
                                                 vehicle.getTrunkLength(), vehicle.getTrunkWidth(),
                                                 vehicle.getTrunkHeight(), vehicle.getTrunkDimensionUnit());
                                         candidate.setAvailableTrunkVolumeM3(Math.max(0.0, trunkTotal - occupied));
+                                        if (vehicle.getVehicleType() != null) {
+                                            candidate.setVehicleType(vehicle.getVehicleType());
+                                        }
                                         return candidate;
                                     })))
                             .onErrorResume(e -> {
@@ -377,7 +412,24 @@ public class MatchingUseCase {
                                 return Mono.just(candidate);
                             });
                 })
+                .flatMap(this::withLoyalty)
                 .collectList();
+    }
+
+    /**
+     * Lot C-54 — loyalty score (seniority + parcels delivered, bounded in [0, 1]) for TOPSIS C5. Absent
+     * card service or failed lookup → 0, which leaves the other criteria to decide.
+     */
+    private Mono<FreelancerCandidate> withLoyalty(FreelancerCandidate candidate) {
+        if (courierCards == null) return Mono.just(candidate);
+        return courierCards.cardOfWireId(candidate.getFreelancerId())
+                .map(card -> {
+                    candidate.setLoyaltyScore(card.loyaltyScore());
+                    if (candidate.getVehicleType() == null) candidate.setVehicleType(card.vehicleType());
+                    return candidate;
+                })
+                .defaultIfEmpty(candidate)
+                .onErrorReturn(candidate);
     }
 
     private UUID extractAnnouncementId(String payload) {

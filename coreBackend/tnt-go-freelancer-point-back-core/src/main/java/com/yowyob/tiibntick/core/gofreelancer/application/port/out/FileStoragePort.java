@@ -34,4 +34,12 @@ public interface FileStoragePort {
      * @return true if deleted, false otherwise
      */
     Mono<Boolean> deleteFile(String filePath);
+
+    /**
+     * Lot C-54 — saves already validated bytes under {@code prefix_<uuid>.<extension>} and returns
+     * the relative path, or an empty string when the write fails (like the other methods).
+     */
+    default Mono<String> saveBytes(byte[] bytes, String prefix, String extension) {
+        return Mono.error(new UnsupportedOperationException("saveBytes not supported by " + getClass()));
+    }
 }

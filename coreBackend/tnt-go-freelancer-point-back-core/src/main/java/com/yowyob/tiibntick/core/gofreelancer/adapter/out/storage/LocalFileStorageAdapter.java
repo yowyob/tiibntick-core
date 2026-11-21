@@ -63,6 +63,23 @@ public class LocalFileStorageAdapter implements FileStoragePort {
     }
 
     @Override
+    public Mono<String> saveBytes(byte[] bytes, String prefix, String extension) {
+        if (bytes == null || bytes.length == 0) {
+            return Mono.just("");
+        }
+        return Mono.fromCallable(() -> {
+            String filename = prefix + "_" + UUID.randomUUID() + "." + extension;
+            Path target = Paths.get(UPLOAD_DIR, filename);
+            Files.createDirectories(target.getParent());
+            Files.write(target, bytes);
+            return UPLOAD_DIR + "/" + filename;
+        }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic()).onErrorResume(ex -> {
+            log.error("Failed to save {} bytes with prefix '{}': {}", bytes.length, prefix, ex.getMessage());
+            return Mono.just("");
+        });
+    }
+
+    @Override
     public Mono<String> saveFilePart(FilePart filePart, String prefix) {
         if (filePart == null) {
             return Mono.just("");

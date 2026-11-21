@@ -19,6 +19,8 @@ public class DeliveryNeedRequestDTO {
     private String signatureUrl;
     private String paymentMethod;
     private String transportMethod;
+    /** Lot C-54 — moto, tricycle, taxi, camion, bus (or the core type names); absent / "ANY" = any vehicle. */
+    private String requiredVehicleType;
     private Double distance;
     private Integer duration;
     private java.time.LocalDateTime pickupDeadline;

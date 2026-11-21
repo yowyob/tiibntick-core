@@ -55,4 +55,12 @@ public interface DeliveryRepository {
      * @return total occupied volume in m³; 0.0 when no active delivery
      */
     Mono<Double> sumOccupiedVolumeM3ByFreelancerId(UUID freelancerId);
+
+    /**
+     * Lot C-54 — deliveries of these courier ids that reached {@code DELIVERED}. Default 0 for the
+     * implementations that predate it.
+     */
+    default Mono<Long> countDeliveredByFreelancerIds(java.util.Collection<UUID> freelancerIds) {
+        return Mono.just(0L);
+    }
 }

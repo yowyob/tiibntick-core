@@ -23,6 +23,17 @@ public class FreelancerCandidateDTO {
      */
     private String status;
 
+    // ── Lot C-54 — courier card. The profile creation date is never part of it. ──
+    private String phone;
+    /** Canonical core type (MOTORBIKE, TRICYCLE, CAR, TRUCK, BUS…), null when the courier declared none. */
+    private String vehicleType;
+    private String vehiclePlate;
+    private java.util.List<String> vehiclePhotoUrls;
+    /** Parcels this courier brought to DELIVERED. */
+    private Long deliveredCount;
+    /** {@code NEW}, {@code CONFIRMED}, {@code LOYAL} or null. */
+    private String badge;
+
     public static final String AVAILABLE = "AVAILABLE";
     public static final String BUSY = "BUSY";
 }

@@ -57,4 +57,12 @@ public interface DeliveryRepository extends ReactiveCrudRepository<Delivery, UUI
               AND status NOT IN ('DELIVERED', 'CANCELLED', 'FAILED')
             """)
     Mono<Long> countUnfinishedByFreelancerIds(java.util.Collection<UUID> freelancerIds);
+
+    /** Deliveries of these courier ids that reached DELIVERED (lot C-54, the "N delivered" of the courier card). */
+    @Query("""
+            SELECT COUNT(*) FROM deliveries
+            WHERE freelancer_id IN (:freelancerIds)
+              AND status = 'DELIVERED'
+            """)
+    Mono<Long> countDeliveredByFreelancerIds(java.util.Collection<UUID> freelancerIds);
 }

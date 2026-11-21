@@ -88,6 +88,91 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
      */
     private com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepository deliveries;
 
+    /**
+     * Lot C-53 — codes de remise créés à l'élection (et non plus au premier appui du livreur).
+     * Injection optionnelle (setter) : absente, {@code updateStatus} les crée toujours en filet.
+     */
+    private DeliveryOtpService deliveryOtp;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setDeliveryOtp(DeliveryOtpService deliveryOtp) {
+        this.deliveryOtp = deliveryOtp;
+    }
+
+    /**
+     * Lot C-54 — fiche du livreur (véhicule réel, immatriculation, photos, livraisons, badge) et type
+     * de véhicule pour la grille plateforme. Injection optionnelle (setter) : absente, fiche inconnue
+     * et grille moto.
+     */
+    private CourierCardService courierCards;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setCourierCards(CourierCardService courierCards) {
+        this.courierCards = courierCards;
+    }
+
+    /** Lot C-54 — miroir local des annonces (lien annonce → besoin) pour le prix indicatif. Optionnel. */
+    private com.yowyob.tiibntick.core.gofreelancer.application.port.out.IAnnouncementRepository localAnnouncements;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setLocalAnnouncements(
+            com.yowyob.tiibntick.core.gofreelancer.application.port.out.IAnnouncementRepository localAnnouncements) {
+        this.localAnnouncements = localAnnouncements;
+    }
+
+    /**
+     * Lot C-54 — prix de la grille plateforme du véhicule de l'appelant pour le colis de l'annonce :
+     * distance et colis du besoin lié (annonce publiée par un besoin Go), sinon la distance de
+     * l'annonce sans colis. Jamais la politique personnelle du livreur : c'est une indication.
+     */
+    @Override
+    public Mono<PlatformPrice> platformPriceForCourier(UUID announcementId, UUID callerUserId) {
+        if (callerUserId == null) {
+            return Mono.error(new org.springframework.security.access.AccessDeniedException(
+                    "An authenticated courier is required"));
+        }
+        if (localAnnouncements == null) {
+            return Mono.error(new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.NOT_FOUND, "Announcement not found"));
+        }
+        Mono<GofpFreelancer> me = gofpFreelancerRepository.findByCoreUserId(callerUserId)
+                .switchIfEmpty(Mono.error(new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "Courier profile not found for the caller")));
+        return localAnnouncements.findById(announcementId)
+                .switchIfEmpty(Mono.error(new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "Announcement not found")))
+                .flatMap(a -> me.flatMap(f -> cardOf(f, f.getId())).flatMap(card -> {
+                    Mono<FreelancerPriceQuoteUseCase.QuoteInput> input = a.getDeliveryNeedId() == null
+                            ? Mono.just(FreelancerPriceQuoteUseCase.QuoteInput.of(
+                                    a.getDistance() != null ? a.getDistance() : 0.0, 0, 0, false, false))
+                            : deliveryNeedRepository.findById(a.getDeliveryNeedId())
+                                    .flatMap(need -> loadPacketMetrics(need.getPacketId()).map(p ->
+                                            new FreelancerPriceQuoteUseCase.QuoteInput(
+                                                    need.getDistance() != null ? need.getDistance() : 0.0,
+                                                    p.weightKg(), p.volumeM3(), p.fragile(), p.perishable(),
+                                                    null, null, need.getPickupDeadline(), need.getPaymentMethod(),
+                                                    null)))
+                                    .defaultIfEmpty(FreelancerPriceQuoteUseCase.QuoteInput.of(
+                                            a.getDistance() != null ? a.getDistance() : 0.0, 0, 0, false, false));
+                    return input.flatMap(in -> freelancerPriceQuoteUseCase.platformQuote(card.vehicleType(), in))
+                            .map(q -> {
+                                var category = com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.vehicle
+                                        .VehicleCategory.parse(card.vehicleType());
+                                return new PlatformPrice(announcementId,
+                                        category == null ? "MOTORBIKE" : category.canonical().name(),
+                                        category == null ? "moto" : category.appWord(),
+                                        q.totalPrice(), q.currency(), q.breakdown());
+                            });
+                }));
+    }
+
+    private Mono<CourierCardService.Card> cardOf(GofpFreelancer freelancer, UUID wireId) {
+        if (courierCards == null) return Mono.just(CourierCardService.Card.UNKNOWN);
+        return (freelancer != null ? courierCards.cardOf(freelancer) : courierCards.cardOfWireId(wireId))
+                .defaultIfEmpty(CourierCardService.Card.UNKNOWN)
+                .onErrorReturn(CourierCardService.Card.UNKNOWN);
+    }
+
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     void setDeliveries(com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepository deliveries) {
         this.deliveries = deliveries;
@@ -178,6 +263,11 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
         if (request.getDeliveryAddress() == null || request.getDeliveryAddress().getAddress() == null) {
             return Mono.error(new IllegalArgumentException("deliveryAddress is required"));
         }
+        try {
+            requiredVehicleOf(request.getRequiredVehicleType());
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            return Mono.error(e);
+        }
 
         Mono<AddressDTO> pickupMono = addressUseCase.createAddress(request.getPickupAddress());
         Mono<AddressDTO> deliveryMono = addressUseCase.createAddress(request.getDeliveryAddress());
@@ -201,6 +291,7 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
                                     .signatureUrl(request.getSignatureUrl())
                                     .paymentMethod(request.getPaymentMethod())
                                     .transportMethod(request.getTransportMethod())
+                                    .requiredVehicleType(requiredVehicleOf(request.getRequiredVehicleType()))
                                     .distance(request.getDistance())
                                     .duration(request.getDuration())
                                     .pickupDeadline(request.getPickupDeadline())
@@ -427,8 +518,27 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
     public Mono<DeliveryNeedResponseDTO> completeAssignment(DeliveryNeed need, GofpFreelancer freelancer) {
         return electThroughAnnouncement(need, freelancer)
                 .switchIfEmpty(Mono.defer(() -> assignWithoutAnnouncement(need, freelancer.getId())))
+                .flatMap(saved -> ensureHandoverCodes(saved).thenReturn(saved))
                 .flatMap(saved -> notifyRelayPoint(saved).thenReturn(saved))
                 .flatMap(this::enrich);
+    }
+
+    /**
+     * Lot C-53 — la livraison créée par l'élection a ses deux codes de remise (créés s'ils manquent,
+     * jamais régénérés). Sans livraison (ancien chemin sans annonce), rien à faire. Un échec ne défait
+     * pas l'élection : {@code updateStatus} reste le filet.
+     */
+    private Mono<Void> ensureHandoverCodes(DeliveryNeed need) {
+        if (deliveries == null || deliveryOtp == null) {
+            return Mono.empty();
+        }
+        return deliveries.findByDeliveryNeedId(need.getId())
+                .flatMap(deliveryOtp::initOtpIfAbsent)
+                .onErrorResume(e -> {
+                    log.warn("Handover codes not created at election for need {}: {}", need.getId(), e.getMessage());
+                    return Mono.empty();
+                })
+                .then();
     }
 
     /** Vue d'un besoin pour un tiers déjà autorisé (le livreur invité) : sans contrôle de propriété. */
@@ -501,11 +611,12 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
         if (freelancer.getCoreUserId() != null) ownerIds.add(freelancer.getCoreUserId());
         ownerIds.add(freelancer.getId());
         double distanceKm = need.getDistance() != null ? need.getDistance() : 0.0;
-        return loadPacketMetrics(need.getPacketId())
-                .flatMap(packet -> freelancerPriceQuoteUseCase.quote(ownerIds,
-                        new FreelancerPriceQuoteUseCase.QuoteInput(distanceKm, packet.weightKg(), packet.volumeM3(),
-                                packet.fragile(), packet.perishable(), null, null, need.getPickupDeadline(),
-                                need.getPaymentMethod(), null)))
+        return Mono.zip(loadPacketMetrics(need.getPacketId()), cardOf(freelancer, freelancer.getId()))
+                .flatMap(t -> freelancerPriceQuoteUseCase.quote(ownerIds,
+                        new FreelancerPriceQuoteUseCase.QuoteInput(distanceKm, t.getT1().weightKg(),
+                                t.getT1().volumeM3(), t.getT1().fragile(), t.getT1().perishable(), null, null,
+                                need.getPickupDeadline(), need.getPaymentMethod(), null),
+                        t.getT2().vehicleType()))
                 .filter(q -> q.totalPrice() > 0)
                 .onErrorMap(e -> !(e instanceof org.springframework.web.server.ResponseStatusException),
                         e -> new org.springframework.web.server.ResponseStatusException(
@@ -568,7 +679,8 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
                             return matchingUseCase.processMatchingForDeliveryNeed(
                                             need.getId(), pickup.lat(), pickup.lon(),
                                             delivery.lat(), delivery.lon(),
-                                            packet.volumeM3(), need.getPickupDeadline())
+                                            packet.volumeM3(), need.getPickupDeadline(),
+                                            need.getRequiredVehicleType())
                                     .flatMapMany(Flux::fromIterable)
                                     .flatMap(candidate -> toPricedCandidate(candidate, distanceKm, packet, need));
                         }));
@@ -651,8 +763,12 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
                 null, null, need != null ? need.getPickupDeadline() : null,
                 need != null ? need.getPaymentMethod() : null, null);
 
-        Mono<FreelancerPriceQuoteUseCase.Quote> quoteMono = freelancerPriceQuoteUseCase
-                .quote(List.of(pricingId, identityId, freelancerId), input)
+        Mono<CourierCardService.Card> cardMono = cardOf(freelancer, freelancerId).cache();
+
+        // Lot C-54 — sans politique personnelle active, la grille plateforme de SON véhicule.
+        Mono<FreelancerPriceQuoteUseCase.Quote> quoteMono = cardMono
+                .flatMap(card -> freelancerPriceQuoteUseCase
+                        .quote(List.of(pricingId, identityId, freelancerId), input, card.vehicleType()))
                 .onErrorResume(e -> {
                     // Un livreur dont le tarif est incalculable n'est pas proposé : mieux vaut
                     // l'omettre que montrer 0 ou un prix inventé.
@@ -664,20 +780,45 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
         Mono<String[]> nameMono = gofpUserRepository.findByCoreUserId(identityId)
                 .map(u -> new String[]{
                         (u.getFirstName() != null && !u.getFirstName().isBlank()) ? u.getFirstName() : "Freelancer",
-                        u.getLastName() != null ? u.getLastName() : ""})
-                .defaultIfEmpty(new String[]{"Freelancer", ""})
-                .onErrorReturn(new String[]{"Freelancer", ""});
+                        u.getLastName() != null ? u.getLastName() : "",
+                        u.getPhone()})
+                .defaultIfEmpty(new String[]{"Freelancer", "", null})
+                .onErrorReturn(new String[]{"Freelancer", "", null});
 
-        return Mono.zip(quoteMono, nameMono, courierStatus(freelancer, freelancerId))
+        return Mono.zip(quoteMono, nameMono, courierStatus(freelancer, freelancerId), cardMono)
                 .map(t -> FreelancerCandidateDTO.builder()
                         .freelancerId(freelancerId)
                         .firstName(t.getT2()[0])
                         .lastName(t.getT2()[1])
+                        .phone(t.getT2().length > 2 ? t.getT2()[2] : null)
                         .rating(candidate.getRating())
                         .estimatedPrice(t.getT1().totalPrice())
                         .priceBreakdown(t.getT1().breakdown())
                         .status(t.getT3())
+                        .vehicleType(t.getT4().vehicleType())
+                        .vehiclePlate(t.getT4().vehiclePlate())
+                        .vehiclePhotoUrls(t.getT4().vehiclePhotoUrls())
+                        .deliveredCount(t.getT4().deliveredCount())
+                        .badge(t.getT4().badge())
                         .build());
+    }
+
+    /**
+     * Lot C-54 — véhicule demandé par l'expéditeur, dans le vocabulaire du core. Absent, vide,
+     * {@code ANY} ou « peu importe » = tous ; une valeur inconnue est refusée (400) plutôt qu'ignorée.
+     */
+    static String requiredVehicleOf(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        String v = raw.trim().toLowerCase(java.util.Locale.ROOT);
+        if (v.equals("any") || v.equals("peu importe") || v.equals("peu_importe")) return null;
+        String canonical = com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.vehicle.VehicleCategory
+                .canonicalName(raw);
+        if (canonical == null) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST,
+                    "requiredVehicleType must be one of moto, tricycle, taxi, camion, bus");
+        }
+        return canonical;
     }
 
     /** Coordonnées d'une adresse ; {@code (0,0)} si l'adresse ou ses coordonnées sont absentes. */
@@ -873,6 +1014,7 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
                 .signatureUrl(need.getSignatureUrl())
                 .paymentMethod(need.getPaymentMethod())
                 .transportMethod(need.getTransportMethod())
+                .requiredVehicleType(need.getRequiredVehicleType())
                 .distance(need.getDistance())
                 .deliveryId(need.getDeliveryId())
                 .assignedFreelancerId(need.getAssignedFreelancerId())

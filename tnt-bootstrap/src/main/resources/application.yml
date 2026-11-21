@@ -432,6 +432,25 @@ tnt:
       # PREVIEW ONLY — never true in production. When true, the plain delivery OTP
       # (deliveryConfirmationCode) is returned in the assign response for E2E testing.
       preview-mode: ${TNT_GOFP_DELIVERY_OTP_PREVIEW:false}
+    # Lot C-54 — platform price grid of each vehicle (XAF), used when the courier has no active
+    # pricing policy of his own; volume (2000/m3), fragile (+500) and perishable (+500) unchanged.
+    # A courier whose vehicle is unknown is priced on the moto grid. Same defaults in
+    # GofpCourierPricingProperties: nothing here is mandatory.
+    courier:
+      grids:
+        moto:     { base-fee: 500,  price-per-km: 100, price-per-kg: 50 }
+        tricycle: { base-fee: 800,  price-per-km: 150, price-per-kg: 40 }
+        taxi:     { base-fee: 1000, price-per-km: 200, price-per-kg: 30 }
+        camion:   { base-fee: 3000, price-per-km: 400, price-per-kg: 20 }
+        bus:      { base-fee: 2000, price-per-km: 300, price-per-kg: 30 }
+      # Badge: NEW below 5 delivered, CONFIRMED from 5, LOYAL from 50 and 6 months of profile.
+      loyalty:
+        new-below-deliveries: 5
+        confirmed-from-deliveries: 5
+        loyal-from-deliveries: 50
+        loyal-from-months: 6
+        score-deliveries-cap: 50
+        score-tenure-days-cap: 365
 
   # ── Agency ERP (Layer 6 back-core) ─────────────────────────────────────────
   agency:

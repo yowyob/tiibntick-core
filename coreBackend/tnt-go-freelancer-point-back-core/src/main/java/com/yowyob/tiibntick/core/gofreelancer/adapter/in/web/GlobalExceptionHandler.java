@@ -128,6 +128,27 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.BAD_REQUEST, "Bad Request", message, exchange);
     }
 
+    /** Lot C-53 — a refusal with a stable code in the body (e.g. {@code NO_COURIER_YET}). */
+    @ExceptionHandler(com.yowyob.tiibntick.core.gofreelancer.domain.exception.CodedStatusException.class)
+    public Mono<ResponseEntity<ErrorResponse>> handleCoded(
+            com.yowyob.tiibntick.core.gofreelancer.domain.exception.CodedStatusException ex,
+            ServerWebExchange exchange) {
+        HttpStatus status = HttpStatus.resolve(ex.getStatusCode().value());
+        if (status == null) {
+            status = HttpStatus.INTERNAL_SERVER_ERROR;
+        }
+        return error(status, status.getReasonPhrase(), ex.getReason(), ex.getCode(), exchange);
+    }
+
+    /** Lot C-53 — wrong pickup/delivery code: 400 with {@code INVALID_HANDOVER_CODE}. */
+    @ExceptionHandler(com.yowyob.tiibntick.core.gofreelancer.domain.exception.InvalidHandoverCodeException.class)
+    public Mono<ResponseEntity<ErrorResponse>> handleInvalidHandoverCode(
+            com.yowyob.tiibntick.core.gofreelancer.domain.exception.InvalidHandoverCodeException ex,
+            ServerWebExchange exchange) {
+        return error(HttpStatus.BAD_REQUEST, "Bad Request", ex.getMessage(),
+                com.yowyob.tiibntick.core.gofreelancer.domain.exception.InvalidHandoverCodeException.CODE, exchange);
+    }
+
     @ExceptionHandler(ResponseStatusException.class)
     public Mono<ResponseEntity<ErrorResponse>> handleResponseStatus(
             ResponseStatusException ex, ServerWebExchange exchange) {
@@ -179,12 +200,18 @@ public class GlobalExceptionHandler {
 
     private static Mono<ResponseEntity<ErrorResponse>> error(
             HttpStatus status, String error, String message, ServerWebExchange exchange) {
+        return error(status, error, message, null, exchange);
+    }
+
+    private static Mono<ResponseEntity<ErrorResponse>> error(
+            HttpStatus status, String error, String message, String code, ServerWebExchange exchange) {
         ErrorResponse body = new ErrorResponse(
                 LocalDateTime.now(),
                 status.value(),
                 error,
                 message,
-                exchange.getRequest().getPath().value());
+                exchange.getRequest().getPath().value(),
+                code);
         return Mono.just(ResponseEntity.status(status).body(body));
     }
 
@@ -197,5 +224,8 @@ public class GlobalExceptionHandler {
         private String error;
         private String message;
         private String path;
+        /** Stable machine-readable code, only for refusals that clients must tell apart. */
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+        private String code;
     }
 }

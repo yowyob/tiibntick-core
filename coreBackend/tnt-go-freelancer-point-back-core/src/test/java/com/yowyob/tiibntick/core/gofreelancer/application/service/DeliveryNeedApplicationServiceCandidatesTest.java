@@ -122,7 +122,7 @@ class DeliveryNeedApplicationServiceCandidatesTest {
         when(addressUseCase.getAddressById(pickupAddressId)).thenReturn(Mono.just(pickupDto));
         when(addressUseCase.getAddressById(deliveryAddressId)).thenReturn(Mono.just(deliveryDto));
         when(matchingUseCase.processMatchingForDeliveryNeed(
-                any(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), any()))
+                any(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), any(), any()))
                 .thenReturn(Mono.just(List.of(candidate)));
         // toPricedCandidate calls findById then findByCoreFreelancerId; stub both to empty
         // so it falls back to default pricing (acceptable for this coordinate-loading test)
@@ -130,7 +130,7 @@ class DeliveryNeedApplicationServiceCandidatesTest {
         when(gofpFreelancerRepository.findByCoreFreelancerId(any(UUID.class))).thenReturn(Mono.empty());
         // priceCandidate asks the billing-engine quote service for the price
         when(freelancerEligibilityUseCase.isEligible(any(), any())).thenReturn(Mono.just(true));
-        when(freelancerPriceQuoteUseCase.quote(any(), any())).thenReturn(Mono.just(
+        when(freelancerPriceQuoteUseCase.quote(any(), any(), any())).thenReturn(Mono.just(
                 new FreelancerPriceQuoteUseCase.Quote(1700.0, "XAF", "Base 500 = 1700 XAF", "PLATFORM_DEFAULT", null)));
         // priceCandidate calls findByCoreUserId for name; stub to empty → "Freelancer" fallback
         when(gofpUserRepository.findByCoreUserId(any())).thenReturn(Mono.empty());
@@ -156,6 +156,7 @@ class DeliveryNeedApplicationServiceCandidatesTest {
                 eq(DELIVERY_LAT),
                 eq(DELIVERY_LON),
                 eq(0.0),
+                eq(null),
                 eq(null));
     }
 
@@ -174,7 +175,7 @@ class DeliveryNeedApplicationServiceCandidatesTest {
         when(deliveryNeedRepository.findById(deliveryNeedId)).thenReturn(Mono.just(need));
         when(addressUseCase.getAddressById(any())).thenReturn(Mono.just(dto));
         when(matchingUseCase.processMatchingForDeliveryNeed(
-                any(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), any()))
+                any(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), any(), any()))
                 .thenReturn(Mono.just(List.of(candidate)));
         when(gofpFreelancerRepository.findById(any(UUID.class))).thenReturn(Mono.empty());
         when(gofpFreelancerRepository.findByCoreFreelancerId(any(UUID.class))).thenReturn(Mono.empty());
@@ -212,7 +213,7 @@ class DeliveryNeedApplicationServiceCandidatesTest {
         when(addressUseCase.getAddressById(pickupAddressId)).thenReturn(Mono.just(dto));
         when(addressUseCase.getAddressById(deliveryAddressId)).thenReturn(Mono.just(dto));
         when(matchingUseCase.processMatchingForDeliveryNeed(
-                any(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), any()))
+                any(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), any(), any()))
                 .thenReturn(Mono.just(List.of()));
         // No candidates → toPricedCandidate is never called; no freelancer repo stubs needed
 
@@ -253,7 +254,7 @@ class DeliveryNeedApplicationServiceCandidatesTest {
         when(deliveryNeedRepository.findById(deliveryNeedId)).thenReturn(Mono.just(need));
         when(addressUseCase.getAddressById(any())).thenReturn(Mono.just(dto));
         when(matchingUseCase.processMatchingForDeliveryNeed(
-                any(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), any()))
+                any(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), any(), any()))
                 .thenReturn(Mono.just(List.of(
                         TopsisRankingUseCase.FreelancerCandidate.builder().freelancerId(busyId).rating(4.0).build(),
                         TopsisRankingUseCase.FreelancerCandidate.builder().freelancerId(freeId).rating(4.0).build())));
@@ -261,7 +262,7 @@ class DeliveryNeedApplicationServiceCandidatesTest {
         when(gofpFreelancerRepository.findById(freeId)).thenReturn(Mono.empty());
         when(gofpFreelancerRepository.findByCoreFreelancerId(freeId)).thenReturn(Mono.empty());
         when(freelancerEligibilityUseCase.isEligible(any(), any())).thenReturn(Mono.just(true));
-        when(freelancerPriceQuoteUseCase.quote(any(), any())).thenReturn(Mono.just(
+        when(freelancerPriceQuoteUseCase.quote(any(), any(), any())).thenReturn(Mono.just(
                 new FreelancerPriceQuoteUseCase.Quote(1700.0, "XAF", "Base", "PLATFORM_DEFAULT", null)));
         when(gofpUserRepository.findByCoreUserId(any())).thenReturn(Mono.empty());
         // la course en cours a été enregistrée sous l'id core du livreur (id du répondant élu)

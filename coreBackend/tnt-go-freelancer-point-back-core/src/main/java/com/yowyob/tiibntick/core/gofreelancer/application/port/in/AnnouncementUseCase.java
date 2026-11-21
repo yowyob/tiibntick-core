@@ -27,6 +27,16 @@ public interface AnnouncementUseCase {
     Flux<AnnouncementResponseDTO> getNearbyAnnouncements(
             com.yowyob.tiibntick.core.gofreelancer.application.port.in.query.NearbyCriteria criteria);
 
+    /**
+     * Lot C-54 — the same, minus the announcements that require a vehicle category the viewer (core
+     * user id of the courier) does not drive. Default: no filter.
+     */
+    default Flux<AnnouncementResponseDTO> getNearbyAnnouncementsFor(
+            com.yowyob.tiibntick.core.gofreelancer.application.port.in.query.NearbyCriteria criteria,
+            UUID viewerUserId) {
+        return getNearbyAnnouncements(criteria);
+    }
+
     Mono<AnnouncementResponseDTO> getAnnouncement(UUID id);
 
     /**

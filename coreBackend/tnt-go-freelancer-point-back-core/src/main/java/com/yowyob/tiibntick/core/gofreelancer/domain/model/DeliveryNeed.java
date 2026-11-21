@@ -117,6 +117,10 @@ public class DeliveryNeed implements Persistable<UUID>, TntPersistableEntity {
     @Column("transport_method")
     private String transportMethod;
 
+    /** Lot C-54 — vehicle the sender asks for (canonical core type: MOTORBIKE, TRICYCLE, CAR, TRUCK, BUS); null = any. */
+    @Column("required_vehicle_type")
+    private String requiredVehicleType;
+
     @Column("distance")
     private Double distance;
 

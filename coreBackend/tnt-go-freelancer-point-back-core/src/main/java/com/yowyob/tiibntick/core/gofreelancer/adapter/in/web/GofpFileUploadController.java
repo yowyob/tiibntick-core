@@ -29,6 +29,8 @@ public class GofpFileUploadController {
     private final GofpFileUploadService uploadService;
     /** Lot C-49: the photos of a relay point are uploaded by its owner or by staff. */
     private final com.yowyob.tiibntick.core.gofreelancer.application.service.RelayPointAccessGuard relayPointGuard;
+    /** Lot C-54: the photos of a vehicle are uploaded by its courier or by staff (open before). */
+    private final com.yowyob.tiibntick.core.gofreelancer.application.service.CourierVehicleService vehicleGuard;
 
     // ── User profile photo ────────────────────────────────────────────────────
 
@@ -128,8 +130,11 @@ public class GofpFileUploadController {
                  consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Mono<ResponseEntity<FreelancerVehicle>> uploadVehicleFrontPhoto(
             @PathVariable UUID freelancerId,
-            @RequestPart("file") FilePart file) {
-        return uploadService.uploadVehicleFrontPhoto(freelancerId, file)
+            @RequestPart("file") FilePart file,
+            @com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser(required = false)
+            com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext ctx) {
+        return vehicleGuard.requireSelfOrStaff(freelancerId, ctx)
+                .flatMap(ownId -> uploadService.uploadVehicleFrontPhoto(ownId, file))
                 .map(ResponseEntity::ok)
                 .onErrorResume(IllegalArgumentException.class,
                         e -> Mono.just(ResponseEntity.notFound().build()));
@@ -142,8 +147,11 @@ public class GofpFileUploadController {
                  consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Mono<ResponseEntity<FreelancerVehicle>> uploadVehicleBackPhoto(
             @PathVariable UUID freelancerId,
-            @RequestPart("file") FilePart file) {
-        return uploadService.uploadVehicleBackPhoto(freelancerId, file)
+            @RequestPart("file") FilePart file,
+            @com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser(required = false)
+            com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext ctx) {
+        return vehicleGuard.requireSelfOrStaff(freelancerId, ctx)
+                .flatMap(ownId -> uploadService.uploadVehicleBackPhoto(ownId, file))
                 .map(ResponseEntity::ok)
                 .onErrorResume(IllegalArgumentException.class,
                         e -> Mono.just(ResponseEntity.notFound().build()));
