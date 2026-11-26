@@ -71,6 +71,13 @@ public class NeedAnnouncementService {
                     local.setDistance(need.getDistance());
                     local.setCurrency(published.currency());
                     local.setDeliveryNeedId(need.getId());
+                    // Lot C-56 — le livreur voit qui envoie et qui reçoit (plus de « - » ni « Recipient »).
+                    local.setShipperFirstName(need.getSenderFirstName());
+                    local.setShipperLastName(need.getSenderLastName());
+                    local.setShipperPhone(need.getSenderPhone());
+                    local.setRecipientFirstName(need.getRecipientFirstName());
+                    local.setRecipientLastName(need.getRecipientLastName());
+                    local.setRecipientPhone(need.getRecipientPhone());
                     log.info("DeliveryNeed {} published as QUOTE_REQUEST announcement {}", need.getId(), published.id());
                     return announcementRepository.save(local).thenReturn(published.id());
                 });
@@ -162,6 +169,12 @@ public class NeedAnnouncementService {
                         }));
     }
 
+    /** Lot C-56 — tenant où l'annonce a été publiée (vide si inconnu : le tenant de l'appelant s'applique). */
+    public Mono<UUID> tenantOf(UUID announcementId) {
+        Mono<UUID> tenant = deliveryAnnouncementPort.tenantOf(announcementId);
+        return tenant == null ? Mono.empty() : tenant.onErrorResume(e -> Mono.empty());
+    }
+
     /** Lot C-52 — l'un de ces livreurs a-t-il déjà répondu (postulé) sur cette annonce ? */
     public Mono<Boolean> hasResponseFrom(UUID announcementId, java.util.Collection<UUID> responderIds) {
         return tenantContextHolder.currentTenantId()
@@ -207,8 +220,8 @@ public class NeedAnnouncementService {
         String packageDescription = p.description() != null
                 ? p.description()
                 : (need.getDescription() != null ? need.getDescription() : "Package");
-        // Contacts : le besoin n'en porte pas — mêmes valeurs neutres que
-        // AnnouncementApplicationService.toPublishCommand, que tnt-delivery-core exige non nulles.
+        // Lot C-56 — contacts du besoin ; tnt-delivery-core les exige non vides : « — » si vraiment
+        // absents, jamais un nom ou un numéro inventé.
         return new PublishAnnouncementPortCommand(
                 tenantId,
                 need.getUserId(),
@@ -221,7 +234,21 @@ public class NeedAnnouncementService {
                 fragile, perishable, packageDescription,
                 pickup,
                 delivery,
-                "Recipient",
-                "+237000000000");
+                orDash(fullName(need.getRecipientFirstName(), need.getRecipientLastName())),
+                orDash(need.getRecipientPhone()));
+    }
+
+    /** Lot C-56 — valeur affichée quand un contact manque vraiment. */
+    public static final String ABSENT = "—";
+
+    static String fullName(String first, String last) {
+        String f = first == null ? "" : first.strip();
+        String l = last == null ? "" : last.strip();
+        String n = (f + " " + l).strip();
+        return n.isEmpty() ? null : n;
+    }
+
+    private static String orDash(String v) {
+        return v == null || v.isBlank() ? ABSENT : v;
     }
 }

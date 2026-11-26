@@ -24,6 +24,8 @@ public class NeedInvitationDTO {
     /** Seconds left before expiry while OPEN, 0 otherwise. */
     private long remainingSeconds;
     private Double estimatedPrice;
+    /** Lot C-56 — nom réel du livreur invité (absent s'il n'en a pas encore). */
+    private String freelancerName;
     private String declineReason;
     private Instant createdAt;
     private Instant respondedAt;

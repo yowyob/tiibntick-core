@@ -16,4 +16,9 @@ public interface NeedInvitationRepository {
     Flux<NeedInvitation> findAllByDeliveryNeedId(UUID deliveryNeedId);
 
     Flux<NeedInvitation> findAllByFreelancerIdAndStatus(UUID freelancerId, String status);
+
+    /** Lot C-36 — every invitation in this status (sweep of the expired ones). */
+    default Flux<NeedInvitation> findAllByStatus(String status) {
+        return Flux.empty();
+    }
 }

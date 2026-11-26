@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
  *   <tr><td>weight</td><td>weightKg</td><td>Double</td></tr>
  *   <tr><td>distance</td><td>distanceKm</td><td>Double</td></tr>
  *   <tr><td>packageType</td><td>packageTypes[0]</td><td>String (enum name)</td></tr>
+ *   <tr><td>packageTypes</td><td>packageTypes (all)</td><td>Set&lt;String&gt; — use with CONTAINS</td></tr>
  *   <tr><td>priority</td><td>priority</td><td>String (enum name)</td></tr>
  *   <tr><td>clientTxCount / txCount</td><td>clientTxCount</td><td>Integer</td></tr>
  *   <tr><td>timeOfDay</td><td>timeOfDay</td><td>LocalTime</td></tr>
@@ -75,6 +76,11 @@ public class VariableNode extends AstNode {
             // FreelancerOrg context ──────────────────────────────────
             case "vehicletype"               -> ctx.getSelectedVehicleType() != null
                                                  ? ctx.getSelectedVehicleType().toUpperCase() : "";
+            // Lot C-56 — every package type of the parcel (packageType only reads the first one):
+            // `packageTypes CONTAINS PERISHABLE` holds for a fragile AND perishable parcel.
+            case "packagetypes"              -> ctx.getPackageTypes() == null ? java.util.Set.of()
+                                                 : ctx.getPackageTypes().stream().map(Enum::name)
+                                                     .collect(java.util.stream.Collectors.toSet());
             case "activeequipmenttypes",
                  "equipmenttypes"            -> ctx.getActiveEquipmentTypeCodes();
             case "specialization"            -> ctx.getActivatedSpecialization() != null
@@ -126,7 +132,7 @@ public class VariableNode extends AstNode {
             case "waitingminutes"            -> ctx.getWaitingMinutes() != null ? ctx.getWaitingMinutes() : 0;
             default -> throw new DslEvaluationException(
                     "Unknown DSL variable: '" + variableName + "'. "
-                    + "Supported (): weight, distance, packageType, priority, "
+                    + "Supported (): weight, distance, packageType, packageTypes, priority, "
                     + "clientTxCount, timeOfDay, weather, roadType, isRaining, isRoadDegraded, "
                     + "vehicleType, activeEquipmentTypes, specialization, isSubDeliverer, "
                     + "packageCount, declaredValue, requiresRefrigeration, requiresAssembly, "

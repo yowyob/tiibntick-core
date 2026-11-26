@@ -33,6 +33,14 @@ public class DeliveryNeedRequestDTO {
 
     // Address & Packet DTOs
     private AddressDTO pickupAddress;
+
+    // Lot C-56 — contacts typed by the sender: kept on the need, shown to the elected courier.
+    private String senderFirstName;
+    private String senderLastName;
+    private String senderPhone;
+    private String recipientFirstName;
+    private String recipientLastName;
+    private String recipientPhone;
     private AddressDTO deliveryAddress;
     private PacketDTO packet;
 }

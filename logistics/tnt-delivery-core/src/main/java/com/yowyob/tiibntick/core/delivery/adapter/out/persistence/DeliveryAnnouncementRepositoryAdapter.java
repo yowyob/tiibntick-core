@@ -65,6 +65,11 @@ public class DeliveryAnnouncementRepositoryAdapter implements DeliveryAnnounceme
     }
 
     @Override
+    public Mono<UUID> findTenantIdOf(UUID announcementId) {
+        return announcementRepo.findById(announcementId).map(e -> e.getTenantId());
+    }
+
+    @Override
     public Mono<DeliveryAnnouncement> findById(UUID tenantId, UUID announcementId) {
         return announcementRepo.findByTenantIdAndId(tenantId, announcementId)
                 .flatMap(e -> parcelRepo.findById(e.getParcelId())

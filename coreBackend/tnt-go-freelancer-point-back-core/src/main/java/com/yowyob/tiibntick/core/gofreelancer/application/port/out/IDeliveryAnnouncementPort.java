@@ -77,4 +77,9 @@ public interface IDeliveryAnnouncementPort {
      * additional filtering is needed.
      */
     Mono<Boolean> hasResponse(UUID announcementId, UUID freelancerId);
+
+    /** Lot C-56 — tenant the announcement was published in, or empty if unknown. */
+    default Mono<UUID> tenantOf(UUID announcementId) {
+        return Mono.empty();
+    }
 }

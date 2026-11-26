@@ -158,6 +158,18 @@ public class RelayDepositService {
         return relayDepositRepository.findByClientId(clientId);
     }
 
+    /** Lot C-36 — in-app notifications of the journey (absent in narrow tests). */
+    private InAppEvents inAppEvents;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setInAppEvents(InAppEvents inAppEvents) {
+        this.inAppEvents = inAppEvents;
+    }
+
+    private Mono<Void> inApp(java.util.function.Function<InAppEvents, Mono<Void>> event) {
+        return inAppEvents == null ? Mono.empty() : event.apply(inAppEvents);
+    }
+
     /**
      * Marks a relay deposit as RETRIEVED.
      *
@@ -231,6 +243,12 @@ public class RelayDepositService {
                                 return Mono.when(inventoryPickup, coreComplete, geoDec)
                                         .then(relayDepositRepository.save(deposit))
                                         .flatMap(saved -> postRetrievalBestEffortTail(saved, retrievedTime)
+                                                .thenReturn(saved))
+                                        // Lot C-36 — sender, courier and relay: the parcel was handed over.
+                                        .flatMap(saved -> inApp(n -> n.handedOver(
+                                                delivery.getDeliveryNeedId() != null
+                                                        ? delivery.getDeliveryNeedId() : saved.getPacketId(),
+                                                delivery.getFreelancerId(), saved.getRelayPointId()))
                                                 .thenReturn(saved));
                             });
                 });

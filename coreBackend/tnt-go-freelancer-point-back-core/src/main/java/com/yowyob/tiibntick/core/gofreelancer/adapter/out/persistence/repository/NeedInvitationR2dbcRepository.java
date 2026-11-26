@@ -11,4 +11,6 @@ public interface NeedInvitationR2dbcRepository extends ReactiveCrudRepository<Ne
     Flux<NeedInvitation> findAllByDeliveryNeedIdOrderByCreatedAtDesc(UUID deliveryNeedId);
 
     Flux<NeedInvitation> findAllByFreelancerIdAndStatus(UUID freelancerId, String status);
+
+    Flux<NeedInvitation> findAllByStatus(String status);
 }

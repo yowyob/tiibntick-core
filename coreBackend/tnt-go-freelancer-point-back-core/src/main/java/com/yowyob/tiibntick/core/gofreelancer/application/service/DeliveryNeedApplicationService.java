@@ -63,6 +63,18 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
      * besoin ne publie aucune annonce — c'est le cas des tests unitaires
      * historiques qui construisent ce service à la main.
      */
+    /** Lot C-36 — in-app notifications of the journey (absent in narrow tests). */
+    private InAppEvents inAppEvents;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setInAppEvents(InAppEvents inAppEvents) {
+        this.inAppEvents = inAppEvents;
+    }
+
+    private Mono<Void> inApp(java.util.function.Function<InAppEvents, Mono<Void>> event) {
+        return inAppEvents == null ? Mono.empty() : event.apply(inAppEvents);
+    }
+
     private NeedAnnouncementService needAnnouncements;
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -297,6 +309,13 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
                                     .pickupDeadline(request.getPickupDeadline())
                                     .targetRelayPointId(request.getTargetRelayPointId())
                                     .requestedStorageDays(request.getRequestedStorageDays())
+                                    // Lot C-56 — contacts enregistrés, relus par l'expéditeur et le livreur.
+                                    .senderFirstName(clean(request.getSenderFirstName()))
+                                    .senderLastName(clean(request.getSenderLastName()))
+                                    .senderPhone(clean(request.getSenderPhone()))
+                                    .recipientFirstName(clean(request.getRecipientFirstName()))
+                                    .recipientLastName(clean(request.getRecipientLastName()))
+                                    .recipientPhone(clean(request.getRecipientPhone()))
                                     .createdAt(now)
                                     .updatedAt(now)
                                     .build();
@@ -305,7 +324,8 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
                             return deliveryNeedRepository.save(need)
                                     .flatMap(saved -> publishAnnouncement(
                                             saved, addresses.getT1(), addresses.getT2(), request.getPacket())
-                                            .thenReturn(saved));
+                                            .thenReturn(saved))
+                                    .flatMap(saved -> inApp(n -> n.relayChosen(saved)).thenReturn(saved));
                         }))
                 .flatMap(this::enrich);
     }
@@ -520,6 +540,7 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
                 .switchIfEmpty(Mono.defer(() -> assignWithoutAnnouncement(need, freelancer.getId())))
                 .flatMap(saved -> ensureHandoverCodes(saved).thenReturn(saved))
                 .flatMap(saved -> notifyRelayPoint(saved).thenReturn(saved))
+                .flatMap(saved -> inApp(n -> n.courierAssigned(saved, freelancer)).thenReturn(saved))
                 .flatMap(this::enrich);
     }
 
@@ -592,12 +613,19 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
         }
         UUID responderId = freelancer.getCoreFreelancerId() != null
                 ? freelancer.getCoreFreelancerId() : freelancer.getId();
+        // Lot C-56 — l'élection lit l'annonce dans SON tenant : le livreur qui accepte une invitation
+        // porte son propre `tid`, qui peut différer de celui de l'expéditeur (sinon 404).
         return needAnnouncements.openAnnouncementOf(need.getId())
-                .flatMap(announcement -> serverPrice(need, freelancer)
-                        .flatMap(quote -> needAnnouncements.responseAt(announcement.getId(), responderId,
-                                java.math.BigDecimal.valueOf(quote.totalPrice()), quote.currency()))
-                        .flatMap(responseId -> announcements.assignResponse(
-                                announcement.getId(), need.getUserId(), responseId))
+                .flatMap(announcement -> needAnnouncements.tenantOf(announcement.getId())
+                        .map(java.util.Optional::of)
+                        .defaultIfEmpty(java.util.Optional.empty())
+                        .flatMap(tenant -> TenantContextHolder.underTenant(tenant.orElse(null),
+                                serverPrice(need, freelancer)
+                                        .flatMap(quote -> needAnnouncements.responseAt(announcement.getId(),
+                                                responderId, java.math.BigDecimal.valueOf(quote.totalPrice()),
+                                                quote.currency()))
+                                        .flatMap(responseId -> announcements.assignResponse(
+                                                announcement.getId(), need.getUserId(), responseId))))
                         .then(deliveryNeedRepository.findById(need.getId())));
     }
 
@@ -925,7 +953,27 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
                         : needAnnouncements.announcementIdOf(need.getId())
                                 .doOnNext(dto::setAnnouncementId)
                                 .onErrorResume(e -> Mono.empty())
-                                .thenReturn(dto));
+                                .thenReturn(dto))
+                .flatMap(this::withAgreedPrice);
+    }
+
+    /**
+     * Lot C-56 — livreur élu : la livraison et SON prix (le tarif figé à l'élection), pour que le
+     * détail et Activités n'affichent plus « À fixer avec le livreur ».
+     */
+    private Mono<DeliveryNeedResponseDTO> withAgreedPrice(DeliveryNeedResponseDTO dto) {
+        Mono<DeliveryNeedResponseDTO> named = dto.getAssignedFreelancerId() == null ? Mono.just(dto)
+                : courierNameOf(dto.getAssignedFreelancerId()).doOnNext(dto::setAssignedCourierName).thenReturn(dto);
+        if (deliveries == null || dto.getAssignedFreelancerId() == null && dto.getStatus() == DeliveryNeedStatus.PENDING) {
+            return named;
+        }
+        return named.then(deliveries.findByDeliveryNeedId(dto.getId()))
+                .doOnNext(d -> {
+                    if (dto.getDeliveryId() == null) dto.setDeliveryId(d.getId());
+                    if (d.getTarif() != null && d.getTarif() > 0) dto.setAgreedPrice(d.getTarif());
+                })
+                .onErrorResume(e -> Mono.empty())
+                .thenReturn(dto);
     }
 
     /**
@@ -1021,6 +1069,33 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
                 .createdAt(need.getCreatedAt())
                 .updatedAt(need.getUpdatedAt())
                 .pickupDeadline(need.getPickupDeadline())
+                .senderFirstName(need.getSenderFirstName())
+                .senderLastName(need.getSenderLastName())
+                .senderPhone(need.getSenderPhone())
+                .recipientFirstName(need.getRecipientFirstName())
+                .recipientLastName(need.getRecipientLastName())
+                .recipientPhone(need.getRecipientPhone())
                 .build();
+    }
+
+    /**
+     * Lot C-56 — nom réel d'un livreur (profil gofp → utilisateur), vide s'il n'en a pas encore :
+     * jamais « Freelancer » quand un nom existe, jamais un nom inventé quand il n'existe pas.
+     */
+    public Mono<String> courierNameOf(UUID gofpFreelancerId) {
+        if (gofpFreelancerId == null) return Mono.empty();
+        return gofpFreelancerRepository.findById(gofpFreelancerId)
+                .switchIfEmpty(Mono.defer(() -> gofpFreelancerRepository.findByCoreFreelancerId(gofpFreelancerId)))
+                .filter(f -> f.getCoreUserId() != null)
+                .flatMap(f -> gofpUserRepository.findByCoreUserId(f.getCoreUserId()))
+                .flatMap(u -> Mono.justOrEmpty(NeedAnnouncementService.fullName(u.getFirstName(), u.getLastName())))
+                .onErrorResume(e -> Mono.empty());
+    }
+
+    /** Valeur saisie, rognée ; vide = absente (jamais une valeur inventée). */
+    static String clean(String raw) {
+        if (raw == null) return null;
+        String v = raw.strip();
+        return v.isEmpty() ? null : v.substring(0, Math.min(v.length(), 120));
     }
 }

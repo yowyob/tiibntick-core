@@ -86,6 +86,18 @@ public class DeliveryStatusApplicationService {
     /** Placeholder driver id used for blockchain anchors when the delivery has no assigned person. */
     private static final UUID UNKNOWN_DRIVER = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
+    /** Lot C-36 — in-app notifications of the journey (absent in narrow tests). */
+    private InAppEvents inAppEvents;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setInAppEvents(InAppEvents inAppEvents) {
+        this.inAppEvents = inAppEvents;
+    }
+
+    private Mono<Void> inApp(java.util.function.Function<InAppEvents, Mono<Void>> event) {
+        return inAppEvents == null ? Mono.empty() : event.apply(inAppEvents);
+    }
+
     /**
      * Moves a delivery through its lifecycle.
      *
@@ -108,6 +120,16 @@ public class DeliveryStatusApplicationService {
      * @return the updated Delivery
      */
     public Mono<Delivery> updateStatus(UUID deliveryId, DeliveryStatusUpdateDTO dto) {
+        // Lot C-56 — la livraison vit dans le tenant de l'expéditeur ; le livreur porte le sien.
+        Mono<UUID> deliveryTenant = lifecycle.tenantOf(deliveryId);
+        return (deliveryTenant == null ? Mono.<UUID>empty() : deliveryTenant.onErrorResume(e -> Mono.empty()))
+                .map(java.util.Optional::of)
+                .defaultIfEmpty(java.util.Optional.empty())
+                .flatMap(tenant -> TenantContextHolder.underTenant(tenant.orElse(null),
+                        updateStatusInCurrentTenant(deliveryId, dto)));
+    }
+
+    private Mono<Delivery> updateStatusInCurrentTenant(UUID deliveryId, DeliveryStatusUpdateDTO dto) {
         return tenantContextHolder.currentTenantId()
                 .defaultIfEmpty(TenantContextHolder.SYSTEM_TENANT)
                 .flatMap(tenantId -> deliveryRepository.findById(deliveryId)
@@ -169,7 +191,9 @@ public class DeliveryStatusApplicationService {
         }
         log.info("Pickup OTP verified for delivery {} — confirming pickup in delivery-core", deliveryId);
         return project(delivery, lifecycle.confirmPickup(tenantId, deliveryId, driver))
-                .flatMap(saved -> anchorPickupFromSender(saved, deliveryId, driver).thenReturn(saved));
+                .flatMap(saved -> anchorPickupFromSender(saved, deliveryId, driver).thenReturn(saved))
+                .flatMap(saved -> saved.getDeliveryNeedId() == null ? Mono.just(saved)
+                        : inApp(n -> n.pickedUp(saved.getDeliveryNeedId())).thenReturn(saved));
     }
 
     /** Blockchain: PICKUP_FROM_SENDER, certified by the OTP (best-effort, ADR-018). */
@@ -245,7 +269,10 @@ public class DeliveryStatusApplicationService {
                                 anchorMissionCompleted(deliveryId, driver),
                                 anchorOtpCertifiedDelivery(deliveryId, driver,
                                         saved.getActualDeliveryTime() != null ? saved.getActualDeliveryTime() : Instant.now()))
-                        .thenReturn(saved));
+                        .thenReturn(saved))
+                .flatMap(saved -> saved.getDeliveryNeedId() == null ? Mono.just(saved)
+                        : inApp(n -> n.handedOver(saved.getDeliveryNeedId(), saved.getFreelancerId(), null))
+                                .thenReturn(saved));
     }
 
     /**
@@ -314,6 +341,7 @@ public class DeliveryStatusApplicationService {
                                     processDeliveryPayment(saved, driver, tenantId),
                                     anchorMissionCompleted(deliveryId, driver),
                                     anchorCustodyTransferToHub(deliveryId, driver, packetId, hubId))
+                            .then(inApp(n -> n.depositedAtRelay(packetId, hubId)))
                             .thenReturn(saved);
                 });
     }

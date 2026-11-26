@@ -34,6 +34,25 @@ public class TenantContextHolder {
      * (e.g. Kafka listener, scheduled task).
      */
     public Mono<UUID> currentTenantId() {
+        return Mono.deferContextual(view -> view.hasKey(TENANT_OVERRIDE)
+                ? Mono.just(view.<UUID>get(TENANT_OVERRIDE))
+                : callerTenantId());
+    }
+
+    /**
+     * Lot C-56 — runs {@code work} as if the current tenant were {@code tenantId} (the tenant an
+     * announcement was published in), whatever the caller's {@code tid}. A courier answering or
+     * accepting an announcement of another tenant then reads it where it lives instead of getting
+     * « Announcement not found ». {@code null} = no change.
+     */
+    public static <T> Mono<T> underTenant(UUID tenantId, Mono<T> work) {
+        return tenantId == null ? work : work.contextWrite(ctx -> ctx.put(TENANT_OVERRIDE, tenantId));
+    }
+
+    /** Reactor-context key of {@link #underTenant}. */
+    static final String TENANT_OVERRIDE = TenantContextHolder.class.getName() + ".override";
+
+    private Mono<UUID> callerTenantId() {
         return resolveCurrentUserUseCase.resolveCurrentContextOrAnonymous()
                 .map(ctx -> {
                     if (ctx.tenantId() != null) {

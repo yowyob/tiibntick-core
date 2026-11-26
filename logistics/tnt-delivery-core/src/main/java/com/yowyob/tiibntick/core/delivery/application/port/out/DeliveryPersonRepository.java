@@ -21,6 +21,15 @@ public interface DeliveryPersonRepository {
 
     Mono<DeliveryPerson> findByActorId(UUID tenantId, UUID actorId);
 
+    /**
+     * A delivery person by its globally unique id, whatever its tenant. Used when a courier answers
+     * an announcement published in another tenant (the Go marketplace lists couriers across tenants).
+     * Empty by default for implementations that do not support it.
+     */
+    default Mono<DeliveryPerson> findByIdInAnyTenant(UUID deliveryPersonId) {
+        return Mono.empty();
+    }
+
     Flux<DeliveryPerson> findAvailableNear(UUID tenantId, GeoCoordinates center, double radiusKm);
 
     Flux<DeliveryPerson> findByStatus(UUID tenantId, DeliveryPersonStatus status);

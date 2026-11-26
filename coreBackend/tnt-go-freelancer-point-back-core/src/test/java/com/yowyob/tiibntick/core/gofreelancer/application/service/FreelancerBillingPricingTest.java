@@ -181,6 +181,40 @@ class FreelancerBillingPricingTest {
     }
 
     @Test
+    @DisplayName("C-56 — a parcel both fragile AND perishable pays both surcharges (personal grid)")
+    void fragileAndPerishableBothBilled() {
+        policyService.upsertPolicy(DELIVERY_PERSON, grid(), TENANT).block();
+
+        Quote q = quote(new QuoteInput(0, 1, 0, true, true, null, null, null, null, null));
+
+        // 500 + 1×50 + 500 fragile + 300 perishable
+        assertThat(q.totalPrice()).isEqualTo(1350.0);
+        assertThat(q.breakdown()).contains("Supplément fragile").contains("Supplément périssable");
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest(name = "fragile={0} perishable={1} → {2} XAF")
+    @org.junit.jupiter.params.provider.CsvSource({"false,false,550", "true,false,1050", "false,true,1050", "true,true,1550"})
+    @DisplayName("C-56b — moto platform grid, 0 km, 1 kg: the 4 fragile × perishable combinations")
+    void motoPlatformGridFourCombinations(boolean fragile, boolean perishable, double expected) {
+        // Liquid and insured have no input in QuoteInput: they cannot change the price (product rule, C-46).
+        Quote q = quoteService.platformQuote("moto",
+                new QuoteInput(0, 1, 0, fragile, perishable, null, null, null, null, null)).block();
+        assertThat(q.totalPrice()).isEqualTo(expected);
+    }
+
+    @Test
+    @DisplayName("C-56 — platform grid of each vehicle: fragile +500 AND perishable +500")
+    void platformGridBillsBothSurcharges() {
+        Quote moto = quoteService.platformQuote("moto", new QuoteInput(0, 1, 0, true, true, null, null, null, null, null)).block();
+        Quote taxi = quoteService.platformQuote("taxi", new QuoteInput(0, 1, 0, true, true, null, null, null, null, null)).block();
+
+        // moto : 500 + 1×50 + 500 + 500 ; taxi : 1000 + 1×30 + 500 + 500
+        assertThat(moto.totalPrice()).isEqualTo(1550.0);
+        assertThat(taxi.totalPrice()).isEqualTo(2030.0);
+        assertThat(moto.breakdown()).contains("Supplément périssable");
+    }
+
+    @Test
     @DisplayName("a delivery that is neither fragile nor perishable pays no surcharge")
     void noSurchargeForStandardParcel() {
         policyService.upsertPolicy(DELIVERY_PERSON, grid(), TENANT).block();

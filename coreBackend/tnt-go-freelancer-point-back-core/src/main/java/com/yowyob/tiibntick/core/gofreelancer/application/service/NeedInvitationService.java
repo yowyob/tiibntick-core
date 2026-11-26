@@ -61,6 +61,18 @@ public class NeedInvitationService {
         this.clock = clock;
     }
 
+    /** Lot C-36 — in-app notifications of the journey (absent in narrow tests). */
+    private InAppEvents inAppEvents;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setInAppEvents(InAppEvents inAppEvents) {
+        this.inAppEvents = inAppEvents;
+    }
+
+    private Mono<Void> inApp(java.util.function.Function<InAppEvents, Mono<Void>> event) {
+        return inAppEvents == null ? Mono.empty() : event.apply(inAppEvents);
+    }
+
     // ── client side ──────────────────────────────────────────────────────
 
     public Mono<NeedInvitationDTO> invite(UUID needId, UUID freelancerId, UUID callerId) {
@@ -95,7 +107,8 @@ public class NeedInvitationService {
                                 .build();
                         return invitations.save(inv)
                                 .onErrorMap(org.springframework.dao.DataIntegrityViolationException.class,
-                                        e -> conflict("An invitation is already pending for this delivery"));
+                                        e -> conflict("An invitation is already pending for this delivery"))
+                                .flatMap(saved -> inApp(n -> n.courseOffered(saved)).thenReturn(saved));
                     }));
                 }))
                 .map(inv -> toDto(inv, null));
@@ -105,7 +118,13 @@ public class NeedInvitationService {
     public Flux<NeedInvitationDTO> forNeed(UUID needId, UUID callerId) {
         return needService.getDeliveryNeed(needId, callerId)
                 .flatMapMany(need -> invitations.findAllByDeliveryNeedId(needId))
-                .map(inv -> toDto(inv, null));
+                .concatMap(inv -> nameOf(inv.getFreelancerId())
+                        .map(name -> {
+                            NeedInvitationDTO dto = toDto(inv, null);
+                            dto.setFreelancerName(name);
+                            return dto;
+                        })
+                        .defaultIfEmpty(toDto(inv, null)));
     }
 
     // ── courier side ─────────────────────────────────────────────────────
@@ -152,6 +171,23 @@ public class NeedInvitationService {
                 .map(inv -> toDto(inv, null));
     }
 
+    /**
+     * Lot C-36 — open invitations past their deadline are closed EXPIRED (the sender is told), without
+     * waiting for someone to touch them. Idempotent: a closed invitation is no longer OPEN.
+     */
+    public Mono<Long> expireOverdue() {
+        Instant now = clock.instant();
+        return invitations.findAllByStatus(NeedInvitation.OPEN)
+                .filter(inv -> inv.isExpiredAt(now))
+                .concatMap(inv -> close(inv, NeedInvitation.EXPIRED, null))
+                .count();
+    }
+
+    @org.springframework.scheduling.annotation.Scheduled(fixedDelayString = "${tnt.gofp.invitations.expiry-sweep-ms:60000}")
+    void scheduledExpiry() {
+        expireOverdue().onErrorResume(e -> Mono.empty()).subscribe();
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────
 
     /** 404 unknown → 403 not the invited courier → 409 already answered → 410 expired (then closed). */
@@ -196,7 +232,8 @@ public class NeedInvitationService {
         inv.setStatus(status);
         inv.setDeclineReason(reason);
         inv.setRespondedAt(clock.instant());
-        return invitations.save(inv);
+        return invitations.save(inv)
+                .flatMap(saved -> inApp(n -> n.invitationClosed(saved)).thenReturn(saved));
     }
 
     private NeedInvitationDTO toDto(NeedInvitation inv, DeliveryNeedResponseDTO need) {
@@ -219,7 +256,13 @@ public class NeedInvitationService {
                 .build();
     }
 
-    private static ResponseStatusException conflict(String reason) {
+    /** Lot C-56 — nom du livreur invité, vide s'il n'en a pas (ou si la lecture échoue). */
+    private Mono<String> nameOf(UUID freelancerId) {
+        Mono<String> name = needService.courierNameOf(freelancerId);
+        return name == null ? Mono.empty() : name.onErrorResume(e -> Mono.empty());
+    }
+
+        private static ResponseStatusException conflict(String reason) {
         return new ResponseStatusException(HttpStatus.CONFLICT, reason);
     }
 }

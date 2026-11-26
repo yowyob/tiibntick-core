@@ -85,8 +85,7 @@ public class DeliveryAnnouncementService implements DeliveryAnnouncementUseCase,
 
         return announcementRepository.findById(cmd.tenantId(), cmd.announcementId())
                 .switchIfEmpty(Mono.error(new AnnouncementNotFoundException(cmd.announcementId())))
-                .flatMap(announcement -> deliveryPersonRepository
-                        .findById(cmd.tenantId(), cmd.deliveryPersonId())
+                .flatMap(announcement -> courierOf(cmd.tenantId(), cmd.deliveryPersonId())
                         .filter(DeliveryPerson::isAvailable)
                         .switchIfEmpty(Mono.error(new DeliveryDomainException(
                             "Delivery person is not available: " + cmd.deliveryPersonId())))
@@ -189,7 +188,9 @@ public class DeliveryAnnouncementService implements DeliveryAnnouncementUseCase,
         GeoCoordinates dropoff = resolveCoords(announcement.getDeliveryAddress());
         double routeKm = Math.max(1.0, pickup.haversineDistanceTo(dropoff));
 
-        return deliveryPersonRepository.findById(tenantId, selected.getDeliveryPersonId())
+        return courierOf(tenantId, selected.getDeliveryPersonId())
+                .switchIfEmpty(Mono.error(new DeliveryDomainException(
+                        "Delivery person not found: " + selected.getDeliveryPersonId())))
                 .flatMap(dp -> costComputationPort.compute(
                         pickup,
                         dropoff,
@@ -220,6 +221,16 @@ public class DeliveryAnnouncementService implements DeliveryAnnouncementUseCase,
                             eta.estimatedArrival());
                     return delivery;
                 })));
+    }
+
+    /**
+     * The courier of a response: in the announcement's tenant first, else by its globally unique id
+     * in any tenant — the Go marketplace lists and invites couriers across tenants, so a courier
+     * of another tenant must be able to answer and be elected (lot C-56).
+     */
+    private Mono<DeliveryPerson> courierOf(UUID tenantId, UUID deliveryPersonId) {
+        return deliveryPersonRepository.findById(tenantId, deliveryPersonId)
+                .switchIfEmpty(Mono.defer(() -> deliveryPersonRepository.findByIdInAnyTenant(deliveryPersonId)));
     }
 
     /** Fallback to Yaoundé centre when an address has no GPS (common for informal create payloads). */

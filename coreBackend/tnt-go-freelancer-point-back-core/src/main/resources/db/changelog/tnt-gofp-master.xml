@@ -482,4 +482,15 @@
                  relativeToChangelogFile="false" splitStatements="true"/>
     </changeSet>
 
+    <!-- Lot C-56: sender and recipient contacts kept on the delivery need. -->
+    <changeSet id="c56-need-contacts" author="TiiBnTickTeam" labels="need-contacts">
+        <sqlFile path="db/changelog/20261122_c56_need_contacts_and_user_names.sql"
+                 relativeToChangelogFile="false" splitStatements="true"/>
+    </changeSet>
+
+    <changeSet id="c36-in-app-notifications" author="TiiBnTickTeam" labels="in-app-notifications">
+        <sqlFile path="db/changelog/20261126_c36_in_app_notifications.sql"
+                 relativeToChangelogFile="false" splitStatements="true"/>
+    </changeSet>
+
 </databaseChangeLog>

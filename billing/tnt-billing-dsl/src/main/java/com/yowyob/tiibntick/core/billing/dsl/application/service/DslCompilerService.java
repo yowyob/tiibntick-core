@@ -65,7 +65,13 @@ public class DslCompilerService {
      */
     public AstNode compileCondition(String conditionExpression) {
         List<Token> tokens = lexer.tokenize(conditionExpression);
-        return parser.parseCondition(tokens);
+        // Lot C-56 — DslParser keeps its cursor (tokens, pos) in fields and is a shared singleton:
+        // concurrent pricing (candidates priced in parallel) corrupted each other's parse, a surcharge
+        // condition then "failed" and the surcharge was silently skipped — the same courier and parcel
+        // got 1050 or 1550 from one call to the next. Parsing a short expression is cheap: serialise it.
+        synchronized (parser) {
+            return parser.parseCondition(tokens);
+        }
     }
 
     /**
@@ -77,7 +83,9 @@ public class DslCompilerService {
      */
     public List<DslAction> compileActions(String actionExpression) {
         List<Token> tokens = lexer.tokenize(actionExpression);
-        return parser.parseActions(tokens);
+        synchronized (parser) { // same shared cursor as compileCondition (lot C-56)
+            return parser.parseActions(tokens);
+        }
     }
 
     /**

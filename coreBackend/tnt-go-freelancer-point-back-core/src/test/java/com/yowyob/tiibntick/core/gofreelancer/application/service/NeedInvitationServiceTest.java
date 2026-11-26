@@ -51,6 +51,9 @@ class NeedInvitationServiceTest {
             return Flux.fromIterable(new ArrayList<>(store.values()))
                     .filter(i -> f.equals(i.getFreelancerId()) && s.equals(i.getStatus()));
         }
+        @Override public Flux<NeedInvitation> findAllByStatus(String s) {
+            return Flux.fromIterable(new ArrayList<>(store.values())).filter(i -> s.equals(i.getStatus()));
+        }
     };
 
     private final Instant t0 = Instant.parse("2026-11-19T10:00:00Z");
@@ -212,6 +215,40 @@ class NeedInvitationServiceTest {
         verify(needs, never()).save(any());
         StepVerifier.create(service.accept(inv.getId(), courierUser))
                 .expectErrorMatches(e -> status(e, 409)).verify();
+    }
+
+    // ── Lot C-36 — notifications in-app ─────────────────────────────────
+
+    @Test
+    @DisplayName("C-36 : invitation → le livreur est notifié ; refus → l'expéditeur ; une seule fois chacun")
+    void inApp_inviteThenDecline() {
+        InAppEvents events = mock(InAppEvents.class);
+        when(events.courseOffered(any())).thenReturn(Mono.empty());
+        when(events.invitationClosed(any())).thenReturn(Mono.empty());
+        service.setInAppEvents(events);
+        NeedInvitationDTO inv = inviteOk();
+        verify(events, org.mockito.Mockito.times(1)).courseOffered(org.mockito.ArgumentMatchers.argThat(
+                i -> i.getId().equals(inv.getId()) && courier.getId().equals(i.getFreelancerId())));
+        service.decline(inv.getId(), courierUser, null).block();
+        verify(events, org.mockito.Mockito.times(1)).invitationClosed(org.mockito.ArgumentMatchers.argThat(
+                i -> "DECLINED".equals(i.getStatus())));
+    }
+
+    @Test
+    @DisplayName("C-36 : une invitation sans réponse expire au balayage, l'expéditeur le sait ; rejouer ne refait rien")
+    void inApp_expirySweep() {
+        InAppEvents events = mock(InAppEvents.class);
+        when(events.courseOffered(any())).thenReturn(Mono.empty());
+        when(events.invitationClosed(any())).thenReturn(Mono.empty());
+        service.setInAppEvents(events);
+        NeedInvitationDTO inv = inviteOk();
+        assertThat(service.expireOverdue().block()).isZero();
+        at(t0.plus(Duration.ofMinutes(11)));
+        assertThat(service.expireOverdue().block()).isEqualTo(1);
+        assertThat(service.expireOverdue().block()).isZero();
+        assertThat(store.get(inv.getId()).getStatus()).isEqualTo("EXPIRED");
+        verify(events, org.mockito.Mockito.times(1)).invitationClosed(org.mockito.ArgumentMatchers.argThat(
+                i -> "EXPIRED".equals(i.getStatus())));
     }
 
     @Test

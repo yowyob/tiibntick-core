@@ -62,28 +62,28 @@ public class DeliveryNeed implements Persistable<UUID>, TntPersistableEntity {
     @Column("requested_storage_days")
     private Integer requestedStorageDays;
 
-    @Transient
+    @Column("sender_first_name") // lot C-56 — persisted (was @Transient: typed by the sender, then lost)
     private String senderFirstName;
 
-    @Transient
+    @Column("sender_last_name") // lot C-56 — persisted (was @Transient: typed by the sender, then lost)
     private String senderLastName;
 
     @Transient
     private String senderEmail;
 
-    @Transient
+    @Column("sender_phone") // lot C-56 — persisted (was @Transient: typed by the sender, then lost)
     private String senderPhone;
 
-    @Transient
+    @Column("recipient_first_name") // lot C-56 — persisted (was @Transient: typed by the sender, then lost)
     private String recipientFirstName;
 
-    @Transient
+    @Column("recipient_last_name") // lot C-56 — persisted (was @Transient: typed by the sender, then lost)
     private String recipientLastName;
 
     @Transient
     private String recipientEmail;
 
-    @Transient
+    @Column("recipient_phone") // lot C-56 — persisted (was @Transient: typed by the sender, then lost)
     private String recipientPhone;
 
     @NotNull

@@ -32,8 +32,11 @@ import java.util.UUID;
 public final class FreelancerGridPolicyMapper {
 
     public static final String GRID_TEMPLATE_CODE = "FREELANCER-GRID";
-    public static final String FRAGILE_CONDITION = "packageType == 'FRAGILE'";
-    public static final String PERISHABLE_CONDITION = "packageType == 'PERISHABLE'";
+    // Lot C-56 — CONTAINS on every package type: `packageType` is only the first one, so a parcel both
+    // fragile and perishable used to get the fragile surcharge only. Old stored conditions
+    // (`packageType == '…'`) are still read back by their FRAGILE / PERISHABLE marker.
+    public static final String FRAGILE_CONDITION = "packageTypes CONTAINS FRAGILE";
+    public static final String PERISHABLE_CONDITION = "packageTypes CONTAINS PERISHABLE";
     public static final String DEFAULT_CURRENCY = "XAF";
 
     /** Platform barème used when a freelancer has published nothing (priced by the same engine). */

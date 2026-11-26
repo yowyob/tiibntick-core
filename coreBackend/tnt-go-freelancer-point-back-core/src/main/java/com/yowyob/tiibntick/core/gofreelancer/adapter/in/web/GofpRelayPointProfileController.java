@@ -5,6 +5,7 @@ import com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.RelayPointUpdateRequest;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.response.RelayExpectedParcelView;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.response.RelayPointPublicView;
+import com.yowyob.tiibntick.core.gofreelancer.application.service.RelayAutoApproval;
 import com.yowyob.tiibntick.core.gofreelancer.application.service.RelayPointAccessGuard;
 import com.yowyob.tiibntick.core.gofreelancer.application.service.RelayPointDirectoryService;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpRelayPoint;
@@ -39,6 +40,17 @@ public class GofpRelayPointProfileController {
     private final GofpRelayPointUseCase relayPointUseCase;
     private final RelayPointAccessGuard guard;
     private final RelayPointDirectoryService directory;
+    /** Lot C-57 — manual approval suspended: an owner's PENDING relay point is approved at once. */
+    private RelayAutoApproval autoApproval;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setAutoApproval(RelayAutoApproval autoApproval) {
+        this.autoApproval = autoApproval;
+    }
+
+    private Mono<GofpRelayPoint> afterOwnerWrite(GofpRelayPoint saved, TntSecurityContext ctx) {
+        return autoApproval == null || RelayPointAccessGuard.isStaff(ctx) ? Mono.just(saved) : autoApproval.afterOwnerWrite(saved);
+    }
 
     @PostMapping
     public Mono<ResponseEntity<GofpRelayPoint>> createOrUpdate(
@@ -46,6 +58,7 @@ public class GofpRelayPointProfileController {
             @CurrentUser(required = false) TntSecurityContext ctx) {
         return guard.prepareWrite(relayPoint, ctx)
                 .flatMap(relayPointUseCase::createOrUpdate)
+                .flatMap(saved -> afterOwnerWrite(saved, ctx))
                 .map(saved -> ResponseEntity.status(HttpStatus.CREATED).body(saved))
                 .onErrorResume(IllegalArgumentException.class,
                         e -> Mono.just(ResponseEntity.badRequest().build()));
@@ -68,6 +81,7 @@ public class GofpRelayPointProfileController {
             @CurrentUser(required = false) TntSecurityContext ctx) {
         return guard.prepareMine(relayPoint, ctx)
                 .flatMap(relayPointUseCase::createOrUpdate)
+                .flatMap(saved -> afterOwnerWrite(saved, ctx))
                 .map(ResponseEntity::ok)
                 .onErrorResume(IllegalArgumentException.class,
                         e -> Mono.just(ResponseEntity.badRequest().build()));

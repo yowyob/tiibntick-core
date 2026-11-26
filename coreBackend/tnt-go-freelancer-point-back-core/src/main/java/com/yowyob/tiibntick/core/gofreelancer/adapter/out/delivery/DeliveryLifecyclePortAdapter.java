@@ -31,6 +31,11 @@ public class DeliveryLifecyclePortAdapter implements IDeliveryLifecyclePort {
     private final DeliveryQueryUseCase query;
 
     @Override
+    public Mono<UUID> tenantOf(UUID deliveryId) {
+        return query.findDeliveryTenantId(deliveryId);
+    }
+
+    @Override
     public Mono<CoreDeliveryState> findState(UUID tenantId, UUID deliveryId) {
         return query.findDeliveryById(tenantId, deliveryId).map(DeliveryLifecyclePortAdapter::toState);
     }

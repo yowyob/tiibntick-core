@@ -42,6 +42,11 @@ public class DeliveryPersonRepositoryAdapter implements DeliveryPersonRepository
     }
 
     @Override
+    public Mono<DeliveryPerson> findByIdInAnyTenant(UUID deliveryPersonId) {
+        return repo.findById(deliveryPersonId).map(DeliveryPersonPersistenceMapper::toDomain);
+    }
+
+    @Override
     public Mono<DeliveryPerson> findByActorId(UUID tenantId, UUID actorId) {
         return repo.findByTenantIdAndActorId(tenantId, actorId)
                 .map(DeliveryPersonPersistenceMapper::toDomain);

@@ -219,6 +219,42 @@ class NeedAnnouncementLinkTest {
     }
 
     @Test
+    @DisplayName("C-56 — les contacts saisis sont enregistrés sur le besoin, publiés, et visibles du livreur ; jamais inventés")
+    void needContacts_keptPublishedAndMirrored() {
+        DeliveryNeedRequestDTO r = request();
+        r.setSenderFirstName("  Awa Expéditrice ");
+        r.setSenderPhone("+237690000416");
+        r.setRecipientFirstName("Marie");
+        r.setRecipientLastName("Destinataire");
+        r.setRecipientPhone("+237677000001");
+
+        var created = needService.createDeliveryNeed(r, ownerId).block();
+
+        ArgumentCaptor<PublishAnnouncementPortCommand> cmd = ArgumentCaptor.forClass(PublishAnnouncementPortCommand.class);
+        verify(port).publish(cmd.capture());
+        assertThat(cmd.getValue().recipientName()).isEqualTo("Marie Destinataire");
+        assertThat(cmd.getValue().recipientPhone()).isEqualTo("+237677000001");
+        DeliveryNeed saved = needStore.get(created.getId());
+        assertThat(saved.getSenderFirstName()).isEqualTo("Awa Expéditrice");
+        assertThat(saved.getRecipientPhone()).isEqualTo("+237677000001");
+        assertThat(created.getSenderPhone()).as("relu par l'expéditeur").isEqualTo("+237690000416");
+        Announcement local = mirror.get(announcementId);
+        assertThat(local.getShipperFirstName()).as("vu par le livreur").isEqualTo("Awa Expéditrice");
+        assertThat(local.getRecipientPhone()).isEqualTo("+237677000001");
+    }
+
+    @Test
+    @DisplayName("C-56 — contacts absents : « — », jamais « Recipient » ni +237000000000")
+    void needWithoutContacts_neverInventsOne() {
+        needService.createDeliveryNeed(request(), ownerId).block();
+
+        ArgumentCaptor<PublishAnnouncementPortCommand> cmd = ArgumentCaptor.forClass(PublishAnnouncementPortCommand.class);
+        verify(port).publish(cmd.capture());
+        assertThat(cmd.getValue().recipientName()).isEqualTo("—");
+        assertThat(cmd.getValue().recipientPhone()).isEqualTo("—");
+    }
+
+    @Test
     @DisplayName("la publication échoue → la création du besoin échoue (pas de besoin sans annonce)")
     void publishFailure_failsNeedCreation() {
         doReturn(Mono.error(new IllegalStateException("delivery-core down"))).when(port).publish(any());
@@ -321,6 +357,40 @@ class NeedAnnouncementLinkTest {
     private void serverQuote(double price) {
         when(quotes.quote(any(), any(), any())).thenReturn(Mono.just(
                 new FreelancerPriceQuoteUseCase.Quote(price, "XAF", "grille", "TEST", null)));
+    }
+
+    /**
+     * Lot C-56 — le livreur qui accepte une invitation porte SON `tid` ; l'annonce vit dans le
+     * tenant de l'expéditeur. Le tenant simulé lit la surcharge posée par {@link TenantContextHolder#underTenant}.
+     */
+    private void callerInTenant(UUID callerTenant) {
+        when(tenant.currentTenantId()).thenReturn(Mono.deferContextual(view -> Mono.just(
+                view.hasKey(TenantContextHolder.TENANT_OVERRIDE)
+                        ? view.<UUID>get(TenantContextHolder.TENANT_OVERRIDE) : callerTenant)));
+    }
+
+    @Test
+    @DisplayName("C-56 — un livreur d'un AUTRE tenant accepte : l'élection lit l'annonce dans le tenant de l'annonce (plus de 404)")
+    void electionByCourierOfAnotherTenant_usesAnnouncementTenant() {
+        UUID needId = createNeed();
+        GofpFreelancer courier = assignableCourier();
+        openAnnouncementWithoutResponse();
+        serverQuote(3000);
+        UUID courierTenant = UUID.randomUUID();
+        when(port.findById(eq(courierTenant), any())).thenReturn(Mono.empty());
+        when(port.tenantOf(announcementId)).thenReturn(Mono.just(tenantId));
+        callerInTenant(courierTenant);
+
+        StepVerifier.create(needService.completeAssignment(needStore.get(needId), courier))
+                .assertNext(dto -> assertThat(dto.getId()).isEqualTo(needId))
+                .verifyComplete();
+
+        ArgumentCaptor<com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.RespondToAnnouncementPortCommand> respond =
+                ArgumentCaptor.forClass(com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.RespondToAnnouncementPortCommand.class);
+        verify(port).respond(respond.capture());
+        assertThat(respond.getValue().tenantId()).as("réponse écrite dans le tenant de l'annonce").isEqualTo(tenantId);
+        verify(port).selectResponse(tenantId, announcementId, ownerId, responseId);
+        assertThat(needStore.get(needId).getStatus()).isEqualTo(DeliveryNeedStatus.ASSIGNED);
     }
 
     @Test

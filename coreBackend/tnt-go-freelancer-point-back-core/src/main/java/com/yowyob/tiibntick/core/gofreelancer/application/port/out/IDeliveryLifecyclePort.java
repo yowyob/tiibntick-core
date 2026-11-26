@@ -30,6 +30,11 @@ public interface IDeliveryLifecyclePort {
 
     Mono<CoreDeliveryState> findState(UUID tenantId, UUID deliveryId);
 
+    /** Lot C-56 — tenant the delivery lives in (the shipper's), or empty if unknown. */
+    default Mono<UUID> tenantOf(UUID deliveryId) {
+        return Mono.empty();
+    }
+
     /** CREATED -> PICKED_UP. */
     Mono<CoreDeliveryState> confirmPickup(UUID tenantId, UUID deliveryId, UUID deliveryPersonId);
 

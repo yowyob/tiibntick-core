@@ -142,6 +142,26 @@ public class AdminRelayPointApplicationService implements AdminRelayPointUseCase
 
     // ── helpers ────────────────────────────────────────────────────────────
 
+    /**
+     * The approval path of {@link #validateRelayPoint} for a relay point registered by its owner
+     * while manual approval is suspended ({@code tnt.gofp.relay.auto-approve}): APPROVED and active,
+     * geo hub provisioned, KYC VERIFIED. No e-mail or push: nothing to announce, and a failed
+     * notification must never block a registration. Hub and KYC are best-effort, as on approval.
+     */
+    public Mono<GofpRelayPoint> approveOnRegistration(GofpRelayPoint rp) {
+        ValidateKycCommand cmd = new ValidateKycCommand(DEFAULT_TENANT, rp.getId(), ActorType.RELAY_OPERATOR,
+                KycStatus.VERIFIED, "auto-approve", "manual approval suspended until the admin platform exists");
+        return updateLocalStatus(rp, RelayPointStatus.APPROVED, true)
+                .flatMap(saved -> ensureHubProvisioned(saved).defaultIfEmpty(saved))
+                .flatMap(saved -> validateKycUseCase.validateKyc(cmd)
+                        .onErrorResume(e -> {
+                            log.warn("KYC auto-validation failed for relay point {} — relay point already APPROVED: {}",
+                                    saved.getId(), e.getMessage());
+                            return Mono.empty();
+                        })
+                        .thenReturn(saved));
+    }
+
     private Mono<GofpRelayPoint> resolveRelayPoint(UUID id) {
         return gofpRelayPointRepository.findById(id)
                 .switchIfEmpty(gofpRelayPointRepository.findByCoreRelayPointId(id));

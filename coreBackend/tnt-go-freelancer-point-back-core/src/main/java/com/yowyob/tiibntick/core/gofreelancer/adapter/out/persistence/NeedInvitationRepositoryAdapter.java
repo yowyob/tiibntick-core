@@ -27,4 +27,8 @@ public class NeedInvitationRepositoryAdapter implements NeedInvitationRepository
     @Override public Flux<NeedInvitation> findAllByFreelancerIdAndStatus(UUID freelancerId, String status) {
         return r2dbc.findAllByFreelancerIdAndStatus(freelancerId, status);
     }
+
+    @Override public Flux<NeedInvitation> findAllByStatus(String status) {
+        return r2dbc.findAllByStatus(status);
+    }
 }

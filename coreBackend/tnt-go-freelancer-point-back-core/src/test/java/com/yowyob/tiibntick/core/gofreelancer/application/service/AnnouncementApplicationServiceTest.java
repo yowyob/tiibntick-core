@@ -172,6 +172,28 @@ class AnnouncementApplicationServiceTest {
     }
 
     @Test
+    void respondToAnnouncement_tellsTheSenderACandidateApplied_lotC36() {
+        AnnouncementResponseSnapshot mine = new AnnouncementResponseSnapshot(UUID.randomUUID(), freelancerId,
+                new BigDecimal("2500"), "XAF", "PENDING", Instant.now());
+        AnnouncementSnapshot after = snapshot(AnnouncementSnapshot.PRICING_MODE_QUOTE_REQUEST, null, "XAF", List.of(mine));
+        var request = new com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.RespondAnnouncementRequestDTO();
+        request.setFreelancerId(freelancerId);
+        when(freelancerQuotaService.hasRemainingQuota(freelancerId)).thenReturn(Mono.just(true));
+        when(tenantContextHolder.currentTenantId()).thenReturn(Mono.just(tenantId));
+        when(deliveryAnnouncementPort.hasResponse(announcementId, freelancerId)).thenReturn(Mono.just(false));
+        when(deliveryAnnouncementPort.respond(any())).thenReturn(Mono.just(after));
+        lenient().when(negotiationChatPort.openNegotiationThread(any(), any(), any())).thenReturn(Mono.empty());
+        InAppEvents events = org.mockito.Mockito.mock(InAppEvents.class);
+        when(events.candidateApplied(any(), any(), any())).thenReturn(Mono.empty());
+        service.setInAppEvents(events);
+
+        StepVerifier.create(service.respondToAnnouncement(announcementId, request)).expectNextCount(1).verifyComplete();
+
+        verify(events, org.mockito.Mockito.times(1))
+                .candidateApplied(announcementId, freelancerId, new BigDecimal("2500"));
+    }
+
+    @Test
     void respondToAnnouncement_idempotent_secondCallDoesNotInvokeRespond() {
         AnnouncementSnapshot current = snapshot(
                 AnnouncementSnapshot.PRICING_MODE_FIXED_PRICE, null, "XAF", List.of());

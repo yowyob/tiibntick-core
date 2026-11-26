@@ -61,4 +61,15 @@ public class DeliveryNeedResponseDTO {
     private Instant createdAt;
     private Instant updatedAt;
     private java.time.LocalDateTime pickupDeadline;
+
+    // Lot C-56 — contacts saisis par l'expéditeur, et le prix du livreur élu (tarif de la livraison).
+    private String senderFirstName;
+    private String senderLastName;
+    private String senderPhone;
+    private String recipientFirstName;
+    private String recipientLastName;
+    private String recipientPhone;
+    private Double agreedPrice;
+    /** Lot C-56 — nom réel du livreur élu (absent s'il n'en a pas encore). */
+    private String assignedCourierName;
 }

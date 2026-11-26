@@ -70,6 +70,18 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
     private final GofpDeliveryOtpProperties deliveryOtpProperties;
 
     /** Lien annonce ↔ besoin Go (injection optionnelle, cf. DeliveryNeedApplicationService). */
+    /** Lot C-36 — in-app notifications of the journey (absent in narrow tests). */
+    private InAppEvents inAppEvents;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setInAppEvents(InAppEvents inAppEvents) {
+        this.inAppEvents = inAppEvents;
+    }
+
+    private Mono<Void> inApp(java.util.function.Function<InAppEvents, Mono<Void>> event) {
+        return inAppEvents == null ? Mono.empty() : event.apply(inAppEvents);
+    }
+
     private NeedAnnouncementService needAnnouncements;
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -143,7 +155,10 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
 
     @Override
     public Mono<AnnouncementResponseDTO> getAnnouncement(UUID id) {
-        return tenantContextHolder.currentTenantId()
+        // Lot C-56 — lue dans le tenant de l'annonce (le livreur qui la consulte porte le sien).
+        return announcementTenant(id)
+                .flatMap(tenant -> TenantContextHolder.underTenant(tenant.orElse(null),
+                        tenantContextHolder.currentTenantId()))
                 .flatMap(tenantId -> deliveryAnnouncementPort.findById(tenantId, id))
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("Announcement not found: " + id)))
                 .map(this::toDTO)
@@ -231,6 +246,27 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
                 ? request.getEstimatedArrivalTime()
                 : Instant.now().plusSeconds(1800);
 
+        // Lot C-56 — la réponse s'écrit dans le tenant de l'annonce, pas dans celui du livreur.
+        Mono<UUID> announcementTenant = deliveryAnnouncementPort.tenantOf(announcementId);
+        return (announcementTenant == null ? Mono.<UUID>empty() : announcementTenant)
+                .onErrorResume(e -> Mono.empty())
+                .map(java.util.Optional::of)
+                .defaultIfEmpty(java.util.Optional.empty())
+                .flatMap(tenant -> TenantContextHolder.underTenant(tenant.orElse(null),
+                        respondInCurrentTenant(announcementId, request, freelancerId, eta)));
+    }
+
+    /** Lot C-56 — tenant où l'annonce a été publiée ; vide si inconnu (le tenant de l'appelant s'applique). */
+    private Mono<java.util.Optional<UUID>> announcementTenant(UUID announcementId) {
+        Mono<UUID> tenant = deliveryAnnouncementPort.tenantOf(announcementId);
+        return (tenant == null ? Mono.<UUID>empty() : tenant)
+                .onErrorResume(e -> Mono.empty())
+                .map(java.util.Optional::of)
+                .defaultIfEmpty(java.util.Optional.empty());
+    }
+
+    private Mono<AnnouncementResponseDTO> respondInCurrentTenant(UUID announcementId,
+            RespondAnnouncementRequestDTO request, UUID freelancerId, Instant eta) {
         return freelancerQuotaService.hasRemainingQuota(freelancerId)
                 .flatMap(hasQuota -> {
                     if (!Boolean.TRUE.equals(hasQuota)) {
@@ -261,7 +297,11 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
                                                 .flatMap(saved -> negotiationChatPort
                                                         .openNegotiationThread(announcementId, saved.clientId(), freelancerId)
                                                         .onErrorResume(e -> Mono.empty())
-                                                        .thenReturn(saved));
+                                                        .thenReturn(saved))
+                                                // Lot C-36 — the sender is told a courier applied.
+                                                .flatMap(saved -> inApp(n -> n.candidateApplied(announcementId,
+                                                        freelancerId, priceOf(saved, freelancerId,
+                                                                request.getProposedPrice()))).thenReturn(saved));
                                     }))
                             .map(saved -> toCandidateDTO(saved, freelancerId))
                             .flatMap(this::enrichFromLocalMirror);
@@ -421,8 +461,10 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
                 .distinct()
                 .concatMap(announcementId -> getAnnouncement(announcementId)
                         .onErrorResume(e -> Mono.empty()))
+                // Lot C-56 — livreur élu par invitation (aucune candidature locale) : l'annonce
+                // complète (adresses, contacts) plutôt que le seul miroir local.
                 .switchIfEmpty(announcementRepository.findAllByAssignedFreelancerId(freelancerId)
-                        .map(this::localToDTO));
+                        .concatMap(a -> getAnnouncement(a.getId()).onErrorResume(e -> Mono.just(localToDTO(a)))));
     }
 
     // ── No escrow ────────────────────────────────────────────────────────────
@@ -602,10 +644,12 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
         Address delivery = toAddress(request.getDeliveryAddress());
 
         String recipientName = joinName(request.getRecipientFirstName(), request.getRecipientLastName());
+        // Lot C-56 — « — » quand un contact manque vraiment, jamais « Recipient » / +237000000000.
         if (recipientName.isBlank()) {
-            recipientName = "Recipient";
+            recipientName = NeedAnnouncementService.ABSENT;
         }
-        String phone = request.getRecipientPhone() != null ? request.getRecipientPhone() : "+237000000000";
+        String phone = request.getRecipientPhone() != null && !request.getRecipientPhone().isBlank()
+                ? request.getRecipientPhone() : NeedAnnouncementService.ABSENT;
 
         String title = request.getTitle() != null && !request.getTitle().isBlank()
                 ? request.getTitle()
@@ -817,5 +861,19 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
         dto.setCreatedAt(a.getCreatedAt());
         dto.setUpdatedAt(a.getUpdatedAt());
         return dto;
+    }
+
+    /** Lot C-36 — price of this courier's response (server price when set), else the one proposed. */
+    private static java.math.BigDecimal priceOf(
+            com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.AnnouncementSnapshot saved,
+            UUID freelancerId, java.math.BigDecimal proposed) {
+        if (saved != null && saved.responses() != null) {
+            for (var r : saved.responses()) {
+                if (freelancerId.equals(r.deliveryPersonId()) && r.proposedPrice() != null) {
+                    return r.proposedPrice();
+                }
+            }
+        }
+        return proposed;
     }
 }

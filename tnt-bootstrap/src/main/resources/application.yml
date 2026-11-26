@@ -419,6 +419,11 @@ tnt:
 
   # ── Go Freelancer Point (Layer 6 back-core) ────────────────────────────────
   gofp:
+    # A relay point registered by its owner is approved at once (same path as a staff approval:
+    # APPROVED, KYC VERIFIED, active, geo hub provisioned), and pending ones are caught up at startup.
+    # Set false to bring back manual approval once the admin platform exists.
+    relay:
+      auto-approve: ${TNT_GOFP_RELAY_AUTO_APPROVE:true}
     admin:
       email: ${TNT_GOFP_ADMIN_EMAIL:admin@test.com}
       password: ${TNT_GOFP_ADMIN_PASSWORD:admin123}

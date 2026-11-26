@@ -18,6 +18,11 @@ public interface DeliveryAnnouncementRepository {
 
     Mono<DeliveryAnnouncement> findById(UUID tenantId, UUID announcementId);
 
+    /** Tenant an announcement was published in (its id is globally unique), or empty if unknown. */
+    default Mono<UUID> findTenantIdOf(UUID announcementId) {
+        return Mono.empty();
+    }
+
     Flux<DeliveryAnnouncement> findByClientId(UUID tenantId, UUID clientId);
 
     Flux<DeliveryAnnouncement> findByStatus(UUID tenantId, AnnouncementStatus status);

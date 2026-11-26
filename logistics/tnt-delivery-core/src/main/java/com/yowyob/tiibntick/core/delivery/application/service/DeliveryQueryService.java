@@ -33,6 +33,11 @@ public class DeliveryQueryService implements DeliveryQueryUseCase {
     private final DeliveryPersonRepository deliveryPersonRepository;
 
     @Override
+    public Mono<UUID> findDeliveryTenantId(UUID deliveryId) {
+        return deliveryRepository.findByIdNoTenant(deliveryId).map(Delivery::getTenantId);
+    }
+
+    @Override
     public Mono<Delivery> findDeliveryById(UUID tenantId, UUID deliveryId) {
         return deliveryRepository.findById(tenantId, deliveryId)
                 .switchIfEmpty(Mono.error(new DeliveryNotFoundException(deliveryId)));
@@ -72,6 +77,11 @@ public class DeliveryQueryService implements DeliveryQueryUseCase {
     @Override
     public Flux<DeliveryAnnouncement> findAnnouncementsByClient(UUID tenantId, UUID clientId) {
         return announcementRepository.findByClientId(tenantId, clientId);
+    }
+
+    @Override
+    public Mono<UUID> findAnnouncementTenantId(UUID announcementId) {
+        return announcementRepository.findTenantIdOf(announcementId);
     }
 
     @Override

@@ -20,6 +20,11 @@ public interface DeliveryQueryUseCase {
      */
     Mono<Delivery> findDeliveryById(UUID tenantId, UUID deliveryId);
 
+    /** Tenant a delivery lives in (its id is globally unique), or empty if unknown — lot C-56. */
+    default Mono<UUID> findDeliveryTenantId(UUID deliveryId) {
+        return Mono.empty();
+    }
+
     /**
      * Finds a delivery by its tracking code.
      */
@@ -61,6 +66,14 @@ public interface DeliveryQueryUseCase {
      * Finds an announcement by its UUID.
      */
     Mono<DeliveryAnnouncement> findAnnouncementById(UUID tenantId, UUID announcementId);
+
+    /**
+     * Tenant an announcement was published in, or empty if unknown. Lets a courier of another
+     * tenant answer it (the Go marketplace is not split by tenant).
+     */
+    default Mono<UUID> findAnnouncementTenantId(UUID announcementId) {
+        return Mono.empty();
+    }
 
     /**
      * Returns all open (PUBLISHED or IN_NEGOTIATION) announcements for a tenant zone.

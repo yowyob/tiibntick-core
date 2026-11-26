@@ -3,6 +3,7 @@ package com.yowyob.tiibntick.core.gofreelancer.domain.model;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.notification.NotificationStatus;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.notification.NotificationType;
 import jakarta.validation.constraints.NotNull;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -47,4 +48,28 @@ public class Notification {
     @NotNull
     @Column("notification_status")
     private NotificationStatus notificationStatus;
+
+    // ── Lot C-36 — in-app inbox (person_id = recipient's user id) ─────────────
+
+    @Column("created_at")
+    private Instant createdAt;
+
+    /** Null while unread. */
+    @Column("read_at")
+    private Instant readAt;
+
+    /** One notification per event and recipient: a replayed action never creates a second one. */
+    @Column("event_key")
+    private String eventKey;
+
+    /** Screen the app opens on tap: SHIPMENT (sender), COURSE (courier), RELAY_PARCEL (relay). */
+    @Column("link_kind")
+    private String linkKind;
+
+    @Column("link_id")
+    private UUID linkId;
+
+    /** JSON object of the values the app renders in the user's language (name, price, ref...). */
+    @Column("params")
+    private String params;
 }
