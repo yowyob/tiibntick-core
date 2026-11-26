@@ -11,6 +11,7 @@ import com.yowyob.tiibntick.core.roles.domain.exception.TntRoleException;
 import com.yowyob.tiibntick.core.roles.domain.model.RoleScopeType;
 import com.yowyob.tiibntick.core.roles.domain.model.RoleSyncOutboxEntry;
 import com.yowyob.tiibntick.core.roles.domain.model.TntRoleDefinition;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import net.javacrumbs.shedlock.core.LockAssert;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
@@ -24,6 +25,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Drains {@code tnt_role_sync_outbox} and replays each pending entry against the Kernel's
@@ -50,6 +52,21 @@ public class KernelRoleSyncWorker {
     /** Backoff ceiling: {@code min(2^attemptCount seconds, 5 minutes)}. */
     static final long MAX_BACKOFF_SECONDS = 300L;
 
+    /**
+     * How long polling pauses after the Kernel circuit breaker refuses a call. Matches
+     * {@code resilience4j.circuitbreaker.instances.kernel*WebClient.wait-duration-in-open-state}
+     * (20s), so the first cycle after the pause lands on a breaker that has had its chance
+     * to move to HALF_OPEN.
+     */
+    static final long CIRCUIT_PAUSE_SECONDS = 20L;
+
+    /**
+     * Rows claimed per cycle while the Kernel circuit is still recovering. A HALF_OPEN
+     * breaker permits only a handful of trial calls, so claiming a full batch would hand it
+     * dozens of calls to refuse — exactly the amplification this worker must not cause.
+     */
+    static final int PROBE_BATCH_SIZE = 1;
+
     private final RoleSyncOutboxRepository outboxRepository;
     private final RoleRepository roleRepository;
     private final UserRoleAssignmentRepository assignmentRepository;
@@ -60,6 +77,19 @@ public class KernelRoleSyncWorker {
 
     /** Guards against overlapping poll cycles within this instance. */
     private final AtomicBoolean pollingInProgress = new AtomicBoolean(false);
+
+    /**
+     * Polling is suspended until this instant; {@code null} means not suspended.
+     * Package-private, like {@link #MAX_ATTEMPTS}, so the unit test can drive the recovery
+     * path without waiting {@link #CIRCUIT_PAUSE_SECONDS} of wall-clock time.
+     */
+    final AtomicReference<LocalDateTime> pausedUntil = new AtomicReference<>();
+
+    /** While true, cycles claim {@link #PROBE_BATCH_SIZE} rows instead of a full batch. */
+    final AtomicBoolean probing = new AtomicBoolean(false);
+
+    /** Set by {@link #handleFailure} when the circuit refused a call in the current cycle. */
+    private final AtomicBoolean circuitRefusedThisCycle = new AtomicBoolean(false);
 
     public KernelRoleSyncWorker(RoleSyncOutboxRepository outboxRepository,
                                  RoleRepository roleRepository,
@@ -111,10 +141,29 @@ public class KernelRoleSyncWorker {
             log.trace("Role sync poll cycle skipped — previous cycle still running");
             return Mono.just(0);
         }
-        return outboxRepository.fetchPendingBatch(batchSize)
+        LocalDateTime resumeAt = pausedUntil.get();
+        if (resumeAt != null && LocalDateTime.now().isBefore(resumeAt)) {
+            pollingInProgress.set(false);
+            log.debug("Role sync poll cycle skipped — Kernel circuit refused calls, polling paused until {}",
+                    resumeAt);
+            return Mono.just(0);
+        }
+        int effectiveBatchSize = probing.get() ? PROBE_BATCH_SIZE : batchSize;
+        circuitRefusedThisCycle.set(false);
+        return outboxRepository.fetchPendingBatch(effectiveBatchSize)
                 .flatMap(entry -> processEntry(entry).thenReturn(true))
                 .count()
                 .map(Long::intValue)
+                .doOnNext(count -> {
+                    if (count > 0 && !circuitRefusedThisCycle.get()) {
+                        // The probe got through: the circuit is closed again, resume full batches.
+                        if (probing.compareAndSet(true, false)) {
+                            log.info("Kernel circuit is serving calls again — role sync resumes full batches of {}",
+                                    batchSize);
+                        }
+                        pausedUntil.set(null);
+                    }
+                })
                 .doFinally(signal -> pollingInProgress.set(false));
     }
 
@@ -237,9 +286,31 @@ public class KernelRoleSyncWorker {
      * reaches {@link #MAX_ATTEMPTS}, the entry is marked {@link
      * com.yowyob.tiibntick.core.roles.domain.model.RoleSyncStatus#DEAD DEAD} instead of
      * scheduled for another retry.
+     *
+     * <p><strong>A circuit-breaker rejection is not a failed attempt.</strong> When the
+     * Kernel circuit is OPEN or HALF_OPEN the call never leaves this process, so counting it
+     * would retire an entry that was never actually tried. Such a rejection instead
+     * {@linkplain RoleSyncOutboxEntry#asDeferred defers} the entry with its attempt counter
+     * intact and suspends polling for {@link #CIRCUIT_PAUSE_SECONDS}, after which a single
+     * probe row ({@link #PROBE_BATCH_SIZE}) tests the circuit before full batches resume.
+     * Without this, an unreachable Kernel emptied the queue into {@code DEAD} at roughly
+     * twenty rows a minute (26 November 2026).
      */
     private Mono<Void> handleFailure(RoleSyncOutboxEntry entry, Throwable error) {
         String message = error.getMessage() != null ? error.getMessage() : error.getClass().getSimpleName();
+
+        if (isCircuitRejection(error)) {
+            circuitRefusedThisCycle.set(true);
+            probing.set(true);
+            LocalDateTime resumeAt = LocalDateTime.now().plusSeconds(CIRCUIT_PAUSE_SECONDS);
+            pausedUntil.accumulateAndGet(resumeAt,
+                    (current, candidate) -> current == null || current.isBefore(candidate) ? candidate : current);
+            log.warn("Kernel circuit refused the call for outbox entry {} (operation={}) — the call never left "
+                            + "this process, so the attempt is NOT counted; entry deferred to {}: {}",
+                    entry.id(), entry.operation(), resumeAt, message);
+            return outboxRepository.save(entry.asDeferred(message, resumeAt)).then();
+        }
+
         log.warn("Kernel sync failed for outbox entry {} (operation={}, attempt={}): {}",
                 entry.id(), entry.operation(), entry.attemptCount(), message);
 
@@ -257,6 +328,24 @@ public class KernelRoleSyncWorker {
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /**
+     * Whether the failure is the circuit breaker refusing to let the call through, rather
+     * than the Kernel answering badly. Matched by <em>type</em> anywhere in the cause chain
+     * — Reactor and the WebClient filter chain routinely wrap the original throwable, and
+     * matching on the class name would quietly stop working if the exception were renamed.
+     */
+    static boolean isCircuitRejection(Throwable error) {
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            if (cause instanceof CallNotPermittedException) {
+                return true;
+            }
+            if (cause.getCause() == cause) {
+                break;
+            }
+        }
+        return false;
+    }
 
     private static Set<String> toStringSet(JsonNode arrayNode) {
         if (arrayNode == null || !arrayNode.isArray()) {

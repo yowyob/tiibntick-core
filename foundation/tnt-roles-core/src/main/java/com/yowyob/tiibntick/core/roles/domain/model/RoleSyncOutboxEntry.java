@@ -143,6 +143,33 @@ public record RoleSyncOutboxEntry(
     }
 
     /**
+     * Reschedules the entry <strong>without consuming a retry attempt</strong> — for a
+     * failure in which the Kernel was never actually called, i.e. an open or half-open
+     * circuit breaker refusing the call outright.
+     *
+     * <p>{@link #asProcessing()} increments {@code attemptCount} <em>before</em> the attempt
+     * is made, so a call that never left the process would otherwise burn one of the ten
+     * attempts that lead to {@link RoleSyncStatus#DEAD DEAD}. That is how, on 26 November
+     * 2026, an unreachable Kernel destroyed several thousand entries in a few hours instead
+     * of leaving them queued: the breaker rejected 50 claimed rows per cycle, and ten
+     * rejections were enough to kill a row that had never been tried once. The increment is
+     * therefore rolled back here. An unreachable Kernel must make the queue <em>wait</em>,
+     * never make it shrink.
+     *
+     * @param reason        why the call was refused (recorded as {@code lastError} for ops)
+     * @param nextAttemptAt when the poller may claim this entry again
+     * @return a copy with {@code status=RETRYING}, {@code attemptCount} restored to its
+     *         pre-attempt value (floored at zero), and {@code nextAttemptAt} rescheduled
+     */
+    public RoleSyncOutboxEntry asDeferred(String reason, LocalDateTime nextAttemptAt) {
+        return new RoleSyncOutboxEntry(
+                id, operation, aggregateType, aggregateId, tenantId, payload,
+                RoleSyncStatus.RETRYING, Math.max(0, attemptCount - 1), reason, kernelRefId,
+                createdAt, nextAttemptAt, processedAt
+        );
+    }
+
+    /**
      * Transitions to the terminal {@link RoleSyncStatus#DEAD} state once the poller has
      * exhausted the configured retry budget for this entry.
      *
