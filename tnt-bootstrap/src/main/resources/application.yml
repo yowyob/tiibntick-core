@@ -682,10 +682,24 @@ management:
       probability: 0.05
 
 springdoc:
+  # Audit n°7 · #10 — re-enabled on 2026-07-23 for an external audit compliance review, with
+  # the instruction "re-disable once the review is done" left in place. Re-disabled on
+  # 2026-11-27, four months later, executing that instruction. The exposure was real and
+  # measured on the live service before closing it: /swagger-ui/index.html answered 200 and
+  # /v3/api-docs served the complete specification to an unauthenticated caller — 913 paths,
+  # 1 052 operations, 594 schemas, 52 of those paths under /admin or /internal. The original
+  # finding (full attack-surface reconnaissance via Swagger UI in prod) is what that is.
+  #
+  # SpringdocProdExposureTest asserts both of these are false under the prod profile. It was
+  # written to prevent exactly this and had never been executed by any pipeline — it ran for
+  # the first time on 2026-11-27 and failed immediately.
+  #
+  # If another audit needs the documentation again, prefer exposing it behind authentication
+  # or on a non-public entrypoint over flipping these back, and set a date to close it.
   swagger-ui:
-    enabled: true  # Audit n°7 · #10 — deliberately re-enabled 2026-07-23 for an external audit compliance review; the underlying finding (full attack-surface reconnaissance via Swagger UI in prod) still stands, re-disable once the review is done
+    enabled: false
   api-docs:
-    enabled: true  # same rationale — /v3/api-docs re-enabled alongside swagger-ui
+    enabled: false
 
 logging:
   level:
