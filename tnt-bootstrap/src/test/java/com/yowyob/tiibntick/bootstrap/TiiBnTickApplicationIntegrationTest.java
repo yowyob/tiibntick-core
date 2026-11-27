@@ -21,7 +21,7 @@ import org.springframework.test.context.ActiveProfiles;
 //    R2dbcAutoConfiguration.class,
 //    R2dbcDataAutoConfiguration.class
 //})
-class TiiBnTickApplicationTest {
+class TiiBnTickApplicationIntegrationTest {
 
     @Test
     void contextLoads() {

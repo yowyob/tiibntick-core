@@ -27,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles({"test", "r2dbc"})
 @DisplayName("Wallet auto-provisioning — wiring in the assembled application")
-class WalletAutoProvisioningWiringTest {
+class WalletAutoProvisioningWiringIntegrationTest {
 
     @Autowired AuthenticatedSessionPublisher publisher;
     @Autowired List<AuthenticatedSessionListener> listeners;

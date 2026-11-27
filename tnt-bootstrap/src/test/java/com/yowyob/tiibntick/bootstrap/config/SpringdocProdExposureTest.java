@@ -17,8 +17,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * production.
  *
  * <p>Deliberately does not boot the full {@code TiiBnTickApplication} (which needs live
- * Postgres/Redis/Kafka — unavailable in this sandbox, see {@code TiiBnTickApplicationTest}
- * / {@code PublicPathsSecurityTest} failures for the same reason) nor pulls in
+ * Postgres/Redis/Kafka — unavailable in this sandbox, see {@code TiiBnTickApplicationIntegrationTest}
+ * / {@code PublicPathsSecurityIntegrationTest} failures for the same reason) nor pulls in
  * springdoc's own auto-configuration (a well-tested third-party library — not what this
  * change needs to re-verify). Instead it loads the real
  * {@code tnt-bootstrap/src/main/resources/application.yml} from the classpath with the

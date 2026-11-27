@@ -26,7 +26,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureWebTestClient(timeout = "PT30S")
 @ActiveProfiles({"test", "r2dbc"})
-class PublicPathsSecurityTest {
+class PublicPathsSecurityIntegrationTest {
 
     @Autowired
     private WebTestClient webTestClient;
