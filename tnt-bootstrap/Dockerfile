@@ -102,4 +102,8 @@ ENV JAVA_OPTS="-XX:+UseContainerSupport \
                -Dfile.encoding=UTF-8"
 
 # ── Spring Boot layered JAR entry point ────────────────────────────────────
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS org.springframework.boot.loader.launch.JarLauncher"]
+# `exec` est indispensable : sans lui le shell reste PID 1 et Docker lui adresse le
+# SIGTERM, que sh ne transmet pas. La JVM mourait donc toujours au SIGKILL du delai
+# de grace, sans arret gracieux — origine des prises `PROCESSING` de l'outbox
+# abandonnees a chaque redeploiement (incident des 274 lignes orphelines, 27/11/2026).
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS org.springframework.boot.loader.launch.JarLauncher"]

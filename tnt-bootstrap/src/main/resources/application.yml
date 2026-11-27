@@ -413,6 +413,24 @@ tnt:
   kafka:
     partitions: ${KAFKA_PARTITIONS:3}
     replication-factor: ${KAFKA_REPLICATION:1}
+    # ── Idle poll cost of the consumers ────────────────────────────────────────
+    # These three CANNOT be expressed under spring.kafka.consumer.*: all 22 modules
+    # that own consumers build their own configuration map and never read
+    # KafkaProperties, so only bootstrap-servers and group-id reach them (through
+    # @Value). TntKafkaConsumerTuning applies these instead, and never overwrites a
+    # value a module declared for itself.
+    consumer:
+      # Kafka's default of 500 ms means two empty fetches a second per consumer —
+      # about 172/s across 86 consumers, for no messages at all. Raising it costs no
+      # latency: fetch.min.bytes is 1, so the broker answers on the first byte.
+      fetch-max-wait-ms: ${TNT_KAFKA_FETCH_MAX_WAIT_MS:5000}
+      # Kafka's default of 3 s means about 29 heartbeats a second. session.timeout.ms
+      # is left alone, so failure detection is unchanged.
+      heartbeat-interval-ms: ${TNT_KAFKA_HEARTBEAT_INTERVAL_MS:10000}
+      # 0 leaves each module its own concurrency (13 of them hardcode 2). Setting 1
+      # brings the 86 consumers down to 59 without touching their code — worth doing
+      # while per-topic traffic is low, worth undoing when it is not.
+      concurrency: ${TNT_KAFKA_CONSUMER_CONCURRENCY:0}
     topics:
       consumed:
         core-mission-created: tnt.delivery.mission.created
