@@ -56,15 +56,21 @@ jobs:
       #     exécuté plus bas pour rester visible à chaque exécution.
       #
       #   Les trois essais Spring Boot qui figuraient ici (WalletAutoProvisioningWiringTest,
-      #   TiiBnTickApplicationTest, PublicPathsSecurityTest) ne sont plus nommés : renommés
-      #   en *IntegrationTest côté dépôt mère, la configuration surefire du pom racine les
-      #   exclut d'elle-même. Une liste d'exclusions par nom de classe pourrit — le prochain
-      #   essai du même genre n'y serait pas, et la porte deviendrait rouge pour une raison
-      #   étrangère au changement examiné.
+      #   TiiBnTickApplicationTest, PublicPathsSecurityTest) sont renommés *IntegrationTest
+      #   côté dépôt mère et exclus ici par MOTIF, plus par nom de classe : une liste de noms
+      #   pourrit — le prochain essai du même genre n'y serait pas, et la porte deviendrait
+      #   rouge pour une raison étrangère au changement examiné.
+      #
+      #   Le motif est indispensable : `-Dtest` SUPPLANTE les <includes>/<excludes> du pom,
+      #   donc l'exclusion `**/*IntegrationTest.java` configurée dans le pom racine ne
+      #   s'applique PAS dès que cette ligne existe. Vérifié dans les deux sens le 27/11/2026
+      #   — sans le motif, 12 erreurs (10 + 1 + 1) faute de Postgres/Redis/Kafka ; avec, 43
+      #   essais verts sur tnt-bootstrap. Avoir validé localement un `mvn test` SANS -Dtest
+      #   avait masqué exactement cette différence.
       - name: Tests unitaires (tous les modules)
         run: >
           mvn -B -ntp test
-          -Dtest='!LayeringArchitectureTest'
+          -Dtest='!LayeringArchitectureTest,!*IntegrationTest'
           -Dsurefire.failIfNoSpecifiedTests=false
       - name: Publier les rapports de test en cas d'échec
         if: failure()
