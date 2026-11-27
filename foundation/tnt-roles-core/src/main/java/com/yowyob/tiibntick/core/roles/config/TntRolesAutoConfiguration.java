@@ -323,13 +323,12 @@ public class TntRolesAutoConfiguration {
             ITntRoleProvisioningPort provisioningPort,
             ITntRoleAssignmentPort assignmentPort,
             ObjectMapper objectMapper,
-            // 168 hourly cycles = one full pass over the PROVISIONED set a week, in slices of
-            // roughly 237 rows against the 39 733 measured on 27 November 2026. Grow this with
-            // the table, never the ceiling below — see the job's Javadoc for why a slice larger
-            // than the ceiling leaves rows permanently unchecked.
-            @Value("${tnt.roles.reconciliation.buckets:168}") int buckets,
-            // Safety net, not the normal limit: ~237 sequential calls fit comfortably inside
-            // the job's PT10M lock, 39 733 never did.
+            // 24 hourly cycles = one full pass a day over the DISTINCT AGGREGATES, of which
+            // there were 29 on 27 November 2026 (for 39 733 rows). Grow this with the number of
+            // aggregates, never the ceiling below — see the job's Javadoc for why a slice larger
+            // than the ceiling leaves aggregates permanently unchecked.
+            @Value("${tnt.roles.reconciliation.buckets:24}") int buckets,
+            // Safety net, not the normal limit: one or two sequential calls a cycle today.
             @Value("${tnt.roles.reconciliation.max-rows-per-cycle:400}") int maxRowsPerCycle) {
         return new KernelRoleReconciliationJob(outboxRepository, roleRepository, assignmentRepository,
                 provisioningPort, assignmentPort, objectMapper, buckets, maxRowsPerCycle);

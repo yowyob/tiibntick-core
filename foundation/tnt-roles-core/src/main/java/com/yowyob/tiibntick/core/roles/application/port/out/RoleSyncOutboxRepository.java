@@ -73,20 +73,24 @@ public interface RoleSyncOutboxRepository {
     Mono<RoleSyncOutboxSummary> summarise();
 
     /**
-     * One bounded slice of the {@link RoleSyncStatus#PROVISIONED PROVISIONED} rows worth
-     * spot-checking against the Kernel, filtered and limited <strong>by the database</strong>.
+     * One bounded slice of the aggregates that have a
+     * {@link RoleSyncStatus#PROVISIONED PROVISIONED} row worth spot-checking against the
+     * Kernel — <strong>at most one row per {@code aggregateId}, the most recent</strong> —
+     * filtered and limited by the database.
      *
      * <p>Replaces {@code findByStatus(PROVISIONED)} for {@code KernelRoleReconciliationJob},
-     * which checked the whole set on every cycle: 39 733 rows and 39 733 Kernel calls an hour
-     * on 27 November 2026. The job spreads the set over {@code bucketCount} slices, one per
-     * cycle, so every row is still checked over a full rotation without any single cycle
-     * hammering the Kernel.
+     * which checked every row on every cycle: 39 733 rows and 39 733 Kernel calls an hour on
+     * 27 November 2026, for exactly 29 distinct aggregates. Because this table is append-only
+     * per attempt, checking rows made the job amplify itself — one absent assignment produced
+     * one re-enqueue per historical row, and each re-enqueue that succeeded added another row
+     * for the next cycle to find.
      *
-     * <p>Implementations must keep the slicing <em>stable</em> — the same row must always fall
-     * in the same bucket — otherwise a row can be skipped forever or checked repeatedly while
-     * others never are.
+     * <p>Two obligations on implementations. The result must hold <em>one row per aggregate</em>
+     * (the newest), or the amplification returns. And the slicing must be <em>stable per
+     * aggregate</em> — the same aggregate always in the same bucket, independently of which of
+     * its rows is currently newest — otherwise a rotation can keep missing it.
      *
-     * @param bucketCount how many slices the PROVISIONED set is divided into, at least 1
+     * @param bucketCount how many slices the aggregate set is divided into, at least 1
      * @param bucketIndex which slice to return, {@code 0 <= bucketIndex < bucketCount}
      * @param maxRows     hard ceiling on rows returned, whatever the slice holds
      */

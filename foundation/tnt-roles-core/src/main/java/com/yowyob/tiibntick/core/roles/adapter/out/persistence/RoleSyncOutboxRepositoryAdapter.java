@@ -108,11 +108,22 @@ public class RoleSyncOutboxRepositoryAdapter implements RoleSyncOutboxRepository
     /**
      * One stable slice of the PROVISIONED rows the reconciliation job may check.
      *
-     * <p>The slice key is the first byte of the UUID (via {@code uuid_send}), which is uniform
-     * for the random v4 ids used here and always non-negative — unlike {@code hashtext}, whose
-     * result can be negative and whose {@code abs()} overflows on {@code Integer.MIN_VALUE}.
-     * The same id therefore always lands in the same bucket, which is what makes a rotation
-     * complete instead of leaving rows permanently unchecked.
+     * <p><b>One row per aggregate, the most recent.</b> This table is append-only per attempt:
+     * every re-enqueue of the same role or assignment leaves another row behind. Checking rows
+     * instead of aggregates therefore made the job amplify itself — a single assignment absent
+     * from the Kernel produced one re-enqueue per historical row, and every re-enqueue that
+     * then succeeded added another PROVISIONED row for the next cycle to find. Measured on
+     * 27 November 2026: 39 733 PROVISIONED rows for exactly 29 distinct aggregates, 39 672 of
+     * them the same assignment, grown from nothing between 9 and 25 November; 940 402 PENDING
+     * and 401 838 DEAD rows were the output of that loop. {@code DISTINCT ON} collapses the
+     * set back to what it is actually about: 29 things to verify, not 39 733.
+     *
+     * <p>The slice key is the first byte of {@code aggregate_id} (via {@code uuid_send}),
+     * uniform for the random v4 ids used here and always non-negative — unlike {@code hashtext},
+     * whose result can be negative and whose {@code abs()} overflows on
+     * {@code Integer.MIN_VALUE}. Keyed on the aggregate rather than the row so that an
+     * aggregate stays in the same bucket even as its newest row changes; otherwise a rotation
+     * could keep missing it.
      *
      * <p>The operation filter is applied here as well as in the job: the job needs it as a
      * domain invariant, the query needs it so the LIMIT is not spent on rows that would be
@@ -120,12 +131,16 @@ public class RoleSyncOutboxRepositoryAdapter implements RoleSyncOutboxRepository
      */
     private static final String RECONCILIATION_BATCH_SQL = """
             SELECT *
-            FROM   tnt_role_sync_outbox
-            WHERE  status = 'PROVISIONED'
-              AND  operation IN ('PROVISION_ROLE', 'ASSIGN_ROLE')
-              AND  (get_byte(uuid_send(id), 0) % :bucketCount) = :bucketIndex
-            ORDER  BY created_at ASC
-            LIMIT  :maxRows
+            FROM (
+                SELECT DISTINCT ON (aggregate_id) *
+                FROM   tnt_role_sync_outbox
+                WHERE  status = 'PROVISIONED'
+                  AND  operation IN ('PROVISION_ROLE', 'ASSIGN_ROLE')
+                ORDER  BY aggregate_id, created_at DESC
+            ) latest_per_aggregate
+            WHERE (get_byte(uuid_send(aggregate_id), 0) % :bucketCount) = :bucketIndex
+            ORDER BY created_at ASC
+            LIMIT :maxRows
             """;
 
     private final DatabaseClient databaseClient;

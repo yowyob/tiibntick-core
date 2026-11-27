@@ -55,16 +55,16 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * sequentially, and a circuit rejection abandons the rest of the cycle instead of racing
  * through it.
  *
- * <p><b>Sizing the rotation (read before changing a default).</b> Every row is checked once per
- * full rotation of {@code bucketCount} cycles, so with the hourly cron the defaults — 168
- * buckets, 400 rows — give one complete pass a week with slices of roughly 237 rows. The
- * invariant that matters is {@code rows / bucketCount < maxRowsPerCycle}: the slice is ordered
- * oldest-first, so if a slice is ever larger than the ceiling, the same oldest rows are
- * re-checked at every rotation and the remainder is <em>never</em> checked at all. Measured on
- * 27 November 2026 the PROVISIONED set held 39 733 rows, i.e. ~237 per bucket against a
- * ceiling of 400 — the ceiling is a safety net, not the normal limit. Grow {@code bucketCount}
- * with the table, not {@code maxRowsPerCycle}: the calls are sequential and must finish inside
- * the {@link SchedulerLock} {@code lockAtMostFor} of ten minutes.
+ * <p><b>Sizing the rotation (read before changing a default).</b> The query returns one row per
+ * <em>aggregate</em>, not per row, so what rotates is the set of distinct roles and assignments
+ * ever provisioned — 29 of them on 27 November 2026, against 39 733 rows. With the hourly cron
+ * and the defaults of 24 buckets and 400 rows, that is a complete pass a day with one or two
+ * aggregates a cycle. The invariant to hold is {@code aggregates / bucketCount <
+ * maxRowsPerCycle}: a slice is ordered oldest-first, so should a slice ever exceed the ceiling,
+ * the same oldest rows would be re-checked at every rotation and the remainder
+ * <em>never</em> checked at all. Grow {@code bucketCount} with the number of aggregates, not
+ * {@code maxRowsPerCycle}: the calls are sequential and must finish inside the
+ * {@link SchedulerLock} {@code lockAtMostFor} of ten minutes.
  *
  * <p>Not registered as a Spring bean here — instantiated explicitly by a later wiring phase
  * (see {@code TntRolesAutoConfiguration}).

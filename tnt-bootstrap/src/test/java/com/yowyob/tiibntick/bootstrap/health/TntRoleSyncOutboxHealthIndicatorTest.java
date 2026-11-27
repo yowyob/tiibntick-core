@@ -17,6 +17,7 @@ import reactor.test.StepVerifier;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -146,13 +147,18 @@ class TntRoleSyncOutboxHealthIndicatorTest {
             return Flux.fromIterable(rows.values()).filter(e -> e.status() == status);
         }
 
+        /** Honours the port's contract: at most one row per aggregate, the most recent. */
         @Override
         public Flux<RoleSyncOutboxEntry> fetchReconciliationBatch(int bucketCount, int bucketIndex, int maxRows) {
-            return Flux.fromIterable(rows.values())
+            Map<UUID, RoleSyncOutboxEntry> newestPerAggregate = new LinkedHashMap<>();
+            rows.values().stream()
                     .filter(e -> e.status() == RoleSyncStatus.PROVISIONED)
                     .filter(e -> e.operation() == RoleSyncOperation.PROVISION_ROLE
                             || e.operation() == RoleSyncOperation.ASSIGN_ROLE)
-                    .take(maxRows);
+                    .sorted(Comparator.comparing(RoleSyncOutboxEntry::createdAt,
+                            Comparator.nullsFirst(Comparator.naturalOrder())))
+                    .forEach(e -> newestPerAggregate.put(e.aggregateId(), e));
+            return Flux.fromIterable(newestPerAggregate.values()).take(maxRows);
         }
 
         /** Stands in for the adapter's grouped SQL aggregates. */
