@@ -4,6 +4,7 @@ import com.yowyob.tiibntick.core.roles.application.port.out.RoleSyncOutboxReposi
 import com.yowyob.tiibntick.core.roles.domain.model.RoleSyncAggregateType;
 import com.yowyob.tiibntick.core.roles.domain.model.RoleSyncOperation;
 import com.yowyob.tiibntick.core.roles.domain.model.RoleSyncOutboxEntry;
+import com.yowyob.tiibntick.core.roles.domain.model.RoleSyncOutboxSummary;
 import com.yowyob.tiibntick.core.roles.domain.model.RoleSyncStatus;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,10 +16,13 @@ import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -26,6 +30,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Lot C-20.2 — a DEAD Kernel role-sync entry is visible both as a gauge and as a degraded
  * health status. The DEAD entry is written through the outbox port's {@code save} by the
  * test itself, the same call {@code KernelRoleSyncWorker} makes when retries run out.
+ *
+ * <p>Counts now come from {@code summarise()}, which the real adapter answers with grouped SQL
+ * aggregates; the in-memory fake below plays that part. The indicator must never read a count
+ * by loading rows — see {@link RoleSyncOutboxSummary} for what that cost in production.
  */
 class TntRoleSyncOutboxHealthIndicatorTest {
 
@@ -47,7 +55,7 @@ class TntRoleSyncOutboxHealthIndicatorTest {
         StepVerifier.create(indicator.health())
                 .assertNext(h -> {
                     assertThat(h.getStatus()).isEqualTo(Status.UP);
-                    assertThat(h.getDetails()).containsEntry("dead", 0);
+                    assertThat(h.getDetails()).containsEntry("dead", 0L);
                 })
                 .verifyComplete();
 
@@ -71,8 +79,8 @@ class TntRoleSyncOutboxHealthIndicatorTest {
                 .assertNext(h -> {
                     assertThat(h.getStatus()).isEqualTo(TntRoleSyncOutboxHealthIndicator.DEGRADED);
                     assertThat(h.getDetails())
-                            .containsEntry("dead", 1)
-                            .containsEntry("retrying", 1)
+                            .containsEntry("dead", 1L)
+                            .containsEntry("retrying", 1L)
                             .containsEntry("dead_by_operation", Map.of("PROVISION_ROLE", 1L))
                             .containsEntry("oldest_dead_last_error", dead.lastError());
                 })
@@ -136,6 +144,35 @@ class TntRoleSyncOutboxHealthIndicatorTest {
         @Override
         public Flux<RoleSyncOutboxEntry> findByStatus(RoleSyncStatus status) {
             return Flux.fromIterable(rows.values()).filter(e -> e.status() == status);
+        }
+
+        @Override
+        public Flux<RoleSyncOutboxEntry> fetchReconciliationBatch(int bucketCount, int bucketIndex, int maxRows) {
+            return Flux.fromIterable(rows.values())
+                    .filter(e -> e.status() == RoleSyncStatus.PROVISIONED)
+                    .filter(e -> e.operation() == RoleSyncOperation.PROVISION_ROLE
+                            || e.operation() == RoleSyncOperation.ASSIGN_ROLE)
+                    .take(maxRows);
+        }
+
+        /** Stands in for the adapter's grouped SQL aggregates. */
+        @Override
+        public Mono<RoleSyncOutboxSummary> summarise() {
+            Map<RoleSyncStatus, Long> byStatus = rows.values().stream()
+                    .collect(Collectors.groupingBy(RoleSyncOutboxEntry::status, Collectors.counting()));
+            List<RoleSyncOutboxEntry> dead = rows.values().stream()
+                    .filter(e -> e.status() == RoleSyncStatus.DEAD && e.createdAt() != null)
+                    .sorted(Comparator.comparing(RoleSyncOutboxEntry::createdAt))
+                    .toList();
+            Map<RoleSyncOperation, Long> deadByOperation = dead.stream()
+                    .collect(Collectors.groupingBy(RoleSyncOutboxEntry::operation, Collectors.counting()));
+            RoleSyncOutboxEntry oldest = dead.isEmpty() ? null : dead.get(0);
+            RoleSyncOutboxEntry newest = dead.isEmpty() ? null : dead.get(dead.size() - 1);
+            return Mono.just(new RoleSyncOutboxSummary(
+                    byStatus, deadByOperation,
+                    oldest == null ? null : oldest.createdAt(),
+                    oldest == null ? null : oldest.lastError(),
+                    newest == null ? null : newest.createdAt()));
         }
     }
 }

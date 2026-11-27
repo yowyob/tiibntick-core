@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import reactor.core.publisher.Mono;
 
+import java.time.Instant;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -43,6 +44,28 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * <p>Same {@link SchedulerLock}/{@link AtomicBoolean} guard shape as
  * {@link KernelRoleSyncWorker} and {@code yow-event-kernel}'s {@code OutboxPollerService}.
  *
+ * <p><b>Bounded, one slice per cycle.</b> Until 27 November 2026 this job read every
+ * {@code PROVISIONED} row on every cycle and called the Kernel once per row — 39 733 rows and
+ * 39 733 calls an hour — through a {@code flatMap} whose default concurrency is 256. With a
+ * 20-call sliding window and a 5 s time limiter on {@code kernelServiceAccountWebClient}, the
+ * first cycle opened the circuit breaker and kept it open, which in turn starved
+ * {@link KernelRoleSyncWorker}: that is how 401 733 outbox entries came to be marked DEAD.
+ * The fix is threefold — the database returns one stable slice of the set
+ * ({@link RoleSyncOutboxRepository#fetchReconciliationBatch}), the calls run strictly
+ * sequentially, and a circuit rejection abandons the rest of the cycle instead of racing
+ * through it.
+ *
+ * <p><b>Sizing the rotation (read before changing a default).</b> Every row is checked once per
+ * full rotation of {@code bucketCount} cycles, so with the hourly cron the defaults — 168
+ * buckets, 400 rows — give one complete pass a week with slices of roughly 237 rows. The
+ * invariant that matters is {@code rows / bucketCount < maxRowsPerCycle}: the slice is ordered
+ * oldest-first, so if a slice is ever larger than the ceiling, the same oldest rows are
+ * re-checked at every rotation and the remainder is <em>never</em> checked at all. Measured on
+ * 27 November 2026 the PROVISIONED set held 39 733 rows, i.e. ~237 per bucket against a
+ * ceiling of 400 — the ceiling is a safety net, not the normal limit. Grow {@code bucketCount}
+ * with the table, not {@code maxRowsPerCycle}: the calls are sequential and must finish inside
+ * the {@link SchedulerLock} {@code lockAtMostFor} of ten minutes.
+ *
  * <p>Not registered as a Spring bean here — instantiated explicitly by a later wiring phase
  * (see {@code TntRolesAutoConfiguration}).
  *
@@ -59,6 +82,9 @@ public class KernelRoleReconciliationJob {
     private final ITntRoleAssignmentPort assignmentPort;
     private final ObjectMapper objectMapper;
 
+    private final int bucketCount;
+    private final int maxRowsPerCycle;
+
     private final AtomicBoolean runInProgress = new AtomicBoolean(false);
 
     public KernelRoleReconciliationJob(RoleSyncOutboxRepository outboxRepository,
@@ -66,13 +92,35 @@ public class KernelRoleReconciliationJob {
                                         UserRoleAssignmentRepository assignmentRepository,
                                         ITntRoleProvisioningPort provisioningPort,
                                         ITntRoleAssignmentPort assignmentPort,
-                                        ObjectMapper objectMapper) {
+                                        ObjectMapper objectMapper,
+                                        int bucketCount,
+                                        int maxRowsPerCycle) {
         this.outboxRepository = Objects.requireNonNull(outboxRepository);
         this.roleRepository = Objects.requireNonNull(roleRepository);
         this.assignmentRepository = Objects.requireNonNull(assignmentRepository);
         this.provisioningPort = Objects.requireNonNull(provisioningPort);
         this.assignmentPort = Objects.requireNonNull(assignmentPort);
         this.objectMapper = Objects.requireNonNull(objectMapper);
+        if (bucketCount < 1) {
+            throw new IllegalArgumentException("bucketCount must be at least 1, got " + bucketCount);
+        }
+        if (maxRowsPerCycle < 1) {
+            throw new IllegalArgumentException("maxRowsPerCycle must be at least 1, got " + maxRowsPerCycle);
+        }
+        this.bucketCount = bucketCount;
+        this.maxRowsPerCycle = maxRowsPerCycle;
+    }
+
+    /**
+     * Visible for tests: which slice this cycle reads.
+     *
+     * <p>Derived from the number of whole hours since the epoch, not from the wall-clock hour:
+     * {@code hour-of-day % bucketCount} only ever yields 0..23, so any {@code bucketCount}
+     * above 24 would leave most slices permanently unreachable. This advances by exactly one
+     * per hourly cycle, wraps cleanly and has no year-boundary discontinuity.
+     */
+    int currentBucketIndex() {
+        return (int) Math.floorMod(Instant.now().getEpochSecond() / 3600L, (long) bucketCount);
     }
 
     @Scheduled(cron = "${tnt.roles.reconciliation.cron:0 0 * * * *}")
@@ -97,10 +145,19 @@ public class KernelRoleReconciliationJob {
             log.trace("Role reconciliation cycle skipped — previous cycle still running");
             return Mono.just(0);
         }
-        return outboxRepository.findByStatus(RoleSyncStatus.PROVISIONED)
+        AtomicBoolean circuitRefused = new AtomicBoolean(false);
+        return outboxRepository.fetchReconciliationBatch(bucketCount, currentBucketIndex(), maxRowsPerCycle)
+                // Kept although the query already filters on operation: this is the
+                // product-owner mandated scope constraint of the whole job (see the class
+                // Javadoc), and it must be enforced in the domain layer too, not left to live
+                // only inside a SQL string that a future index change could quietly rewrite.
                 .filter(entry -> entry.operation() == RoleSyncOperation.PROVISION_ROLE
                         || entry.operation() == RoleSyncOperation.ASSIGN_ROLE)
-                .flatMap(this::reconcileEntry)
+                // concatMap, NOT flatMap. flatMap's default concurrency is 256, so this job
+                // fired up to 256 simultaneous Kernel calls; against a 20-call sliding window
+                // that opens the breaker on the first cycle. One call at a time is slower and
+                // is the point: this is a background spot-check, not a user-facing path.
+                .concatMap(entry -> circuitRefused.get() ? Mono.just(false) : reconcileEntry(entry, circuitRefused))
                 // reconcileEntry always emits true/false (checked vs. re-enqueued) — only
                 // count entries that actually needed re-enqueuing, not every entry checked.
                 .filter(Boolean::booleanValue)
@@ -109,12 +166,24 @@ public class KernelRoleReconciliationJob {
                 .doFinally(signal -> runInProgress.set(false));
     }
 
-    private Mono<Boolean> reconcileEntry(RoleSyncOutboxEntry entry) {
+    private Mono<Boolean> reconcileEntry(RoleSyncOutboxEntry entry, AtomicBoolean circuitRefused) {
         Mono<Boolean> result = switch (entry.aggregateType()) {
             case ROLE -> reconcileRole(entry);
             case ASSIGNMENT -> reconcileAssignment(entry);
         };
         return result.onErrorResume(error -> {
+            // A breaker rejection means the Kernel is already being spared; carrying on would
+            // burn through the remaining rows in milliseconds, hold the breaker open and
+            // starve KernelRoleSyncWorker, which shares the same instance. Stop the cycle —
+            // the next one picks the same slice up again.
+            if (KernelRoleSyncWorker.isCircuitRejection(error)) {
+                if (circuitRefused.compareAndSet(false, true)) {
+                    log.warn("Kernel circuit refused a reconciliation call — abandoning the rest of this "
+                            + "cycle so the breaker can recover and the outbox worker is not starved: {}",
+                            error.getMessage());
+                }
+                return Mono.just(false);
+            }
             log.warn("Reconciliation check failed for outbox entry {} (kept as-is, will retry next cycle): {}",
                     entry.id(), error.getMessage(), error);
             return Mono.just(false);

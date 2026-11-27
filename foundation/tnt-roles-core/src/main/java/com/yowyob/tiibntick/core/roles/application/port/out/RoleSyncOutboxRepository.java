@@ -1,6 +1,7 @@
 package com.yowyob.tiibntick.core.roles.application.port.out;
 
 import com.yowyob.tiibntick.core.roles.domain.model.RoleSyncOutboxEntry;
+import com.yowyob.tiibntick.core.roles.domain.model.RoleSyncOutboxSummary;
 import com.yowyob.tiibntick.core.roles.domain.model.RoleSyncStatus;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -50,6 +51,44 @@ public interface RoleSyncOutboxRepository {
      * roles/assignments have a Kernel-side counterpart, since the domain {@code Role}/
      * {@code UserRoleAssignment} records themselves carry no {@code kernelRoleId}/
      * {@code kernelAssignmentId} field.
+     *
+     * <p><strong>Unbounded.</strong> There is no limit, no ordering and no projection: every
+     * matching row is transferred and mapped. Never call this to count rows or to build a
+     * metric — use {@link #summarise()}. Callers that genuinely need the rows must expect the
+     * full set (39 733 {@code PROVISIONED} rows on 27 November 2026).
      */
     Flux<RoleSyncOutboxEntry> findByStatus(RoleSyncStatus status);
+
+    /**
+     * Counts and summarises the outbox <strong>in the database</strong>, without transferring
+     * or materialising a single row.
+     *
+     * <p>Use this — never {@link #findByStatus(RoleSyncStatus)} — whenever the question is
+     * "how many" rather than "which". The table is unbounded: it held 1 364 000 rows on
+     * 27 November 2026, and counting them by loading them saturated three R2DBC event loops
+     * and the heap (see {@link RoleSyncOutboxSummary} for the full account).
+     *
+     * @return the aggregated summary; {@link RoleSyncOutboxSummary#empty()} when the table is empty
+     */
+    Mono<RoleSyncOutboxSummary> summarise();
+
+    /**
+     * One bounded slice of the {@link RoleSyncStatus#PROVISIONED PROVISIONED} rows worth
+     * spot-checking against the Kernel, filtered and limited <strong>by the database</strong>.
+     *
+     * <p>Replaces {@code findByStatus(PROVISIONED)} for {@code KernelRoleReconciliationJob},
+     * which checked the whole set on every cycle: 39 733 rows and 39 733 Kernel calls an hour
+     * on 27 November 2026. The job spreads the set over {@code bucketCount} slices, one per
+     * cycle, so every row is still checked over a full rotation without any single cycle
+     * hammering the Kernel.
+     *
+     * <p>Implementations must keep the slicing <em>stable</em> — the same row must always fall
+     * in the same bucket — otherwise a row can be skipped forever or checked repeatedly while
+     * others never are.
+     *
+     * @param bucketCount how many slices the PROVISIONED set is divided into, at least 1
+     * @param bucketIndex which slice to return, {@code 0 <= bucketIndex < bucketCount}
+     * @param maxRows     hard ceiling on rows returned, whatever the slice holds
+     */
+    Flux<RoleSyncOutboxEntry> fetchReconciliationBatch(int bucketCount, int bucketIndex, int maxRows);
 }

@@ -3,7 +3,9 @@ package com.yowyob.tiibntick.core.roles.adapter.out.persistence;
 import com.yowyob.tiibntick.core.roles.adapter.out.persistence.entity.RoleSyncOutboxEntity;
 import com.yowyob.tiibntick.core.roles.adapter.out.persistence.mapper.RoleSyncOutboxPersistenceMapper;
 import com.yowyob.tiibntick.core.roles.application.port.out.RoleSyncOutboxRepository;
+import com.yowyob.tiibntick.core.roles.domain.model.RoleSyncOperation;
 import com.yowyob.tiibntick.core.roles.domain.model.RoleSyncOutboxEntry;
+import com.yowyob.tiibntick.core.roles.domain.model.RoleSyncOutboxSummary;
 import com.yowyob.tiibntick.core.roles.domain.model.RoleSyncStatus;
 import org.springframework.data.r2dbc.core.R2dbcEntityTemplate;
 import org.springframework.data.relational.core.query.Criteria;
@@ -14,7 +16,10 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
+import java.util.EnumMap;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -64,6 +69,63 @@ public class RoleSyncOutboxRepositoryAdapter implements RoleSyncOutboxRepository
             ORDER  BY created_at ASC
             LIMIT  :batchSize
             FOR UPDATE SKIP LOCKED
+            """;
+
+    /**
+     * Counts per status in one grouped aggregate — no row leaves the database. Served by the
+     * {@code (status, created_at)} index added in changeset 004 as an index-only scan.
+     */
+    private static final String COUNT_BY_STATUS_SQL = """
+            SELECT status, count(*) AS total
+            FROM   tnt_role_sync_outbox
+            GROUP  BY status
+            """;
+
+    /** Counts of DEAD rows per operation — the {@code dead_by_operation} health detail. */
+    private static final String DEAD_BY_OPERATION_SQL = """
+            SELECT operation, count(*) AS total
+            FROM   tnt_role_sync_outbox
+            WHERE  status = 'DEAD'
+            GROUP  BY operation
+            """;
+
+    /**
+     * The two DEAD extremes and the oldest one's error, in a single pass — never the 401 733
+     * rows themselves.
+     */
+    private static final String DEAD_EXTREMES_SQL = """
+            SELECT min(created_at) AS oldest,
+                   max(created_at) AS newest,
+                   (SELECT last_error
+                      FROM tnt_role_sync_outbox
+                     WHERE status = 'DEAD'
+                     ORDER BY created_at ASC
+                     LIMIT 1) AS oldest_error
+            FROM   tnt_role_sync_outbox
+            WHERE  status = 'DEAD'
+            """;
+
+    /**
+     * One stable slice of the PROVISIONED rows the reconciliation job may check.
+     *
+     * <p>The slice key is the first byte of the UUID (via {@code uuid_send}), which is uniform
+     * for the random v4 ids used here and always non-negative — unlike {@code hashtext}, whose
+     * result can be negative and whose {@code abs()} overflows on {@code Integer.MIN_VALUE}.
+     * The same id therefore always lands in the same bucket, which is what makes a rotation
+     * complete instead of leaving rows permanently unchecked.
+     *
+     * <p>The operation filter is applied here as well as in the job: the job needs it as a
+     * domain invariant, the query needs it so the LIMIT is not spent on rows that would be
+     * discarded afterwards.
+     */
+    private static final String RECONCILIATION_BATCH_SQL = """
+            SELECT *
+            FROM   tnt_role_sync_outbox
+            WHERE  status = 'PROVISIONED'
+              AND  operation IN ('PROVISION_ROLE', 'ASSIGN_ROLE')
+              AND  (get_byte(uuid_send(id), 0) % :bucketCount) = :bucketIndex
+            ORDER  BY created_at ASC
+            LIMIT  :maxRows
             """;
 
     private final DatabaseClient databaseClient;
@@ -124,5 +186,89 @@ public class RoleSyncOutboxRepositoryAdapter implements RoleSyncOutboxRepository
                         Query.query(Criteria.where("status").is(status.name())),
                         RoleSyncOutboxEntity.class)
                 .map(RoleSyncOutboxPersistenceMapper::toDomain);
+    }
+
+    /**
+     * Three grouped/aggregate queries instead of three full scans materialised into Java
+     * objects. An unknown {@code status}/{@code operation} value found in the table is skipped
+     * rather than failing the whole summary: a monitoring read must never be the thing that
+     * breaks on an unexpected enum value.
+     */
+    @Override
+    public Mono<RoleSyncOutboxSummary> summarise() {
+        Mono<Map<RoleSyncStatus, Long>> byStatus = databaseClient.sql(COUNT_BY_STATUS_SQL)
+                .map((row, metadata) -> Map.entry(
+                        String.valueOf(row.get("status", String.class)),
+                        total(row.get("total", Long.class))))
+                .all()
+                .reduce(new EnumMap<RoleSyncStatus, Long>(RoleSyncStatus.class), (acc, e) -> {
+                    parse(RoleSyncStatus.class, e.getKey())
+                            .ifPresent(status -> acc.merge(status, e.getValue(), Long::sum));
+                    return acc;
+                })
+                .map(Map::copyOf);
+
+        Mono<Map<RoleSyncOperation, Long>> deadByOperation = databaseClient.sql(DEAD_BY_OPERATION_SQL)
+                .map((row, metadata) -> Map.entry(
+                        String.valueOf(row.get("operation", String.class)),
+                        total(row.get("total", Long.class))))
+                .all()
+                .reduce(new EnumMap<RoleSyncOperation, Long>(RoleSyncOperation.class), (acc, e) -> {
+                    parse(RoleSyncOperation.class, e.getKey())
+                            .ifPresent(operation -> acc.merge(operation, e.getValue(), Long::sum));
+                    return acc;
+                })
+                .map(Map::copyOf);
+
+        Mono<DeadExtremes> extremes = databaseClient.sql(DEAD_EXTREMES_SQL)
+                .map((row, metadata) -> new DeadExtremes(
+                        row.get("oldest", LocalDateTime.class),
+                        row.get("newest", LocalDateTime.class),
+                        row.get("oldest_error", String.class)))
+                .one()
+                .defaultIfEmpty(new DeadExtremes(null, null, null));
+
+        return Mono.zip(byStatus, deadByOperation, extremes)
+                .map(t -> new RoleSyncOutboxSummary(
+                        t.getT1(), t.getT2(),
+                        t.getT3().oldest(), t.getT3().oldestError(), t.getT3().newest()));
+    }
+
+    private static long total(Long value) {
+        return value == null ? 0L : value;
+    }
+
+    private static <E extends Enum<E>> Optional<E> parse(Class<E> type, String raw) {
+        if (raw == null) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(Enum.valueOf(type, raw));
+        } catch (IllegalArgumentException e) {
+            return Optional.empty();
+        }
+    }
+
+    @Override
+    public Flux<RoleSyncOutboxEntry> fetchReconciliationBatch(int bucketCount, int bucketIndex, int maxRows) {
+        if (bucketCount < 1) {
+            return Flux.error(new IllegalArgumentException("bucketCount must be at least 1, got " + bucketCount));
+        }
+        if (bucketIndex < 0 || bucketIndex >= bucketCount) {
+            return Flux.error(new IllegalArgumentException(
+                    "bucketIndex must be in [0, " + bucketCount + "), got " + bucketIndex));
+        }
+        if (maxRows < 1) {
+            return Flux.error(new IllegalArgumentException("maxRows must be at least 1, got " + maxRows));
+        }
+        return databaseClient.sql(RECONCILIATION_BATCH_SQL)
+                .bind("bucketCount", bucketCount)
+                .bind("bucketIndex", bucketIndex)
+                .bind("maxRows", maxRows)
+                .map((row, metadata) -> RoleSyncOutboxPersistenceMapper.fromRow(row))
+                .all();
+    }
+
+    private record DeadExtremes(LocalDateTime oldest, LocalDateTime newest, String oldestError) {
     }
 }

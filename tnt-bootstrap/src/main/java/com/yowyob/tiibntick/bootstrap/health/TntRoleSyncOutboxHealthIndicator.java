@@ -1,7 +1,7 @@
 package com.yowyob.tiibntick.bootstrap.health;
 
 import com.yowyob.tiibntick.core.roles.application.port.out.RoleSyncOutboxRepository;
-import com.yowyob.tiibntick.core.roles.domain.model.RoleSyncOutboxEntry;
+import com.yowyob.tiibntick.core.roles.domain.model.RoleSyncOutboxSummary;
 import com.yowyob.tiibntick.core.roles.domain.model.RoleSyncStatus;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -11,15 +11,12 @@ import org.springframework.boot.health.contributor.ReactiveHealthIndicator;
 import org.springframework.boot.health.contributor.Status;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -47,6 +44,14 @@ import java.util.concurrent.atomic.AtomicLong;
  * </ul>
  *
  * <p>Read-only: never purges, retries or rewrites an entry — dead rows are the evidence.
+ *
+ * <p><strong>Counts are computed in SQL</strong> ({@link RoleSyncOutboxRepository#summarise()}),
+ * never by loading rows. This indicator used to call {@code findByStatus} once per gauged
+ * status and {@code collectList()} the result to read {@code List::size}: on 27 November 2026
+ * that was 1 324 000 rows materialised every sixty seconds, three saturated R2DBC event loops,
+ * a heap past 20 GiB, and an {@code /actuator/health} that no longer answered within ninety
+ * seconds — a monitor that had become the outage it was meant to report. Its cost must not
+ * grow with the table it watches.
  *
  * @author KOUAM Kamdem
  */
@@ -94,50 +99,34 @@ public class TntRoleSyncOutboxHealthIndicator implements ReactiveHealthIndicator
     }
 
     Mono<Snapshot> snapshot() {
-        return Flux.fromIterable(GAUGED)
-                .concatMap(status -> outboxRepository.findByStatus(status).collectList()
-                        .map(rows -> Map.entry(status, rows)))
-                .collectMap(Map.Entry::getKey, Map.Entry::getValue)
-                .map(byStatus -> {
-                    byStatus.forEach((status, rows) -> levels.get(status).set(rows.size()));
-                    return new Snapshot(byStatus);
-                });
+        return outboxRepository.summarise()
+                .doOnNext(summary -> GAUGED.forEach(status -> levels.get(status).set(summary.count(status))))
+                .map(Snapshot::new);
     }
 
     private Health toHealth(Snapshot s) {
-        List<RoleSyncOutboxEntry> dead = s.rows(RoleSyncStatus.DEAD);
+        RoleSyncOutboxSummary summary = s.summary();
         Map<String, Object> details = new LinkedHashMap<>();
-        details.put("dead", dead.size());
-        details.put("retrying", s.rows(RoleSyncStatus.RETRYING).size());
-        details.put("pending", s.rows(RoleSyncStatus.PENDING).size());
-        if (dead.isEmpty()) {
+        details.put("dead", summary.deadCount());
+        details.put("retrying", summary.count(RoleSyncStatus.RETRYING));
+        details.put("pending", summary.count(RoleSyncStatus.PENDING));
+        if (summary.deadCount() == 0L) {
             return Health.up().withDetails(details).build();
         }
         Map<String, Long> deadByOperation = new LinkedHashMap<>();
-        dead.forEach(e -> deadByOperation.merge(e.operation().name(), 1L, Long::sum));
+        summary.deadCountByOperation().forEach((operation, count) -> deadByOperation.put(operation.name(), count));
         details.put("dead_by_operation", deadByOperation);
-        oldest(dead).ifPresent(e -> {
-            details.put("oldest_dead_created_at", String.valueOf(e.createdAt()));
-            details.put("oldest_dead_last_error", e.lastError());
-        });
-        newest(dead).ifPresent(e -> details.put("newest_dead_created_at", String.valueOf(e.createdAt())));
+        if (summary.oldestDeadCreatedAt() != null) {
+            details.put("oldest_dead_created_at", String.valueOf(summary.oldestDeadCreatedAt()));
+            details.put("oldest_dead_last_error", summary.oldestDeadLastError());
+        }
+        if (summary.newestDeadCreatedAt() != null) {
+            details.put("newest_dead_created_at", String.valueOf(summary.newestDeadCreatedAt()));
+        }
         return Health.status(DEGRADED).withDetails(details).build();
     }
 
-    private static Optional<RoleSyncOutboxEntry> oldest(List<RoleSyncOutboxEntry> rows) {
-        return rows.stream().filter(e -> e.createdAt() != null)
-                .min(Comparator.comparing(RoleSyncOutboxEntry::createdAt));
-    }
-
-    private static Optional<RoleSyncOutboxEntry> newest(List<RoleSyncOutboxEntry> rows) {
-        return rows.stream().filter(e -> e.createdAt() != null)
-                .max(Comparator.comparing(RoleSyncOutboxEntry::createdAt));
-    }
-
-    record Snapshot(Map<RoleSyncStatus, List<RoleSyncOutboxEntry>> byStatus) {
-        List<RoleSyncOutboxEntry> rows(RoleSyncStatus status) {
-            return byStatus.getOrDefault(status, List.of());
-        }
+    record Snapshot(RoleSyncOutboxSummary summary) {
     }
 
     /** Visible for tests: last measured level for a status, -1 before the first refresh. */
