@@ -107,14 +107,20 @@ services:
     # services voisins passés de 0,155 s à 1,2 s. Le noyau, pourtant plus gros, tient
     # dans 1,07 Gio parce qu'il EST borné à 2 Gio.
     #
-    # 4 Gio : le tas plafonne à 3 Gio (75 %), le reste couvre metaspace, les ~350 Mio de
+    # 2,5 Gio depuis le 2026-11-27. La borne de 4 Gio avait été posée pour un processus qui
+    # matérialisait 1,3 million de lignes par minute dans l'indicateur de santé ; ce défaut
+    # corrigé, le régime mesuré est de 1,17 Gio avec un pic de 1,25 — soit deux fois de marge
+    # ici. Le tas plafonne à 1,875 Gio (75 %), le reste couvre metaspace, les ~350 Mio de
     # piles (348 threads, dont 258 pour 86 consommateurs Kafka) et les tampons directs.
     # Dépasser la borne fait tuer le conteneur par Docker (OOM) au lieu de laisser l'hôte
     # se dégrader : c'est le comportement voulu, le redémarrage est automatique.
     #
+    # Mesure à surveiller avant de descendre plus bas : le pic réel sur une journée entière,
+    # pas sur une heure — `docker exec tiibntick-core cat /sys/fs/cgroup/memory.peak`.
+    #
     # 4 CPU : limite aussi `availableProcessors`, donc la taille des boucles d'événements
     # Netty/R2DBC (12 auparavant). Trois d'entre elles saturaient à elles seules.
-    mem_limit: 4g
+    mem_limit: 2500m
     cpus: "4"
     logging:
       driver: "json-file"
