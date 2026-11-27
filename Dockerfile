@@ -27,4 +27,10 @@ RUN chown -R tiibntick:tiibntick /app
 USER tiibntick
 EXPOSE 8080
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom -Dfile.encoding=UTF-8"
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]
+# `exec` est indispensable : sans lui le shell reste PID 1 et Docker lui adresse le
+# SIGTERM, que sh ne transmet pas a la JVM. Celle-ci mourait donc toujours au
+# SIGKILL du delai de grace, sans arret gracieux — c'est l'origine des prises
+# `PROCESSING` de l'outbox abandonnees a chaque redeploiement (incident des 274
+# lignes orphelines du 27/11/2026, dont le balayage de recuperation ne traitait
+# que le symptome).
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar /app/app.jar"]
