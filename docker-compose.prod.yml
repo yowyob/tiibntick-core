@@ -99,6 +99,23 @@ services:
       timeout: 10s
       retries: 20
       start_period: 180s
+    # ── Bornes de ressources ────────────────────────────────────────────────
+    # Sans limite, `-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0` (posé par le
+    # Dockerfile) se dimensionne sur les 47 Gio de l'HÔTE : plafond de tas ~35 Gio, donc
+    # aucune pression de GC et une empreinte qui ne redescend jamais. Mesuré le
+    # 2026-11-27 : RSS 1,8 Gio au démarrage → 21,67 Gio, charge machine 15,95, et les
+    # services voisins passés de 0,155 s à 1,2 s. Le noyau, pourtant plus gros, tient
+    # dans 1,07 Gio parce qu'il EST borné à 2 Gio.
+    #
+    # 4 Gio : le tas plafonne à 3 Gio (75 %), le reste couvre metaspace, les ~350 Mio de
+    # piles (348 threads, dont 258 pour 86 consommateurs Kafka) et les tampons directs.
+    # Dépasser la borne fait tuer le conteneur par Docker (OOM) au lieu de laisser l'hôte
+    # se dégrader : c'est le comportement voulu, le redémarrage est automatique.
+    #
+    # 4 CPU : limite aussi `availableProcessors`, donc la taille des boucles d'événements
+    # Netty/R2DBC (12 auparavant). Trois d'entre elles saturaient à elles seules.
+    mem_limit: 4g
+    cpus: "4"
     logging:
       driver: "json-file"
       options: { max-size: "50m", max-file: "5" }
