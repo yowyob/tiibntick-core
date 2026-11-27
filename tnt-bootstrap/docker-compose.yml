@@ -267,6 +267,10 @@ services:
       - "8080:8080"
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      # La documentation est fermée par défaut dans application.yml (elle était servie
+      # publiquement en production). On la rouvre ici pour le développement local.
+      SPRINGDOC_SWAGGER_UI_ENABLED: "true"
+      SPRINGDOC_API_DOCS_ENABLED: "true"
       DB_HOST: postgres          # in-network service name — always "postgres" here, unrelated to host DB_HOST
       DB_PORT: 5432              # in-network port — always 5432 here, unrelated to host-mapped DB_PORT
       DB_NAME: ${DB_NAME:-tiibntick_core}

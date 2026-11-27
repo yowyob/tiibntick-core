@@ -169,7 +169,22 @@ management:
 
 # ── SpringDoc / Swagger UI ─────────────────────────────────────────────────
 springdoc:
+  # Fermé par défaut depuis le 2026-11-27. Ces deux clés étaient ABSENTES de ce document,
+  # donc les valeurs par défaut de springdoc s'appliquaient et la documentation était
+  # servie. Elles étaient posées à false dans le profil `prod` — mais le conteneur de
+  # production ne déclare AUCUN profil Spring (« No active profile set, falling back to 1
+  # default profile: default »), si bien que ce profil n'était jamais activé et que la
+  # spécification complète était téléchargeable sans authentification : 913 chemins,
+  # 1 052 opérations, 594 schémas, dont 52 sous /admin ou /internal.
+  #
+  # La leçon est la clé, pas la valeur : un durcissement posé dans le profil `prod` de ce
+  # fichier ne protège rien tant que la production ne déclare pas ce profil. Ce qui doit
+  # être sûr doit l'être ICI, dans le document par défaut.
+  #
+  # Pour l'activer en développement : SPRINGDOC_SWAGGER_UI_ENABLED=true (le compose local
+  # de tnt-bootstrap le fait déjà). Le profil `staging` l'active explicitement.
   swagger-ui:
+    enabled: ${SPRINGDOC_SWAGGER_UI_ENABLED:false}
     path: /swagger-ui.html
     display-request-duration: true
     groups-order: asc
@@ -179,6 +194,7 @@ springdoc:
     persist-authorization: true
     doc-expansion: none
   api-docs:
+    enabled: ${SPRINGDOC_API_DOCS_ENABLED:false}
     path: /v3/api-docs
   show-actuator: false
 
@@ -632,6 +648,14 @@ iwm:
       issuer: ${JWT_ISSUER_URI:https://auth-staging.tiibntick.com}
       access-token-ttl: PT15M
 
+# La documentation reste ouverte hors production : SpringdocProdExposureTest exige
+# explicitement que ces deux clés soient vraies sous le profil `staging`, maintenant que
+# le document par défaut les ferme.
+springdoc:
+  swagger-ui:
+    enabled: true
+  api-docs:
+    enabled: true
 ---
 # ══════════════════════════════════════════════════════════════════════════════
 # PROFILE: prod

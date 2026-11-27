@@ -58,10 +58,18 @@ class SpringdocProdExposureTest {
                 .profiles("staging")
                 .run()) {
 
-            // No override in the staging/default document — springdoc's own default
-            // (true) applies, i.e. the property is simply absent here.
-            assertThat(context.getEnvironment().getProperty("springdoc.swagger-ui.enabled")).isNull();
-            assertThat(context.getEnvironment().getProperty("springdoc.api-docs.enabled")).isNull();
+            // Explicitly true, not absent. Absence was the defect: these keys were
+            // missing from the default document, so springdoc's own default applied and
+            // the full specification was served publicly by production — which declares
+            // no Spring profile at all, so the prod document's `false` never applied.
+            // Leaving a security-relevant property unset means whatever the library
+            // decides, in whichever environment forgot to override it.
+            assertThat(context.getEnvironment().getProperty("springdoc.swagger-ui.enabled", Boolean.class))
+                    .as("springdoc.swagger-ui.enabled must be explicitly true outside prod")
+                    .isTrue();
+            assertThat(context.getEnvironment().getProperty("springdoc.api-docs.enabled", Boolean.class))
+                    .as("springdoc.api-docs.enabled must be explicitly true outside prod")
+                    .isTrue();
         }
     }
 }
