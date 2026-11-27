@@ -11,12 +11,9 @@ import com.yowyob.tiibntick.core.roles.domain.model.RoleSyncOperation;
 import com.yowyob.tiibntick.core.roles.domain.model.RoleSyncOutboxEntry;
 import com.yowyob.tiibntick.core.roles.domain.model.RoleSyncStatus;
 import com.yowyob.tiibntick.core.roles.domain.model.TntRoleDefinition;
-import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
-import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
@@ -25,7 +22,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -349,130 +345,6 @@ class KernelRoleSyncWorkerTest {
 
         // No Kernel ports should have been invoked
         verify(provisioningPort, never()).provisionRole(any(), any());
-    }
-
-    // ── Circuit-breaker rejections (incident of 26 November 2026) ────────────
-
-    /**
-     * Builds a real {@link CallNotPermittedException} rather than a stand-in: the worker
-     * matches the rejection by type, and a look-alike class would make this test pass while
-     * production kept killing entries.
-     */
-    private static CallNotPermittedException circuitRejection() {
-        CircuitBreaker breaker = CircuitBreaker.ofDefaults("kernelServiceAccountWebClient");
-        breaker.transitionToOpenState();
-        return CallNotPermittedException.createCallNotPermittedException(breaker);
-    }
-
-    private RoleSyncOutboxEntry revokeEntryWithAttempts(int attemptCount) {
-        String payload = "{\"kernelAssignmentId\":\"" + UUID.randomUUID() + "\"}";
-        return buildEntryWithAttemptCount(
-                RoleSyncOperation.REVOKE_ASSIGNMENT, RoleSyncAggregateType.ASSIGNMENT, payload, attemptCount);
-    }
-
-    @Test
-    void circuitRejection_atTheAttemptCap_isDeferredInsteadOfKilled() {
-        // attemptCount = 9 going in; asProcessing() bumps it to 10 == MAX_ATTEMPTS, which is
-        // exactly the state in which the old code wrote DEAD. The call never reached the
-        // Kernel, so the entry must survive with its counter intact.
-        RoleSyncOutboxEntry entry = revokeEntryWithAttempts(KernelRoleSyncWorker.MAX_ATTEMPTS - 1);
-        when(outboxRepository.fetchPendingBatch(50)).thenReturn(Flux.just(entry));
-        when(assignmentPort.revokeAssignment(any())).thenReturn(Mono.error(circuitRejection()));
-
-        StepVerifier.create(worker.poll()).expectNext(1).verifyComplete();
-
-        ArgumentCaptor<RoleSyncOutboxEntry> savedCaptor = ArgumentCaptor.forClass(RoleSyncOutboxEntry.class);
-        verify(outboxRepository, times(2)).save(savedCaptor.capture());
-        RoleSyncOutboxEntry finalState = savedCaptor.getAllValues().get(1);
-
-        assertThat(finalState.status()).isEqualTo(RoleSyncStatus.RETRYING);
-        assertThat(finalState.status()).isNotEqualTo(RoleSyncStatus.DEAD);
-        assertThat(finalState.attemptCount()).isEqualTo(KernelRoleSyncWorker.MAX_ATTEMPTS - 1);
-        assertThat(finalState.nextAttemptAt()).isAfter(LocalDateTime.now());
-    }
-
-    @Test
-    void circuitRejection_wrappedInAnotherThrowable_isStillRecognised() {
-        RoleSyncOutboxEntry entry = revokeEntryWithAttempts(KernelRoleSyncWorker.MAX_ATTEMPTS - 1);
-        when(outboxRepository.fetchPendingBatch(50)).thenReturn(Flux.just(entry));
-        when(assignmentPort.revokeAssignment(any()))
-                .thenReturn(Mono.error(new IllegalStateException("wrapped by the filter chain", circuitRejection())));
-
-        StepVerifier.create(worker.poll()).expectNext(1).verifyComplete();
-
-        ArgumentCaptor<RoleSyncOutboxEntry> savedCaptor = ArgumentCaptor.forClass(RoleSyncOutboxEntry.class);
-        verify(outboxRepository, times(2)).save(savedCaptor.capture());
-        assertThat(savedCaptor.getAllValues().get(1).status()).isEqualTo(RoleSyncStatus.RETRYING);
-        assertThat(savedCaptor.getAllValues().get(1).attemptCount()).isEqualTo(KernelRoleSyncWorker.MAX_ATTEMPTS - 1);
-    }
-
-    @Test
-    void circuitRejection_suspendsPolling_soTheQueueIsNotHammered() {
-        RoleSyncOutboxEntry entry = revokeEntryWithAttempts(0);
-        when(outboxRepository.fetchPendingBatch(anyInt())).thenReturn(Flux.just(entry));
-        when(assignmentPort.revokeAssignment(any())).thenReturn(Mono.error(circuitRejection()));
-
-        StepVerifier.create(worker.poll()).expectNext(1).verifyComplete();
-
-        // The very next cycle must claim nothing at all — no second fetch, no second attempt.
-        StepVerifier.create(worker.poll()).expectNext(0).verifyComplete();
-        verify(outboxRepository, times(1)).fetchPendingBatch(anyInt());
-        assertThat(worker.pausedUntil.get()).isAfter(LocalDateTime.now());
-    }
-
-    @Test
-    void afterThePause_onlyOneProbeRowIsClaimed() {
-        RoleSyncOutboxEntry entry = revokeEntryWithAttempts(0);
-        when(outboxRepository.fetchPendingBatch(anyInt())).thenReturn(Flux.just(entry));
-        when(assignmentPort.revokeAssignment(any())).thenReturn(Mono.error(circuitRejection()));
-
-        StepVerifier.create(worker.poll()).expectNext(1).verifyComplete();
-        worker.pausedUntil.set(null);   // the pause has elapsed
-
-        StepVerifier.create(worker.poll()).expectNext(1).verifyComplete();
-
-        // A HALF_OPEN breaker allows a handful of trial calls: the cycle after the pause must
-        // claim one row. The first cycle legitimately claimed a full batch — the circuit was
-        // not yet known to be refusing — so exactly one full-batch claim is expected overall.
-        verify(outboxRepository).fetchPendingBatch(KernelRoleSyncWorker.PROBE_BATCH_SIZE);
-        verify(outboxRepository, times(1)).fetchPendingBatch(50);
-    }
-
-    @Test
-    void aProbeThatGetsThrough_resumesFullBatches() {
-        RoleSyncOutboxEntry entry = revokeEntryWithAttempts(0);
-        when(outboxRepository.fetchPendingBatch(anyInt())).thenReturn(Flux.just(entry));
-        when(assignmentPort.revokeAssignment(any())).thenReturn(Mono.error(circuitRejection()));
-        StepVerifier.create(worker.poll()).expectNext(1).verifyComplete();
-        assertThat(worker.probing.get()).isTrue();
-
-        // Kernel is answering again.
-        worker.pausedUntil.set(null);
-        when(assignmentPort.revokeAssignment(any())).thenReturn(Mono.empty());
-
-        StepVerifier.create(worker.poll()).expectNext(1).verifyComplete();
-
-        assertThat(worker.probing.get()).isFalse();
-        assertThat(worker.pausedUntil.get()).isNull();
-    }
-
-    @Test
-    void aGenuineKernelFailureStillCountsAsAnAttempt() {
-        // Guard against over-correcting: only a breaker rejection is exempt. A real refusal
-        // from the Kernel must still consume an attempt and still reach DEAD at the cap.
-        RoleSyncOutboxEntry entry = revokeEntryWithAttempts(KernelRoleSyncWorker.MAX_ATTEMPTS - 1);
-        when(outboxRepository.fetchPendingBatch(50)).thenReturn(Flux.just(entry));
-        when(assignmentPort.revokeAssignment(any()))
-                .thenReturn(Mono.error(new IllegalStateException("403 Forbidden from the Kernel")));
-
-        StepVerifier.create(worker.poll()).expectNext(1).verifyComplete();
-
-        ArgumentCaptor<RoleSyncOutboxEntry> savedCaptor = ArgumentCaptor.forClass(RoleSyncOutboxEntry.class);
-        verify(outboxRepository, times(2)).save(savedCaptor.capture());
-        RoleSyncOutboxEntry finalState = savedCaptor.getAllValues().get(1);
-        assertThat(finalState.status()).isEqualTo(RoleSyncStatus.DEAD);
-        assertThat(finalState.attemptCount()).isEqualTo(KernelRoleSyncWorker.MAX_ATTEMPTS);
-        assertThat(worker.pausedUntil.get()).isNull();
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────

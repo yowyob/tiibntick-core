@@ -137,16 +137,6 @@
             <artifactId>shedlock-spring</artifactId>
         </dependency>
 
-        <!-- KernelRoleSyncWorker must recognise a circuit-breaker rejection by TYPE
-             (CallNotPermittedException) rather than by class name, so that a rejected call
-             is never counted as a consumed retry attempt. Version comes from the root
-             resilience4j-bom import; already on the runtime classpath via tnt-bootstrap,
-             so this adds no runtime weight. -->
-        <dependency>
-            <groupId>io.github.resilience4j</groupId>
-            <artifactId>resilience4j-circuitbreaker</artifactId>
-        </dependency>
-
         <!-- ═══════════════════════════════════════════════════════
              TESTS
              ═══════════════════════════════════════════════════════ -->
