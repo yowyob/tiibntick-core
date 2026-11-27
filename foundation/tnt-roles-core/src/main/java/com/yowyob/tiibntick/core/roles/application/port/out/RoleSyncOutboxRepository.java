@@ -38,6 +38,30 @@ public interface RoleSyncOutboxRepository {
     Flux<RoleSyncOutboxEntry> fetchPendingBatch(int batchSize);
 
     /**
+     * Puts back into the queue every entry claimed more than {@code staleAfter} ago and still
+     * in {@link RoleSyncStatus#PROCESSING} — a claim whose process never finished.
+     *
+     * <p>{@link #fetchPendingBatch(int)} only ever returns {@code PENDING} and
+     * {@code RETRYING} rows, so a row left in {@code PROCESSING} by a restart, an OOM kill or
+     * a lost instance has <em>no recovery path whatsoever</em>: it is neither retried nor
+     * declared dead, and no count reports it as late. There were 274 such rows on
+     * 27 November 2026 — work accepted and silently dropped.
+     *
+     * <p>The claim instant is {@code nextAttemptAt}, stamped by
+     * {@link RoleSyncOutboxEntry#asProcessing()}. Implementations must requeue
+     * <em>in the database</em>, in one statement, without transferring rows.
+     *
+     * <p>{@code staleAfter} must stay well above the longest legitimate attempt (the Kernel
+     * call timeout, and the poller's {@code lockAtMostFor}), otherwise a row still being
+     * processed elsewhere is handed to a second instance. The attempt counter is not reset:
+     * a row that keeps being claimed and lost still reaches {@code DEAD} and stops.
+     *
+     * @param staleAfter how long a claim may stay unfinished before it is considered lost
+     * @return the number of entries put back into the queue
+     */
+    Mono<Long> requeueStaleClaims(java.time.Duration staleAfter);
+
+    /**
      * Returns every outbox entry recorded for a given local aggregate (role or
      * assignment), across its full history of attempts.
      */

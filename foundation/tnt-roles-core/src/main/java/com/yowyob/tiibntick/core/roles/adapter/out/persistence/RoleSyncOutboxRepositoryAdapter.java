@@ -15,6 +15,7 @@ import org.springframework.r2dbc.core.DatabaseClient.GenericExecuteSpec;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.EnumMap;
 import java.util.Map;
@@ -69,6 +70,30 @@ public class RoleSyncOutboxRepositoryAdapter implements RoleSyncOutboxRepository
             ORDER  BY created_at ASC
             LIMIT  :batchSize
             FOR UPDATE SKIP LOCKED
+            """;
+
+    /**
+     * Puts lost claims back into the queue, in one statement, without transferring a row.
+     *
+     * <p>A row reaches PROCESSING when the poller claims it and stays there for as long as the
+     * attempt lasts. If the process stops in between — restart, OOM kill, lost instance — the
+     * row stays PROCESSING forever: {@link #FETCH_PENDING_SQL} only looks at PENDING and
+     * RETRYING, so nothing retries it and nothing declares it dead. 274 rows were in that
+     * state on 27 November 2026.
+     *
+     * <p>{@code next_attempt_at} carries the claim instant for a PROCESSING row (see
+     * {@link RoleSyncOutboxEntry#asProcessing()}). The error is overwritten on purpose: what
+     * matters about such a row is that its attempt never finished, which no earlier message
+     * says. The attempt counter is left as it is — a row that keeps being claimed and lost
+     * still exhausts its attempts and ends up DEAD rather than cycling forever.
+     */
+    private static final String REQUEUE_STALE_CLAIMS_SQL = """
+            UPDATE tnt_role_sync_outbox
+            SET    status          = 'RETRYING',
+                   next_attempt_at = :now,
+                   last_error      = 'Claim never completed (process stopped mid-attempt); requeued'
+            WHERE  status = 'PROCESSING'
+              AND  next_attempt_at < :claimedBefore
             """;
 
     /**
@@ -185,6 +210,17 @@ public class RoleSyncOutboxRepositoryAdapter implements RoleSyncOutboxRepository
                 .bind("batchSize", batchSize)
                 .map((row, metadata) -> RoleSyncOutboxPersistenceMapper.fromRow(row))
                 .all();
+    }
+
+    @Override
+    public Mono<Long> requeueStaleClaims(Duration staleAfter) {
+        Objects.requireNonNull(staleAfter, "staleAfter is required");
+        LocalDateTime now = LocalDateTime.now();
+        return databaseClient.sql(REQUEUE_STALE_CLAIMS_SQL)
+                .bind("now", now)
+                .bind("claimedBefore", now.minus(staleAfter))
+                .fetch()
+                .rowsUpdated();
     }
 
     @Override

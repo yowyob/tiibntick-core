@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.LinkedHashSet;
 import java.util.Objects;
@@ -75,6 +76,14 @@ public class KernelRoleSyncWorker {
     private final ObjectMapper objectMapper;
     private final int batchSize;
 
+    /**
+     * How long a claim may stay unfinished before {@link #scheduledStaleClaimSweep()} hands the
+     * row back to the queue. Must stay well above the longest legitimate attempt — the Kernel
+     * call timeout and this poller's {@code lockAtMostFor} — or a row still being processed
+     * elsewhere would be given to a second instance.
+     */
+    private final Duration staleClaimTimeout;
+
     /** Guards against overlapping poll cycles within this instance. */
     private final AtomicBoolean pollingInProgress = new AtomicBoolean(false);
 
@@ -97,7 +106,8 @@ public class KernelRoleSyncWorker {
                                  ITntRoleProvisioningPort provisioningPort,
                                  ITntRoleAssignmentPort assignmentPort,
                                  ObjectMapper objectMapper,
-                                 int batchSize) {
+                                 int batchSize,
+                                 Duration staleClaimTimeout) {
         this.outboxRepository = Objects.requireNonNull(outboxRepository);
         this.roleRepository = Objects.requireNonNull(roleRepository);
         this.assignmentRepository = Objects.requireNonNull(assignmentRepository);
@@ -105,6 +115,7 @@ public class KernelRoleSyncWorker {
         this.assignmentPort = Objects.requireNonNull(assignmentPort);
         this.objectMapper = Objects.requireNonNull(objectMapper);
         this.batchSize = batchSize;
+        this.staleClaimTimeout = Objects.requireNonNull(staleClaimTimeout);
     }
 
     // ── Scheduled polling ────────────────────────────────────────────────────
@@ -165,6 +176,52 @@ public class KernelRoleSyncWorker {
                     }
                 })
                 .doFinally(signal -> pollingInProgress.set(false));
+    }
+
+    // ── Lost claims ──────────────────────────────────────────────────────────
+
+    /**
+     * Puts back into the queue the entries claimed and never finished.
+     *
+     * <p>{@link #processEntry} marks a row PROCESSING before dispatching it. If this process
+     * stops in between — a restart, an OOM kill, a lost instance — the row stays PROCESSING,
+     * and {@link RoleSyncOutboxRepository#fetchPendingBatch(int)} only ever returns PENDING and
+     * RETRYING rows. Such a row therefore has <em>no</em> recovery path: it is never retried,
+     * never declared dead, and no count reports it as late. 274 of them were counted on
+     * 27 November 2026, the oldest predating the Kernel outage — roles and assignments the
+     * platform had accepted to synchronise and silently dropped.
+     *
+     * <p>Separate from {@link #poll()} on purpose: polling runs every two seconds and this
+     * sweep has nothing to do that often. It also runs when polling is paused by the circuit
+     * breaker — a lost claim is lost whatever the Kernel is doing, and putting it back in the
+     * queue costs no Kernel call.
+     */
+    @Scheduled(fixedDelayString = "${tnt.roles.outbox.stale-claim-sweep-ms:60000}",
+            initialDelayString = "${tnt.roles.outbox.stale-claim-sweep-initial-delay-ms:30000}")
+    @SchedulerLock(name = "tnt-roles-stale-claim-sweep", lockAtMostFor = "PT1M", lockAtLeastFor = "PT1S")
+    public void scheduledStaleClaimSweep() {
+        LockAssert.assertLocked();
+        recoverStaleClaims().subscribe(
+                count -> { },
+                error -> log.error("Stale-claim sweep failed", error)
+        );
+    }
+
+    /**
+     * Requeues the lost claims and says how many — a non-zero count is always worth a line in
+     * the log, since it means an earlier attempt disappeared without trace.
+     *
+     * @return the number of entries put back into the queue
+     */
+    public Mono<Long> recoverStaleClaims() {
+        return outboxRepository.requeueStaleClaims(staleClaimTimeout)
+                .doOnNext(count -> {
+                    if (count > 0) {
+                        log.warn("Requeued {} role sync outbox {} claimed more than {} ago and never completed "
+                                        + "— an attempt was interrupted without recording its outcome",
+                                count, count == 1 ? "entry" : "entries", staleClaimTimeout);
+                    }
+                });
     }
 
     // ── Per-entry processing ─────────────────────────────────────────────────

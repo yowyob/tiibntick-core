@@ -62,7 +62,7 @@ class KernelRoleSyncWorkerTest {
         ObjectMapper objectMapper = new ObjectMapper();
 
         worker = new KernelRoleSyncWorker(outboxRepository, roleRepository, assignmentRepository,
-                provisioningPort, assignmentPort, objectMapper, 50);
+                provisioningPort, assignmentPort, objectMapper, 50, java.time.Duration.ofMinutes(15));
 
         // save() echoes back whatever it's given, like the real adapters do.
         when(outboxRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));

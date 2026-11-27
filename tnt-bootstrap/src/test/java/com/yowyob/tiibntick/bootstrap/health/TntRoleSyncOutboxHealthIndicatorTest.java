@@ -137,6 +137,23 @@ class TntRoleSyncOutboxHealthIndicatorTest {
                     .take(batchSize);
         }
 
+        /** Honours the port's contract: a claim older than {@code staleAfter} goes back to RETRYING. */
+        @Override
+        public Mono<Long> requeueStaleClaims(java.time.Duration staleAfter) {
+            java.time.LocalDateTime claimedBefore = java.time.LocalDateTime.now().minus(staleAfter);
+            long requeued = 0;
+            for (RoleSyncOutboxEntry entry : rows.values()) {
+                if (entry.status() == RoleSyncStatus.PROCESSING
+                        && entry.nextAttemptAt() != null
+                        && entry.nextAttemptAt().isBefore(claimedBefore)) {
+                    rows.put(entry.id(), entry.asRetrying("Claim never completed; requeued",
+                            java.time.LocalDateTime.now()));
+                    requeued++;
+                }
+            }
+            return Mono.just(requeued);
+        }
+
         @Override
         public Flux<RoleSyncOutboxEntry> findByAggregateId(UUID aggregateId) {
             return Flux.fromIterable(rows.values()).filter(e -> e.aggregateId().equals(aggregateId));

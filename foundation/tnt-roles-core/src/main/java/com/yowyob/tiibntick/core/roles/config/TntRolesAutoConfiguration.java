@@ -304,9 +304,13 @@ public class TntRolesAutoConfiguration {
             ITntRoleProvisioningPort provisioningPort,
             ITntRoleAssignmentPort assignmentPort,
             ObjectMapper objectMapper,
-            @Value("${tnt.roles.outbox.batch-size:50}") int batchSize) {
+            @Value("${tnt.roles.outbox.batch-size:50}") int batchSize,
+            // 15 minutes : bien au-dessus de la plus longue tentative légitime (délai d'attente
+            // de l'appel au noyau, et lockAtMostFor=PT2M du scrutateur). Descendre sous ces
+            // bornes ferait reprendre une ligne qu'une autre instance traite encore.
+            @Value("${tnt.roles.outbox.stale-claim-timeout:PT15M}") java.time.Duration staleClaimTimeout) {
         return new KernelRoleSyncWorker(outboxRepository, roleRepository, assignmentRepository,
-                provisioningPort, assignmentPort, objectMapper, batchSize);
+                provisioningPort, assignmentPort, objectMapper, batchSize, staleClaimTimeout);
     }
 
     /**

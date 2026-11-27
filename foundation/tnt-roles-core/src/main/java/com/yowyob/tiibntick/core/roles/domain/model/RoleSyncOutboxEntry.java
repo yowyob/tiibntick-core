@@ -99,13 +99,28 @@ public record RoleSyncOutboxEntry(
      * Transitions to {@link RoleSyncStatus#PROCESSING} and increments the attempt counter.
      * Called by the poller right after claiming this row.
      *
-     * @return a copy with {@code status=PROCESSING} and {@code attemptCount+1}
+     * <p><strong>{@code nextAttemptAt} is stamped to now: for a PROCESSING row it means
+     * "claimed at".</strong> Without it, a claim leaves no trace of when it happened, and a
+     * process that stops mid-attempt — a restart, an OOM kill, a lost pod — leaves the row in
+     * PROCESSING with no way to tell a claim made one second ago from one made in September.
+     * Since {@code RoleSyncOutboxRepository#fetchPendingBatch(int)} only ever returns PENDING
+     * and RETRYING rows, such a row had no recovery path at all: 274 of them were counted on
+     * 27 November 2026, the oldest from before the Kernel outage, none of which would ever
+     * have been retried. {@code RoleSyncOutboxRepository#requeueStaleClaims(Duration)} uses
+     * this stamp to find them.
+     *
+     * <p>Safe to reuse the field: it is only read for PENDING and RETRYING rows, and both
+     * {@link #asRetrying(String, LocalDateTime)} and {@link #asDeferred(String, LocalDateTime)}
+     * overwrite it when the row goes back into the queue.
+     *
+     * @return a copy with {@code status=PROCESSING}, {@code attemptCount+1}, and
+     *         {@code nextAttemptAt} marking the claim
      */
     public RoleSyncOutboxEntry asProcessing() {
         return new RoleSyncOutboxEntry(
                 id, operation, aggregateType, aggregateId, tenantId, payload,
                 RoleSyncStatus.PROCESSING, attemptCount + 1, lastError, kernelRefId,
-                createdAt, nextAttemptAt, processedAt
+                createdAt, LocalDateTime.now(), processedAt
         );
     }
 
