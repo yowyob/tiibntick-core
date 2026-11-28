@@ -39,6 +39,21 @@ public class GofpFreelancerService implements GofpFreelancerUseCase {
     private final DeliveryPersonRepository deliveryPersonRepository;
     private final TenantContextHolder      tenantContextHolder;
 
+    /** Dedicated log of the approvals decided without a person (D-181) or across tenants (D-182). */
+    private static final org.slf4j.Logger audit = org.slf4j.LoggerFactory.getLogger("tnt.audit.freelancer-approval");
+
+    /**
+     * Decision D-181 (2026-11-28): manual approval of couriers is suspended until the admin platform exists, like the
+     * relays (D-158). On (default), a new courier's delivery person is created APPROVED, and the couriers still
+     * PENDING are approved once at startup. Off: PENDING until an administrator approves it.
+     */
+    @org.springframework.beans.factory.annotation.Value("${tnt.gofp.freelancer.auto-approve:true}")
+    private boolean autoApprove = true;
+
+    void setAutoApprove(boolean autoApprove) {
+        this.autoApprove = autoApprove;
+    }
+
     // ── Composition helper ────────────────────────────────────────────────
 
     private Mono<GofpFreelancer> hydrate(GofpFreelancer f) {
@@ -83,14 +98,20 @@ public class GofpFreelancerService implements GofpFreelancerUseCase {
 
     /**
      * The delivery-core delivery person carrying the vetting status, at the id of the freelancer (lot L3, C1):
-     * created when absent, always PENDING (an administrator approves it through {@link #updateStatus}, lot L3), so
-     * that the status read back and the vetting transitions find it. An existing one is kept unchanged.
+     * created when absent, PENDING (an administrator approves it through {@link #updateStatus}, lot L3) — or APPROVED
+     * while the auto-approval of D-181 is on — so that the status read back and the vetting transitions find it. An
+     * existing one is kept unchanged. The body of the request never chooses the status.
      */
     private Mono<DeliveryPerson> ensureDeliveryPerson(GofpFreelancer f) {
         return tenantContextHolder.currentTenantId().flatMap(tenantId -> deliveryPersonRepository
                 .findById(tenantId, f.getId())
                 .switchIfEmpty(Mono.defer(() -> {
-                    FreelancerStatus initial = FreelancerStatus.PENDING; // no self-approval through the body
+                    // never from the body: PENDING, or APPROVED by the platform rule of D-181
+                    FreelancerStatus initial = autoApprove ? FreelancerStatus.APPROVED : FreelancerStatus.PENDING;
+                    if (autoApprove) {
+                        audit.info("Courier {} (actor {}) auto-approved at creation in tenant {} (D-181)",
+                                f.getId(), f.getCoreUserId(), tenantId);
+                    }
                     DeliveryPerson dp = DeliveryPerson.builder()
                             .id(f.getId())
                             .tenantId(tenantId)
@@ -120,32 +141,88 @@ public class GofpFreelancerService implements GofpFreelancerUseCase {
      */
     @Override
     public Mono<GofpFreelancer> updateStatus(UUID id, FreelancerStatus status) {
+        return courierTenantForAdmin(id)
+                .flatMap(tenant -> TenantContextHolder.underTenant(tenant.orElse(null), applyStatus(id, status)));
+    }
+
+    /**
+     * Decision D-182: a courier absent from the caller's tenant is looked up everywhere when the caller is a platform
+     * administrator; the whole transition then runs in the courier's own tenant (status read and written there). Empty
+     * = the caller's tenant, unchanged. The cross-tenant access is written to {@code tnt.audit.freelancer-approval}.
+     */
+    private Mono<java.util.Optional<UUID>> courierTenantForAdmin(UUID id) {
+        return tenantContextHolder.currentTenantId()
+                .flatMap(tenantId -> deliveryPersonRepository.findById(tenantId, id)
+                        .map(local -> java.util.Optional.<UUID>empty())
+                        .switchIfEmpty(Mono.defer(() -> tenantContextHolder.callerIsPlatformAdmin()
+                                .filter(Boolean::booleanValue)
+                                .flatMap(admin -> deliveryPersonRepository.findByIdInAnyTenant(id))
+                                .doOnNext(dp -> audit.info("TNT_ADMIN (token tenant {}) changes courier {} of tenant {}"
+                                        + " (D-182)", tenantId, id, dp.getTenantId()))
+                                .map(dp -> java.util.Optional.of(dp.getTenantId())))))
+                .defaultIfEmpty(java.util.Optional.empty());
+    }
+
+    /**
+     * The transition itself, in the current tenant. The delivery person is looked up first: a courier without one here
+     * is not found (404) — its status would otherwise read as the PENDING default and give a misleading 409.
+     */
+    private Mono<GofpFreelancer> applyStatus(UUID id, FreelancerStatus status) {
         return freelancerRepository.findById(id)
                 .switchIfEmpty(Mono.error(new FreelancerNotFoundException("GofpFreelancer not found: " + id)))
-                .flatMap(f -> {
-                    if (f.getStatus() == status) {
-                        return Mono.just(f); // idempotent: same state, nothing written
-                    }
-                    if (!FreelancerStatus.isAllowed(f.getStatus(), status)) {
-                        return Mono.error(new InvalidFreelancerStatusTransitionException(f.getStatus(), status));
-                    }
-                    return tenantContextHolder.currentTenantId()
-                            .flatMap(tenantId -> deliveryPersonRepository.findById(tenantId, f.getId()))
-                            .switchIfEmpty(Mono.error(new FreelancerNotFoundException(
-                                    "No delivery person in the core for freelancer " + id)))
-                            .flatMap(dp -> {
-                                FreelancerStatus previous = f.getStatus();
-                                dp.transitionTo(status.toCore());
-                                return deliveryPersonRepository.save(dp).flatMap(saved -> {
-                                    f.setStatus(FreelancerStatus.fromCore(saved.getStatus()));
-                                    if (status != FreelancerStatus.APPROVED) f.setIsActive(false);
-                                    f.setUpdatedAt(Instant.now());
-                                    log.info("Freelancer {} status {} -> {} (delivery-core)", id, previous, status);
-                                    return freelancerRepository.save(f);
-                                });
+                .flatMap(f -> tenantContextHolder.currentTenantId()
+                        .flatMap(tenantId -> deliveryPersonRepository.findById(tenantId, f.getId()))
+                        .switchIfEmpty(Mono.error(new FreelancerNotFoundException(
+                                "No delivery person in the core for freelancer " + id)))
+                        .flatMap(dp -> {
+                            FreelancerStatus previous = FreelancerStatus.fromCore(dp.getStatus());
+                            f.setStatus(previous);
+                            if (previous == status) {
+                                return Mono.just(f); // idempotent: same state, nothing written
+                            }
+                            if (!FreelancerStatus.isAllowed(previous, status)) {
+                                return Mono.error(new InvalidFreelancerStatusTransitionException(previous, status));
+                            }
+                            dp.transitionTo(status.toCore());
+                            return deliveryPersonRepository.save(dp).flatMap(saved -> {
+                                f.setStatus(FreelancerStatus.fromCore(saved.getStatus()));
+                                if (status != FreelancerStatus.APPROVED) f.setIsActive(false);
+                                f.setUpdatedAt(Instant.now());
+                                log.info("Freelancer {} status {} -> {} (delivery-core)", id, previous, status);
+                                return freelancerRepository.save(f);
                             });
-                })
+                        }))
                 .flatMap(this::hydrate);
+    }
+
+    /**
+     * D-181: the couriers registered while approval was manual are approved once at startup, through the same state
+     * machine. REJECTED, SUSPENDED or other staff decisions are never touched.
+     */
+    @org.springframework.context.event.EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
+    public void catchUpPendingCouriers() {
+        if (!autoApprove) return;
+        approvePendingCouriers()
+                .subscribe(n -> { if (n > 0) log.info("{} PENDING courier(s) auto-approved at startup (D-181)", n); },
+                        e -> log.warn("Courier auto-approval catch-up failed: {}", e.getMessage()));
+    }
+
+    /** Approves every PENDING courier (any tenant); returns how many were approved. */
+    Mono<Long> approvePendingCouriers() {
+        return freelancerRepository.findAllByStatus(FreelancerStatus.PENDING)
+                .concatMap(f -> deliveryPersonRepository.findByIdInAnyTenant(f.getId())
+                        .filter(dp -> dp.getStatus() == FreelancerStatus.PENDING.toCore())
+                        .flatMap(dp -> {
+                            dp.transitionTo(FreelancerStatus.APPROVED.toCore());
+                            return deliveryPersonRepository.save(dp);
+                        })
+                        .doOnNext(dp -> audit.info("Courier {} of tenant {} auto-approved (catch-up, D-181)",
+                                dp.getId(), dp.getTenantId()))
+                        .onErrorResume(e -> {
+                            log.warn("Catch-up auto-approval of courier {} failed: {}", f.getId(), e.getMessage());
+                            return Mono.empty();
+                        }))
+                .count();
     }
 
     @Override

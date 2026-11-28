@@ -44,6 +44,12 @@ Citations exactes des messages de l'utilisateur qui fixent une règle ou une dé
 | 2026-11-27 | « J'aimerais que l'on fasse des modifications, proposes moi tout ce qui te semble éfficace via des questions avec propositions et recommandations et agis comme un ingénieur très expérimenté et qualifié. De plus j'ai déjà une doliance j'aimerais que lorsque on assigne le role TNT_ADMIN à quelqu'un qu'il n'ait plus besoin obligatoirement de se connecter via le tenant système pour que son role TNT_ADMIN soit éffectif et aussi pas obliger que l'utilisateur soit dans le tenant système pour qu'on puisse lui assigner le role TNT_ADMIN. Règle aussi éfficacement le problème lié à : «il passe les contrôles par permission (@RequirePermission) mais pas ceux écrits @PreAuthorize("hasRole('TNT_ADMIN')")». Par contre je veux que l'option de delete du role TNT_ADMIN ne soit pas possible pour le propriétaire du tenant système. Le core doit aussi enregistrer qui à assigner le role à qui et pour le propriétaire du tenant système le marqué dans cette logique SYSTEM_OWNER. J'aimerais aussi que l'on mettes en place un mécanisme qui fera que quand le propriétaire du tenant système se connectes qu'il puisse lui même assigner le rôle TNT_ADMIN afin que même en se reconnectant plus tard avec un autre tenant(différent du tenant système) qu'il soit toujours reconnu comme TNT_ADMIN. On doit aussi enregistrer le tenant à partir duquel quelqu'un obtient le rôle TNT_ADMIN et la possibilité aussi de révoquer tout les roles TNT_ADMIN dont le tenant d'obtention est différent du tenant système. Structures bien tout ceci et n'oublie d'ajouter aussi tes proposition sachant que on veux une cohérence maximale. Aussi je veux savoir vu que les rôles sont provisionner dans le kernel au démarrage de l'application pourquoi est ce que celui-ci ne renvoie pas un jwt avec les rôles de TiiBnTick si c'est possible de résoudre cela fais le. » |
 | 2026-11-27 | « Enregistres et versionnes toutes ces décisions dans un fichier dédié. » |
 | 2026-11-27 | « L'attribution et la révocation doivent bien déclencher l'envoie d'un message automatique au OWNER du tenant système pour l'informer bien sans oublier le mail. et le message doit respecter les préférences linguistiques du OWNER en question. » |
+| 2026-11-27 | « Parles en francais ici dans la conversation. » |
+| 2026-11-28 | « On me modifies rien, voici le retour du dev du mobile/BFF et je veux que tu me produises une bonne réponse à cela ici dans le chat pour que je copie » |
+| 2026-11-28 | « Pour toutes les modifications qui m'incombe de faire sur le core je veux que tu les lances et ne t'arrêtes que lorsque c'est fini et aussi pour toutes préocupations poses moi toutes tes questions avec propositions et recommandations bien pensé. » |
+| 2026-11-28 | « À la fin donnes moi la dans unfichier .md la réponse finale et complète à envoyer au développeur du mobile/BFF » |
+| 2026-11-28 | « N'oublie pas que nous somme sur notre branche single-* ici hors j'ai déjà push et fais un merge de pull request sur main donc si possible assures toi de la cohérence de cette branche à nouveau avec le main particulièrement avec le commit de marge » |
+| 2026-11-28 | « Non si tu avais déjà crée une branche spécifique pour les modifs mobile bff maintient là et on abandonne single-* » |
 
 Les règles permanentes de travail (commits en anglais sans co-auteur, jamais de push, jamais de publication en ligne,
 ne jamais lire `tiibntick-platforms`, changesets Liquibase jamais modifiés, tests d'intégration exécutés avant de dire
@@ -2153,6 +2159,108 @@ Options proposées :
 - **Garder hasRole** — TNT_ADMIN reste un rôle tout-ou-rien sur ces écrans.
 
 **Réponse de l'utilisateur :** Laisser pour le moment et noter comme dette envisageant une migration complète pour plus tard.
+
+### D-180 · Événements véhicule d'un indépendant (point 1 du retour mobile/BFF) · 2026-11-28 06:18 UTC
+
+**Question :** Point 1 (véhicule d'un livreur indépendant → 500) : les 3 événements « véhicule freelance » utilisent l'organisation propriétaire comme tenant et comme clé Kafka, or un indépendant n'en a pas. Aucun module ne consomme ces topics aujourd'hui. Que met-on à la place quand il n'y a pas d'organisation ?
+
+Options proposées :
+
+- **Tenant de la requête (Recommandé)** — Tenant = celui du jeton de l'appelant (le tenant de l'appli), clé = id du véhicule ; on ajoute ownerActorId à l'événement (champ en plus, compatible). Une organisation, quand elle existe, reste la clé comme avant.
+- **Propriétaire comme tenant** — Tenant et clé = l'organisation, sinon l'acteur propriétaire. Simple, mais un acteur n'est pas un tenant : l'enveloppe porterait une valeur trompeuse.
+- **Ne pas publier pour un indépendant** — On saute l'événement quand il n'y a pas d'organisation. Corrige le 500 mais perd l'information (aucun consommateur aujourd'hui).
+
+**Réponse de l'utilisateur :** Je suis confu ce problème nous ne l'avions pas déjà résolu, détailles mieux ta questions et reposes là avec plus d'explication.
+
+### D-181 · Approbation des livreurs (point 2) · 2026-11-28 06:18 UTC
+
+**Question :** Point 2 (livreur créé PENDING, aucun écran d'approbation) : faut-il une approbation automatique comme pour les relais (D-158) tant que la plateforme d'administration n'existe pas ?
+
+Options proposées :
+
+- **Auto à la création, désactivable (Recommandé)** — Même schéma que D-158 : réglage tnt.gofp.freelancer.auto-approve (vrai par défaut). Le livreur passe APPROVED dès la création ; on coupera le réglage quand la plateforme admin existera. Statut et motif tracés « auto-approve ».
+- **Auto quand le dossier est complet** — APPROVED seulement quand le véhicule est enregistré (et pièces fournies). Plus juste, mais il faut fixer la liste exacte des pièces et le flux devient plus long à tester.
+- **Rester manuel** — Pas d'approbation automatique ; un TNT_ADMIN approuve via le PATCH (voir question suivante).
+
+**Réponse de l'utilisateur :** Auto à la création, désactivable (Recommandé)
+
+### D-182 · Approbation par un TNT_ADMIN d'un autre tenant (point 2 bis) · 2026-11-28 06:18 UTC
+
+**Question :** Point 2 bis : un admin connecté dans le tenant système reçoit 404 sur PATCH …/freelancer-profiles/{id}/status, car le livreur est cherché dans le tenant du jeton de l'appelant. Que fait-on ?
+
+Options proposées :
+
+- **TNT_ADMIN trouve le livreur partout (Recommandé)** — Pour un TNT_ADMIN, l'approbation cherche le livreur par son id quel que soit son tenant et agit dans le tenant du livreur ; journalisé comme les lectures inter-tenant (D-178). Les autres appelants gardent la règle actuelle.
+- **Paramètre tenant explicite** — Ajout d'un paramètre ?tenantId= réservé aux TNT_ADMIN. Plus explicite mais change le contrat de l'endpoint.
+- **Ne rien changer** — L'admin se connecte dans le tenant de l'appli (possible depuis le registre TNT_ADMIN).
+
+**Réponse de l'utilisateur :** TNT_ADMIN trouve le livreur partout (Recommandé)
+
+### D-183 · Capacité d'un relais (point 3) · 2026-11-28 06:18 UTC
+
+**Question :** Point 3 (deux capacités de relais) : dans le core, max_deposits du relais est le QUOTA d'abonnement (BASIC 50, STANDARD 200, PREMIUM illimité = -1), pas la place physique ; il sert pourtant à fixer les places du hub à l'approbation (PREMIUM → 10 places). Comment modéliser la capacité ?
+
+Options proposées :
+
+- **Nouveau champ capacité physique (Recommandé)** — Le relayeur déclare dans son profil une capacité en colis (parcel_capacity), modifiable ; elle fixe les places du hub et est répercutée à chaque changement. Le quota d'abonnement reste séparé. Le BFF envoie sa valeur au core au lieu de la garder.
+- **Réutiliser max_deposits** — On fait de max_deposits la capacité physique, modifiable par le relayeur. Mélange quota et place : déconseillé.
+- **Déduire du volume de stockage** — Places = volume (longueur × largeur × hauteur) ÷ un volume moyen de colis. Automatique mais approximatif, et le relayeur ne contrôle plus le chiffre.
+
+**Réponse de l'utilisateur :** Je ne comprends pas du tout ceci, expliques mieux et repose ta questions avec plus de détails.
+
+### D-184 · Événements véhicule d'un indépendant (reprise de D-180) · 2026-11-28 06:31 UTC
+
+**Question :** Point 1 réexpliqué. Non, ce n'était pas déjà résolu. Quand un livreur enregistre son véhicule, le core l'écrit en base puis annonce « véhicule enregistré » sur Kafka. Chaque annonce porte une étiquette « tenant » (à quel espace elle appartient) et une « clé » (pour garder l'ordre des messages d'un même objet). Le code met partout l'identifiant de l'organisation de livreurs. Le lot L3 (commit 56f5f79a du 26/11) a ajouté les véhicules personnels des indépendants, qui n'ont pas d'organisation, mais n'a pas adapté cette annonce : l'identifiant est vide, l'annonce plante, et comme l'écriture et l'annonce sont dans la même transaction, le véhicule n'est pas enregistré (500). Le test de l'époque simulait l'annonce, d'où le trou. Personne n'écoute ces annonces aujourd'hui : le choix ne change que ce qui est écrit dessus. Que met-on pour un indépendant ?
+
+Options proposées :
+
+- **Tenant de l'appli + id véhicule (Recommandé)** — Étiquette tenant = le tenant dans lequel le livreur est connecté (celui de l'appli) ; clé = l'identifiant du véhicule. On ajoute aussi l'identifiant du livreur propriétaire dans l'annonce (champ en plus, sans casser personne). Pour un véhicule d'organisation, rien ne change. Test réel ajouté sur le cas indépendant.
+- **Id du livreur comme tenant** — Étiquette tenant et clé = l'organisation, sinon l'identifiant du livreur. Plus simple, mais l'étiquette « tenant » contiendrait autre chose qu'un tenant, ce qui peut tromper un futur consommateur.
+- **Pas d'annonce pour un indépendant** — On n'émet rien quand il n'y a pas d'organisation. Le 500 disparaît, mais l'information n'existe plus sur Kafka pour ces véhicules.
+
+**Réponse de l'utilisateur :** Tenant de l'appli + id véhicule (Recommandé)
+
+### D-185 · Capacité d'un relais (reprise de D-183) · 2026-11-28 06:31 UTC
+
+**Question :** Point 3 réexpliqué. Un relais a deux chiffres différents. (a) Le QUOTA de son abonnement (colonne max_deposits) : combien de dépôts il a le droit de recevoir selon son forfait (BASIC 50, STANDARD 200, PREMIUM illimité) — c'est une limite commerciale. (b) La PLACE dans sa boutique : combien de colis peuvent y être EN MÊME TEMPS. Le core tient (b) dans le « hub » géographique du relais : chaque dépôt ajoute 1 colis présent, chaque retrait en enlève 1, et quand c'est plein le dépôt est refusé. Problème : à l'approbation, le core remplit (b) avec le chiffre (a), une seule fois, et le relayeur ne peut pas le changer ; un PREMIUM (illimité) reçoit même 10 places. Le BFF, lui, garde le chiffre déclaré par le relayeur (parcel_capacity), que le core ignore. Exemple : un relais PREMIUM qui déclare 40 colis, le core refuse le 11e dépôt. Quel chiffre doit fixer la place du relais ?
+
+Options proposées :
+
+- **Place déclarée par le relayeur (Recommandé)** — Nouveau champ « capacité en colis » dans le profil du relais côté core, saisi et modifiable par le relayeur (le BFF y envoie sa parcel_capacity). Il fixe la place du hub et chaque modification y est répercutée. Le quota d'abonnement reste à part, inchangé. Sans valeur déclarée : 10 par défaut (réglage admin).
+- **Le quota sert de place** — On garde max_deposits pour les deux usages et on le rend modifiable par le relayeur. Mélange limite commerciale et place physique : déconseillé.
+- **Calculée depuis le volume** — Place = volume de stockage déjà saisi (longueur × largeur × hauteur) ÷ un volume moyen de colis. Automatique, mais approximatif, et le relayeur ne contrôle pas le chiffre.
+
+**Réponse de l'utilisateur :** Je choisi 1. Place déclarée par le relayeur (Recommandé)     Nouveau champ « capacité en colis » dans le profil du relais côté core, saisi et modifiable par le relayeur (le BFF y envoie sa parcel_capacity). Il fixe la place du hub et chaque modification y est répercutée. Le quota d'abonnement      reste à part, inchangé. Sans valeur déclarée : 10 par défaut (réglage admin). Et aussi notes bien que le QUOTA d'abonnement de point relais est à revoir car il est problématique en temps normal on ne devrais pas avoir à s'abonner pour pouvoir utiliser tout l'espace disponible de son point relais donc notes cela comme à revoir dans le futur
+
+### D-186 · Nettoyage des données personnelles du dépôt (point 4) · 2026-11-28 06:31 UTC
+
+**Question :** Point 4 : un e-mail nominatif (le même) figure dans 3 documents d'audit, avec des identifiants de compte, d'acteur et d'organisation de notification. Une autre adresse (la vôtre) figure dans le registre des décisions (D-037/D-038, option citée mot pour mot), qui est en ajout seul. Que nettoie-t-on dans le dépôt (nouveau commit) ?
+
+Options proposées :
+
+- **E-mails + ids de comptes, docs d'audit (Recommandé)** — Dans les 3 documents d'audit : e-mail, ids de compte/acteur/organisation de notification remplacés par des libellés (« compte propriétaire du tenant système »…). L'id du tenant système reste (configuration, pas un secret, déjà dans pom.xml et les tests). Le registre n'est pas réécrit ; une note de masquage y est ajoutée.
+- **Idem + masquer dans le registre** — Comme ci-dessus, et l'adresse du registre est remplacée par « <adresse du mainteneur> », en dérogeant à la règle d'ajout seul (entrée de rectification citée).
+- **Tout, id du tenant système compris** — Masquer aussi l'id du tenant système dans toute la doc (il reste dans pom.xml et les tests, nécessaires au build).
+
+**Réponse de l'utilisateur :** E-mails + ids de comptes, docs d'audit (Recommandé)
+
+### D-187 · Historique du miroir public (point 4 bis) · 2026-11-28 06:31 UTC
+
+**Question :** Point 4 bis : un commit de retrait n'efface pas l'historique déjà recopié sur le miroir public. Réécrire l'historique (git filter-repo + force-push) casse toutes les copies locales et les PR ouvertes, et c'est vous qui poussez. Que fait-on ?
+
+Options proposées :
+
+- **Pas de réécriture (Recommandé)** — Commit de nettoyage seulement. L'adresse déjà publiée reste dans l'historique ; si elle est sensible, mieux vaut la considérer comme exposée (filtrage anti-spam). Aucun impact sur les développeurs.
+- **Préparer la réécriture** — Je rédige une procédure pas à pas (git filter-repo sur une copie, vérifications, commandes de force-push que vous lancerez vous-même, message aux développeurs). Je n'exécute rien sur les dépôts distants.
+- **Miroir privé** — Rendre le miroir yowyob/tiibntick-core privé (réglage GitHub que vous faites), sans réécrire l'historique.
+
+**Réponse de l'utilisateur :** Pas de réécriture (Recommandé)
+
+> **Note de masquage (2026-11-28, D-186).** Les documents d'audit `docs/audits/remediation/single-system-tenant.md`,
+> `kernel-notifications-delegation.md` et `kernel-request-notification-organization.md` ne contiennent plus d'adresse
+> e-mail ni d'identifiant de compte, d'acteur, d'application cliente ou d'organisation de notification. Le présent
+> registre, en ajout seul, n'est pas réécrit : l'adresse citée mot pour mot dans l'option de D-037/D-038 y reste, sans
+> autre usage. L'historique git déjà publié n'est pas réécrit (D-187).
 
 ## 3. Documents de décisions détaillés par chantier
 

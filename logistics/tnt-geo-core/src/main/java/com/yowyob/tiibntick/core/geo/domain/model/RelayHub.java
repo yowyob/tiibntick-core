@@ -30,7 +30,7 @@ public final class RelayHub {
     private final UUID tenantId;
     private final UUID branchId;
     private final RoadNodeId nodeId;
-    private final int capacitySlots;
+    private int capacitySlots;
     private int currentOccupancy;
     private final String operatorActorId;
     private HubStatus status;
@@ -192,6 +192,26 @@ public final class RelayHub {
         // parcels leave whatever the approval (D-140: picked up until the end of their storage period)
         if (this.status == HubStatus.FULL && this.currentOccupancy < this.capacitySlots) {
             this.status = HubStatus.ACTIVE;
+        }
+        this.updatedAt = Instant.now();
+    }
+
+    /**
+     * Decision D-185 (2026-11-28): the capacity follows the number of parcels the relay operator declares he can hold
+     * at once. Never below the parcels present ({@link IllegalStateException}); the FULL/ACTIVE state follows, a
+     * closed or revoked hub stays closed.
+     */
+    public void resize(int slots) {
+        if (slots <= 0) {
+            throw new IllegalArgumentException("capacitySlots must be > 0");
+        }
+        if (slots < currentOccupancy) {
+            throw new IllegalStateException("Hub " + id + " holds " + currentOccupancy
+                    + " parcels: its capacity cannot go below that");
+        }
+        this.capacitySlots = slots;
+        if (status == HubStatus.ACTIVE || status == HubStatus.FULL) {
+            this.status = (currentOccupancy == capacitySlots) ? HubStatus.FULL : HubStatus.ACTIVE;
         }
         this.updatedAt = Instant.now();
     }

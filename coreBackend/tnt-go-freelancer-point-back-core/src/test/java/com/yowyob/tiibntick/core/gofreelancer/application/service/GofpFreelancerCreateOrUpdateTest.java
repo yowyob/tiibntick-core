@@ -78,6 +78,7 @@ class GofpFreelancerCreateOrUpdateTest {
      */
     @Test
     void createOrUpdate_newRecord_takesCoreFreelancerIdAndCreatesTheDeliveryPerson() {
+        service.setAutoApprove(false); // manual vetting: PENDING
         UUID profileId = UUID.randomUUID();
         UUID actor = UUID.randomUUID();
         GofpFreelancer incoming = new GofpFreelancer();
@@ -133,5 +134,50 @@ class GofpFreelancerCreateOrUpdateTest {
 
         StepVerifier.create(service.createOrUpdate(incoming)).expectError(IllegalArgumentException.class).verify();
         verify(freelancerRepository, org.mockito.Mockito.never()).save(any());
+    }
+
+    /** D-181: auto-approval on (default) — the new courier's delivery person is created APPROVED, never by the body. */
+    @Test
+    void createOrUpdate_newRecord_autoApproved_createsTheDeliveryPersonApproved() {
+        UUID profileId = UUID.randomUUID();
+        UUID actor = UUID.randomUUID();
+        GofpFreelancer incoming = new GofpFreelancer();
+        incoming.setCoreFreelancerId(profileId);
+        incoming.setCoreUserId(actor);
+        when(tenantContextHolder.currentTenantId()).thenReturn(Mono.just(TENANT));
+        when(freelancerRepository.findByCoreFreelancerId(profileId)).thenReturn(Mono.empty());
+        when(deliveryPersons.findById(TENANT, profileId)).thenReturn(Mono.empty());
+        when(deliveryPersons.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(freelancerRepository.save(any(GofpFreelancer.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(userRepository.findByCoreUserId(actor)).thenReturn(Mono.empty());
+
+        service.createOrUpdate(incoming).block();
+
+        var dp = ArgumentCaptor.forClass(com.yowyob.tiibntick.core.delivery.domain.model.aggregate.DeliveryPerson.class);
+        verify(deliveryPersons).save(dp.capture());
+        assertThat(dp.getValue().getStatus())
+                .isEqualTo(com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryPersonStatus.APPROVED);
+        assertThat(dp.getValue().getTenantId()).isEqualTo(TENANT);
+    }
+
+    /** D-181: an existing delivery person is never re-approved by a profile update or creation retry. */
+    @Test
+    void createOrUpdate_existingDeliveryPerson_keepsItsStatus() {
+        UUID profileId = UUID.randomUUID();
+        GofpFreelancer incoming = new GofpFreelancer();
+        incoming.setCoreFreelancerId(profileId);
+        incoming.setCoreUserId(UUID.randomUUID());
+        var suspended = com.yowyob.tiibntick.core.delivery.domain.model.aggregate.DeliveryPerson.builder()
+                .id(profileId).tenantId(TENANT)
+                .status(com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryPersonStatus.SUSPENDED).build();
+        when(tenantContextHolder.currentTenantId()).thenReturn(Mono.just(TENANT));
+        when(freelancerRepository.findByCoreFreelancerId(profileId)).thenReturn(Mono.empty());
+        when(deliveryPersons.findById(TENANT, profileId)).thenReturn(Mono.just(suspended));
+        when(freelancerRepository.save(any(GofpFreelancer.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(userRepository.findByCoreUserId(any())).thenReturn(Mono.empty());
+
+        service.createOrUpdate(incoming).block();
+
+        verify(deliveryPersons, org.mockito.Mockito.never()).save(any());
     }
 }

@@ -361,3 +361,31 @@ cœur, pas de miroir local).
   1 000 / 1 500 / 1 500 / 2 000 XAF (au lieu de 550 / 1 050 / 1 050 / 1 550 sur `main`).
 - **Dépôt au relais** — les notifications « colis au relais » / « colis reçu » ne partent que si le relais est la
   destination (D-149) ; un relais de transfert ne déclenche rien.
+
+## Retours du développeur Mobile/BFF — 2026-11-28 (décisions D-180 à D-187, branche `fix/mobile-bff-feedback`)
+
+- **Véhicule d'un livreur indépendant (D-184)** — `PUT /api/v1/gofp/freelancer-profiles/me/vehicle` ne répond plus
+  500 pour un livreur sans organisation. Contrat d'API inchangé. Les événements Kafka « véhicule enregistré / affecté /
+  libéré » d'un véhicule personnel portent le tenant de la requête (celui du livreur connecté) et la clé = id du
+  véhicule ; un champ `ownerActorId` (propriétaire, `null` pour un véhicule d'organisation) est ajouté au message.
+  Aucun consommateur aujourd'hui.
+- **Livreur approuvé à la création (D-181)** — `POST /api/v1/gofp/freelancer-profiles`, comme le parcours du mobile
+  (`POST /api/v1/freelancers` puis première route Go, qui projette le livreur), crée le livreur `APPROVED`
+  (interrupteur `TNT_GOFP_FREELANCER_AUTO_APPROVE`, vrai par défaut) ; les livreurs déjà `PENDING` sont approuvés au
+  démarrage. L'écran « compte en cours de validation » ne s'affiche donc plus tant que l'interrupteur est vrai ; le
+  garder pour le jour où il passera à faux. Le statut ne vient jamais du corps de la requête.
+- **Changer le statut d'un livreur depuis n'importe quel tenant (D-182)** — `PATCH
+  /api/v1/gofp/freelancer-profiles/{id}/status?status=…` : un TNT_ADMIN (registre du Core, quel que soit le tenant de
+  sa connexion) trouve le livreur dans son tenant et y applique la transition. Une autre personne d'un autre tenant
+  reçoit **404** (avant : 409 trompeur, le statut étant lu « PENDING » par défaut).
+- **Capacité d'un relais (D-185)** — nouveau champ **`parcelCapacity`** (entier, 1 à 10 000, colis présents en même
+  temps) dans le relais : `PUT /api/v1/gofp/relay-point-profiles/mine` et `POST /api/v1/gofp/relay-point-profiles`,
+  relu dans les réponses. Le BFF y envoie sa `parcel_capacity`. Absent du corps = inchangé. Il fixe la capacité du hub
+  du cœur à l'approbation (10 sans valeur déclarée, réglage `TNT_GOFP_RELAY_DEFAULT_PARCEL_CAPACITY`) et à chaque
+  modification. En dessous du nombre de colis présents : **409**, rien n'est modifié ; 0, négatif ou plus de 10 000 :
+  **400**. Le quota d'abonnement (`maxDeposits`) reste à part, non modifiable par le relayeur, et ne dimensionne plus le
+  hub (son principe est à revoir, spec admin §6.8). Les relais déjà approuvés gardent la capacité actuelle de leur hub
+  jusqu'au premier envoi de `parcelCapacity`.
+- **Données personnelles (D-186, D-187)** — e-mail et identifiants de compte, d'acteurs, d'application cliente et
+  d'organisation de notification retirés des documents d'audit. L'identifiant du tenant système reste (configuration,
+  pas un secret). L'historique git déjà publié n'est pas réécrit.

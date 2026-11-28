@@ -145,6 +145,14 @@ public class GofpRelayPoint implements Persistable<UUID>, TntPersistableEntity {
     @Column("max_deposits")
     private Integer maxDeposits;
 
+    /**
+     * Decision D-185 (2026-11-28): how many parcels the relay can hold at once, declared and changed by its operator
+     * ({@code null} = not declared). It sets the capacity of the core hub — unlike {@link #maxDeposits}, the
+     * subscription quota, which is a commercial limit and no longer sizes the hub.
+     */
+    @Column("parcel_capacity")
+    private Integer parcelCapacity;
+
     // ── Storage space dimensions ──────────────────────────────────────────
 
     /**

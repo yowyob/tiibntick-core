@@ -56,6 +56,17 @@ public class AdminRelayPointApplicationService implements AdminRelayPointUseCase
     private final GofpRelayRevocationApplier revocationApplier;
     private final IManageHubApprovalUseCase hubApproval;
 
+    /**
+     * D-185: capacity of the hub of a relay that declared none (default 10). A platform setting until the
+     * administration platform manages it ({@code tnt.gofp.relay.default-parcel-capacity}).
+     */
+    @org.springframework.beans.factory.annotation.Value("${tnt.gofp.relay.default-parcel-capacity:10}")
+    private int defaultParcelCapacity = 10;
+
+    void setDefaultParcelCapacity(int defaultParcelCapacity) {
+        this.defaultParcelCapacity = defaultParcelCapacity;
+    }
+
     private static final UUID DEFAULT_TENANT = TenantContextHolder.SYSTEM_TENANT;
 
     @Override
@@ -376,8 +387,9 @@ public class AdminRelayPointApplicationService implements AdminRelayPointUseCase
                     GeoPoint point = GeoPoint.of(
                             coordinates.get().getLatitude(), coordinates.get().getLongitude());
                     String cityCode = address.getCity() != null ? address.getCity() : "UNKNOWN";
-                    int capacity = rp.getMaxDeposits() != null && rp.getMaxDeposits() > 0
-                            ? rp.getMaxDeposits() : 10;
+                    // D-185: the capacity the relay declared, never the subscription quota; default when undeclared
+                    int capacity = rp.getParcelCapacity() != null && rp.getParcelCapacity() > 0
+                            ? rp.getParcelCapacity() : defaultParcelCapacity;
                     // H1: the hub's operator is the owner's actor (freelancer's core user), never a profile id.
                     return revocationApplier.operatorActor(DEFAULT_TENANT, rp)
                             .map(UUID::toString)

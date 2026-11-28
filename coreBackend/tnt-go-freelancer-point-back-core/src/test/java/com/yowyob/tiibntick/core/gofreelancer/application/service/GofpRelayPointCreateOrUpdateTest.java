@@ -140,4 +140,82 @@ class GofpRelayPointCreateOrUpdateTest {
                         status, approval, t, t, null, null, null)));
         return rp;
     }
+
+    // ── D-185: the declared parcel capacity sizes the core hub ────────────
+
+    private GofpRelayPoint stored(UUID hubId, Integer capacity) {
+        GofpRelayPoint existing = new GofpRelayPoint();
+        existing.setId(UUID.randomUUID());
+        existing.setCoreRelayPointId(hubId);
+        existing.setParcelCapacity(capacity);
+        existing.markNotNew();
+        when(relayPointRepository.findByCoreRelayPointId(hubId)).thenReturn(Mono.just(existing));
+        return existing;
+    }
+
+    private static com.yowyob.tiibntick.core.geo.domain.model.RelayHub hub(UUID id, int capacity, int occupancy) {
+        return com.yowyob.tiibntick.core.geo.domain.model.RelayHub.rehydrate(id, UUID.randomUUID(), null,
+                com.yowyob.tiibntick.core.geo.domain.model.RoadNodeId.generate(), capacity, occupancy, "actor-1",
+                com.yowyob.tiibntick.core.geo.domain.model.HubStatus.ACTIVE, java.time.Instant.now(),
+                java.time.Instant.now());
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("D-185: a changed parcel capacity resizes the hub, then the relay point is saved")
+    void changedCapacityResizesTheHub() {
+        var hubs = org.mockito.Mockito.mock(com.yowyob.tiibntick.core.gofreelancer.application.port.out.IRelayHubPort.class);
+        service.setRelayHubs(hubs);
+        UUID hubId = UUID.randomUUID();
+        stored(hubId, null);
+        var hub = hub(hubId, 10, 3);
+        when(hubs.findHub(hubId, null)).thenReturn(Mono.just(hub));
+        when(hubs.resizeHub(hubId, hub.tenantId(), 40)).thenReturn(Mono.just(hub(hubId, 40, 3)));
+        when(relayPointRepository.save(any(GofpRelayPoint.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        GofpRelayPoint incoming = new GofpRelayPoint();
+        incoming.setCoreRelayPointId(hubId);
+        incoming.setParcelCapacity(40);
+
+        StepVerifier.create(service.createOrUpdate(incoming))
+                .expectNextMatches(rp -> rp.getParcelCapacity() == 40).verifyComplete();
+        verify(hubs).resizeHub(hubId, hub.tenantId(), 40);
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("D-185: below the parcels present → 409 and nothing saved; unchanged → hub untouched")
+    void capacityBelowTheParcelsPresentIsAConflict() {
+        var hubs = org.mockito.Mockito.mock(com.yowyob.tiibntick.core.gofreelancer.application.port.out.IRelayHubPort.class);
+        service.setRelayHubs(hubs);
+        UUID hubId = UUID.randomUUID();
+        stored(hubId, 20);
+        var hub = hub(hubId, 20, 12);
+        when(hubs.findHub(hubId, null)).thenReturn(Mono.just(hub));
+        when(hubs.resizeHub(hubId, hub.tenantId(), 5)).thenReturn(Mono.error(new IllegalStateException("holds 12")));
+        GofpRelayPoint incoming = new GofpRelayPoint();
+        incoming.setCoreRelayPointId(hubId);
+        incoming.setParcelCapacity(5);
+
+        StepVerifier.create(service.createOrUpdate(incoming))
+                .expectErrorMatches(e -> e instanceof org.springframework.web.server.ResponseStatusException r
+                        && r.getStatusCode().value() == 409).verify();
+        org.mockito.Mockito.verify(relayPointRepository, org.mockito.Mockito.never()).save(any());
+
+        GofpRelayPoint same = new GofpRelayPoint();
+        same.setCoreRelayPointId(hubId);
+        same.setParcelCapacity(20);
+        when(relayPointRepository.save(any(GofpRelayPoint.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        StepVerifier.create(service.createOrUpdate(same)).expectNextCount(1).verifyComplete();
+        org.mockito.Mockito.verify(hubs, org.mockito.Mockito.never()).resizeHub(any(), any(), org.mockito.ArgumentMatchers.eq(20));
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("D-185: a capacity of 0, negative or absurd is refused (400), nothing read nor saved")
+    void invalidCapacityIsRefused() {
+        for (int bad : new int[] {0, -3, 10_001}) {
+            GofpRelayPoint incoming = new GofpRelayPoint();
+            incoming.setCoreRelayPointId(UUID.randomUUID());
+            incoming.setParcelCapacity(bad);
+            StepVerifier.create(service.createOrUpdate(incoming)).expectError(IllegalArgumentException.class).verify();
+        }
+        org.mockito.Mockito.verifyNoInteractions(relayPointRepository);
+    }
 }

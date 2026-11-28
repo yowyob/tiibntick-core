@@ -1,5 +1,7 @@
 # Chantier — Un seul tenant système, plus aucune valeur codée en dur
 
+> Données personnelles masquées le 2026-11-28 (décision D-186) : adresse e-mail, identifiants de compte, d'acteurs, d'application cliente et d'organisation de notification remplacés par des libellés. L'identifiant du tenant système reste (configuration, pas un secret). Les valeurs réelles ne sont pas dans le dépôt ; elles sont connues du mainteneur.
+
 **Branche :** `feat/single-system-tenant`
 **Décidé le :** 2026-11-11 (utilisateur) — TiiBnTick (Go-Freelancer compris) n'a qu'**un seul** tenant système, fourni par la configuration ; aucune valeur de tenant n'est plus écrite dans le code.
 
@@ -25,13 +27,13 @@
 ## À faire AVANT de déployer
 
 1. Définir `TNT_SYSTEM_TENANT_ID` dans l'environnement de production (`.env.prod.example`, `docker-compose.yml` l'exige désormais : `${TNT_SYSTEM_TENANT_ID:?…}`).
-2. Valeur retenue : le tenant `fbd90da6-629d-4d78-9a36-8735ff1762cb` (propriétaire `OWNER` : `yow_npk@yowyob.com`). C'est le même tenant que celui des notifications : il porte l'organisation « TiiBnTick Notif » (`a804a304-fb65-4970-bf97-b94390cdbdff`, code `TNT-NOTIF-001`, `APPROVED`, abonnée à `NOTIFICATION`).
+2. Valeur retenue : le tenant `fbd90da6-629d-4d78-9a36-8735ff1762cb` (propriétaire `OWNER` : `<adresse du compte propriétaire>`). C'est le même tenant que celui des notifications : il porte l'organisation « TiiBnTick Notif » (`<id de l'organisation de notification>`, code `TNT-NOTIF-001`, `APPROVED`, abonnée à `NOTIFICATION`).
 3. Variables associées (clé d'API du client Kernel à fournir séparément, jamais dans le dépôt) :
 
 ```
 TNT_SYSTEM_TENANT_ID=fbd90da6-629d-4d78-9a36-8735ff1762cb
 TNT_NOTIFY_KERNEL_DEFAULT_TENANT_ID=fbd90da6-629d-4d78-9a36-8735ff1762cb
-TNT_NOTIFY_KERNEL_DEFAULT_ORGANIZATION_ID=a804a304-fb65-4970-bf97-b94390cdbdff
+TNT_NOTIFY_KERNEL_DEFAULT_ORGANIZATION_ID=<id de l'organisation de notification>
 TNT_KERNEL_CLIENT_ID=tibntick-backend
 TNT_KERNEL_API_KEY=<fournie par l'équipe Kernel>
 ```

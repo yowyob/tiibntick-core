@@ -88,12 +88,16 @@ import static org.springframework.kafka.test.utils.KafkaTestUtils.getSingleRecor
 @Testcontainers
 @EmbeddedKafka(partitions = 1, topics = {
         ResourceKafkaEventPublisherOutboxIntegrationTest.VEHICLE_REGISTERED_TOPIC,
-        ResourceKafkaEventPublisherOutboxIntegrationTest.FL_VEHICLE_ASSIGNED_MISSION_TOPIC})
+        ResourceKafkaEventPublisherOutboxIntegrationTest.FL_VEHICLE_ASSIGNED_MISSION_TOPIC,
+        ResourceKafkaEventPublisherOutboxIntegrationTest.FL_VEHICLE_REGISTERED_TOPIC})
 @Tag("integration")
 class ResourceKafkaEventPublisherOutboxIntegrationTest {
 
     static final String VEHICLE_REGISTERED_TOPIC = "tnt.resource.vehicle.registered";
     static final String FL_VEHICLE_ASSIGNED_MISSION_TOPIC = "tnt.vehicle.assigned_to_mission";
+    static final String FL_VEHICLE_REGISTERED_TOPIC = "tnt.resource.freelancer.vehicle.registered";
+    /** Tenant of the (simulated) logged-in courier of the D-184 scenario. */
+    static final UUID CALLER_TENANT = UUID.fromString("c0ffee00-0000-4000-8000-000000000184");
 
     @Container
     @SuppressWarnings("resource")
@@ -243,6 +247,49 @@ class ResourceKafkaEventPublisherOutboxIntegrationTest {
                 .verifyComplete();
     }
 
+    @Test
+    @DisplayName("D-184: the vehicle of an independent courier (no organisation) is published under the caller's "
+            + "tenant, keyed by the vehicle, with its owner actor — no longer a NullPointerException (500)")
+    void publishIndependentCourierVehicle() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+        UUID vehicleId = UUID.randomUUID();
+        UUID ownerActorId = UUID.randomUUID();
+        com.yowyob.tiibntick.core.resource.domain.event.FreelancerVehicleRegisteredEvent registered =
+                com.yowyob.tiibntick.core.resource.domain.event.FreelancerVehicleRegisteredEvent.of(vehicleId, null,
+                        ownerActorId, VehicleType.MOTORCYCLE, "LT-184-AA", 30.0, null);
+
+        publisher.publish(registered).block(Duration.ofSeconds(10));
+        publisher.publish(FreelancerVehicleAssignedToMissionEvent.of(vehicleId, null, ownerActorId,
+                VehicleType.MOTORCYCLE, "MISSION-184")).block(Duration.ofSeconds(10));
+
+        StepVerifier.create(envelopeRepository.findByAggregateId(
+                        vehicleId.toString(), "FreelancerVehicle", CALLER_TENANT.toString()).collectList())
+                .assertNext(envelopes -> {
+                    assertThat(envelopes).hasSize(2);
+                    assertThat(envelopes).allSatisfy(e -> {
+                        assertThat(e.getKafkaPartitionKey()).isEqualTo(vehicleId.toString());
+                        assertThat(e.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED);
+                    });
+                })
+                .verifyComplete();
+
+        Map<String, Object> consumerProps = new HashMap<>(
+                KafkaTestUtils.consumerProps(embeddedKafka, "resource-outbox-independent-it", true));
+        consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        try (Consumer<String, String> rawConsumer = new KafkaConsumer<>(consumerProps)) {
+            embeddedKafka.consumeFromAnEmbeddedTopic(rawConsumer, FL_VEHICLE_REGISTERED_TOPIC);
+            ConsumerRecord<String, String> received =
+                    getSingleRecord(rawConsumer, FL_VEHICLE_REGISTERED_TOPIC, Duration.ofSeconds(15));
+            assertThat(received.key()).isEqualTo(vehicleId.toString());
+            JsonNode wire = objectMapper.readTree(received.value());
+            assertThat(wire.get("ownerOrgId").isNull()).isTrue();
+            assertThat(wire.get("ownerActorId").asText()).isEqualTo(ownerActorId.toString());
+            assertThat(wire.get("plateNumber").asText()).isEqualTo("LT-184-AA");
+        }
+    }
+
     @Configuration
     @Import({
             R2dbcAutoConfiguration.class,
@@ -274,11 +321,31 @@ class ResourceKafkaEventPublisherOutboxIntegrationTest {
             return new KafkaTemplate<>(producerFactory);
         }
 
+        /** The logged-in courier of the D-184 scenario, in {@link #CALLER_TENANT}. */
+        @Bean
+        com.yowyob.tiibntick.core.auth.application.port.in.ResolveCurrentUserUseCase currentUser() {
+            var ctx = com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext.builder()
+                    .userId(UUID.randomUUID()).tenantId(CALLER_TENANT).authenticated(true).build();
+            return new com.yowyob.tiibntick.core.auth.application.port.in.ResolveCurrentUserUseCase() {
+                public reactor.core.publisher.Mono<com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext>
+                        resolveCurrentContext() { return reactor.core.publisher.Mono.just(ctx); }
+                public reactor.core.publisher.Mono<com.yowyob.tiibntick.core.auth.domain.model.TntUserIdentity>
+                        resolveCurrentIdentity() {
+                    return reactor.core.publisher.Mono.just(
+                            com.yowyob.tiibntick.core.auth.domain.model.TntUserIdentity.from(ctx));
+                }
+                public reactor.core.publisher.Mono<com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext>
+                        resolveCurrentContextOrAnonymous() { return reactor.core.publisher.Mono.just(ctx); }
+            };
+        }
+
         @Bean
         ResourceKafkaEventPublisher resourceKafkaEventPublisher(
                 PublishEventUseCase publishEventUseCase,
-                @Qualifier("tntObjectMapper") ObjectMapper tntObjectMapper) {
-            return new ResourceKafkaEventPublisher(publishEventUseCase, tntObjectMapper);
+                @Qualifier("tntObjectMapper") ObjectMapper tntObjectMapper,
+                org.springframework.beans.factory.ObjectProvider<
+                        com.yowyob.tiibntick.core.auth.application.port.in.ResolveCurrentUserUseCase> currentUser) {
+            return new ResourceKafkaEventPublisher(publishEventUseCase, tntObjectMapper, currentUser);
         }
     }
 }

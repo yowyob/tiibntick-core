@@ -223,4 +223,18 @@ class RelayAutoApprovalTest {
         assertThat(store.values()).filteredOn(rp -> "Refusé".equals(rp.getName()))
                 .singleElement().satisfies(rp -> assertThat(rp.getStatus()).isEqualTo(RelayPointStatus.REJECTED));
     }
+
+    @Test
+    @DisplayName("D-185: the hub gets the capacity the relay declared, never the subscription quota; 10 when undeclared")
+    void hubCapacityIsTheDeclaredParcelCapacity() {
+        as(OWNER_USER, true).put().uri(RP_PATH + "/mine").contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"name\":\"Boutique Akwa\",\"physicalAccessAddressId\":\"" + ADDRESS
+                        + "\",\"parcelCapacity\":40,\"maxDeposits\":-1}")
+                .exchange().expectStatus().isOk().expectBody().jsonPath("$.parcelCapacity").isEqualTo(40);
+        verify(hubs).provisionHub(any(), any(), anyString(), anyString(), org.mockito.ArgumentMatchers.eq(40), any());
+
+        as(STRANGER_USER, true).put().uri(RP_PATH + "/mine").contentType(MediaType.APPLICATION_JSON).bodyValue(BODY)
+                .exchange().expectStatus().isOk();
+        verify(hubs).provisionHub(any(), any(), anyString(), anyString(), org.mockito.ArgumentMatchers.eq(10), any());
+    }
 }

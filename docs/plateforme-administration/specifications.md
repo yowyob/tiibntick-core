@@ -45,6 +45,9 @@ Lot L3 (fait) : le refus (`reject`), la levée de suspension et la révocation e
 (`GofpFreelancerService.updateStatus` → `DeliveryPerson.transitionTo`) : `validate` avec `approved=false` refuse,
 `.../activate` lève une suspension. La projection et la création Go créent le livreur `PENDING` (plus d'agrément d'office).
 
+> **2026-11-28 (D-181)** : agrément manuel suspendu provisoirement, comme pour les relais — le livreur est créé
+> `APPROVED` tant que `tnt.gofp.freelancer.auto-approve` est vrai. Voir §6.8.
+
 ## 2. Inventaire des validations par un administrateur
 
 Garde = contrôle d'accès vu dans le code. « ⚠ » signale une garde trop faible, à corriger avant d'exposer la route à
@@ -621,3 +624,27 @@ Conception : [registre-administrateurs-plateforme.md](../architecture/chantiers/
 - Changement de `TNT_SYSTEM_TENANT_ID` : l'écran doit signaler les entrées dont le tenant d'obtention n'est plus le
   tenant système et proposer la révocation de masse.
 
+### 6.8 Retours du développeur Mobile/BFF (décisions D-180 à D-187, 2026-11-28)
+
+- **Approbation automatique des livreurs (D-181).** Comme pour les relais (§6.5), tant que la plateforme
+  d'administration n'existe pas, un nouveau livreur est créé `APPROVED` (jamais par le corps de la requête) et les
+  livreurs encore `PENDING` sont approuvés une fois au démarrage, par la machine à états du cœur. Réglage
+  `tnt.gofp.freelancer.auto-approve` (`TNT_GOFP_FREELANCER_AUTO_APPROVE`, **vrai par défaut**). Chaque approbation
+  automatique est écrite dans le journal `tnt.audit.freelancer-approval`. Cela suspend provisoirement la décision du
+  §1 (agrément manuel), qui reprend dès que l'interrupteur passe à faux. La plateforme d'administration doit offrir :
+  **le réglage**, **la liste des livreurs approuvés automatiquement** (journal ci-dessus) pour une revue a posteriori,
+  et les actions du §1 sur chacun (suspendre, révoquer…) ; action journalisée (section 4 bis).
+- **Agrément d'un livreur depuis n'importe quel tenant (D-182).** Un TNT_ADMIN connecté dans un autre tenant que celui
+  du livreur le trouve (`PATCH /api/v1/gofp/freelancer-profiles/{id}/status`) ; la transition s'applique dans le
+  tenant du livreur et l'accès est écrit dans `tnt.audit.freelancer-approval`. L'écran des livreurs doit donc lister
+  tous les tenants pour un TNT_ADMIN, et montrer ce journal. Un non-TNT_ADMIN d'un autre tenant reçoit 404.
+- **Capacité d'un point relais (D-185).** Le relayeur déclare et modifie lui-même `parcelCapacity` (colis présents en
+  même temps) ; elle fixe la capacité du hub du cœur, jamais en dessous des colis présents (409). Sans valeur
+  déclarée, la capacité du hub à l'approbation est un **réglage de plateforme** : `tnt.gofp.relay.default-parcel-capacity`
+  (`TNT_GOFP_RELAY_DEFAULT_PARCEL_CAPACITY`, 10 par défaut), à reprendre dans l'écran des réglages. L'écran d'un relais
+  doit afficher la capacité déclarée, la capacité du hub et le nombre de colis présents.
+- **À revoir plus tard : le quota d'abonnement des relais** (`max_deposits`, forfaits BASIC 50, STANDARD 200,
+  PREMIUM illimité). Consigne du mainteneur (D-185) : « en temps normal on ne devrait pas avoir à s'abonner pour
+  pouvoir utiliser tout l'espace disponible de son point relais ». Le quota ne limite plus la place du hub, mais il
+  existe toujours comme limite commerciale de dépôts ; son principe est à réexaminer (supprimer, ou le réserver à des
+  services en plus) avant que la plateforme d'administration n'expose la gestion des abonnements.

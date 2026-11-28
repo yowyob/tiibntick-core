@@ -67,6 +67,11 @@ public class RelayHubPortAdapter implements IRelayHubPort {
     }
 
     @Override
+    public Mono<RelayHub> resizeHub(UUID hubId, UUID tenantId, int capacitySlots) {
+        return manageRelayHubUseCase.resizeHub(hubId, tenantId, capacitySlots);
+    }
+
+    @Override
     public Mono<RelayHub> provisionHub(UUID tenantId, GeoPoint coordinates, String name, String cityCode,
                                         int capacitySlots, String operatorActorId) {
         return manageRoadNetworkUseCase

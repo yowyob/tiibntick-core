@@ -22,12 +22,22 @@ public record FreelancerVehicleRegisteredEvent(
         String plateNumber,
         double maxCapacityKg,
         FuelType fuelType,
-        Instant occurredAt
+        Instant occurredAt,
+        /**
+         * Actor owning a personal vehicle (independent courier, no organisation), else {@code null}. Added
+         * 2026-11-28 (decision D-184): an independent's vehicle has no {@code ownerOrgId}.
+         */
+        UUID ownerActorId
 ) {
     public static FreelancerVehicleRegisteredEvent of(UUID vehicleId, UUID ownerOrgId,
             VehicleType vehicleType, String plateNumber, double maxCapacityKg, FuelType fuelType) {
+        return of(vehicleId, ownerOrgId, null, vehicleType, plateNumber, maxCapacityKg, fuelType);
+    }
+
+    public static FreelancerVehicleRegisteredEvent of(UUID vehicleId, UUID ownerOrgId, UUID ownerActorId,
+            VehicleType vehicleType, String plateNumber, double maxCapacityKg, FuelType fuelType) {
         return new FreelancerVehicleRegisteredEvent(
                 UUID.randomUUID(), vehicleId, ownerOrgId, vehicleType, plateNumber,
-                maxCapacityKg, fuelType, Instant.now());
+                maxCapacityKg, fuelType, Instant.now(), ownerActorId);
     }
 }

@@ -89,15 +89,20 @@ public class GofpRelayPointService implements GofpRelayPointUseCase {
         // D-130: the storage of an independent relay must stay within the platform bounds (400 otherwise)
         Mono<Void> storageCheck = rp.getStorageDays() == null ? Mono.empty()
                 : deliveryThresholds.checkIndependentRelayStorageDays(rp.getStorageDays());
+        if (rp.getParcelCapacity() != null
+                && (rp.getParcelCapacity() <= 0 || rp.getParcelCapacity() > MAX_PARCEL_CAPACITY)) {
+            return Mono.error(new IllegalArgumentException(
+                    "parcelCapacity must be between 1 and " + MAX_PARCEL_CAPACITY));
+        }
         return storageCheck.then(relayPointRepository.findByCoreRelayPointId(rp.getCoreRelayPointId())
-                .flatMap(existing -> {
+                .flatMap(existing -> resizeHub(existing, rp).then(Mono.defer(() -> {
                     rp.setId(existing.getId());
                     rp.markNotNew();
                     rp.setCreatedAt(existing.getCreatedAt());
                     rp.setUpdatedAt(Instant.now());
                     log.info("Updating GofpRelayPoint coreRelayPointId={}", rp.getCoreRelayPointId());
                     return relayPointRepository.save(rp);
-                })
+                })))
                 .switchIfEmpty(Mono.defer(() -> {
                     if (rp.getId() == null) rp.setId(UUID.randomUUID());
                     rp.setCreatedAt(Instant.now());
@@ -106,6 +111,30 @@ public class GofpRelayPointService implements GofpRelayPointUseCase {
                     return relayPointRepository.save(rp);
                 }))
                 .flatMap(this::hydrate));
+    }
+
+    /** D-185: upper bound of a declared parcel capacity (a typing error, not a real relay). */
+    static final int MAX_PARCEL_CAPACITY = 10_000;
+
+    /**
+     * D-185: a changed declared capacity is carried to the core hub at once, before the relay point is saved. No hub
+     * yet (not approved, or no address): nothing to do, the capacity is used when the hub is provisioned. Below the
+     * parcels present: 409, nothing saved.
+     */
+    private Mono<Void> resizeHub(GofpRelayPoint existing, GofpRelayPoint next) {
+        Integer capacity = next.getParcelCapacity();
+        if (relayHubs == null || capacity == null || capacity.equals(existing.getParcelCapacity())
+                || existing.getCoreRelayPointId() == null) {
+            return Mono.empty();
+        }
+        return relayHubs.findHub(existing.getCoreRelayPointId(), null)
+                .onErrorResume(e -> Mono.empty())
+                .flatMap(hub -> relayHubs.resizeHub(hub.id(), hub.tenantId(), capacity))
+                .doOnNext(hub -> log.info("Relay point {}: hub {} capacity set to {} (D-185)", existing.getId(),
+                        hub.id(), hub.capacitySlots()))
+                .onErrorMap(IllegalStateException.class, e -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.CONFLICT, e.getMessage()))
+                .then();
     }
 
     /**

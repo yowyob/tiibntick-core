@@ -41,6 +41,11 @@ import java.util.UUID;
  * the closest available partition key, consistent with how the rest of the module already
  * treats {@code ownerOrgId} as the FreelancerOrg's tenancy boundary.
  *
+ * <p>Decision D-184 (2026-11-28): the <b>personal vehicle of an independent courier</b> (lot L3) has no
+ * {@code ownerOrgId}. Its events then carry the tenant of the request (the one the courier is logged in,
+ * system tenant for a flow without caller) and are keyed by the vehicle id; {@code ownerActorId} names
+ * the owner. An organisation's vehicle is published exactly as before.
+ *
  * @author MANFOUO Braun
  */
 @Component
@@ -68,12 +73,33 @@ public class ResourceKafkaEventPublisher implements ResourceEventPublisherPort {
 
     private final PublishEventUseCase publishEventUseCase;
     private final ObjectMapper objectMapper;
+    private final org.springframework.beans.factory.ObjectProvider<
+            com.yowyob.tiibntick.core.auth.application.port.in.ResolveCurrentUserUseCase> currentUser;
 
     public ResourceKafkaEventPublisher(
             PublishEventUseCase publishEventUseCase,
-            @Qualifier("tntObjectMapper") ObjectMapper objectMapper) {
+            @Qualifier("tntObjectMapper") ObjectMapper objectMapper,
+            org.springframework.beans.factory.ObjectProvider<
+                    com.yowyob.tiibntick.core.auth.application.port.in.ResolveCurrentUserUseCase> currentUser) {
         this.publishEventUseCase = publishEventUseCase;
         this.objectMapper = objectMapper;
+        this.currentUser = currentUser;
+    }
+
+    /**
+     * D-184: the envelope tenant of a freelancer-vehicle event — the owning organisation when there is one (unchanged),
+     * else the tenant of the request, else the system tenant (flow without caller).
+     */
+    Mono<UUID> vehicleTenant(UUID ownerOrgId) {
+        if (ownerOrgId != null) {
+            return Mono.just(ownerOrgId);
+        }
+        var resolver = currentUser.getIfAvailable();
+        Mono<UUID> caller = resolver == null ? Mono.empty()
+                : resolver.resolveCurrentContextOrAnonymous()
+                        .mapNotNull(com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext::tenantId)
+                        .onErrorResume(e -> Mono.empty());
+        return caller.defaultIfEmpty(com.yowyob.tiibntick.common.tenant.SystemTenant.id());
     }
 
     // ── Agency Vehicle events ─────────────────────────────────────────────
@@ -138,24 +164,25 @@ public class ResourceKafkaEventPublisher implements ResourceEventPublisherPort {
 
     @Override
     public Mono<Void> publish(FreelancerVehicleRegisteredEvent event) {
-        return enqueue(TOPIC_FL_VEHICLE_REGISTERED, event, event.eventId(),
-                event.vehicleId().toString(), AGGREGATE_TYPE_FREELANCER_VEHICLE,
-                event.ownerOrgId().toString(), event.ownerOrgId(), event.occurredAt());
+        String key = event.ownerOrgId() != null ? event.ownerOrgId().toString() : event.vehicleId().toString();
+        return vehicleTenant(event.ownerOrgId()).flatMap(tenant -> enqueue(TOPIC_FL_VEHICLE_REGISTERED, event,
+                event.eventId(), event.vehicleId().toString(), AGGREGATE_TYPE_FREELANCER_VEHICLE, key, tenant,
+                event.occurredAt()));
     }
 
     @Override
     public Mono<Void> publish(FreelancerVehicleAssignedToMissionEvent event) {
         // Keyed by vehicleId for tnt-delivery-core and tnt-realtime-core ordering
-        return enqueue(TOPIC_FL_VEHICLE_ASSIGNED_MISSION, event, event.eventId(),
-                event.vehicleId().toString(), AGGREGATE_TYPE_FREELANCER_VEHICLE,
-                event.vehicleId().toString(), event.ownerOrgId(), event.occurredAt());
+        return vehicleTenant(event.ownerOrgId()).flatMap(tenant -> enqueue(TOPIC_FL_VEHICLE_ASSIGNED_MISSION, event,
+                event.eventId(), event.vehicleId().toString(), AGGREGATE_TYPE_FREELANCER_VEHICLE,
+                event.vehicleId().toString(), tenant, event.occurredAt()));
     }
 
     @Override
     public Mono<Void> publish(FreelancerVehicleReleasedFromMissionEvent event) {
-        return enqueue(TOPIC_FL_VEHICLE_RELEASED_MISSION, event, event.eventId(),
-                event.vehicleId().toString(), AGGREGATE_TYPE_FREELANCER_VEHICLE,
-                event.vehicleId().toString(), event.ownerOrgId(), event.occurredAt());
+        return vehicleTenant(event.ownerOrgId()).flatMap(tenant -> enqueue(TOPIC_FL_VEHICLE_RELEASED_MISSION, event,
+                event.eventId(), event.vehicleId().toString(), AGGREGATE_TYPE_FREELANCER_VEHICLE,
+                event.vehicleId().toString(), tenant, event.occurredAt()));
     }
 
     // ── Private helper ────────────────────────────────────────────────────

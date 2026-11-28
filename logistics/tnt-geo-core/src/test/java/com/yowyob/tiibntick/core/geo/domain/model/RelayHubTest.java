@@ -45,4 +45,44 @@ class RelayHubTest {
         assertThatThrownBy(() -> RelayHub.create(UUID.randomUUID(), null, null, 10, "actor-1"))
                 .isInstanceOf(NullPointerException.class);
     }
+
+    // ── D-185: the capacity follows the relay's declared parcel capacity ──
+
+    private static RelayHub hub(int capacity, int occupancy, HubStatus status) {
+        return RelayHub.rehydrate(UUID.randomUUID(), UUID.randomUUID(), null, RoadNodeId.generate(), capacity,
+                occupancy, "actor-1", status, java.time.Instant.now(), java.time.Instant.now());
+    }
+
+    @Test
+    void resize_growsAFullHubAndReopensIt() {
+        RelayHub hub = hub(10, 10, HubStatus.FULL);
+        hub.resize(40);
+        assertThat(hub.capacitySlots()).isEqualTo(40);
+        assertThat(hub.availableSlots()).isEqualTo(30);
+        assertThat(hub.status()).isEqualTo(HubStatus.ACTIVE);
+    }
+
+    @Test
+    void resize_downToTheParcelsPresentMakesItFull() {
+        RelayHub hub = hub(40, 12, HubStatus.ACTIVE);
+        hub.resize(12);
+        assertThat(hub.status()).isEqualTo(HubStatus.FULL);
+    }
+
+    @Test
+    void resize_neverBelowTheParcelsPresent() {
+        RelayHub hub = hub(40, 12, HubStatus.ACTIVE);
+        assertThatThrownBy(() -> hub.resize(11)).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("holds 12 parcels");
+        assertThat(hub.capacitySlots()).isEqualTo(40);
+        assertThatThrownBy(() -> hub.resize(0)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void resize_leavesAClosedHubClosed() {
+        RelayHub hub = hub(10, 0, HubStatus.TEMPORARILY_CLOSED);
+        hub.resize(25);
+        assertThat(hub.capacitySlots()).isEqualTo(25);
+        assertThat(hub.status()).isEqualTo(HubStatus.TEMPORARILY_CLOSED);
+    }
 }

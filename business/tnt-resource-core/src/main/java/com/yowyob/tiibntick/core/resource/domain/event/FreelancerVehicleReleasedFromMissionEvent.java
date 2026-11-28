@@ -17,11 +17,21 @@ public record FreelancerVehicleReleasedFromMissionEvent(
         UUID vehicleId,
         UUID ownerOrgId,
         String missionId,
-        Instant occurredAt
+        Instant occurredAt,
+        /**
+         * Actor owning a personal vehicle (independent courier, no organisation), else {@code null}. Added
+         * 2026-11-28 (decision D-184): an independent's vehicle has no {@code ownerOrgId}.
+         */
+        UUID ownerActorId
 ) {
     public static FreelancerVehicleReleasedFromMissionEvent of(UUID vehicleId, UUID ownerOrgId,
             String missionId) {
+        return of(vehicleId, ownerOrgId, null, missionId);
+    }
+
+    public static FreelancerVehicleReleasedFromMissionEvent of(UUID vehicleId, UUID ownerOrgId, UUID ownerActorId,
+            String missionId) {
         return new FreelancerVehicleReleasedFromMissionEvent(
-                UUID.randomUUID(), vehicleId, ownerOrgId, missionId, Instant.now());
+                UUID.randomUUID(), vehicleId, ownerOrgId, missionId, Instant.now(), ownerActorId);
     }
 }

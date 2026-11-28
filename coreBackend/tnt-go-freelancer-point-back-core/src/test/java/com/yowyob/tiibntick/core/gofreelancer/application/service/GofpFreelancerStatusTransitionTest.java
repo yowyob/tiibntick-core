@@ -18,6 +18,7 @@ import reactor.test.StepVerifier;
 
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -48,6 +49,10 @@ class GofpFreelancerStatusTransitionTest {
     @BeforeEach
     void setUp() {
         service = new GofpFreelancerService(freelancerRepository, userRepository, deliveryPersons, tenantContextHolder);
+        // defaults of the D-182 look-up: caller in TENANT, no delivery person there, not a platform administrator
+        lenient().when(tenantContextHolder.currentTenantId()).thenReturn(Mono.just(TENANT));
+        lenient().when(deliveryPersons.findById(eq(TENANT), any())).thenReturn(Mono.empty());
+        lenient().when(tenantContextHolder.callerIsPlatformAdmin()).thenReturn(Mono.just(false));
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────
@@ -72,6 +77,13 @@ class GofpFreelancerStatusTransitionTest {
         when(deliveryPersons.findById(TENANT, id)).thenReturn(Mono.just(dp));
         when(deliveryPersons.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
         return dp;
+    }
+
+    /** The delivery person, read only (the transition is refused or idempotent before any write). */
+    private void stubCoreRead(UUID id, FreelancerStatus status) {
+        when(deliveryPersons.findById(TENANT, id)).thenReturn(Mono.just(
+                com.yowyob.tiibntick.core.delivery.domain.model.aggregate.DeliveryPerson.builder()
+                        .id(id).tenantId(TENANT).status(status.toCore()).build()));
     }
 
     private void stubSave() {
@@ -143,6 +155,7 @@ class GofpFreelancerStatusTransitionTest {
     void updateStatus_invalidTransition_emitsTransitionException(FreelancerStatus from, FreelancerStatus to) {
         UUID id = UUID.randomUUID();
         stubFind(id, freelancer(id, from));
+        stubCoreRead(id, from);
 
         StepVerifier.create(service.updateStatus(id, to))
                 .expectErrorMatches(e -> e instanceof InvalidFreelancerStatusTransitionException
@@ -160,6 +173,7 @@ class GofpFreelancerStatusTransitionTest {
         stubFind(id, freelancer(id, FreelancerStatus.PENDING));
         when(tenantContextHolder.currentTenantId()).thenReturn(Mono.just(TENANT));
         when(deliveryPersons.findById(TENANT, id)).thenReturn(Mono.empty());
+        when(tenantContextHolder.callerIsPlatformAdmin()).thenReturn(Mono.just(false));
 
         StepVerifier.create(service.updateStatus(id, FreelancerStatus.APPROVED))
                 .expectError(FreelancerNotFoundException.class)
@@ -174,6 +188,7 @@ class GofpFreelancerStatusTransitionTest {
         UUID id = UUID.randomUUID();
         GofpFreelancer f = freelancer(id, FreelancerStatus.APPROVED);
         stubFind(id, f);
+        stubCoreRead(id, FreelancerStatus.APPROVED);
         stubNoUser(f.getCoreUserId());
 
         StepVerifier.create(service.updateStatus(id, FreelancerStatus.APPROVED))
@@ -191,6 +206,7 @@ class GofpFreelancerStatusTransitionTest {
     void updateStatus_approvedToPending_isRejected() {
         UUID id = UUID.randomUUID();
         stubFind(id, freelancer(id, FreelancerStatus.APPROVED));
+        stubCoreRead(id, FreelancerStatus.APPROVED);
 
         StepVerifier.create(service.updateStatus(id, FreelancerStatus.PENDING))
                 .expectError(InvalidFreelancerStatusTransitionException.class)
@@ -214,5 +230,80 @@ class GofpFreelancerStatusTransitionTest {
         StepVerifier.create(service.updateStatus(id, FreelancerStatus.SUSPENDED))
                 .expectNextMatches(saved -> !saved.getIsActive())
                 .verifyComplete();
+    }
+
+    // ── D-182: platform administrator, courier of another tenant ──────────
+
+    @Test
+    void updateStatus_platformAdmin_findsTheCourierInItsOwnTenant() {
+        UUID id = UUID.randomUUID();
+        UUID courierTenant = UUID.randomUUID();
+        stubFind(id, freelancer(id, FreelancerStatus.PENDING)); // what the token tenant sees (no delivery person)
+        var dp = com.yowyob.tiibntick.core.delivery.domain.model.aggregate.DeliveryPerson.builder()
+                .id(id).tenantId(courierTenant).status(FreelancerStatus.PENDING.toCore()).build();
+        // the token tenant is TENANT; inside underTenant(courierTenant) the current tenant becomes the courier's
+        when(tenantContextHolder.currentTenantId()).thenReturn(
+                Mono.deferContextual(ctx -> Mono.just(ctx.getOrDefault(TenantContextHolder.TENANT_OVERRIDE, TENANT))));
+        when(tenantContextHolder.callerIsPlatformAdmin()).thenReturn(Mono.just(true));
+        when(deliveryPersons.findByIdInAnyTenant(id)).thenReturn(Mono.just(dp));
+        when(deliveryPersons.findById(courierTenant, id)).thenReturn(Mono.just(dp));
+        when(deliveryPersons.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        stubSave();
+
+        StepVerifier.create(service.updateStatus(id, FreelancerStatus.APPROVED))
+                .expectNextMatches(f -> f.getStatus() == FreelancerStatus.APPROVED)
+                .verifyComplete();
+        var saved = org.mockito.ArgumentCaptor.forClass(
+                com.yowyob.tiibntick.core.delivery.domain.model.aggregate.DeliveryPerson.class);
+        verify(deliveryPersons).save(saved.capture());
+        assertThat(saved.getValue().getTenantId()).as("acts in the courier's tenant").isEqualTo(courierTenant);
+    }
+
+    @Test
+    void updateStatus_notAdmin_neverLooksInOtherTenants() {
+        UUID id = UUID.randomUUID();
+        stubFind(id, freelancer(id, FreelancerStatus.PENDING));
+        when(tenantContextHolder.currentTenantId()).thenReturn(Mono.just(TENANT));
+        when(deliveryPersons.findById(TENANT, id)).thenReturn(Mono.empty());
+        when(tenantContextHolder.callerIsPlatformAdmin()).thenReturn(Mono.just(false));
+
+        StepVerifier.create(service.updateStatus(id, FreelancerStatus.APPROVED))
+                .expectError(FreelancerNotFoundException.class).verify();
+        verify(deliveryPersons, never()).findByIdInAnyTenant(any());
+    }
+
+    // ── D-181: startup catch-up of PENDING couriers ───────────────────────
+
+    @Test
+    void approvePendingCouriers_approvesOnlyPendingDeliveryPersons() {
+        UUID pending = UUID.randomUUID();
+        UUID rejected = UUID.randomUUID();
+        when(freelancerRepository.findAllByStatus(FreelancerStatus.PENDING))
+                .thenReturn(reactor.core.publisher.Flux.just(freelancer(pending, FreelancerStatus.PENDING),
+                        freelancer(rejected, FreelancerStatus.PENDING)));
+        when(deliveryPersons.findByIdInAnyTenant(pending)).thenReturn(Mono.just(
+                com.yowyob.tiibntick.core.delivery.domain.model.aggregate.DeliveryPerson.builder()
+                        .id(pending).tenantId(TENANT).status(FreelancerStatus.PENDING.toCore()).build()));
+        when(deliveryPersons.findByIdInAnyTenant(rejected)).thenReturn(Mono.just(
+                com.yowyob.tiibntick.core.delivery.domain.model.aggregate.DeliveryPerson.builder()
+                        .id(rejected).tenantId(TENANT).status(FreelancerStatus.REJECTED.toCore()).build()));
+        when(deliveryPersons.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+
+        StepVerifier.create(service.approvePendingCouriers()).expectNext(1L).verifyComplete();
+        var saved = org.mockito.ArgumentCaptor.forClass(
+                com.yowyob.tiibntick.core.delivery.domain.model.aggregate.DeliveryPerson.class);
+        verify(deliveryPersons).save(saved.capture());
+        assertThat(saved.getValue().getId()).isEqualTo(pending);
+        assertThat(saved.getValue().getStatus()).isEqualTo(FreelancerStatus.APPROVED.toCore());
+    }
+
+    @Test
+    void updateStatus_withoutDeliveryPersonHere_isNotFoundNotAMisleadingConflict() {
+        UUID id = UUID.randomUUID();
+        // the projection reads PENDING by default when the delivery person is not in this tenant
+        stubFind(id, freelancer(id, FreelancerStatus.PENDING));
+
+        StepVerifier.create(service.updateStatus(id, FreelancerStatus.SUSPENDED))
+                .expectError(FreelancerNotFoundException.class).verify();
     }
 }

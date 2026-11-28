@@ -507,5 +507,6 @@
     <include file="db/changelog/changes/gdd-final.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/changes/evt-l2.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/changes/evt-l5.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/mbf-l1.xml" relativeToChangelogFile="false"/>
 
 </databaseChangeLog>

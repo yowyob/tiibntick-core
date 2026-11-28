@@ -504,6 +504,12 @@ tnt:
     # Set false to bring back manual approval once the admin platform exists.
     relay:
       auto-approve: ${TNT_GOFP_RELAY_AUTO_APPROVE:true}
+      # D-185: hub capacity of a relay that declared no parcel capacity (parcelCapacity) yet
+      default-parcel-capacity: ${TNT_GOFP_RELAY_DEFAULT_PARCEL_CAPACITY:10}
+    # D-181: a new courier is approved at creation, and PENDING ones are caught up at startup, until the admin
+    # platform exists. Set false to bring back manual approval (PENDING until an administrator approves).
+    freelancer:
+      auto-approve: ${TNT_GOFP_FREELANCER_AUTO_APPROVE:true}
     admin:
       email: ${TNT_GOFP_ADMIN_EMAIL:admin@test.com}
       password: ${TNT_GOFP_ADMIN_PASSWORD:admin123}

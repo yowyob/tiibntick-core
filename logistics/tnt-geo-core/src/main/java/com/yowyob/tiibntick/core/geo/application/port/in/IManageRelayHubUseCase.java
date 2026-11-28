@@ -29,4 +29,7 @@ public interface IManageRelayHubUseCase {
                              int capacitySlots, String operatorActorId);
 
     Flux<RelayHub> findHubsByBranch(UUID branchId, UUID tenantId);
+
+    /** D-185: sets the number of parcels the hub holds at once (never below the parcels present). */
+    Mono<RelayHub> resizeHub(UUID hubId, UUID tenantId, int capacitySlots);
 }

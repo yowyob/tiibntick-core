@@ -78,6 +78,19 @@ public class RelayHubService implements IFindNearbyHubsUseCase, IManageRelayHubU
     }
 
     @Override
+    public Mono<RelayHub> resizeHub(UUID hubId, UUID tenantId, int capacitySlots) {
+        return hubRepository.findById(hubId, tenantId)
+                .switchIfEmpty(Mono.error(new GeoNotFoundException("RelayHub", hubId.toString())))
+                .flatMap(hub -> {
+                    if (hub.capacitySlots() == capacitySlots) {
+                        return Mono.just(hub);
+                    }
+                    hub.resize(capacitySlots);
+                    return hubRepository.save(hub);
+                });
+    }
+
+    @Override
     public Flux<RelayHub> findHubsByBranch(UUID branchId, UUID tenantId) {
         return hubRepository.findByBranch(branchId, tenantId);
     }

@@ -33,6 +33,9 @@ public interface IRelayHubPort {
      */
     Mono<RelayHub> decrementOccupancy(UUID hubId, UUID tenantId);
 
+    /** D-185: the capacity of the hub follows the relay's declared parcel capacity (never below its parcels). */
+    Mono<RelayHub> resizeHub(UUID hubId, UUID tenantId, int capacitySlots);
+
     /**
      * Provisions a brand-new relay hub in {@code tnt-geo-core} at the given coordinates,
      * with no agency branch (freelance/independent hub — see {@code RelayHub.branchId}).

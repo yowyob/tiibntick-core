@@ -80,6 +80,7 @@ class GofpFreelancerProjectionServiceTest {
 
     @Test
     void projectIfAbsent_fromZero_createsBothRowsWithProfileId() {
+        service.setAutoApprove(false); // manual vetting (lot L3)
         FreelancerProfile profile = profileWithId(PROFILE_ID);
 
         when(freelancerRepository.findByActorId(TENANT_ID, CORE_USER)).thenReturn(Mono.just(profile));
@@ -222,4 +223,22 @@ class GofpFreelancerProjectionServiceTest {
     }
 
     // Test 8 (guard) lives in GofpProjectionTablesSeedGuardTest — repo-wide scan.
+
+    /** D-181: the mobile app's courier (projected by the filter) is approved at once while the switch is on. */
+    @Test
+    void projectIfAbsent_autoApprove_createsTheDeliveryPersonApproved() {
+        when(freelancerRepository.findByActorId(TENANT_ID, CORE_USER)).thenReturn(Mono.just(profileWithId(PROFILE_ID)));
+        when(userProvisioningService.provisionIfAbsent(CORE_USER)).thenReturn(Mono.just(stubGofpUser()));
+        when(gofpFreelancerRepository.findById(PROFILE_ID)).thenReturn(Mono.empty());
+        when(gofpFreelancerRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(deliveryPersonRepository.findById(TENANT_ID, PROFILE_ID)).thenReturn(Mono.empty());
+        when(deliveryPersonRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+
+        StepVerifier.create(service.projectIfAbsent(CORE_USER, TENANT_ID)).expectNext(true).verifyComplete();
+
+        ArgumentCaptor<DeliveryPerson> dpCap = ArgumentCaptor.forClass(DeliveryPerson.class);
+        verify(deliveryPersonRepository).save(dpCap.capture());
+        assertThat(dpCap.getValue().getStatus()).isEqualTo(DeliveryPersonStatus.APPROVED);
+        assertThat(dpCap.getValue().getTenantId()).isEqualTo(TENANT_ID);
+    }
 }

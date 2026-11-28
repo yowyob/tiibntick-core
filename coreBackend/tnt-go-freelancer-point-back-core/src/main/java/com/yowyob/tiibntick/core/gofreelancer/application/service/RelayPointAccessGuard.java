@@ -135,6 +135,8 @@ public class RelayPointAccessGuard {
         body.setSubscriptionId(existing.getSubscriptionId());
         body.setDepositsUsed(existing.getDepositsUsed());
         body.setMaxDeposits(existing.getMaxDeposits());
+        // D-185: the declared capacity is the owner's to change; absent from the body = unchanged
+        if (body.getParcelCapacity() == null) body.setParcelCapacity(existing.getParcelCapacity());
         if (body.getName() == null) body.setName(existing.getName());
         if (body.getPostalAddressId() == null) body.setPostalAddressId(existing.getPostalAddressId());
         if (body.getPhysicalAccessAddressId() == null) body.setPhysicalAccessAddressId(existing.getPhysicalAccessAddressId());

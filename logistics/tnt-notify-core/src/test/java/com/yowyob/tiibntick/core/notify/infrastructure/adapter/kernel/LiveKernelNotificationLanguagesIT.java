@@ -91,7 +91,7 @@ class LiveKernelNotificationLanguagesIT {
 
         UUID user = UUID.fromString(recipientUserId);
         NotificationModel model = new NotificationModel("account.welcome", "fr",
-                Map.of("name", "yow_npk"), NotificationPriority.NORMAL);
+                Map.of("name", "Awa"), NotificationPriority.NORMAL);
 
         languages.choose(user, "fr").block();
         Notification french = service.send(tenantId, organizationId, recipientUserId, recipientEmail, model,
@@ -107,12 +107,12 @@ class LiveKernelNotificationLanguagesIT {
         assertThat(french).isNotNull();
         assertThat(french.getStatus()).as("French delivery: %s", french.getErrorMessage())
                 .isNotEqualTo(DeliveryStatus.FAILED);
-        assertThat(french.getContent()).isEqualTo("Bienvenue sur TiiBnTick, yow_npk !");
+        assertThat(french.getContent()).isEqualTo("Bienvenue sur TiiBnTick, Awa !");
 
         assertThat(english).isNotNull();
         assertThat(english.getStatus()).as("English delivery: %s", english.getErrorMessage())
                 .isNotEqualTo(DeliveryStatus.FAILED);
-        assertThat(english.getContent()).isEqualTo("Welcome to TiiBnTick, yow_npk!");
+        assertThat(english.getContent()).isEqualTo("Welcome to TiiBnTick, Awa!");
 
         // What the Kernel really recorded for these two deliveries.
         var recorded = client.listDeliveries(tenantId, organizationId).collectList().block();

@@ -459,3 +459,43 @@ Preuves (2026-11-27) :
   `SPRING_*`), `TntKafkaConsumerTuningTest` 10/10, `NoProfileHardeningTest` 3/3. Aucun rapport ne mentionne le Kernel
   de production.
 
+
+## Retours du développeur Mobile/BFF — 2026-11-28 (D-180 à D-187, branche `fix/mobile-bff-feedback`, depuis `main` a0d86c55)
+
+- **D-184, 500 sur le véhicule d'un indépendant** : cause = `ResourceKafkaEventPublisher` utilisait `ownerOrgId` comme
+  tenant et clé de l'enveloppe ; le lot L3 (56f5f79a, véhicule personnel) ne l'avait pas adapté et le test du service
+  simulait le publieur. Correction : tenant = organisation, sinon tenant de la requête (`ResolveCurrentUserUseCase`),
+  sinon tenant système ; clé = organisation, sinon id du véhicule ; `ownerActorId` ajouté aux trois événements.
+- **D-181, approbation automatique des livreurs** : `GofpFreelancerService` (`tnt.gofp.freelancer.auto-approve`), création
+  `APPROVED` ; même règle dans `GofpFreelancerProjectionService` (parcours du mobile : profil actor-core puis projection
+  par le filtre, qui créait encore `PENDING`) ; rattrapage des `PENDING` au démarrage (`approvePendingCouriers`, tout tenant, statut réel relu dans
+  delivery-core), journal `tnt.audit.freelancer-approval`.
+- **D-182, TNT_ADMIN de n'importe quel tenant** : `courierTenantForAdmin` cherche le livreur partout
+  (`findByIdInAnyTenant`) et toute la transition s'exécute sous `TenantContextHolder.underTenant(tenant du livreur)`,
+  pour que le statut soit lu et écrit au bon endroit. Corrigé au passage : le livreur est cherché avant la machine à
+  états, d'où 404 au lieu d'un 409 trompeur.
+- **D-185, capacité déclarée d'un relais** : colonne `gofp_relay_points.parcel_capacity` (changeset
+  `mbf-l1-001-relay-parcel-capacity`, additif, contrainte `> 0`), `RelayHub.resize` (jamais sous l'occupation, état
+  FULL/ACTIVE recalculé, hub fermé laissé fermé), `IManageRelayHubUseCase.resizeHub`, `IRelayHubPort.resizeHub` ;
+  `GofpRelayPointService` redimensionne le hub avant d'enregistrer le relais (409 sinon) ; provisionnement à
+  l'approbation = `parcelCapacity`, sinon `tnt.gofp.relay.default-parcel-capacity` (10) — plus jamais `maxDeposits`.
+- **D-186** : trois documents d'audit nettoyés ; constante d'organisation de `KernelInAppInboxAdapterTest` remplacée
+  par une valeur fictive, nom de compte de `LiveKernelNotificationLanguagesIT` remplacé.
+
+### Preuves
+
+- `MobileBffFeedbackFullStackIT` (l7, nouvelle application complète, chaîne de sécurité réelle, Kernel sur un port
+  mort) 3/3 : parcours mobile (`POST /api/v1/freelancers` puis route Go, projection) → livreur `APPROVED` dans son
+  tenant ; livreur créé par `POST /api/v1/gofp/freelancer-profiles` `APPROVED` dans son tenant ; véhicule d'indépendant enregistré (200) et enveloppe outbox
+  sous le tenant du livreur, clé = agrégat, `ownerActorId` présent ; non-TNT_ADMIN d'un autre tenant → 404 ;
+  TNT_ADMIN d'un autre tenant suspend puis réactive (statut réel lu dans le tenant du livreur) ; relais déclarant 40
+  colis → hub à 40 (quota envoyé ignoré), puis 15 → hub à 15, 12 colis présents et 5 demandé → 409 sans changement,
+  0 → 400.
+- `ResourceKafkaEventPublisherOutboxIntegrationTest` 3/3 (Testcontainers + Kafka embarqué, cas indépendant ajouté).
+- Non-régression : `PlatformAdminFullStackIT` 1/1, `TntApplicationFullStackIT` 7/7, `CourierReplacementFullStackIT` 1/1,
+  porte `LiquibaseMasterChangelogIntegrationTest` 3/3. Aucune mention du Kernel de production dans les journaux.
+- Suite unitaire complète (tous modules) : 3 735 tests, seul échec `LayeringArchitectureTest` (1 145 violations, nombre
+  inchangé, dette connue) ; GOFP 800/800 et notify 668/668 relancés après le dernier changement.
+- Unitaires ciblés : `GofpFreelancerStatusTransitionTest` 22, `GofpFreelancerCreateOrUpdateTest` 6,
+  `GofpRelayPointCreateOrUpdateTest` 6, `GofpFreelancerProjectionServiceTest` 7, `RelayAutoApprovalTest`,
+  `RelayHubTest` (resize ×4).

@@ -67,6 +67,17 @@ public class TenantContextHolder {
     }
 
     /**
+     * Decision D-182: whether the caller is a platform administrator ({@code ROLE_TNT_ADMIN}, granted only by the
+     * Core's JWT converter from its registry, whatever the tenant of the login).
+     */
+    public Mono<Boolean> callerIsPlatformAdmin() {
+        return resolveCurrentUserUseCase.resolveCurrentContextOrAnonymous()
+                .map(ctx -> ctx.hasRole("ROLE_TNT_ADMIN"))
+                .defaultIfEmpty(false)
+                .onErrorReturn(false);
+    }
+
+    /**
      * Returns {@link #SYSTEM_TENANT} for use in non-reactive (Kafka consumer) contexts.
      * Prefer {@link #currentTenantId()} in reactive flows.
      */

@@ -111,7 +111,7 @@ public class FreelancerFleetApplicationService implements
                     return vehicleRepository.save(vehicle);
                 }))
                 .flatMap(saved -> eventPublisher.publish(
-                        FreelancerVehicleRegisteredEvent.of(saved.vehicleId(), saved.ownerOrgId(),
+                        FreelancerVehicleRegisteredEvent.of(saved.vehicleId(), saved.ownerOrgId(), saved.ownerActorId(),
                                 saved.type(), saved.plateNumber(), saved.maxCapacityKg(),
                                 saved.fuelType()))
                         .thenReturn(saved));
@@ -136,7 +136,7 @@ public class FreelancerFleetApplicationService implements
                         cmd.insuranceDocRef())))
                 .flatMap(vehicleRepository::save)
                 .flatMap(saved -> eventPublisher.publish(
-                        FreelancerVehicleRegisteredEvent.of(saved.vehicleId(), saved.ownerOrgId(),
+                        FreelancerVehicleRegisteredEvent.of(saved.vehicleId(), saved.ownerOrgId(), saved.ownerActorId(),
                                 saved.type(), saved.plateNumber(), saved.maxCapacityKg(), saved.fuelType()))
                         .thenReturn(saved));
     }
@@ -191,7 +191,7 @@ public class FreelancerFleetApplicationService implements
                 .flatMap(vehicleRepository::save)
                 .flatMap(saved -> eventPublisher.publish(
                         FreelancerVehicleAssignedToMissionEvent.of(saved.vehicleId(),
-                                saved.ownerOrgId(), saved.type(), cmd.deliveryId()))
+                                saved.ownerOrgId(), saved.ownerActorId(), saved.type(), cmd.deliveryId()))
                         .thenReturn(saved));
     }
 
@@ -206,7 +206,7 @@ public class FreelancerFleetApplicationService implements
                 .flatMap(vehicleRepository::save)
                 .flatMap(saved -> eventPublisher.publish(
                         FreelancerVehicleReleasedFromMissionEvent.of(saved.vehicleId(),
-                                saved.ownerOrgId(), deliveryId))
+                                saved.ownerOrgId(), saved.ownerActorId(), deliveryId))
                         .thenReturn(saved));
     }
 

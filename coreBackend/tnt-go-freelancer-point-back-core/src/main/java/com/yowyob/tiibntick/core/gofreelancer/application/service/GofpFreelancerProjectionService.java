@@ -47,6 +47,10 @@ import java.util.UUID;
  * ({@code PATCH /api/v1/gofp/freelancer-profiles/{id}/status}, delivery-core state machine). Freelancers already
  * approved keep their status: an existing row is never touched.
  *
+ * <p><strong>Decision D-181 (2026-11-28):</strong> while {@code tnt.gofp.freelancer.auto-approve} is on (default),
+ * the projected delivery person is approved at once through that state machine, like a courier created by
+ * {@link GofpFreelancerService} — this is the path of a courier registered by the mobile app.
+ *
  * @author KOUAM Kamdem
  */
 @Slf4j
@@ -70,6 +74,16 @@ public class GofpFreelancerProjectionService {
     private final GofpUserProvisioningService userProvisioningService;
     private final GofpFreelancerRepository gofpFreelancerRepository;
     private final DeliveryPersonRepository deliveryPersonRepository;
+
+    /** D-181: same switch as {@link GofpFreelancerService}. */
+    @org.springframework.beans.factory.annotation.Value("${tnt.gofp.freelancer.auto-approve:true}")
+    private boolean autoApprove = true;
+
+    void setAutoApprove(boolean autoApprove) {
+        this.autoApprove = autoApprove;
+    }
+
+    private static final org.slf4j.Logger audit = org.slf4j.LoggerFactory.getLogger("tnt.audit.freelancer-approval");
 
     /**
      * Ensures the GOFP projection rows exist for {@code coreUserId} in {@code tenantId}.
@@ -118,6 +132,11 @@ public class GofpFreelancerProjectionService {
                 .switchIfEmpty(Mono.defer(() -> {
                     DeliveryPerson dp = DeliveryPerson.projection(profileId, tenantId, coreUserId,
                             DEFAULT_INITIAL_QUOTA);
+                    if (autoApprove) {
+                        dp.transitionTo(com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryPersonStatus.APPROVED);
+                        audit.info("Courier {} (actor {}) auto-approved at projection in tenant {} (D-181)",
+                                profileId, coreUserId, tenantId);
+                    }
                     log.info("Projecting tnt_delivery_persons id={} actorId={}", profileId, coreUserId);
                     return deliveryPersonRepository.save(dp);
                 }));

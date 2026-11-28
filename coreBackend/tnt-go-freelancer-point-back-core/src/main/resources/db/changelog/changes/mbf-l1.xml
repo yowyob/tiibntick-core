@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="
+           http://www.liquibase.org/xml/ns/dbchangelog
+           http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.23.xsd">
+
+    <!-- Mobile/BFF feedback of 2026-11-28 (decision log D-180 to D-187). -->
+
+    <changeSet id="mbf-l1-001-relay-parcel-capacity" author="mbf-l1" labels="mbf-l1">
+        <comment>
+            Decision D-185 (2026-11-28): the number of parcels a relay point can hold at once, declared and changed
+            by its operator. It sets the capacity of the relay's core hub; the subscription quota (max_deposits)
+            stays apart and unchanged. NULL = not declared (default capacity at approval). Additive, no data to move.
+        </comment>
+        <sql splitStatements="false">
+            ALTER TABLE gofp_relay_points ADD COLUMN IF NOT EXISTS parcel_capacity INTEGER;
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_gofp_relay_points_parcel_capacity') THEN
+                    ALTER TABLE gofp_relay_points ADD CONSTRAINT ck_gofp_relay_points_parcel_capacity
+                        CHECK (parcel_capacity IS NULL OR parcel_capacity > 0);
+                END IF;
+            END $$;
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

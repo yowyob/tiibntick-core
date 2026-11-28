@@ -35,7 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class KernelInAppInboxAdapterTest {
 
     private static final String TENANT = "fbd90da6-629d-4d78-9a36-8735ff1762cb";
-    private static final String ORG = "a804a304-fb65-4970-bf97-b94390cdbdff";
+    private static final String ORG = "0f0f0f0f-0000-4000-8000-0000000000aa";
 
     private static WireMockServer wireMock;
     private KernelInAppInboxAdapter adapter;
