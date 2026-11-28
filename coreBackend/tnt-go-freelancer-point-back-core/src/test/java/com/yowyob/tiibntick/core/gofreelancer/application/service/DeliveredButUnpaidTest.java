@@ -17,7 +17,7 @@ import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryNeed
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.PushNotificationPort;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.DeliveryNeed;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryStatus;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryStatus;
 import com.yowyob.tiibntick.core.trust.application.port.in.RecordCustodyTransferUseCase;
 import com.yowyob.tiibntick.core.trust.application.port.in.RecordMissionUseCase;
 import com.yowyob.tiibntick.core.trust.application.port.in.RecordPaymentUseCase;
@@ -96,11 +96,11 @@ class DeliveredButUnpaidTest {
 
         gofpDelivery = new Delivery();
         gofpDelivery.setId(deliveryId);
-        gofpDelivery.setFreelancerId(profileId);
+        com.yowyob.tiibntick.core.gofreelancer.TestDeliveries.driver(gofpDelivery, profileId);
         gofpDelivery.setAnnouncementId(UUID.randomUUID()); // no delivery need → digital (ORANGE_MONEY)
-        gofpDelivery.setTarif(3000.0);
+        com.yowyob.tiibntick.core.gofreelancer.TestDeliveries.tarif(gofpDelivery, 3000.0);
         gofpDelivery.setDeliveryOtpHash("hash");
-        gofpDelivery.setStatus(DeliveryStatus.PICKED_UP);
+        com.yowyob.tiibntick.core.gofreelancer.TestDeliveries.status(gofpDelivery, DeliveryStatus.PICKED_UP);
 
         var coreDelivery = com.yowyob.tiibntick.core.delivery.domain.model.aggregate.Delivery.builder()
                 .id(deliveryId).tenantId(tenantId).deliveryPersonId(profileId)
@@ -119,8 +119,10 @@ class DeliveredButUnpaidTest {
         // delivery-core is the lifecycle authority: it sits in IN_TRANSIT and accepts the completion.
         when(lifecycle.findState(tenantId, deliveryId)).thenReturn(Mono.just(new CoreDeliveryState(
                 deliveryId, "IN_TRANSIT", null, profileId, null, null)));
-        when(lifecycle.complete(eq(tenantId), eq(deliveryId), any())).thenReturn(Mono.just(new CoreDeliveryState(
-                deliveryId, "DELIVERED", null, profileId, null, java.time.Instant.now())));
+        // The agreed price is the core delivery's (lot L1): the completed state carries it.
+        when(lifecycle.complete(eq(tenantId), eq(deliveryId), any())).thenReturn(Mono.just(
+                com.yowyob.tiibntick.core.gofreelancer.TestDeliveries.priced(new CoreDeliveryState(
+                        deliveryId, "DELIVERED", null, profileId, null, java.time.Instant.now()), 3000.0)));
         when(deliveryQueryUseCase.findDeliveryById(tenantId, deliveryId)).thenReturn(Mono.just(coreDelivery));
         when(deliveryQueryUseCase.resolveActorIdForDeliveryPerson(tenantId, profileId))
                 .thenReturn(Mono.just(courierActor));
@@ -139,7 +141,7 @@ class DeliveredButUnpaidTest {
                 .assertNext(d -> assertThat(d.getStatus()).isEqualTo(DeliveryStatus.DELIVERED))
                 .verifyComplete();
 
-        assertThat(writes).containsExactly(DeliveryStatus.DELIVERED);
+        assertThat(writes).as("the gofp row is never rewritten: the status is the core's").isEmpty();
         ArgumentCaptor<RecordSettlementCommand> captor = ArgumentCaptor.forClass(RecordSettlementCommand.class);
         verify(settlements).record(captor.capture());
         assertThat(captor.getValue().status()).isEqualTo(SettlementStatus.UNPAID);
@@ -192,7 +194,27 @@ class DeliveredButUnpaidTest {
     }
 
     @Test
-    @DisplayName("recording the settlement fails after the OTP: DELIVERED stays saved, error propagates, failure counted")
+    @DisplayName("CASH delivery: the commission rate comes from the CommissionRatePort (H5 extension point)")
+    void cashDelivery_commissionRateFromExtensionPoint() {
+        gofpDelivery.setAnnouncementId(null);
+        UUID needId = UUID.randomUUID();
+        gofpDelivery.setDeliveryNeedId(needId);
+        when(deliveryNeedRepository.findById(needId))
+                .thenReturn(Mono.just(DeliveryNeed.builder().id(needId).paymentMethod("CASH").build()));
+        when(settlements.record(any())).thenAnswer(inv -> Mono.just(settlement(inv.getArgument(0),
+                SettlementStatus.CASH_COLLECTED, CommissionStatus.DUE)));
+        DeliveryStatusApplicationService s = service();
+        s.setCommissionRates((t, d) -> Mono.just(new java.math.BigDecimal("0.12")));
+
+        StepVerifier.create(s.updateStatus(deliveryId, deliver())).expectNextCount(1).verifyComplete();
+
+        ArgumentCaptor<RecordSettlementCommand> captor = ArgumentCaptor.forClass(RecordSettlementCommand.class);
+        verify(settlements).record(captor.capture());
+        assertThat(captor.getValue().commissionRate()).isEqualByComparingTo("0.12");
+    }
+
+    @Test
+    @DisplayName("recording the settlement fails after the OTP: DELIVERED stays recorded in the core, error propagates, failure counted")
     void settlementFailure_afterDeliveredSaved_statusStays_errorPropagates() {
         when(settlements.record(any())).thenReturn(Mono.error(new IllegalStateException("db down")));
 
@@ -200,9 +222,10 @@ class DeliveredButUnpaidTest {
                 .expectError(IllegalStateException.class)
                 .verify();
 
-        assertThat(writes)
-                .as("exactly one write, DELIVERED, before the settlement — nothing reverts it")
-                .containsExactly(DeliveryStatus.DELIVERED);
+        // DELIVERED was recorded once in the core, before the settlement; nothing reverts it and the
+        // gofp row is never rewritten.
+        verify(lifecycle).complete(eq(tenantId), eq(deliveryId), any());
+        assertThat(writes).isEmpty();
         verify(pushNotificationPort, never()).sendPushNotification(any(), any(), any());
         assertThat(meters.get("gofp.delivery.payment.failures").counter().count()).isEqualTo(1.0);
     }

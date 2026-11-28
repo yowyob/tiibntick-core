@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- Lot L3 (evt-incidents), spec cible-evenements-colis-livraison.md §1.3 -->
+
+    <changeSet id="evt-l3-001-incident-reported-replaces-detected" author="evt-l3" labels="evt-l3">
+        <comment>
+            DETECTED is removed (decision D.2): an incident is born REPORTED, detections are delivery alerts. The rows
+            still DETECTED (opened by the removed detection listeners) become REPORTED. Idempotent.
+        </comment>
+        <sql>UPDATE tnt_incidents SET status = 'REPORTED' WHERE status = 'DETECTED';</sql>
+    </changeSet>
+
+    <changeSet id="evt-l3-002-incident-blocking-outcome-columns" author="evt-l3" labels="evt-l3">
+        <comment>
+            blocking (QO-2) and its courier forcing; delivery_outcome (RESUMED / FAILED / DISPUTE, mandatory on every
+            move to RESOLVED) and responsible_party (payer of a return, B.6); resolution_note and
+            resolution_proposed_at (PENDING_CONFIRMATION, QO-14: automatic confirmation after the delay);
+            event_sequence = aggregateVersion of the last event published on tnt.incident.events. Existing open
+            incidents were all treated as blocking (old isBlockingMission = not terminal and not DETECTED): they keep
+            blocking = TRUE. Additive and idempotent.
+        </comment>
+        <sql>
+            ALTER TABLE tnt_incidents ADD COLUMN IF NOT EXISTS blocking                   BOOLEAN NOT NULL DEFAULT FALSE;
+            ALTER TABLE tnt_incidents ADD COLUMN IF NOT EXISTS blocking_forced_by_courier BOOLEAN NOT NULL DEFAULT FALSE;
+            ALTER TABLE tnt_incidents ADD COLUMN IF NOT EXISTS delivery_outcome           VARCHAR(20);
+            ALTER TABLE tnt_incidents ADD COLUMN IF NOT EXISTS responsible_party          VARCHAR(20);
+            ALTER TABLE tnt_incidents ADD COLUMN IF NOT EXISTS resolution_note            TEXT;
+            ALTER TABLE tnt_incidents ADD COLUMN IF NOT EXISTS resolution_proposed_at     TIMESTAMPTZ;
+            ALTER TABLE tnt_incidents ADD COLUMN IF NOT EXISTS event_sequence             BIGINT NOT NULL DEFAULT 0;
+            UPDATE tnt_incidents SET blocking = TRUE
+             WHERE status NOT IN ('CLOSED', 'CANCELLED') AND blocking = FALSE AND event_sequence = 0;
+        </sql>
+    </changeSet>
+
+    <changeSet id="evt-l3-003-incident-pending-confirmation-index" author="evt-l3" labels="evt-l3">
+        <comment>Automatic confirmation job (QO-14): incidents waiting for the courier's confirmation.</comment>
+        <sql>
+            CREATE INDEX IF NOT EXISTS idx_tnt_incidents_pending_confirmation
+                ON tnt_incidents (resolution_proposed_at)
+                WHERE status = 'PENDING_CONFIRMATION';
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

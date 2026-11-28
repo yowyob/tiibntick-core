@@ -47,7 +47,9 @@ public class FreelancerFleetApplicationService implements
         ReleaseFreelancerVehicleFromMissionUseCase,
         ListFreelancerFleetUseCase,
         GetFreelancerVehicleUseCase,
-        DeactivateFreelancerVehicleUseCase {
+        DeactivateFreelancerVehicleUseCase,
+        AddPersonalVehicleUseCase,
+        UpdateFreelancerVehicleUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(FreelancerFleetApplicationService.class);
 
@@ -115,6 +117,58 @@ public class FreelancerFleetApplicationService implements
                         .thenReturn(saved));
     }
 
+    // ── AddPersonalVehicleUseCase (lot L3) ────────────────────────────────
+
+    @Transactional
+    @Override
+    public Mono<FreelancerVehicle> addPersonalVehicle(AddPersonalVehicleCommand cmd) {
+        log.info("Adding personal vehicle: actorId={} plate={}", cmd.ownerActorId(), cmd.plateNumber());
+        Mono<Void> capacityCheck = vehicleRepository.countByOwnerActorId(cmd.ownerActorId())
+                .flatMap(count -> count >= FreelancerVehicle.MAX_VEHICLES_PER_ORG
+                        ? Mono.<Void>error(new IllegalStateException("An actor owns at most "
+                                + FreelancerVehicle.MAX_VEHICLES_PER_ORG + " vehicles"))
+                        : Mono.<Void>empty());
+        return capacityCheck
+                .then(plateFree(cmd.plateNumber(), cmd.vehicleId()))
+                .then(Mono.fromCallable(() -> FreelancerVehicle.registerPersonal(cmd.vehicleId(), cmd.ownerActorId(),
+                        cmd.type(), cmd.brand(), cmd.model(), cmd.plateNumber(), cmd.maxCapacityKg(), cmd.volumeM3(),
+                        cmd.fuelType(), cmd.fuelConsumptionLPer100km(), cmd.registrationDocRef(),
+                        cmd.insuranceDocRef())))
+                .flatMap(vehicleRepository::save)
+                .flatMap(saved -> eventPublisher.publish(
+                        FreelancerVehicleRegisteredEvent.of(saved.vehicleId(), saved.ownerOrgId(),
+                                saved.type(), saved.plateNumber(), saved.maxCapacityKg(), saved.fuelType()))
+                        .thenReturn(saved));
+    }
+
+    @Override
+    public Flux<FreelancerVehicle> getPersonalVehicles(UUID ownerActorId) {
+        return vehicleRepository.findByOwnerActorId(ownerActorId);
+    }
+
+    // ── UpdateFreelancerVehicleUseCase (lot L3) ───────────────────────────
+
+    @Transactional
+    @Override
+    public Mono<FreelancerVehicle> updateVehicle(UpdateFreelancerVehicleCommand cmd) {
+        log.info("Updating FreelancerVehicle {} plate={}", cmd.vehicleId(), cmd.plateNumber());
+        return loadVehicle(cmd.vehicleId())
+                .flatMap(v -> plateFree(cmd.plateNumber(), v.vehicleId())
+                        .then(Mono.fromCallable(() -> v.update(cmd.type(), cmd.brand(), cmd.model(),
+                                cmd.plateNumber(), cmd.maxCapacityKg(), cmd.volumeM3(), cmd.fuelType(),
+                                cmd.fuelConsumptionLPer100km()))))
+                .flatMap(vehicleRepository::save);
+    }
+
+    /** A plate is carried by one vehicle only (unique column): refused when another vehicle has it. */
+    private Mono<Void> plateFree(String plateNumber, UUID vehicleId) {
+        return vehicleRepository.existsByPlateNumberOnAnotherVehicle(plateNumber, vehicleId)
+                .flatMap(taken -> taken
+                        ? Mono.<Void>error(new IllegalStateException(
+                                "Plate number already registered on another vehicle: " + plateNumber))
+                        : Mono.<Void>empty());
+    }
+
     // ── AddFreelancerEquipmentUseCase ─────────────────────────────────────
 
     @Override
@@ -131,13 +185,13 @@ public class FreelancerFleetApplicationService implements
     @Transactional
     @Override
     public Mono<FreelancerVehicle> assignToMission(AssignFreelancerVehicleToMissionCommand cmd) {
-        log.info("Assigning FreelancerVehicle {} to mission {}", cmd.vehicleId(), cmd.missionId());
+        log.info("Assigning FreelancerVehicle {} to mission {}", cmd.vehicleId(), cmd.deliveryId());
         return loadVehicle(cmd.vehicleId())
-                .map(v -> v.assignToMission(cmd.missionId()))
+                .map(v -> v.assignToMission(cmd.deliveryId()))
                 .flatMap(vehicleRepository::save)
                 .flatMap(saved -> eventPublisher.publish(
                         FreelancerVehicleAssignedToMissionEvent.of(saved.vehicleId(),
-                                saved.ownerOrgId(), saved.type(), cmd.missionId()))
+                                saved.ownerOrgId(), saved.type(), cmd.deliveryId()))
                         .thenReturn(saved));
     }
 
@@ -145,14 +199,14 @@ public class FreelancerFleetApplicationService implements
 
     @Transactional
     @Override
-    public Mono<FreelancerVehicle> releaseFromMission(UUID vehicleId, String missionId) {
-        log.info("Releasing FreelancerVehicle {} from mission {}", vehicleId, missionId);
+    public Mono<FreelancerVehicle> releaseFromDelivery(UUID vehicleId, String deliveryId) {
+        log.info("Releasing FreelancerVehicle {} from mission {}", vehicleId, deliveryId);
         return loadVehicle(vehicleId)
                 .map(FreelancerVehicle::releaseFromMission)
                 .flatMap(vehicleRepository::save)
                 .flatMap(saved -> eventPublisher.publish(
                         FreelancerVehicleReleasedFromMissionEvent.of(saved.vehicleId(),
-                                saved.ownerOrgId(), missionId))
+                                saved.ownerOrgId(), deliveryId))
                         .thenReturn(saved));
     }
 

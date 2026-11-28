@@ -19,7 +19,8 @@ import com.yowyob.tiibntick.core.gofreelancer.application.port.out.*;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryLifecyclePort.CoreDeliveryState;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.AnnouncementResponseSnapshot;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.AnnouncementSnapshot;
-import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.PublishAnnouncementPortCommand;
+import com.yowyob.tiibntick.core.gofreelancer.adapter.out.delivery.CoreAnnouncementReadAdapter;
+import com.yowyob.tiibntick.core.gofreelancer.testsupport.InMemoryAnnouncementPort;
 import com.yowyob.tiibntick.core.gofreelancer.application.usecase.MatchingUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.config.GofpDeliveryOtpProperties;
 import com.yowyob.tiibntick.core.gofreelancer.domain.exception.CodedStatusException;
@@ -29,8 +30,8 @@ import com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.DeliveryNeed;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpFreelancer;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.NeedInvitation;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.announcement.AnnouncementStatus;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryStatus;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.AnnouncementStatus;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryStatus;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.freelancer.FreelancerStatus;
 import com.yowyob.tiibntick.core.trust.application.port.in.RecordCustodyTransferUseCase;
 import com.yowyob.tiibntick.core.trust.application.port.in.RecordMissionUseCase;
@@ -39,8 +40,6 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.r2dbc.core.DatabaseClient;
-import org.springframework.r2dbc.core.RowsFetchSpec;
 import org.springframework.security.access.AccessDeniedException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -81,7 +80,7 @@ class HandoverCodesJourneyTest {
     private final UUID responseId = UUID.randomUUID();
     private final UUID deliveryId = UUID.randomUUID();
 
-    private final IDeliveryAnnouncementPort port = mock(IDeliveryAnnouncementPort.class);
+    private final InMemoryAnnouncementPort port = org.mockito.Mockito.spy(new InMemoryAnnouncementPort());
     private final TenantContextHolder tenant = mock(TenantContextHolder.class);
     private final IDeliveryNeedRepository needs = mock(IDeliveryNeedRepository.class);
     private final AddressUseCase addressUseCase = mock(AddressUseCase.class);
@@ -91,9 +90,11 @@ class HandoverCodesJourneyTest {
     private final IDeliveryLifecyclePort lifecycle = mock(IDeliveryLifecyclePort.class);
     private final PushNotificationPort push = mock(PushNotificationPort.class);
 
-    private final Map<UUID, Announcement> mirror = new HashMap<>();
     private final Map<UUID, DeliveryNeed> needStore = new HashMap<>();
     private final Map<UUID, Delivery> deliveryStore = new HashMap<>();
+    /** What tnt-delivery-core says about the delivery: the gofp row holds no status nor courier (lot L1). */
+    private final java.util.concurrent.atomic.AtomicReference<CoreDeliveryState> core =
+            new java.util.concurrent.atomic.AtomicReference<>();
     private final Map<UUID, NeedInvitation> invitationStore = new HashMap<>();
 
     private final OtpService otpService = new OtpService();
@@ -101,26 +102,21 @@ class HandoverCodesJourneyTest {
     private NeedInvitationService invitationService;
     private HandoverCodeService handoverCodes;
     private DeliveryStatusApplicationService statusService;
-    private boolean responded;
 
     @BeforeEach
     void setUp() {
-        IAnnouncementRepository mirrorRepo = mock(IAnnouncementRepository.class);
-        when(mirrorRepo.save(any())).thenAnswer(inv -> {
-            Announcement a = inv.getArgument(0);
-            mirror.put(a.getId(), a);
-            return Mono.just(a);
-        });
-        when(mirrorRepo.findById(any(UUID.class))).thenAnswer(inv -> Mono.justOrEmpty(mirror.get(inv.getArgument(0))));
-        when(mirrorRepo.findByDeliveryNeedId(any())).thenAnswer(inv -> Mono.justOrEmpty(mirror.values().stream()
-                .filter(a -> inv.getArgument(0).equals(a.getDeliveryNeedId())).findFirst()));
+        port.nextAnnouncementId(announcementId).nextResponseId(responseId).nextDeliveryId(deliveryId);
+        IAnnouncementRepository mirrorRepo = new CoreAnnouncementReadAdapter(port, tenant);
+        DeliveryNeedStateService state = new DeliveryNeedStateService(port, lifecycle, tenant);
+        when(lifecycle.findState(any(), any())).thenReturn(Mono.empty());
 
         when(needs.save(any())).thenAnswer(inv -> {
             DeliveryNeed n = inv.getArgument(0);
             needStore.put(n.getId(), n);
-            return Mono.just(n);
+            return state.hydrate(n);
         });
-        when(needs.findById(any(UUID.class))).thenAnswer(inv -> Mono.justOrEmpty(needStore.get(inv.getArgument(0))));
+        when(needs.findById(any(UUID.class))).thenAnswer(inv -> Mono.justOrEmpty(needStore.get(inv.getArgument(0)))
+                .flatMap(state::hydrate));
         when(tenant.currentTenantId()).thenReturn(Mono.just(tenantId));
 
         when(deliveries.save(any())).thenAnswer(inv -> {
@@ -128,30 +124,35 @@ class HandoverCodesJourneyTest {
             deliveryStore.put(d.getId(), d);
             return Mono.just(d);
         });
-        when(deliveries.findById(any(UUID.class))).thenAnswer(inv -> Mono.justOrEmpty(deliveryStore.get(inv.getArgument(0))));
+        // Reads fill the extension row from the core, as GofpDeliveryRepositoryAdapter does.
+        core.set(new CoreDeliveryState(deliveryId, "CREATED", "TNT-1", freelancerId, null, null));
+        when(lifecycle.findStateAnyTenant(any())).thenAnswer(inv -> Mono.justOrEmpty(core.get())
+                .filter(s -> s.deliveryId().equals(inv.getArgument(0))));
+        when(deliveries.findById(any(UUID.class))).thenAnswer(inv -> Mono.justOrEmpty(deliveryStore.get(inv.getArgument(0)))
+                .map(this::hydrated));
         when(deliveries.findByDeliveryNeedId(any())).thenAnswer(inv -> Mono.justOrEmpty(deliveryStore.values().stream()
-                .filter(d -> inv.getArgument(0).equals(d.getDeliveryNeedId())).findFirst()));
+                .filter(d -> inv.getArgument(0).equals(d.getDeliveryNeedId())).findFirst()).map(this::hydrated));
         when(push.sendPushNotification(any(), anyString(), anyString())).thenReturn(Mono.empty());
 
-        DeliveryOtpService deliveryOtp = new DeliveryOtpService(otpService, deliveries, needs, mirrorRepo, push,
-                mock(EmailPort.class), new HandoverCodeCipher("journey-test-secret"));
+        DeliveryOtpService deliveryOtp = new DeliveryOtpService(otpService, deliveries,
+                new HandoverCodeCipher("journey-test-secret"));
 
-        NeedAnnouncementService link = new NeedAnnouncementService(port, tenant, mirrorRepo, needs, freelancers);
+        NeedAnnouncementService link = new NeedAnnouncementService(port, tenant);
         GofpUserRepository users = mock(GofpUserRepository.class);
         when(users.findByCoreUserId(any())).thenReturn(Mono.empty());
         needService = new DeliveryNeedApplicationService(
                 needs, mock(AdminRelayPointUseCase.class), push,
                 mock(MatchingUseCase.class), addressUseCase, users,
-                freelancers, quotes, mock(FreelancerEligibilityUseCase.class), legacyUserExists());
+                freelancers, quotes, mock(FreelancerEligibilityUseCase.class));
         needService.setNeedAnnouncements(link);
         needService.setDeliveries(deliveries);
         needService.setDeliveryOtp(deliveryOtp);
         AnnouncementApplicationService announcementService = new AnnouncementApplicationService(
                 port, tenant, mock(FreelancerQuotaService.class),
-                mock(INegotiationChatPort.class), mirrorRepo, mock(AnnouncementSubscriptionRepository.class),
+                mock(INegotiationChatPort.class),
                 freelancers, mock(GofpUserRepository.class), deliveries, deliveryOtp,
-                mock(GofpDeliveryOtpProperties.class));
-        announcementService.setNeedAnnouncements(link);
+                mock(GofpDeliveryOtpProperties.class), lifecycle);
+        com.yowyob.tiibntick.core.gofreelancer.TestDeliveries.acceptTerms(lifecycle);
         needService.setAnnouncements(announcementService);
 
         invitationService = new NeedInvitationService(needs, freelancers, invitationRepo(), needService);
@@ -178,18 +179,6 @@ class HandoverCodesJourneyTest {
             return Mono.just(AddressDTO.builder().id(UUID.randomUUID()).address(in.getAddress()).build());
         });
         when(addressUseCase.getAddressById(any())).thenReturn(Mono.empty());
-        when(port.publish(any())).thenAnswer(inv -> {
-            PublishAnnouncementPortCommand c = inv.getArgument(0);
-            return Mono.just(snapshot(c.clientId(), null, null, List.of()));
-        });
-        when(port.findById(eq(tenantId), eq(announcementId))).thenAnswer(inv -> Mono.just(
-                snapshot(ownerId, null, null, responded ? List.of(response()) : List.of())));
-        when(port.respond(any())).thenAnswer(inv -> {
-            responded = true;
-            return Mono.just(snapshot(ownerId, null, null, List.of(response())));
-        });
-        when(port.selectResponse(tenantId, announcementId, ownerId, responseId)).thenReturn(Mono.just(
-                snapshot(ownerId, responseId, deliveryId, List.of(response()))));
         when(quotes.quote(any(), any(), any())).thenReturn(Mono.just(
                 new FreelancerPriceQuoteUseCase.Quote(3000, "XAF", "grille", "TEST", null)));
 
@@ -204,21 +193,6 @@ class HandoverCodesJourneyTest {
     }
 
     // ── harness ─────────────────────────────────────────────────────────────
-
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private static DatabaseClient legacyUserExists() {
-        DatabaseClient db = mock(DatabaseClient.class);
-        DatabaseClient.GenericExecuteSpec spec = mock(DatabaseClient.GenericExecuteSpec.class);
-        RowsFetchSpec rows = mock(RowsFetchSpec.class);
-        org.springframework.r2dbc.core.FetchSpec fetch = mock(org.springframework.r2dbc.core.FetchSpec.class);
-        when(db.sql(anyString())).thenReturn(spec);
-        when(spec.bind(anyString(), any())).thenReturn(spec);
-        when(spec.map(any(java.util.function.BiFunction.class))).thenReturn(rows);
-        when(rows.first()).thenReturn(Mono.just(1));
-        when(spec.fetch()).thenReturn(fetch);
-        when(fetch.rowsUpdated()).thenReturn(Mono.just(1L));
-        return db;
-    }
 
     private NeedInvitationRepository invitationRepo() {
         return new NeedInvitationRepository() {
@@ -244,18 +218,6 @@ class HandoverCodesJourneyTest {
                 "SENT", Instant.now());
     }
 
-    private AnnouncementSnapshot snapshot(UUID clientId, UUID selected, UUID createdDelivery,
-                                          List<AnnouncementResponseSnapshot> responses) {
-        return new AnnouncementSnapshot(
-                announcementId, tenantId, clientId, "Colis", "desc",
-                selected != null ? AnnouncementStatus.ASSIGNED : AnnouncementStatus.PUBLISHED,
-                Instant.now(), Instant.now(), null, "XAF", "QUOTE_REQUEST",
-                Address.builder().street("Rue Joss").city("Douala").country("CM")
-                        .coordinates(GeoCoordinates.of(4.0511, 9.7679)).build(),
-                Address.builder().landmark("Carrefour Ndokoti").city("Douala").country("CM").build(), 0.0,
-                null, null, null, null, null, null, null, null,
-                "Destinataire", "+237600000000", selected, createdDelivery, null, responses);
-    }
 
     private UUID createNeed() {
         DeliveryNeedRequestDTO r = new DeliveryNeedRequestDTO();
@@ -279,8 +241,23 @@ class HandoverCodesJourneyTest {
     }
 
     private void coreIs(String status) {
-        when(lifecycle.findState(tenantId, deliveryId)).thenReturn(Mono.just(
-                new CoreDeliveryState(deliveryId, status, "TNT-1", freelancerId, null, null)));
+        CoreDeliveryState state = new CoreDeliveryState(deliveryId, status, "TNT-1", freelancerId,
+                core.get() != null ? core.get().actualPickupTime() : null, null);
+        core.set(state);
+        when(lifecycle.findState(tenantId, deliveryId)).thenReturn(Mono.just(state));
+    }
+
+    private Delivery hydrated(Delivery row) {
+        CoreDeliveryState state = core.get();
+        return state != null && state.deliveryId().equals(row.getId()) ? CoreDeliveryAssembler.hydrate(row, state) : row;
+    }
+
+    /** A core transition: the core moves to {@code state} and returns it. */
+    private org.mockito.stubbing.Answer<Mono<CoreDeliveryState>> moves(CoreDeliveryState state) {
+        return inv -> {
+            core.set(state);
+            return Mono.just(state);
+        };
     }
 
     private static DeliveryStatusUpdateDTO statusWith(DeliveryStatus status, String code) {
@@ -322,7 +299,7 @@ class HandoverCodesJourneyTest {
                 .expectError(InvalidHandoverCodeException.class)
                 .verify();
 
-        when(lifecycle.confirmPickup(tenantId, deliveryId, freelancerId)).thenReturn(Mono.just(
+        when(lifecycle.confirmPickup(tenantId, deliveryId, freelancerId)).thenAnswer(moves(
                 new CoreDeliveryState(deliveryId, "PICKED_UP", "TNT-1", freelancerId, Instant.now(), null)));
         Delivery picked = statusService.updateStatus(deliveryId,
                 statusWith(DeliveryStatus.PICKED_UP, codes.pickupCode())).block();
@@ -334,9 +311,9 @@ class HandoverCodesJourneyTest {
         assertThat(afterPickup.deliveryStatus()).isEqualTo("PICKED_UP");
 
         coreIs("PICKED_UP");
-        when(lifecycle.startOrResumeTransit(tenantId, deliveryId, freelancerId)).thenReturn(Mono.just(
+        when(lifecycle.startOrResumeTransit(tenantId, deliveryId, freelancerId)).thenAnswer(moves(
                 new CoreDeliveryState(deliveryId, "IN_TRANSIT", "TNT-1", freelancerId, Instant.now(), null)));
-        when(lifecycle.complete(tenantId, deliveryId, freelancerId)).thenReturn(Mono.just(
+        when(lifecycle.complete(tenantId, deliveryId, freelancerId)).thenAnswer(moves(
                 new CoreDeliveryState(deliveryId, "DELIVERED", "TNT-1", freelancerId, Instant.now(), Instant.now())));
         Delivery delivered = statusService.updateStatus(deliveryId,
                 statusWith(DeliveryStatus.DELIVERED, codes.deliveryCode())).block();
@@ -398,8 +375,7 @@ class HandoverCodesJourneyTest {
         Delivery legacy = new Delivery();
         legacy.setId(deliveryId);
         legacy.setDeliveryNeedId(needId);
-        legacy.setFreelancerId(freelancerId);
-        legacy.setStatus(DeliveryStatus.PICKED_UP);
+        coreIs("PICKED_UP");
         legacy.setPickupOtpHash(otpService.hashOtp("123456"));
         String oldDeliveryHash = otpService.hashOtp("654321");
         legacy.setDeliveryOtpHash(oldDeliveryHash);
@@ -424,7 +400,7 @@ class HandoverCodesJourneyTest {
     void finishedDelivery_noCode() {
         UUID needId = createNeed();
         inviteAndAccept(needId);
-        deliveryStore.get(deliveryId).setStatus(DeliveryStatus.CANCELLED);
+        coreIs("CANCELLED");
 
         HandoverCodesDTO codes = handoverCodes.forOwner(needId, ownerId).block();
 

@@ -20,3 +20,6 @@ databaseChangeLog:
             path: migrations/002_add_freelancer_org_provider_links.sql
             relativeToChangelogFile: true
             splitStatements: true
+  - include:
+      file: db/changelog/gdd-l3-tp.yaml
+      relativeToChangelogFile: false

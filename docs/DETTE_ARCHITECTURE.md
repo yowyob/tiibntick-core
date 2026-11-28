@@ -82,6 +82,14 @@ puis injecter ces ports dans les consumers.
 
 ---
 
+## Dette — contrôles `hasRole('TNT_ADMIN')` (décision D-179, 2026-11-27)
+
+Plus de 100 contrôles `@PreAuthorize("hasRole('TNT_ADMIN')")`/`hasAnyRole(...)` répartis dans 18 fichiers. Depuis le
+registre des administrateurs (D-159/D-160) ils fonctionnent quel que soit le tenant de connexion, mais restent
+tout-ou-rien. Décision du mainteneur : laisser pour le moment ; migration **complète** vers `@RequirePermission`
+(permissions fines par action) envisagée plus tard, dans un lot dédié. Voir
+[registre-administrateurs-plateforme.md](architecture/chantiers/registre-administrateurs-plateforme.md) §5.
+
 ## Suivi
 
 Ces violations sont tracées ici en attendant leur correction dans un Chantier

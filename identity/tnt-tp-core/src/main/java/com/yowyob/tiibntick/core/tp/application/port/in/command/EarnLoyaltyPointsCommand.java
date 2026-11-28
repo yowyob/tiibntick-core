@@ -11,5 +11,5 @@ public record EarnLoyaltyPointsCommand(
         UUID tenantId,
         UUID thirdPartyId,
         int points,
-        String missionId
+        String deliveryId
 ) {}

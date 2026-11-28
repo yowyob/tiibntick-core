@@ -16,7 +16,8 @@ import java.util.UUID;
 @Value @Builder
 public class StartAgencyHandlingCommand {
     @NotNull UUID incidentId;
-    @NotNull UUID agencyId;
+    /** {@code null}: the TiiBnTick support takes an incident without agency (lot L3). */
+    UUID agencyId;
     UUID assignedToActorId;
     @NotNull UUID initiatedByActorId;
     String notes;

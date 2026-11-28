@@ -78,7 +78,13 @@ public class TemplateCatalogSeeder implements ApplicationRunner {
      */
     Mono<Void> syncCatalog() {
         return Flux.fromIterable(buildAllTemplates())
-                .concatMap(this::syncOne)
+                // One template that fails (unreadable stored row, write error) must not stop the others from
+                // being seeded: concatMap used to abort the whole sync at the first error.
+                .concatMap(wanted -> syncOne(wanted).onErrorResume(e -> {
+                    log.error("Template {} could not be synchronized, continuing with the next ones: {}",
+                            wanted.getTemplateCode(), e.toString());
+                    return Mono.empty();
+                }))
                 .then();
     }
 

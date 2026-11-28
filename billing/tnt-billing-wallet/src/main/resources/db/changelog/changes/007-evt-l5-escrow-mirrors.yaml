@@ -1,0 +1,77 @@
+databaseChangeLog:
+  - changeSet:
+      id: evt-l5-002-payment-intents-and-escrow-mirrors
+      author: evt-l5
+      labels: evt-l5
+      comment: >
+        Lot L5 (spec §4.1, §4.2, decision H of 2026-11-26): the Kernel holds the money (escrow of a delivery price,
+        cash collected by a courier); the Core keeps the payment intent of a selection and mirrors of the Kernel
+        escrows and cash collections. Shares are stored as JSON text (the R2DBC driver cannot bind a String into
+        jsonb, see yow-event-kernel 002).
+      changes:
+        - createTable:
+            schemaName: billing
+            tableName: wallet_payment_intents
+            columns:
+              - column: { name: id, type: UUID, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: tenant_id, type: UUID, constraints: { nullable: false } }
+              - column: { name: delivery_id, type: UUID, constraints: { nullable: false, unique: true, uniqueConstraintName: uq_wallet_payment_intent_delivery } }
+              - column: { name: announcement_id, type: UUID }
+              - column: { name: response_id, type: UUID }
+              - column: { name: mode, type: VARCHAR(10), constraints: { nullable: false }, remarks: "ESCROW | CASH" }
+              - column: { name: amount, type: "NUMERIC(19,4)", constraints: { nullable: false } }
+              - column: { name: currency, type: VARCHAR(3), constraints: { nullable: false } }
+              - column: { name: shares, type: TEXT, constraints: { nullable: false }, remarks: "JSON {platform, merchants[{walletId, amount}], courier}" }
+              - column: { name: payer_actor_id, type: UUID }
+              - column: { name: payer_wallet_id, type: UUID }
+              - column: { name: courier_actor_id, type: UUID }
+              - column: { name: courier_wallet_id, type: UUID }
+              - column: { name: platform_wallet_id, type: UUID }
+              - column: { name: expires_at, type: TIMESTAMP }
+              - column: { name: consumed_at, type: TIMESTAMP }
+              - column: { name: created_at, type: TIMESTAMP, defaultValueComputed: NOW(), constraints: { nullable: false } }
+        - createTable:
+            schemaName: billing
+            tableName: wallet_escrows
+            columns:
+              - column: { name: id, type: UUID, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: tenant_id, type: UUID, constraints: { nullable: false } }
+              - column: { name: delivery_id, type: UUID, constraints: { nullable: false } }
+              - column: { name: purpose, type: VARCHAR(20), constraints: { nullable: false }, remarks: "DELIVERY | RETURN_GUARANTEE" }
+              - column: { name: kernel_escrow_id, type: UUID, constraints: { nullable: false } }
+              - column: { name: status, type: VARCHAR(12), constraints: { nullable: false }, remarks: "HELD | FROZEN | RELEASED | REFUNDED" }
+              - column: { name: amount, type: "NUMERIC(19,4)", constraints: { nullable: false } }
+              - column: { name: currency, type: VARCHAR(3), constraints: { nullable: false } }
+              - column: { name: payer_wallet_id, type: UUID }
+              - column: { name: reason, type: VARCHAR(255) }
+              - column: { name: created_at, type: TIMESTAMP, defaultValueComputed: NOW(), constraints: { nullable: false } }
+              - column: { name: updated_at, type: TIMESTAMP, defaultValueComputed: NOW(), constraints: { nullable: false } }
+        - addUniqueConstraint:
+            schemaName: billing
+            tableName: wallet_escrows
+            columnNames: delivery_id, purpose
+            constraintName: uq_wallet_escrow_delivery_purpose
+        - createTable:
+            schemaName: billing
+            tableName: wallet_cash_collections
+            columns:
+              - column: { name: id, type: UUID, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: tenant_id, type: UUID, constraints: { nullable: false } }
+              - column: { name: delivery_id, type: UUID, constraints: { nullable: false, unique: true, uniqueConstraintName: uq_wallet_cash_collection_delivery } }
+              - column: { name: kernel_collection_id, type: UUID, constraints: { nullable: false } }
+              - column: { name: courier_actor_id, type: UUID, constraints: { nullable: false } }
+              - column: { name: courier_wallet_id, type: UUID, constraints: { nullable: false } }
+              - column: { name: expected_amount, type: "NUMERIC(19,4)", constraints: { nullable: false } }
+              - column: { name: collected_amount, type: "NUMERIC(19,4)" }
+              - column: { name: amount_to_remit, type: "NUMERIC(19,4)" }
+              - column: { name: currency, type: VARCHAR(3), constraints: { nullable: false } }
+              - column: { name: status, type: VARCHAR(12), constraints: { nullable: false }, remarks: "OPEN | COLLECTED | REMITTED | CANCELLED" }
+              - column: { name: created_at, type: TIMESTAMP, defaultValueComputed: NOW(), constraints: { nullable: false } }
+              - column: { name: updated_at, type: TIMESTAMP, defaultValueComputed: NOW(), constraints: { nullable: false } }
+        - createIndex:
+            schemaName: billing
+            tableName: wallet_cash_collections
+            indexName: idx_wallet_cash_collections_courier_status
+            columns:
+              - column: { name: courier_actor_id }
+              - column: { name: status }

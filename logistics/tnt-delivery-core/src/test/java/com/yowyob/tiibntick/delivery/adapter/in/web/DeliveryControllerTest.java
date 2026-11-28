@@ -117,6 +117,7 @@ class DeliveryControllerTest {
     @DisplayName("POST /deliveries/{id}/pickup should return updated delivery")
     void shouldConfirmPickup() {
         Delivery updated = buildTestDelivery();
+        updated.assignDeliveryPerson(UUID.randomUUID(), null, 1.0, null);
         updated.confirmPickup();
         when(lifecycleUseCase.confirmPickup(any())).thenReturn(Mono.just(updated));
 

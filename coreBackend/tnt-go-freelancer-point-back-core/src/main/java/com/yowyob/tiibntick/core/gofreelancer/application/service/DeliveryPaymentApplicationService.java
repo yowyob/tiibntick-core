@@ -1,19 +1,17 @@
 package com.yowyob.tiibntick.core.gofreelancer.application.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.yowyob.tiibntick.core.billing.invoice.application.port.in.SystemInvoicingUseCase;
 import com.yowyob.tiibntick.core.billing.invoice.application.port.in.command.GenerateInvoiceCommand;
 import com.yowyob.tiibntick.core.billing.invoice.domain.model.InvoiceLine;
 import com.yowyob.tiibntick.core.billing.invoice.domain.model.enums.LineItemType;
-import com.yowyob.tiibntick.core.billing.wallet.application.port.in.IKernelWalletUseCase;
+import com.yowyob.tiibntick.core.billing.wallet.application.port.in.IEscrowUseCase;
 import com.yowyob.tiibntick.core.billing.wallet.application.port.in.ISettlementUseCase;
-import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.RecordSettlementCommand;
-import com.yowyob.tiibntick.core.billing.wallet.domain.enums.SettlementMethod;
-import com.yowyob.tiibntick.core.billing.wallet.domain.enums.SettlementStatus;
+import com.yowyob.tiibntick.core.billing.wallet.domain.model.EscrowMirror;
+import com.yowyob.tiibntick.core.billing.wallet.domain.model.PaymentIntent;
 import com.yowyob.tiibntick.core.billing.wallet.domain.model.WalletSettlement;
+import com.yowyob.tiibntick.core.billing.wallet.domain.policy.EscrowOutcomePolicy;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.dto.DeliveryPaymentDtos.PaymentChallengeResponse;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.dto.DeliveryPaymentDtos.PaymentStatusResponse;
-import com.yowyob.tiibntick.core.gofreelancer.application.port.in.dto.DeliveryPaymentDtos.ReceiveCodeResponse;
 import com.yowyob.tiibntick.core.gofreelancer.application.exception.DeliveryPaymentException;
 import com.yowyob.tiibntick.core.gofreelancer.application.exception.DeliveryPaymentException.Reason;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.DeliveryPaymentUseCase;
@@ -22,7 +20,7 @@ import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IAnnouncement
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpUserRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryNeedRepository;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryStatus;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -42,92 +40,90 @@ public class DeliveryPaymentApplicationService implements DeliveryPaymentUseCase
     /** Settlement reference type, shared with the incident freeze adapter (a mission is a delivery). */
     public static final String REFERENCE_TYPE = "DELIVERY";
     public static final String CURRENCY = "XAF";
-    /** Platform commission, tracked as due until the Kernel can split a transfer (request R2). */
+    /** Default platform commission rate, taken by the escrow at release (lot L5). */
     public static final BigDecimal COMMISSION_RATE = new BigDecimal("0.05");
 
     private final DeliveryRepository deliveryRepository;
     private final IAnnouncementRepository announcementRepository;
     private final IDeliveryNeedRepository deliveryNeedRepository;
     private final DeliveryStatusApplicationService deliveryStatusService;
-    private final IKernelWalletUseCase kernelWallet;
+    private final IEscrowUseCase escrows;
     private final ISettlementUseCase settlements;
+    private final com.yowyob.tiibntick.core.delivery.application.port.in.DeliveryQueryUseCase deliveryQuery;
     private final TenantContextHolder tenantContextHolder;
     private final SystemInvoicingUseCase invoicing;
     private final GofpUserRepository gofpUserRepository;
+
+    /**
+     * H5 extension point: the commission rate of a delivery. Optional (setter): absent, empty or failing, the fixed
+     * {@link #COMMISSION_RATE} applies.
+     */
+    private com.yowyob.tiibntick.core.gofreelancer.application.port.out.CommissionRatePort commissionRates;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setCommissionRates(com.yowyob.tiibntick.core.gofreelancer.application.port.out.CommissionRatePort rates) {
+        this.commissionRates = rates;
+    }
+
+    private Mono<BigDecimal> commissionRate(UUID tenantId, UUID deliveryId) {
+        if (commissionRates == null) return Mono.just(COMMISSION_RATE);
+        return Mono.defer(() -> commissionRates.deliveryCommissionRate(tenantId, deliveryId))
+                .defaultIfEmpty(COMMISSION_RATE)
+                .onErrorResume(e -> {
+                    log.warn("Commission rate lookup failed for delivery {} — using {}", deliveryId, COMMISSION_RATE, e);
+                    return Mono.just(COMMISSION_RATE);
+                });
+    }
 
     /** Printed on invoices: the platform brand and the market the gofp module serves. */
     static final String INVOICE_TENANT_CODE = "TNT";
     static final String INVOICE_COUNTRY_CODE = "CM";
 
-    // ── 1. Delivery person: receive code ───────────────────────────────────
+    // ── 1. Client: challenge (escrow of an elected delivery) ───────────────
 
-    @Override
-    public Mono<ReceiveCodeResponse> generateReceiveCode(UUID deliveryId, UUID callerUserId) {
-        return findDelivery(deliveryId)
-                .flatMap(delivery -> deliveryStatusService
-                        .assertCallerIsAssignedDeliveryPerson(deliveryId, callerUserId)
-                        .onErrorMap(org.springframework.security.access.AccessDeniedException.class,
-                                e -> new DeliveryPaymentException(Reason.FORBIDDEN, e.getMessage()))
-                        .then(Mono.defer(() -> {
-                            if (delivery.getStatus() == DeliveryStatus.CANCELLED) {
-                                return Mono.<ReceiveCodeResponse>error(new DeliveryPaymentException(
-                                        Reason.CONFLICT, "Delivery " + deliveryId + " is cancelled"));
-                            }
-                            // Generated with the DRIVER's bearer: the Kernel binds the code to their wallet.
-                            return kernelWallet.generateReceiveCode()
-                                    .flatMap(rc -> {
-                                        delivery.setDriverUserId(callerUserId);
-                                        delivery.setReceiveCode(rc.code());
-                                        delivery.setReceiveCodeExpiresAt(rc.expiresAt());
-                                        return deliveryRepository.save(delivery)
-                                                .thenReturn(new ReceiveCodeResponse(
-                                                        deliveryId, rc.code(), rc.expiresAt()));
-                                    });
-                        })));
-    }
-
-    // ── 2. Client: challenge ───────────────────────────────────────────────
-
+    /**
+     * Lot L5: a delivery elected without payment (Go need, accepted invitation, legacy assign) is paid into the same
+     * Kernel escrow as a paid selection (spec §4.1): payer = the client, COURIER = the assigned courier's wallet,
+     * PLATFORM = the commission. The Kernel sends the client a code.
+     */
     @Override
     public Mono<PaymentChallengeResponse> startPayment(UUID deliveryId, UUID callerUserId) {
         return findPayableDelivery(deliveryId, callerUserId)
-                .flatMap(delivery -> {
-                    BigDecimal amount = amountOf(delivery);
-                    return kernelWallet.transferChallenge(delivery.getReceiveCode(), amount, reference(deliveryId))
-                            .map(ch -> new PaymentChallengeResponse(deliveryId, amount, CURRENCY,
-                                    ch.challengeToken(), ch.expiresInSeconds(), ch.codePreview()));
-                });
+                .flatMap(delivery -> tenant().flatMap(tenantId -> courierActor(tenantId, delivery)
+                        .flatMap(courier -> commissionRate(tenantId, deliveryId)
+                                .flatMap(rate -> escrows.createIntent(new IEscrowUseCase.IntentRequest(tenantId,
+                                        deliveryId, delivery.getAnnouncementId(), null, PaymentIntent.Mode.ESCROW,
+                                        amountOf(delivery), CURRENCY, rate, List.of(), callerUserId, courier,
+                                        null))))
+                        .map(ic -> new PaymentChallengeResponse(deliveryId, ic.intent().amount(), CURRENCY,
+                                ic.challengeToken(), ic.expiresInSeconds(), ic.codePreview()))));
     }
 
-    // ── 3. Client: confirm → money moves ───────────────────────────────────
+    // ── 2. Client: confirm → the Kernel holds the money ────────────────────
 
     @Override
     public Mono<PaymentStatusResponse> confirmPayment(UUID deliveryId, UUID callerUserId,
                                                       String challengeToken, String code) {
-        return findPayableDelivery(deliveryId, callerUserId)
-                .flatMap(delivery -> {
-                    BigDecimal amount = amountOf(delivery);
-                    return tenantContextHolder.currentTenantId()
-                            .defaultIfEmpty(TenantContextHolder.SYSTEM_TENANT)
-                            .flatMap(tenantId -> kernelWallet
-                                    .transfer(delivery.getReceiveCode(), amount, reference(deliveryId),
-                                            challengeToken, code)
-                                    .flatMap(tx -> recordPaid(tenantId, delivery, callerUserId, amount, tx)));
-                });
-    }
-
-    private Mono<PaymentStatusResponse> recordPaid(UUID tenantId, Delivery delivery, UUID payerUserId,
-                                                   BigDecimal amount, JsonNode kernelTx) {
-        RecordSettlementCommand cmd = new RecordSettlementCommand(
-                tenantId, REFERENCE_TYPE, delivery.getId(), payerUserId, delivery.getDriverUserId(),
-                amount, CURRENCY, SettlementMethod.WALLET_TRANSFER, SettlementStatus.PAID,
-                kernelReference(kernelTx, delivery.getId()), COMMISSION_RATE);
-        return settlements.record(cmd)
-                .doOnError(e -> log.error("PAYMENT_UNRECORDED delivery={} payer={} amount={} {} — the Kernel "
-                                + "transfer SUCCEEDED but the settlement could not be saved ({}); record it by hand",
-                        delivery.getId(), payerUserId, amount, CURRENCY, e.toString()))
-                .flatMap(s -> issueInvoice(tenantId, delivery, payerUserId, amount, cmd.kernelReference())
-                        .thenReturn(toResponse(delivery, s)));
+        return findDelivery(deliveryId)
+                .flatMap(delivery -> isClient(delivery, callerUserId).flatMap(isClient -> !isClient
+                        ? Mono.<PaymentStatusResponse>error(new DeliveryPaymentException(Reason.FORBIDDEN,
+                                "Only the client of delivery " + deliveryId + " can pay it"))
+                        : escrows.intentOfDelivery(deliveryId)
+                                .switchIfEmpty(Mono.error(() -> new DeliveryPaymentException(Reason.CONFLICT,
+                                        "No payment started for delivery " + deliveryId
+                                                + ": POST /api/v1/deliveries/" + deliveryId + "/payment/challenge")))
+                                .flatMap(intent -> escrows.hold(intent.id(), callerUserId, challengeToken, code)
+                                        // paid after the hand-over: the work is done, released at once (E4)
+                                        .flatMap(e -> delivery.getStatus() == DeliveryStatus.DELIVERED
+                                                ? escrows.apply(deliveryId, EscrowOutcomePolicy.Action.RELEASE,
+                                                        "PAID_AFTER_DELIVERY")
+                                                : Mono.just(e))
+                                        .flatMap(e -> tenant().flatMap(tenantId -> {
+                                            delivery.setDriverUserId(intent.courierActorId());
+                                            return issueInvoice(tenantId, delivery, callerUserId, intent.amount(),
+                                                    e.kernelEscrowId().toString())
+                                                    .then(status(tenantId, delivery, e));
+                                        })))));
     }
 
     /**
@@ -184,17 +180,26 @@ public class DeliveryPaymentApplicationService implements DeliveryPaymentUseCase
                                         Reason.FORBIDDEN, "Only the client or the assigned delivery person "
                                         + "can read the payment of delivery " + deliveryId));
                             }
-                            return tenantContextHolder.currentTenantId()
-                                    .defaultIfEmpty(TenantContextHolder.SYSTEM_TENANT)
-                                    .flatMap(tenantId -> settlements.find(tenantId, REFERENCE_TYPE, deliveryId))
-                                    .map(s -> toResponse(delivery, s))
-                                    .switchIfEmpty(Mono.fromSupplier(() -> notSettled(delivery)));
+                            return tenant().flatMap(tenantId -> escrows.find(deliveryId)
+                                    .flatMap(e -> status(tenantId, delivery, e))
+                                    .switchIfEmpty(Mono.defer(() -> settlements.find(tenantId, REFERENCE_TYPE, deliveryId)
+                                            .map(s -> toResponse(delivery, s, null))))
+                                    .switchIfEmpty(Mono.fromSupplier(() -> notSettled(delivery))));
                         }));
+    }
+
+    /** The escrow state; once released, the settlement it produced (PAID, commission). */
+    private Mono<PaymentStatusResponse> status(UUID tenantId, Delivery delivery, EscrowMirror e) {
+        return settlements.find(tenantId, REFERENCE_TYPE, delivery.getId())
+                .map(s -> toResponse(delivery, s, e.status().name()))
+                .switchIfEmpty(Mono.fromSupplier(() -> new PaymentStatusResponse(delivery.getId(),
+                        e.status().name(), e.amount(), e.currency(), "ESCROW", null, null, false, null,
+                        e.status().name())));
     }
 
     // ── Guards ─────────────────────────────────────────────────────────────
 
-    /** Delivery exists, caller is its client, payable (tarif, not cancelled, not paid/cash, valid code). */
+    /** Delivery exists, caller is its client, payable (tarif, not cancelled/failed, not cash, no escrow yet). */
     private Mono<Delivery> findPayableDelivery(UUID deliveryId, UUID callerUserId) {
         return findDelivery(deliveryId).flatMap(delivery ->
                 isClient(delivery, callerUserId).flatMap(isClient -> {
@@ -202,9 +207,9 @@ public class DeliveryPaymentApplicationService implements DeliveryPaymentUseCase
                         return Mono.<Delivery>error(new DeliveryPaymentException(Reason.FORBIDDEN,
                                 "Only the client of delivery " + deliveryId + " can pay it"));
                     }
-                    if (delivery.getStatus() == DeliveryStatus.CANCELLED) {
+                    if (delivery.getStatus() == DeliveryStatus.CANCELLED || delivery.getStatus() == DeliveryStatus.FAILED) {
                         return Mono.<Delivery>error(new DeliveryPaymentException(Reason.CONFLICT,
-                                "Delivery " + deliveryId + " is cancelled"));
+                                "Delivery " + deliveryId + " is " + delivery.getStatus().name().toLowerCase()));
                     }
                     if (delivery.getTarif() == null || delivery.getTarif() <= 0) {
                         return Mono.<Delivery>error(new DeliveryPaymentException(Reason.CONFLICT,
@@ -215,25 +220,13 @@ public class DeliveryPaymentApplicationService implements DeliveryPaymentUseCase
                             return Mono.<Delivery>error(new DeliveryPaymentException(Reason.CONFLICT,
                                     "Delivery " + deliveryId + " is paid in cash to the delivery person"));
                         }
-                        return tenantContextHolder.currentTenantId()
-                                .defaultIfEmpty(TenantContextHolder.SYSTEM_TENANT)
-                                .flatMap(tenantId -> settlements.find(tenantId, REFERENCE_TYPE, deliveryId)
-                                        .map(s -> s.getStatus() == SettlementStatus.PAID)
-                                        .defaultIfEmpty(false))
-                                .flatMap(alreadyPaid -> {
-                                    if (alreadyPaid) {
-                                        return Mono.<Delivery>error(new DeliveryPaymentException(Reason.CONFLICT,
-                                                "Delivery " + deliveryId + " is already paid"));
-                                    }
-                                    if (!delivery.hasValidReceiveCode()) {
-                                        return Mono.<Delivery>error(new DeliveryPaymentException(
-                                                Reason.RECEIVE_CODE_MISSING,
-                                                "The delivery person has no valid receive code: ask them to "
-                                                        + "regenerate it (POST /api/v1/deliveries/" + deliveryId
-                                                        + "/payment/receive-code)"));
-                                    }
-                                    return Mono.just(delivery);
-                                });
+                        return escrows.find(deliveryId)
+                                .map(e -> e.status() != EscrowMirror.Status.REFUNDED)
+                                .defaultIfEmpty(false)
+                                .flatMap(alreadyPaid -> alreadyPaid
+                                        ? Mono.<Delivery>error(new DeliveryPaymentException(Reason.CONFLICT,
+                                                "Delivery " + deliveryId + " is already paid"))
+                                        : Mono.just(delivery));
                     });
                 }));
     }
@@ -285,32 +278,34 @@ public class DeliveryPaymentApplicationService implements DeliveryPaymentUseCase
         return "DELIVERY:" + deliveryId;
     }
 
-    /** Best-effort extraction of the Kernel transaction id from its (loosely specified) response. */
-    static String kernelReference(JsonNode tx, UUID deliveryId) {
-        if (tx != null) {
-            for (String field : new String[]{"transactionId", "id", "reference", "txId"}) {
-                JsonNode n = tx.path(field);
-                if (!n.isMissingNode() && !n.isNull() && !n.asText().isBlank()) {
-                    return n.asText();
-                }
-            }
-        }
-        return reference(deliveryId);
+    private Mono<UUID> tenant() {
+        return tenantContextHolder.currentTenantId().defaultIfEmpty(TenantContextHolder.SYSTEM_TENANT);
     }
 
-    private static PaymentStatusResponse toResponse(Delivery delivery, WalletSettlement s) {
+    /** The actor (Kernel user) behind the delivery's assigned courier. */
+    private Mono<UUID> courierActor(UUID tenantId, Delivery delivery) {
+        if (delivery.getFreelancerId() == null) {
+            return Mono.error(new DeliveryPaymentException(Reason.CONFLICT,
+                    "Delivery " + delivery.getId() + " has no courier yet"));
+        }
+        return deliveryQuery.resolveActorIdForDeliveryPerson(tenantId, delivery.getFreelancerId())
+                .switchIfEmpty(Mono.error(() -> new DeliveryPaymentException(Reason.CONFLICT,
+                        "No account for the courier of delivery " + delivery.getId())));
+    }
+
+    private static PaymentStatusResponse toResponse(Delivery delivery, WalletSettlement s, String escrowStatus) {
         return new PaymentStatusResponse(delivery.getId(), s.getStatus().name(), s.getAmount(), s.getCurrency(),
-                s.getMethod().name(), s.getCommissionStatus().name(), s.getCommissionAmount(),
-                s.getStatus() != SettlementStatus.PAID && s.getMethod() == SettlementMethod.WALLET_TRANSFER
-                        && delivery.hasValidReceiveCode(),
-                s.getPaidAt() == null ? null : s.getPaidAt().atZone(java.time.ZoneId.systemDefault()).toInstant());
+                s.getMethod().name(), s.getCommissionStatus().name(), s.getCommissionAmount(), false,
+                s.getPaidAt() == null ? null : s.getPaidAt().atZone(java.time.ZoneId.systemDefault()).toInstant(),
+                escrowStatus);
     }
 
     private static PaymentStatusResponse notSettled(Delivery delivery) {
         boolean payable = delivery.getTarif() != null && delivery.getTarif() > 0
-                && delivery.getStatus() != DeliveryStatus.CANCELLED && delivery.hasValidReceiveCode();
+                && delivery.getStatus() != DeliveryStatus.CANCELLED && delivery.getStatus() != DeliveryStatus.FAILED
+                && delivery.getFreelancerId() != null;
         return new PaymentStatusResponse(delivery.getId(), "NOT_SETTLED",
                 delivery.getTarif() == null ? null : amountOf(delivery), CURRENCY,
-                null, null, null, payable, null);
+                null, null, null, payable, null, null);
     }
 }

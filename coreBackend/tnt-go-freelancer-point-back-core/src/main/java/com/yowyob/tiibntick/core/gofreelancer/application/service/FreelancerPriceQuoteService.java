@@ -10,7 +10,6 @@ import com.yowyob.tiibntick.core.billing.pricing.domain.port.in.IBillingPolicyUs
 import com.yowyob.tiibntick.core.billing.pricing.domain.port.in.IPricingUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.FreelancerPricingDTO;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.FreelancerPriceQuoteUseCase;
-import com.yowyob.tiibntick.core.gofreelancer.application.port.out.FreelancerPricingRepository;
 import com.yowyob.tiibntick.core.gofreelancer.config.GofpCourierPricingProperties;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.vehicle.VehicleCategory;
 import lombok.RequiredArgsConstructor;
@@ -32,11 +31,11 @@ import java.util.UUID;
  * {@link FreelancerPriceQuoteUseCase} on the billing engine.
  *
  * <p>Resolution order for a freelancer: (1) the most recently updated ACTIVE, currently valid
- * {@code BillingPolicy} owned under any of the given identities — whether created by the legacy
- * grid endpoint or applied from a billing template; (2) a grid saved before the billing migration,
- * priced on the fly; (3) the platform default grid. A policy the engine cannot price (no rule
- * matches the context) falls back to (2)/(3) rather than dropping the freelancer from the
- * candidate list.
+ * {@code BillingPolicy} owned under any of the given identities — whether created by the grid
+ * endpoint or applied from a billing template; (2) the platform default grid. A policy the engine
+ * cannot price (no rule matches the context) falls back to (2) rather than dropping the freelancer
+ * from the candidate list. The legacy {@code delivery_person_pricing} grids are no longer read: they
+ * were copied into billing policies once (legacy pricing backfill, lot L4; table dropped by gdd-final).
  *
  * @author MANFOUO BRAUN
  */
@@ -47,7 +46,6 @@ public class FreelancerPriceQuoteService implements FreelancerPriceQuoteUseCase 
 
     private final IBillingPolicyUseCase billingPolicyUseCase;
     private final IPricingUseCase pricingEngine;
-    private final FreelancerPricingRepository legacyPricingRepository;
 
     /**
      * Lot C-54 — platform grid of each vehicle. Optional (setter): absent, the defaults of
@@ -70,9 +68,12 @@ public class FreelancerPriceQuoteService implements FreelancerPriceQuoteUseCase 
         return priceGrid(List.of(), platformGrid(vehicleType), toContext(input), "PLATFORM_DEFAULT");
     }
 
-    /** The platform grid of this vehicle (either vocabulary; unknown or absent = moto). */
+    /**
+     * The platform grid of this vehicle (either vocabulary): the precise type's own grid (BIKE, SCOOTER, VAN), else its
+     * category's grid; unknown or absent = moto (decision D-058).
+     */
     FreelancerPricingDTO platformGrid(String vehicleType) {
-        return courierPricing.gridFor(VehicleCategory.parse(vehicleType));
+        return courierPricing.gridForVehicle(vehicleType);
     }
 
     @Override
@@ -84,23 +85,15 @@ public class FreelancerPriceQuoteService implements FreelancerPriceQuoteUseCase 
             BillingPolicy active = all.stream()
                     .filter(p -> p.isActive() && p.getValidFrom() != null && p.isValidNow())
                     .max(FreelancerGridPolicyMapper.BY_FRESHNESS).orElse(null);
-            // The legacy table mirrors the grid: once a grid policy exists it is the only truth, so a
-            // deactivated/archived grid is not resurrected from its stale mirror.
-            boolean migrated = all.stream()
-                    .anyMatch(p -> FreelancerGridPolicyMapper.GRID_TEMPLATE_CODE.equals(p.getTemplateCode()));
 
             Mono<Quote> fromPolicy = active == null ? Mono.empty()
                     : price(active, ctx, "POLICY", active.getId())
                             .onErrorResume(e -> {
                                 log.warn("Billing policy {} cannot price this delivery ({}) — falling back to the "
-                                        + "legacy/default grid", active.getId(), e.getMessage());
+                                        + "platform grid", active.getId(), e.getMessage());
                                 return Mono.empty();
                             });
-            Mono<Quote> fromLegacy = migrated ? Mono.empty()
-                    : legacyGrid(owners).flatMap(grid -> priceGrid(owners, grid, ctx, "LEGACY_GRID"));
-
             return fromPolicy
-                    .switchIfEmpty(Mono.defer(() -> fromLegacy))
                     .switchIfEmpty(Mono.defer(() -> priceGrid(owners,
                             platformGrid(vehicleType), ctx, "PLATFORM_DEFAULT")));
         });
@@ -112,20 +105,9 @@ public class FreelancerPriceQuoteService implements FreelancerPriceQuoteUseCase 
                 .concatMap(id -> billingPolicyUseCase.findByOwnerActorId(id.toString()))
                 .collectList()
                 .onErrorResume(e -> {
-                    log.warn("Billing policy lookup failed for {} — falling back to the legacy/default grid",
+                    log.warn("Billing policy lookup failed for {} — falling back to the platform grid",
                             owners, e);
                     return Mono.just(List.of());
-                });
-    }
-
-    private Mono<FreelancerPricingDTO> legacyGrid(List<UUID> owners) {
-        return Flux.fromIterable(owners)
-                .concatMap(legacyPricingRepository::findByDeliveryPersonId)
-                .next()
-                .map(FreelancerGridPolicyMapper::toGrid)
-                .onErrorResume(e -> {
-                    log.warn("Legacy grid lookup failed for {} — using the platform default", owners, e);
-                    return Mono.empty();
                 });
     }
 
@@ -141,7 +123,7 @@ public class FreelancerPriceQuoteService implements FreelancerPriceQuoteUseCase 
 
     // ── mapping ───────────────────────────────────────────────────────────────
 
-    static PricingContext toContext(QuoteInput in) {
+    public static PricingContext toContext(QuoteInput in) {
         List<PackageType> types = new ArrayList<>();
         if (in.fragile()) types.add(PackageType.FRAGILE);
         if (in.perishable()) types.add(PackageType.PERISHABLE);
@@ -185,7 +167,7 @@ public class FreelancerPriceQuoteService implements FreelancerPriceQuoteUseCase 
     }
 
     /** {@code Base 500 + 12.0 km × 100 XAF/km: 1200 + … = 1700 XAF} — always starts with "Base". */
-    static String breakdown(PriceEvaluation ev, double total, String currency) {
+    public static String breakdown(PriceEvaluation ev, double total, String currency) {
         StringBuilder sb = new StringBuilder();
         if (ev.getPriceBreakdown() != null) {
             for (PriceLineItem item : ev.getPriceBreakdown()) {

@@ -2,7 +2,6 @@ package com.yowyob.tiibntick.core.inventory.application;
 
 import com.yowyob.tiibntick.core.inventory.application.port.in.DepositHubPackageCommand;
 import com.yowyob.tiibntick.core.inventory.application.port.out.HubPackageEntryRepository;
-import com.yowyob.tiibntick.core.inventory.application.port.out.InventoryEventPublisherPort;
 import com.yowyob.tiibntick.core.inventory.application.service.HubInventoryApplicationService;
 import com.yowyob.tiibntick.core.inventory.domain.model.HubPackageEntry;
 import org.junit.jupiter.api.Test;
@@ -26,8 +25,6 @@ class HubInventoryApplicationServiceTest {
 
     @Mock
     private HubPackageEntryRepository hubPackageRepository;
-    @Mock
-    private InventoryEventPublisherPort eventPublisher;
 
     @InjectMocks
     private HubInventoryApplicationService service;
@@ -39,7 +36,6 @@ class HubInventoryApplicationServiceTest {
         UUID packageId = UUID.randomUUID();
 
         when(hubPackageRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
-        when(eventPublisher.publishPackageDeposited(any())).thenReturn(Mono.empty());
 
         DepositHubPackageCommand cmd = new DepositHubPackageCommand(
                 tenantId, hubId, packageId, "TNT-2026-CMR001",
@@ -105,9 +101,92 @@ class HubInventoryApplicationServiceTest {
 
         when(hubPackageRepository.findByTrackingCode(trackingCode)).thenReturn(Mono.just(existing));
         when(hubPackageRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
-        when(eventPublisher.publishPackagePickedUp(any())).thenReturn(Mono.empty());
 
         StepVerifier.create(service.pickupPackage(trackingCode, actorId))
                 .verifyComplete();
+    }
+
+    @Test
+    void aDepositCarriesItsOwnerAndStorageFee() {
+        UUID owner = UUID.randomUUID();
+        when(hubPackageRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+
+        StepVerifier.create(service.depositPackage(new DepositHubPackageCommand(UUID.randomUUID(), UUID.randomUUID(),
+                        UUID.randomUUID(), "trk-own-1", null, null, null, owner, new java.math.BigDecimal("500.00"), "XAF")))
+                .assertNext(e -> {
+                    org.assertj.core.api.Assertions.assertThat(e.ownerActorId()).isEqualTo(owner);
+                    org.assertj.core.api.Assertions.assertThat(e.storageFee()).isEqualByComparingTo("500");
+                    org.assertj.core.api.Assertions.assertThat(e.feeCurrency()).isEqualTo("XAF");
+                    org.assertj.core.api.Assertions.assertThat(e.penaltyFee()).isNull();
+                    org.assertj.core.api.Assertions.assertThat(e.trackingCode()).isEqualTo("TRK-OWN-1");
+                }).verifyComplete();
+    }
+
+    @Test
+    void pickupFindsTheEntryWhateverTheCaseOfTheTrackingCode() {
+        HubPackageEntry existing = HubPackageEntry.deposit(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                "abc-def", null, null, null);
+        when(hubPackageRepository.findByTrackingCode("ABC-DEF")).thenReturn(Mono.just(existing));
+        when(hubPackageRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+
+        StepVerifier.create(service.pickupPackage(" abc-def ", UUID.randomUUID())).verifyComplete();
+    }
+
+    @Test
+    void negativeFeesAreRefused() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> HubPackageEntry.deposit(UUID.randomUUID(),
+                        UUID.randomUUID(), UUID.randomUUID(), "T", null, null, null, null,
+                        new java.math.BigDecimal("-1"), "XAF"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void entriesAreReadByIdHubAndOwner() {
+        UUID owner = UUID.randomUUID();
+        UUID hub = UUID.randomUUID();
+        HubPackageEntry e = HubPackageEntry.deposit(UUID.randomUUID(), hub, UUID.randomUUID(), "T1", null, null, null,
+                owner, null, null);
+        when(hubPackageRepository.findById(e.id())).thenReturn(Mono.just(e));
+        when(hubPackageRepository.findAllByHub(hub)).thenReturn(reactor.core.publisher.Flux.just(e));
+        when(hubPackageRepository.findAllByOwner(owner)).thenReturn(reactor.core.publisher.Flux.just(e));
+
+        StepVerifier.create(service.findEntry(e.id())).expectNext(e).verifyComplete();
+        StepVerifier.create(service.findEntriesOfHub(hub)).expectNext(e).verifyComplete();
+        StepVerifier.create(service.findEntriesOfOwner(owner)).expectNext(e).verifyComplete();
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("D-140: a hub that is not approved refuses the deposit (409), nothing saved nor published")
+    void depositRefusedInAHubThatIsNotApproved() {
+        UUID hubId = UUID.randomUUID();
+        service.setHubDepositGuard(id -> Mono.error(
+                new com.yowyob.tiibntick.core.geo.domain.exception.RelayHubStateException("Hub " + id + " is SUSPENDED")));
+        DepositHubPackageCommand cmd = new DepositHubPackageCommand(UUID.randomUUID(), hubId, UUID.randomUUID(),
+                "TNT-1", null, UUID.randomUUID(), null);
+
+        StepVerifier.create(service.depositPackage(cmd))
+                .expectError(com.yowyob.tiibntick.core.geo.domain.exception.RelayHubStateException.class).verify();
+        org.mockito.Mockito.verifyNoInteractions(hubPackageRepository);
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("D-140: an approved hub (guard completes) takes the deposit; pick-ups are never guarded")
+    void depositAcceptedInAnApprovedHub() {
+        java.util.List<UUID> checked = new java.util.ArrayList<>();
+        service.setHubDepositGuard(id -> Mono.fromRunnable(() -> checked.add(id)));
+        UUID hubId = UUID.randomUUID();
+        when(hubPackageRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+
+        StepVerifier.create(service.depositPackage(new DepositHubPackageCommand(UUID.randomUUID(), hubId,
+                        UUID.randomUUID(), "TNT-2", null, UUID.randomUUID(), null)))
+                .assertNext(e -> assertThat(e.hubId()).isEqualTo(hubId))
+                .verifyComplete();
+        assertThat(checked).containsExactly(hubId);
+
+        HubPackageEntry held = HubPackageEntry.deposit(UUID.randomUUID(), hubId, UUID.randomUUID(), "TNT-3", null,
+                null, null);
+        when(hubPackageRepository.findByTrackingCode("TNT-3")).thenReturn(Mono.just(held));
+        StepVerifier.create(service.pickupPackage("TNT-3", UUID.randomUUID())).verifyComplete();
+        assertThat(checked).as("the pick-up does not ask the hub").containsExactly(hubId);
     }
 }

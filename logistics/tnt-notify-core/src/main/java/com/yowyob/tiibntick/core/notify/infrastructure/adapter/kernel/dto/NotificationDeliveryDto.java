@@ -27,5 +27,15 @@ public record NotificationDeliveryDto(
         String providerMessageId,
         String errorMessage,
         Instant requestedAt,
-        Instant sentAt) {
+        Instant sentAt,
+        /** When the recipient read it in their inbox (IN_APP channel); null while unread. */
+        Instant readAt) {
+
+    public NotificationDeliveryDto(UUID id, UUID tenantId, UUID organizationId, UUID recipientUserId,
+            String recipientAddress, String channel, String templateCode, String subject, String body,
+            Map<String, Object> variables, Map<String, Object> metadata, String status, String providerType,
+            String providerMessageId, String errorMessage, Instant requestedAt, Instant sentAt) {
+        this(id, tenantId, organizationId, recipientUserId, recipientAddress, channel, templateCode, subject, body,
+                variables, metadata, status, providerType, providerMessageId, errorMessage, requestedAt, sentAt, null);
+    }
 }

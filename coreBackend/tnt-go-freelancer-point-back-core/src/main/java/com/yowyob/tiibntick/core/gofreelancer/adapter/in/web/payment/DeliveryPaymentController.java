@@ -6,7 +6,6 @@ import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.dto.DeliveryPaymentDtos.ConfirmPaymentRequest;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.dto.DeliveryPaymentDtos.PaymentChallengeResponse;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.dto.DeliveryPaymentDtos.PaymentStatusResponse;
-import com.yowyob.tiibntick.core.gofreelancer.application.port.in.dto.DeliveryPaymentDtos.ReceiveCodeResponse;
 import com.yowyob.tiibntick.core.gofreelancer.application.exception.DeliveryPaymentException;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.DeliveryPaymentUseCase;
 import jakarta.validation.Valid;
@@ -20,8 +19,7 @@ import java.net.URI;
 import java.util.UUID;
 
 /**
- * Pays a delivery from the client's Kernel wallet to the delivery person's Kernel wallet.
- * See {@link DeliveryPaymentUseCase} for the three-step flow. The identity is the JWT subject
+ * Pays an elected delivery into a Kernel escrow (lot L5). See {@link DeliveryPaymentUseCase} for the two-step flow. The identity is the JWT subject
  * ({@code ctx.userId()} — the Kernel wallet owner); nothing identifying comes from the body.
  */
 @RestController
@@ -35,15 +33,7 @@ public class DeliveryPaymentController {
     private final com.yowyob.tiibntick.core.billing.wallet.adapter.in.web.WalletExceptionHandler kernelErrors =
             new com.yowyob.tiibntick.core.billing.wallet.adapter.in.web.WalletExceptionHandler();
 
-    /** Delivery person: generate (with their own token) and store the temporary receive code. */
-    @PostMapping("/receive-code")
-    @RequirePermission(resource = "payment", action = "process")
-    public Mono<ReceiveCodeResponse> generateReceiveCode(@PathVariable UUID deliveryId,
-                                                         @CurrentUser(required = false) TntSecurityContext ctx) {
-        return withCaller(ctx, userId -> useCase.generateReceiveCode(deliveryId, userId));
-    }
-
-    /** Client: ask the Kernel for a transfer challenge (the Kernel sends the confirmation code). */
+    /** Client: ask the Kernel for an escrow challenge (the Kernel sends the confirmation code). */
     @PostMapping("/challenge")
     @RequirePermission(resource = "payment", action = "process")
     public Mono<PaymentChallengeResponse> startPayment(@PathVariable UUID deliveryId,
@@ -51,7 +41,7 @@ public class DeliveryPaymentController {
         return withCaller(ctx, userId -> useCase.startPayment(deliveryId, userId));
     }
 
-    /** Client: confirm the transfer with the challenge token and the one-time code. */
+    /** Client: confirm the escrow with the challenge token and the one-time code. */
     @PostMapping
     @RequirePermission(resource = "payment", action = "process")
     public Mono<PaymentStatusResponse> confirmPayment(@PathVariable UUID deliveryId,
@@ -83,7 +73,7 @@ public class DeliveryPaymentController {
         HttpStatus status = switch (ex.getReason()) {
             case FORBIDDEN -> HttpStatus.FORBIDDEN;
             case NOT_FOUND -> HttpStatus.NOT_FOUND;
-            case CONFLICT, RECEIVE_CODE_MISSING -> HttpStatus.CONFLICT;
+            case CONFLICT -> HttpStatus.CONFLICT;
         };
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(status, ex.getMessage());
         pd.setType(URI.create("urn:tiibntick:gofp:delivery-payment:" + ex.getReason().name().toLowerCase()));
@@ -98,11 +88,11 @@ public class DeliveryPaymentController {
         return kernelErrors.handleKernelError(ex);
     }
 
-    /** Spendable balance is reduced by funds held for an open incident or dispute. */
-    @ExceptionHandler(com.yowyob.tiibntick.core.billing.wallet.domain.exception.WalletFrozenException.class)
-    public Mono<ProblemDetail> onFrozen(
-            com.yowyob.tiibntick.core.billing.wallet.domain.exception.WalletFrozenException ex) {
-        return kernelErrors.handleWalletFrozen(ex);
+    /** Escrow refusals (lot L5): stable code and status. */
+    @ExceptionHandler(com.yowyob.tiibntick.core.billing.wallet.domain.exception.WalletSettlementException.class)
+    public Mono<ProblemDetail> onSettlement(
+            com.yowyob.tiibntick.core.billing.wallet.domain.exception.WalletSettlementException ex) {
+        return Mono.just(PaymentProblems.of(ex));
     }
 
     @ExceptionHandler(com.yowyob.tiibntick.core.billing.wallet.domain.exception.WalletNotFoundException.class)

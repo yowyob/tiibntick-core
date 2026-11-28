@@ -62,18 +62,14 @@ public class RealtimeProperties {
      */
     public static class KafkaTopics {
         private String etaUpdated = "tnt.route.eta.updated";
-        private String missionStatusChanged = "tnt.delivery.mission.status.changed";
-        private String actorConnected = "tnt.realtime.actor.connected";
-        private String actorDisconnected = "tnt.realtime.actor.disconnected";
+        private String actorConnected = com.yowyob.tiibntick.common.kafka.TntTopics.REALTIME_ACTOR_CONNECTED;
+        private String actorDisconnected = com.yowyob.tiibntick.common.kafka.TntTopics.REALTIME_ACTOR_DISCONNECTED;
         private String gpsPositionUpdated = "tnt.realtime.gps.position.updated";
         private String geofenceTriggered = "tnt.realtime.geofence.triggered";
-        private String etaUpdatePublished = "tnt.realtime.eta.updated";
+        private String etaUpdatePublished = com.yowyob.tiibntick.common.kafka.TntTopics.REALTIME_ETA_UPDATED;
 
         public String getEtaUpdated() { return etaUpdated; }
         public void setEtaUpdated(String etaUpdated) { this.etaUpdated = etaUpdated; }
-
-        public String getMissionStatusChanged() { return missionStatusChanged; }
-        public void setMissionStatusChanged(String v) { this.missionStatusChanged = v; }
 
         public String getActorConnected() { return actorConnected; }
         public void setActorConnected(String v) { this.actorConnected = v; }

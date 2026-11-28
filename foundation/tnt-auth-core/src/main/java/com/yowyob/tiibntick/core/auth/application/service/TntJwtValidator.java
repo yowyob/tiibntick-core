@@ -127,10 +127,16 @@ public class TntJwtValidator {
         if (perms instanceof List) {
             return ((List<?>) perms).stream()
                     .map(Object::toString)
+                    // decision D-162: a Kernel claim never makes a platform administrator
+                    .filter(p -> !com.yowyob.tiibntick.core.roles.domain.model.PlatformAdminAuthorities
+                            .isForgeableAdminClaim(p))
                     .collect(Collectors.toUnmodifiableSet());
         }
         if (perms instanceof String) {
-            return Set.of(perms.toString().split(","));
+            return java.util.Arrays.stream(perms.toString().split(","))
+                    .filter(p -> !com.yowyob.tiibntick.core.roles.domain.model.PlatformAdminAuthorities
+                            .isForgeableAdminClaim(p))
+                    .collect(Collectors.toUnmodifiableSet());
         }
         return Set.of();
     }

@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yowyob.tiibntick.common.exception.TntValidationException;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.DeliveryStatusUpdateDTO;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryStatus;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryStatus;
 import com.yowyob.tiibntick.core.sync.domain.model.enums.OfflineOpType;
 
 import com.yowyob.tiibntick.core.gofreelancer.application.service.DeliveryProofService.NewProof;
@@ -40,7 +40,8 @@ public final class GofpOfflineOpContracts {
 
     /** Targets a delivery person may request; the Core-only states (pause, timeout...) are refused. */
     private static final Set<DeliveryStatus> ALLOWED_TARGETS = EnumSet.of(
-            DeliveryStatus.PICKED_UP, DeliveryStatus.IN_TRANSIT, DeliveryStatus.AT_RELAY_POINT,
+            DeliveryStatus.PICKED_UP, DeliveryStatus.IN_TRANSIT, DeliveryStatus.AT_RELAY_HUB,
+            DeliveryStatus.OUT_FOR_DELIVERY, DeliveryStatus.DELIVERY_ATTEMPT_FAILED,
             DeliveryStatus.DELIVERED, DeliveryStatus.FAILED, DeliveryStatus.CANCELLED);
 
     private GofpOfflineOpContracts() {
@@ -58,10 +59,11 @@ public final class GofpOfflineOpContracts {
     public static int forwardRank(DeliveryStatus status) {
         return switch (status) {
             case CREATED -> 0;
-            case PICKED_UP -> 1;
-            case IN_TRANSIT -> 2;
-            case AT_RELAY_POINT -> 3;
-            case DELIVERED -> 4;
+            case ASSIGNED -> 1;
+            case PICKED_UP -> 2;
+            case IN_TRANSIT -> 3;
+            case AT_RELAY_HUB -> 4;
+            case DELIVERED -> 5;
             default -> -1;
         };
     }
@@ -76,7 +78,7 @@ public final class GofpOfflineOpContracts {
         if (rawStatus == null) {
             status = switch (type) {
                 case DELIVERY_CONFIRMATION -> DeliveryStatus.DELIVERED;
-                case HUB_DEPOSIT -> DeliveryStatus.AT_RELAY_POINT;
+                case HUB_DEPOSIT -> DeliveryStatus.AT_RELAY_HUB;
                 default -> throw new TntValidationException("Offline payload requires a status for " + type);
             };
         } else {

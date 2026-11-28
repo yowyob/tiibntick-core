@@ -1,6 +1,7 @@
 package com.yowyob.tiibntick.core.gofreelancer.application.service;
 
 import com.yowyob.tiibntick.core.billing.wallet.application.port.in.ISettlementUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpNotificationTemplates;
 import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.RecordSettlementCommand;
 import com.yowyob.tiibntick.core.billing.wallet.domain.enums.SettlementMethod;
 import com.yowyob.tiibntick.core.billing.wallet.domain.enums.SettlementStatus;
@@ -14,7 +15,8 @@ import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryNeed
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.PushNotificationPort;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpRelayPoint;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryStatus;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryFailureReason;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryStatus;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.relaypoint.RelayPointStatus;
 import com.yowyob.tiibntick.core.trust.application.port.in.RecordCustodyTransferUseCase;
 import com.yowyob.tiibntick.core.trust.application.port.in.RecordMissionUseCase;
@@ -36,7 +38,7 @@ import java.util.UUID;
  * Application service handling delivery status transitions.
  *
  * <p>Orchestrates wallet, trust, notifications, and for relay deposits:
- * {@code tnt-delivery-core#depositAtRelayPoint} + inventory/geo via {@link RelayDepositService}.</p>
+ * {@code tnt-delivery-core#depositAtRelayHub} + inventory/geo via {@link RelayDepositService}.</p>
  *
  * @author MANFOUO BRAUN
  */
@@ -74,12 +76,34 @@ public class DeliveryStatusApplicationService {
 
     private final io.micrometer.core.instrument.MeterRegistry meterRegistry;
 
+    /**
+     * H5 extension point, shared with {@link DeliveryPaymentApplicationService}: the commission rate of a delivery.
+     * Optional (setter): absent, empty or failing, the fixed {@link DeliveryPaymentApplicationService#COMMISSION_RATE}.
+     */
+    private com.yowyob.tiibntick.core.gofreelancer.application.port.out.CommissionRatePort commissionRates;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setCommissionRates(com.yowyob.tiibntick.core.gofreelancer.application.port.out.CommissionRatePort rates) {
+        this.commissionRates = rates;
+    }
+
+    private Mono<java.math.BigDecimal> commissionRate(UUID tenantId, UUID deliveryId) {
+        java.math.BigDecimal fixed = DeliveryPaymentApplicationService.COMMISSION_RATE;
+        if (commissionRates == null) return Mono.just(fixed);
+        return Mono.defer(() -> commissionRates.deliveryCommissionRate(tenantId, deliveryId))
+                .defaultIfEmpty(fixed)
+                .onErrorResume(e -> {
+                    log.warn("Commission rate lookup failed for delivery {} — using {}", deliveryId, fixed, e);
+                    return Mono.just(fixed);
+                });
+    }
+
     private io.micrometer.core.instrument.Counter paymentFailures;
 
     @jakarta.annotation.PostConstruct
     void initMetrics() {
         paymentFailures = io.micrometer.core.instrument.Counter.builder("gofp.delivery.payment.failures")
-                .description("Deliveries saved as DELIVERED/AT_RELAY_POINT whose payment then failed (unpaid)")
+                .description("Deliveries saved as DELIVERED/AT_RELAY_HUB whose payment then failed (unpaid)")
                 .register(meterRegistry);
     }
 
@@ -105,7 +129,8 @@ public class DeliveryStatusApplicationService {
      * applied through {@link IDeliveryLifecyclePort}, whose state machine refuses an illegal move
      * (the error propagates and nothing is written here) and publishes the mission events that
      * realtime, incident, sales, invoicing and notifications react to. Only after the core accepted
-     * it does gofp project the resulting state onto its own row and run its product side-effects:
+     * it does gofp read the resulting state back (nothing is copied onto its own row: the status,
+     * instants and price live in the core only) and run its product side-effects:
      * <ul>
      *   <li>{@code PICKED_UP} — the sender's pickup OTP is checked, then custody is anchored;</li>
      *   <li>{@code IN_TRANSIT} — mission creation is anchored (also resumes a stop at a relay point);</li>
@@ -151,7 +176,7 @@ public class DeliveryStatusApplicationService {
         log.info("Updating delivery {} status {} -> {} via delivery-core", deliveryId, core.status(), target);
 
         boolean relayDeposit = dto.getRelayPointId() != null
-                && (DeliveryStatus.DELIVERED.equals(target) || DeliveryStatus.AT_RELAY_POINT.equals(target));
+                && (DeliveryStatus.DELIVERED.equals(target) || DeliveryStatus.AT_RELAY_HUB.equals(target));
         if (relayDeposit) {
             return depositAtRelay(tenantId, delivery, core, driver, dto);
         }
@@ -159,23 +184,47 @@ public class DeliveryStatusApplicationService {
             case PICKED_UP -> pickUp(tenantId, delivery, driver, dto);
             case IN_TRANSIT -> startOrResumeTransit(tenantId, delivery, core, driver);
             case DELIVERED -> deliverDirect(tenantId, delivery, core, driver, dto);
-            case FAILED -> project(delivery, lifecycle.fail(tenantId, deliveryId, driver,
-                    dto.getReason() != null && !dto.getReason().isBlank() ? dto.getReason() : "Reported by the delivery person"));
+            // rows D9/D10: a failed hand-over attempt with its reason code; the core decides whether the delivery
+            // fails for good (refusal, maximum of attempts) — lot evt-l2, decision [C.2], QO-3
+            case FAILED, DELIVERY_ATTEMPT_FAILED -> attemptReason(dto.getReason())
+                    .flatMap(reason -> project(delivery,
+                            lifecycle.recordFailedAttempt(tenantId, deliveryId, driver, reason)));
+            case OUT_FOR_DELIVERY -> project(delivery, lifecycle.startFinalLeg(tenantId, deliveryId, driver));
             case CANCELLED -> project(delivery, lifecycle.cancel(tenantId, deliveryId, driver,
                     dto.getReason() != null && !dto.getReason().isBlank() ? dto.getReason() : "Cancelled by the delivery person"));
-            case AT_RELAY_POINT -> Mono.error(new IllegalArgumentException(
+            case AT_RELAY_HUB -> Mono.error(new IllegalArgumentException(
                     "relayPointId is required to deposit a parcel at a relay point"));
             default -> Mono.error(new IllegalArgumentException(
                     "Status " + target + " cannot be set directly; it is driven by the delivery lifecycle"));
         };
     }
 
-    /** Applies the state the core returned to the gofp row, then saves it. */
+    /**
+     * The reason of a failed attempt: a {@link DeliveryFailureReason} attempt code ({@code CLIENT_*}). A free text
+     * is refused: the core counts attempts and decides the return on the code (QO-3, [B.4]).
+     */
+    static Mono<DeliveryFailureReason> attemptReason(String reason) {
+        if (reason != null) {
+            try {
+                DeliveryFailureReason code = DeliveryFailureReason.valueOf(reason.trim());
+                if (code.isAttemptReason()) {
+                    return Mono.just(code);
+                }
+            } catch (IllegalArgumentException notACode) {
+                // fall through
+            }
+        }
+        return Mono.error(new IllegalArgumentException("reason must be one of "
+                + java.util.Arrays.stream(DeliveryFailureReason.values()).filter(DeliveryFailureReason::isAttemptReason)
+                .map(Enum::name).toList() + ", got: " + reason));
+    }
+
+    /**
+     * Reads the state the core returned onto the delivery to hand back. Nothing is written to the gofp
+     * row: the lifecycle facts are the core's, and the transition was already recorded there.
+     */
     private Mono<Delivery> project(Delivery delivery, Mono<CoreDeliveryState> coreResult) {
-        return coreResult.flatMap(state -> {
-            CoreDeliveryProjection.apply(delivery, state);
-            return deliveryRepository.save(delivery);
-        });
+        return coreResult.map(state -> CoreDeliveryAssembler.hydrate(delivery, state));
     }
 
     private Mono<Delivery> pickUp(UUID tenantId, Delivery delivery, UUID driver, DeliveryStatusUpdateDTO dto) {
@@ -190,16 +239,30 @@ public class DeliveryStatusApplicationService {
                     "Code de confirmation incorrect. Vérifiez le code auprès de l'expéditeur."));
         }
         log.info("Pickup OTP verified for delivery {} — confirming pickup in delivery-core", deliveryId);
-        return project(delivery, lifecycle.confirmPickup(tenantId, deliveryId, driver))
-                .flatMap(saved -> anchorPickupFromSender(saved, deliveryId, driver).thenReturn(saved))
+        return lifecycle.confirmPickup(tenantId, deliveryId, driver)
+                .flatMap(state -> {
+                    Delivery saved = CoreDeliveryAssembler.hydrate(delivery, state);
+                    return anchorPickupFromSender(saved, deliveryId, driver, parcelIdOf(state, delivery))
+                            .thenReturn(saved);
+                })
                 .flatMap(saved -> saved.getDeliveryNeedId() == null ? Mono.just(saved)
                         : inApp(n -> n.pickedUp(saved.getDeliveryNeedId())).thenReturn(saved));
     }
 
+    /**
+     * The parcel the delivery carries: the id the core reports; for a row the core cannot describe, the
+     * delivery need (or, failing that, the delivery) so that an anchor is never keyed on nothing.
+     */
+    private static UUID parcelIdOf(CoreDeliveryState state, Delivery delivery) {
+        if (state != null && state.parcelId() != null) {
+            return state.parcelId();
+        }
+        return delivery.getDeliveryNeedId() != null ? delivery.getDeliveryNeedId() : delivery.getId();
+    }
+
     /** Blockchain: PICKUP_FROM_SENDER, certified by the OTP (best-effort, ADR-018). */
-    private Mono<Void> anchorPickupFromSender(Delivery delivery, UUID deliveryId, UUID driver) {
+    private Mono<Void> anchorPickupFromSender(Delivery delivery, UUID deliveryId, UUID driver, UUID packetId) {
         Instant pickupTime = delivery.getActualPickupTime() != null ? delivery.getActualPickupTime() : Instant.now();
-        UUID packetId = delivery.getDeliveryNeedId() != null ? delivery.getDeliveryNeedId() : deliveryId;
         LocalDateTime pickupLdt = LocalDateTime.ofInstant(pickupTime, java.time.ZoneOffset.UTC);
         String pocHash = CustodyTransferRecord.computePocHash(
                 packetId.toString(), null, driver.toString(),
@@ -219,14 +282,14 @@ public class DeliveryStatusApplicationService {
 
     private Mono<Delivery> startOrResumeTransit(UUID tenantId, Delivery delivery, CoreDeliveryState before, UUID driver) {
         UUID deliveryId = delivery.getId();
-        boolean resume = DeliveryStatus.AT_RELAY_POINT.name().equals(before.status());
+        boolean resume = DeliveryStatus.AT_RELAY_HUB.name().equals(before.status());
         return project(delivery, lifecycle.startOrResumeTransit(tenantId, deliveryId, driver))
                 .flatMap(saved -> resume ? Mono.just(saved)
                         : anchorMissionCreated(deliveryId, driver).thenReturn(saved));
     }
 
     /**
-     * The core refuses {@code PICKED_UP → DELIVERED} and {@code PICKED_UP → AT_RELAY_POINT}: a parcel
+     * The core refuses {@code PICKED_UP → DELIVERED} and {@code PICKED_UP → AT_RELAY_HUB}: a parcel
      * must be in transit first. The livreur's single "delivered" / "deposit" tap therefore also
      * starts the transit when it was not started yet, so no earlier flow is lost.
      */
@@ -300,10 +363,14 @@ public class DeliveryStatusApplicationService {
                         return Mono.error(new IllegalArgumentException(
                                 "The delivery need has no owner to collect the parcel"));
                     }
+                    // The deposit is keyed on the parcel (same id from the need to the hub inventory), not on
+                    // the need: the core's parcel id, else the one the need was registered with.
+                    UUID parcelId = core.parcelId() != null ? core.parcelId()
+                            : need.getPacketId() != null ? need.getPacketId() : needId;
                     return findRelayPoint(dto.getRelayPointId())
                             .flatMap(rp -> checkDepositTarget(rp, need.getTargetRelayPointId()))
-                            .flatMap(hubId -> depositAt(tenantId, delivery, core, driver, dto, needId,
-                                    need.getUserId(), hubId));
+                            .flatMap(hubId -> depositAt(tenantId, delivery, core, driver, dto, parcelId,
+                                    need.getUserId(), hubId, need.getRequestedStorageDays()));
                 });
     }
 
@@ -324,24 +391,39 @@ public class DeliveryStatusApplicationService {
     }
 
     private Mono<Delivery> depositAt(UUID tenantId, Delivery delivery, CoreDeliveryState core, UUID driver,
-                                     DeliveryStatusUpdateDTO dto, UUID packetId, UUID clientId, UUID hubId) {
+                                     DeliveryStatusUpdateDTO dto, UUID parcelId, UUID clientId, UUID hubId,
+                                     Integer requestedStorageDays) {
         UUID deliveryId = delivery.getId();
+        java.util.concurrent.atomic.AtomicReference<CoreDeliveryState> deposited =
+                new java.util.concurrent.atomic.AtomicReference<>();
         // The core refuses the deposit unless the parcel is in transit; nothing is written then.
+        // QO-30: the core computes the storage = min(requested, storage of the relay) — no default here.
         return project(delivery, ensureInTransit(tenantId, deliveryId, core, driver)
-                .then(Mono.defer(() -> lifecycle.depositAtRelayPoint(tenantId, deliveryId, driver, hubId))))
+                .then(Mono.defer(() -> lifecycle.depositAtRelayHub(tenantId, deliveryId, driver, hubId,
+                        requestedStorageDays)))
+                .doOnNext(deposited::set))
                 .flatMap(saved -> {
                     Mono<Void> createDeposit = relayDepositService
-                            .createRelayDeposit(packetId, clientId, hubId, dto.getStorageFee(), driver)
+                            .createRelayDeposit(parcelId, clientId, hubId, dto.getStorageFee(), driver)
                             .doOnSuccess(deposit -> log.info("RelayDeposit mirror {} for delivery {} hub={}",
                                     deposit.getId(), deliveryId, hubId))
-                            .flatMap(deposit -> notifyRelayDeposit(hubId, clientId, packetId,
-                                    delivery.getDeliveryNeedId()))
+                            .flatMap(deposit -> notifyRelayDeposit(hubId, clientId, deposited.get()))
                             .then();
+                    // D-149: the deposit ends the courier's mission (anchoring + payment) only when the relay is
+                    // the destination of the delivery; a relay on the way (transfer) ends nothing.
+                    boolean destination = deposited.get() != null && deposited.get().atDestinationRelay();
+                    if (!destination) {
+                        log.info("Delivery {} deposited at hub {} on the way: mission not ended (D-149)",
+                                deliveryId, hubId);
+                    }
                     return Mono.when(createDeposit,
-                                    processDeliveryPayment(saved, driver, tenantId),
-                                    anchorMissionCompleted(deliveryId, driver),
-                                    anchorCustodyTransferToHub(deliveryId, driver, packetId, hubId))
-                            .then(inApp(n -> n.depositedAtRelay(packetId, hubId)))
+                                    destination ? processDeliveryPayment(saved, driver, tenantId) : Mono.empty(),
+                                    destination ? anchorMissionCompleted(deliveryId, driver) : Mono.empty(),
+                                    anchorCustodyTransferToHub(deliveryId, driver, parcelId, hubId))
+                            // C-36: sender and relay owner are told once the relay is the destination (D-149).
+                            .then(destination && saved.getDeliveryNeedId() != null
+                                    ? inApp(n -> n.depositedAtRelay(saved.getDeliveryNeedId(), hubId))
+                                    : Mono.empty())
                             .thenReturn(saved);
                 });
     }
@@ -363,40 +445,41 @@ public class DeliveryStatusApplicationService {
                         "No GofpRelayPoint found for id/coreRelayPointId: " + relayPointId)));
     }
 
-    private Mono<Void> notifyRelayDeposit(UUID hubId, UUID clientId, UUID packetId, UUID deliveryNeedId) {
+    /**
+     * Notifies the relay and the client of a deposit. The storage days are those the core computed for this deposit
+     * (QO-30: min(requested, storage of the relay)); the code shown is the parcel tracking code (D-136).
+     */
+    private Mono<Void> notifyRelayDeposit(UUID hubId, UUID clientId, CoreDeliveryState deposited) {
         Mono<GofpRelayPoint> rpMono = gofpRelayPointRepository.findByCoreRelayPointId(hubId)
                 .switchIfEmpty(gofpRelayPointRepository.findById(hubId));
+        String trackingCode = deposited != null && deposited.trackingCode() != null ? deposited.trackingCode()
+                : deposited != null ? String.valueOf(deposited.parcelId()) : "";
+        Integer storageDays = deposited != null ? deposited.relayStorageDays() : null;
 
-        Mono<Integer> daysMono = deliveryNeedId == null
-                ? Mono.just(3)
-                : deliveryNeedRepository.findById(deliveryNeedId)
-                .map(need -> need.getRequestedStorageDays() != null ? need.getRequestedStorageDays() : 3)
-                .defaultIfEmpty(3);
-
-        return rpMono.zipWith(daysMono)
-                .flatMap(tuple -> {
-                    GofpRelayPoint rp = tuple.getT1();
-                    int storageDays = tuple.getT2();
+        return rpMono
+                .flatMap(rp -> {
                     String rpName = rp.getName() != null && !rp.getName().isBlank()
                             ? rp.getName() : "Point Relais";
 
                     Mono<Void> notifyRelay = Mono.empty();
                     if (rp.getCoreFreelancerId() != null) {
-                        notifyRelay = pushNotificationPort.sendPushNotification(
+                        notifyRelay = pushNotificationPort.sendLocalized(
                                 rp.getCoreFreelancerId(),
-                                "Nouveau Dépôt",
-                                "Un nouveau colis a été déposé dans votre point relais « "
-                                        + rpName + " ». Suivi : " + packetId);
+                                GofpNotificationTemplates.RELAY_PARCEL_DEPOSITED,
+                                java.util.Map.of("relayName", rpName, "trackingCode", trackingCode));
                     } else {
                         log.warn("Relay hub {} has no coreFreelancerId — skip RP push", hubId);
                     }
 
-                    Mono<Void> notifyClient = pushNotificationPort.sendPushNotification(
+                    if (storageDays == null) {
+                        log.warn("Deposit at hub {}: the core returned no storage (relay not the destination?) — "
+                                + "client not notified of a storage deadline", hubId);
+                        return notifyRelay;
+                    }
+                    Mono<Void> notifyClient = pushNotificationPort.sendLocalized(
                             clientId,
-                            "Colis Arrivé !",
-                            "Votre colis est arrivé au point relais " + rpName
-                                    + ". Il sera gardé pendant " + storageDays
-                                    + " jours sans frais de pénalité.");
+                            GofpNotificationTemplates.RELAY_PARCEL_ARRIVED,
+                            java.util.Map.of("relayName", rpName, "storageDays", storageDays));
 
                     return Mono.when(notifyRelay, notifyClient);
                 })
@@ -569,11 +652,12 @@ public class DeliveryStatusApplicationService {
             paymentMethodMono = Mono.just("UNKNOWN");
         }
 
-        return paymentMethodMono.flatMap(paymentMethod -> {
+        return paymentMethodMono.zipWith(commissionRate(tenantId, delivery.getId())).flatMap(methodAndRate -> {
+            String paymentMethod = methodAndRate.getT1();
             log.info("Payment method for delivery {} is {}", delivery.getId(), paymentMethod);
             java.math.BigDecimal amount = java.math.BigDecimal.valueOf(delivery.getTarif())
                     .setScale(2, java.math.RoundingMode.HALF_UP);
-            java.math.BigDecimal rate = DeliveryPaymentApplicationService.COMMISSION_RATE;
+            java.math.BigDecimal rate = methodAndRate.getT2();
 
             Mono<String> settle;
             if ("CASH".equalsIgnoreCase(paymentMethod)) {
@@ -766,18 +850,26 @@ public class DeliveryStatusApplicationService {
                         return Mono.<Void>error(new AccessDeniedException(
                                 "Only platform staff can change the price of a delivery"));
                     }
-                    if (delivery.getReceiveCode() != null) {
-                        return Mono.<Void>error(paymentStarted(deliveryId));
-                    }
-                    return tenantContextHolder.currentTenantId()
+                    Mono<Boolean> escrowed = escrows == null ? Mono.just(false)
+                            : escrows.intentOfDelivery(deliveryId).hasElement();
+                    return escrowed.flatMap(started -> started ? Mono.<Void>error(paymentStarted(deliveryId))
+                            : tenantContextHolder.currentTenantId()
                             .defaultIfEmpty(TenantContextHolder.SYSTEM_TENANT)
                             .flatMap(tenantId -> settlements.find(tenantId,
                                     DeliveryPaymentApplicationService.REFERENCE_TYPE, deliveryId))
                             .hasElement()
                             .flatMap(settled -> settled
                                     ? Mono.<Void>error(paymentStarted(deliveryId))
-                                    : Mono.<Void>empty());
+                                    : Mono.<Void>empty()));
                 });
+    }
+
+    /** Lot L5: a payment intent (escrow or cash) freezes the price. Optional for module tests. */
+    private com.yowyob.tiibntick.core.billing.wallet.application.port.in.IEscrowUseCase escrows;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setEscrows(com.yowyob.tiibntick.core.billing.wallet.application.port.in.IEscrowUseCase escrows) {
+        this.escrows = escrows;
     }
 
     private static org.springframework.web.server.ResponseStatusException paymentStarted(UUID deliveryId) {

@@ -22,7 +22,7 @@ public record GenerateInvoiceCommand(
         @NotNull UUID tenantId,
         @NotBlank String tenantCode,
         @NotBlank String countryCode,
-        String missionId,
+        String deliveryId,
         String salesOrderId,
         @NotBlank String clientId,
         @NotEmpty List<InvoiceLine> lines,
@@ -73,8 +73,8 @@ public record GenerateInvoiceCommand(
         String appliedTemplateName
 ) {
     public GenerateInvoiceCommand {
-        if (missionId == null && salesOrderId == null) {
-            throw new IllegalArgumentException("Either missionId or salesOrderId must be provided");
+        if (deliveryId == null && salesOrderId == null) {
+            throw new IllegalArgumentException("Either deliveryId or salesOrderId must be provided");
         }
         if (discounts == null) discounts = List.of();
         if (surchargeLines == null) surchargeLines = List.of();
@@ -86,11 +86,11 @@ public record GenerateInvoiceCommand(
      */
     public static GenerateInvoiceCommand simple(
             UUID tenantId, String tenantCode, String countryCode,
-            String missionId, String salesOrderId, String clientId,
+            String deliveryId, String salesOrderId, String clientId,
             List<InvoiceLine> lines, List<InvoiceDiscount> discounts,
             String currency, LocalDateTime dueAt) {
         return new GenerateInvoiceCommand(tenantId, tenantCode, countryCode,
-                missionId, salesOrderId, clientId, lines, discounts, currency, dueAt,
+                deliveryId, salesOrderId, clientId, lines, discounts, currency, dueAt,
                 null, null, null, null, List.of(), null, null);
     }
 }

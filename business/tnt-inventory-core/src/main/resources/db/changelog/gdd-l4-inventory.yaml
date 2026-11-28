@@ -1,0 +1,11 @@
+databaseChangeLog:
+  - changeSet:
+      id: gdd-l4-403-hub-entry-owner-and-fees
+      author: gdd-l4
+      labels: gdd-l4
+      comment: Owner (collector) and storage/penalty fees on a hub package entry.
+      changes:
+        - sqlFile:
+            path: gdd-l4/V403__gdd_l4_403_hub_entry_owner_and_fees.sql
+            relativeToChangelogFile: true
+            splitStatements: true

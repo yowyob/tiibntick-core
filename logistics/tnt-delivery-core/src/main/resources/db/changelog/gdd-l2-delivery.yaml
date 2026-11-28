@@ -1,0 +1,41 @@
+databaseChangeLog:
+  - changeSet:
+      id: gdd-l2-201-announcement-details
+      author: gdd-l2
+      labels: gdd-l2
+      comment: >
+        Optional, generic complements of a delivery announcement (sender contact, recipient e-mail,
+        vehicle/payment/transport preferences, route estimate, destination hub, handover signature
+        reference, service fee, origin reference). All columns are nullable and additive.
+      changes:
+        - sql:
+            splitStatements: true
+            stripComments: true
+            sql: |
+              ALTER TABLE tnt_delivery_announcements ADD COLUMN IF NOT EXISTS sender_name            VARCHAR(150);
+              ALTER TABLE tnt_delivery_announcements ADD COLUMN IF NOT EXISTS sender_phone           VARCHAR(30);
+              ALTER TABLE tnt_delivery_announcements ADD COLUMN IF NOT EXISTS sender_email           VARCHAR(255);
+              ALTER TABLE tnt_delivery_announcements ADD COLUMN IF NOT EXISTS recipient_email        VARCHAR(255);
+              ALTER TABLE tnt_delivery_announcements ADD COLUMN IF NOT EXISTS required_vehicle_type  VARCHAR(40);
+              ALTER TABLE tnt_delivery_announcements ADD COLUMN IF NOT EXISTS payment_method         VARCHAR(30);
+              ALTER TABLE tnt_delivery_announcements ADD COLUMN IF NOT EXISTS transport_method       VARCHAR(30);
+              ALTER TABLE tnt_delivery_announcements ADD COLUMN IF NOT EXISTS distance_km            NUMERIC(10,3);
+              ALTER TABLE tnt_delivery_announcements ADD COLUMN IF NOT EXISTS estimated_duration_min INTEGER;
+              ALTER TABLE tnt_delivery_announcements ADD COLUMN IF NOT EXISTS destination_hub_id     UUID;
+              ALTER TABLE tnt_delivery_announcements ADD COLUMN IF NOT EXISTS handover_signature_ref VARCHAR(500);
+              ALTER TABLE tnt_delivery_announcements ADD COLUMN IF NOT EXISTS service_fee            NUMERIC(14,2);
+              ALTER TABLE tnt_delivery_announcements ADD COLUMN IF NOT EXISTS origin_ref_type        VARCHAR(30);
+              ALTER TABLE tnt_delivery_announcements ADD COLUMN IF NOT EXISTS origin_ref_id          UUID;
+  - changeSet:
+      id: gdd-l2-203-announcement-origin-unique
+      author: gdd-l2
+      labels: gdd-l2
+      comment: "At most one announcement per origin (a delivery need is published once)."
+      changes:
+        - sql:
+            sql: |
+              CREATE UNIQUE INDEX IF NOT EXISTS uq_tnt_ann_origin_ref
+                  ON tnt_delivery_announcements (origin_ref_type, origin_ref_id)
+                  WHERE origin_ref_id IS NOT NULL;
+              CREATE INDEX IF NOT EXISTS idx_tnt_announcement_responses_person
+                  ON tnt_announcement_responses (delivery_person_id);

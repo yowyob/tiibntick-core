@@ -16,7 +16,7 @@ import com.yowyob.tiibntick.core.gofreelancer.application.service.TenantContextH
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Announcement;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.DeliveryNeed;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpFreelancer;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.announcement.AnnouncementStatus;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.AnnouncementStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

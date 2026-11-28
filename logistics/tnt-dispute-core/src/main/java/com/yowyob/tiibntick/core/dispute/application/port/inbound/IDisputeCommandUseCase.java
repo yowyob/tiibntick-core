@@ -95,4 +95,10 @@ public interface IDisputeCommandUseCase {
      * @return the created dispute
      */
     Mono<Dispute> openAgainstFreelancerOrg(OpenDisputeAgainstFreelancerOrgCommand cmd);
+
+    /**
+     * Pays the compensation of a PENDING_COMPENSATION dispute from the Kernel fund (spec §4.3), then LT9. Errors:
+     * {@code 503 COMPENSATION_UNAVAILABLE}, {@code 409 COMPENSATION_FUND_INSUFFICIENT}; the dispute stays pending.
+     */
+    Mono<Dispute> payCompensation(com.yowyob.tiibntick.core.dispute.domain.model.DisputeId disputeId, String tenantId);
 }

@@ -1,6 +1,5 @@
 package com.yowyob.tiibntick.core.notify.infrastructure.adapter.kernel;
 
-import com.yowyob.tiibntick.common.kernel.KernelResponses;
 import com.yowyob.tiibntick.core.notify.config.NotifyProperties;
 import com.yowyob.tiibntick.core.notify.infrastructure.adapter.kernel.dto.NotificationDeliveryDto;
 import com.yowyob.tiibntick.core.notify.infrastructure.adapter.kernel.dto.NotificationPreferenceDto;
@@ -18,8 +17,11 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+
+import java.util.UUID;
 
 /**
  * Thin typed client for the Kernel's (RT-comops) generic notification engine
@@ -52,6 +54,8 @@ public class KernelNotificationClient {
     private static final String PROVIDERS_PATH = "/api/notifications/providers";
     private static final String REMINDERS_PATH = "/api/notifications/reminders";
     private static final String TEMPLATES_PATH = "/api/notifications/templates";
+    private static final String INBOX_PATH = "/api/notifications/inbox";
+    private static final String INBOX_READ_PATH = "/api/notifications/inbox/{deliveryId}/read";
 
     private final WebClient kernelWebClient;
     private final NotifyProperties properties;
@@ -60,6 +64,77 @@ public class KernelNotificationClient {
             NotifyProperties properties) {
         this.kernelWebClient = kernelWebClient;
         this.properties = properties;
+    }
+
+    /**
+     * In-app inbox (lot C-36 moved to the Kernel, decision D-157). The Kernel inbox is per user: it is read and
+     * marked with the caller's own token ({@code kernelUserWebClient}, which relays the request's bearer). An
+     * in-app message is written for another user (the sender is told a courier applied, ...), often outside any
+     * request, so it is sent with the platform service account ({@code kernelServiceAccountWebClient}). Both are
+     * optional beans of the application: without them the inbox calls fail explicitly.
+     */
+    private WebClient kernelUserWebClient;
+    private WebClient kernelServiceAccountWebClient;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setKernelUserWebClient(@Qualifier("kernelUserWebClient") WebClient kernelUserWebClient) {
+        this.kernelUserWebClient = kernelUserWebClient;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setKernelServiceAccountWebClient(
+            @Qualifier("kernelServiceAccountWebClient") WebClient kernelServiceAccountWebClient) {
+        this.kernelServiceAccountWebClient = kernelServiceAccountWebClient;
+    }
+
+    // ── In-app inbox (channel IN_APP) ────────────────────────────────────────
+
+    /** Writes one message into {@code request.recipientUserId}'s Kernel inbox (channel {@code IN_APP}). */
+    public Mono<NotificationDeliveryDto> sendInApp(SendNotificationRequestDto request) {
+        return Mono.defer(() -> {
+            WebClient web = require(kernelServiceAccountWebClient, "kernelServiceAccountWebClient");
+            var responseSpec = web.post()
+                    .uri(DELIVERIES_PATH)
+                    .headers(h -> tenantHeaders(h, null, null))
+                    .bodyValue(request)
+                    .retrieve();
+            return bodyOrPropagate(responseSpec, NotificationDeliveryDto.class);
+        });
+    }
+
+    /** The caller's Kernel inbox, optionally limited to one application. Errors propagate (no silent empty inbox). */
+    public Flux<NotificationDeliveryDto> inbox(String application) {
+        return Flux.defer(() -> {
+            WebClient web = require(kernelUserWebClient, "kernelUserWebClient");
+            return web.get()
+                    .uri(b -> {
+                        b.path(INBOX_PATH);
+                        if (application != null && !application.isBlank()) b.queryParam("application", application);
+                        return b.build();
+                    })
+                    .headers(h -> tenantHeaders(h, null, null))
+                    .retrieve()
+                    .bodyToFlux(NotificationDeliveryDto.class);
+        });
+    }
+
+    /** Marks one message of the caller's Kernel inbox as read; emits the message as the Kernel now holds it. */
+    public Mono<NotificationDeliveryDto> markInboxRead(UUID deliveryId) {
+        return Mono.defer(() -> {
+            WebClient web = require(kernelUserWebClient, "kernelUserWebClient");
+            var responseSpec = web.post()
+                    .uri(INBOX_READ_PATH, deliveryId)
+                    .headers(h -> tenantHeaders(h, null, null))
+                    .retrieve();
+            return bodyOrPropagate(responseSpec, NotificationDeliveryDto.class);
+        });
+    }
+
+    private static WebClient require(WebClient web, String name) {
+        if (web == null) {
+            throw new KernelContextMissingException("No " + name + " bean: the Kernel in-app inbox is unavailable");
+        }
+        return web;
     }
 
     // ── Deliveries ───────────────────────────────────────────────────────────
@@ -72,7 +147,7 @@ public class KernelNotificationClient {
                     .headers(h -> tenantHeaders(h, tenantId, organizationId))
                     .bodyValue(request)
                     .retrieve();
-            return KernelResponses.unwrapObjectOrPropagate(responseSpec, NotificationDeliveryDto.class);
+            return bodyOrPropagate(responseSpec, NotificationDeliveryDto.class);
         });
     }
 
@@ -82,8 +157,9 @@ public class KernelNotificationClient {
                     .uri(DELIVERIES_PATH)
                     .headers(h -> tenantHeaders(h, tenantId, organizationId))
                     .retrieve();
-            return KernelResponses.unwrapList(responseSpec, NotificationDeliveryDto.class, log, "listDeliveries");
-        });
+            return bodyListFailOpen(responseSpec, NotificationDeliveryDto.class, "listDeliveries");
+        })
+                .onErrorResume(KernelContextMissingException.class, ex -> failOpen(ex));
     }
 
     // ── Preferences ──────────────────────────────────────────────────────────
@@ -96,7 +172,7 @@ public class KernelNotificationClient {
                     .headers(h -> tenantHeaders(h, tenantId, organizationId))
                     .bodyValue(request)
                     .retrieve();
-            return KernelResponses.unwrapObjectOrPropagate(responseSpec, NotificationPreferenceDto.class);
+            return bodyOrPropagate(responseSpec, NotificationPreferenceDto.class);
         });
     }
 
@@ -106,8 +182,9 @@ public class KernelNotificationClient {
                     .uri(PREFERENCES_BY_USER_PATH, userId)
                     .headers(h -> tenantHeaders(h, tenantId, organizationId))
                     .retrieve();
-            return KernelResponses.unwrapList(responseSpec, NotificationPreferenceDto.class, log, "listPreferences userId=" + userId);
-        });
+            return bodyListFailOpen(responseSpec, NotificationPreferenceDto.class, "listPreferences userId=" + userId);
+        })
+                .onErrorResume(KernelContextMissingException.class, ex -> failOpen(ex));
     }
 
     // ── Providers ────────────────────────────────────────────────────────────
@@ -118,8 +195,9 @@ public class KernelNotificationClient {
                     .uri(PROVIDERS_PATH)
                     .headers(h -> tenantHeaders(h, tenantId, organizationId))
                     .retrieve();
-            return KernelResponses.unwrapList(responseSpec, NotificationProviderDto.class, log, "listProviders");
-        });
+            return bodyListFailOpen(responseSpec, NotificationProviderDto.class, "listProviders");
+        })
+                .onErrorResume(KernelContextMissingException.class, ex -> failOpen(ex));
     }
 
     public Mono<NotificationProviderDto> saveProvider(String tenantId, String organizationId,
@@ -130,7 +208,7 @@ public class KernelNotificationClient {
                     .headers(h -> tenantHeaders(h, tenantId, organizationId))
                     .bodyValue(request)
                     .retrieve();
-            return KernelResponses.unwrapObjectOrPropagate(responseSpec, NotificationProviderDto.class);
+            return bodyOrPropagate(responseSpec, NotificationProviderDto.class);
         });
     }
 
@@ -142,8 +220,9 @@ public class KernelNotificationClient {
                     .uri(REMINDERS_PATH)
                     .headers(h -> tenantHeaders(h, tenantId, organizationId))
                     .retrieve();
-            return KernelResponses.unwrapList(responseSpec, NotificationReminderDto.class, log, "listReminders");
-        });
+            return bodyListFailOpen(responseSpec, NotificationReminderDto.class, "listReminders");
+        })
+                .onErrorResume(KernelContextMissingException.class, ex -> failOpen(ex));
     }
 
     public Mono<NotificationReminderDto> saveReminder(String tenantId, String organizationId,
@@ -154,7 +233,7 @@ public class KernelNotificationClient {
                     .headers(h -> tenantHeaders(h, tenantId, organizationId))
                     .bodyValue(request)
                     .retrieve();
-            return KernelResponses.unwrapObjectOrPropagate(responseSpec, NotificationReminderDto.class);
+            return bodyOrPropagate(responseSpec, NotificationReminderDto.class);
         });
     }
 
@@ -166,8 +245,9 @@ public class KernelNotificationClient {
                     .uri(TEMPLATES_PATH)
                     .headers(h -> tenantHeaders(h, tenantId, organizationId))
                     .retrieve();
-            return KernelResponses.unwrapList(responseSpec, NotificationTemplateDto.class, log, "listTemplates");
-        });
+            return bodyListFailOpen(responseSpec, NotificationTemplateDto.class, "listTemplates");
+        })
+                .onErrorResume(KernelContextMissingException.class, ex -> failOpen(ex));
     }
 
     public Mono<NotificationTemplateDto> saveTemplate(String tenantId, String organizationId,
@@ -178,22 +258,77 @@ public class KernelNotificationClient {
                     .headers(h -> tenantHeaders(h, tenantId, organizationId))
                     .bodyValue(request)
                     .retrieve();
-            return KernelResponses.unwrapObjectOrPropagate(responseSpec, NotificationTemplateDto.class);
+            return bodyOrPropagate(responseSpec, NotificationTemplateDto.class);
         });
+    }
+
+    // ── Wire format ──────────────────────────────────────────────────────────
+
+    /**
+     * The Kernel notification engine answers with the bare object or array ({@code NotificationDelivery},
+     * {@code NotificationDelivery[]}, ...), not with the {@code {success, data, ...}} envelope the other
+     * Kernel services use (see the 200 responses of {@code /api/notifications/*} in the OpenAPI spec). Unwrapping
+     * an envelope here made every send fail to decode and every read come back empty.
+     */
+    private static <T> Mono<T> bodyOrPropagate(WebClient.ResponseSpec responseSpec, Class<T> type) {
+        return responseSpec.bodyToMono(type);
+    }
+
+    /** Fail-open list read: a missing resource or any Kernel error yields an empty list, as for the other Kernel reads. */
+    private static <T> Flux<T> bodyListFailOpen(WebClient.ResponseSpec responseSpec, Class<T> type, String description) {
+        return responseSpec.bodyToFlux(type)
+                .onErrorResume(WebClientResponseException.NotFound.class, ex -> {
+                    log.debug("{}: not found in Kernel", description);
+                    return Flux.empty();
+                })
+                .onErrorResume(Exception.class, ex -> {
+                    log.warn("{}: Kernel bridge error: {}", description, ex.getMessage());
+                    return Flux.empty();
+                });
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
+    private static final long MISSING_CONTEXT_WARN_EVERY_MS = 60_000;
+    private final java.util.concurrent.atomic.AtomicLong lastMissingContextWarn =
+            new java.util.concurrent.atomic.AtomicLong();
+
     /**
-     * Applies the tenant/organization context the Kernel requires on every call. A value the caller did
-     * not provide falls back to the configured platform default ({@code tnt.notify.kernel.default-*});
-     * when neither exists the call fails here with an explicit message instead of being rejected by the
-     * Kernel with {@code ORGANIZATION_CONTEXT_REQUIRED}.
+     * Reads follow the fail-open contract of of the Kernel reads (a Kernel that cannot answer yields an
+     * empty list): a deployment without the default tenant/organization must not turn every history poll into
+     * an error. Writes ({@code send}, {@code save*}) still fail explicitly. Warned at most once a minute, since
+     * the front polls.
+     */
+    private <T> Flux<T> failOpen(KernelContextMissingException ex) {
+        long now = System.currentTimeMillis();
+        long last = lastMissingContextWarn.get();
+        if (now - last >= MISSING_CONTEXT_WARN_EVERY_MS && lastMissingContextWarn.compareAndSet(last, now)) {
+            log.warn("Kernel notification read skipped, returning an empty list: {}", ex.getMessage());
+        }
+        return Flux.empty();
+    }
+
+    /**
+     * Applies the tenant/organization context the Kernel requires on every call.
+     *
+     * <p>An organization belongs to exactly one tenant, so the two are resolved <b>as a pair</b>. When the
+     * caller names an organization, its tenant (or the default one) goes with it. When the caller names
+     * none — the usual case: a business module only knows its own tenant — the platform notification
+     * organization is used together with <i>its own</i> tenant: sending the business tenant next to the
+     * notification organization would be refused by the Kernel as a mismatch.
+     * When nothing is configured the call fails here with an explicit message instead of being rejected by
+     * the Kernel with {@code ORGANIZATION_CONTEXT_REQUIRED}.
      */
     private void tenantHeaders(HttpHeaders headers, String tenantId, String organizationId) {
-        headers.set("X-Tenant-Id", requireContext("tenant", tenantId, properties.getKernel().getDefaultTenantId()));
-        headers.set("X-Organization-Id",
-                requireContext("organization", organizationId, properties.getKernel().getDefaultOrganizationId()));
+        boolean organizationGiven = organizationId != null && !organizationId.isBlank();
+        String defaultOrganization = properties.getKernel().getDefaultOrganizationId();
+        boolean usesDefaultOrganization = !organizationGiven
+                && defaultOrganization != null && !defaultOrganization.isBlank();
+        String tenant = usesDefaultOrganization
+                ? requireContext("tenant", properties.getKernel().getDefaultTenantId(), tenantId)
+                : requireContext("tenant", tenantId, properties.getKernel().getDefaultTenantId());
+        headers.set("X-Tenant-Id", tenant);
+        headers.set("X-Organization-Id", requireContext("organization", organizationId, defaultOrganization));
     }
 
     private static String requireContext(String what, String given, String configuredDefault) {
@@ -203,7 +338,7 @@ public class KernelNotificationClient {
         if (configuredDefault != null && !configuredDefault.isBlank()) {
             return configuredDefault;
         }
-        throw new IllegalStateException("No " + what + " for the Kernel notification call and no default configured "
+        throw new KernelContextMissingException("No " + what + " for the Kernel notification call and no default configured "
                 + "(tnt.notify.kernel.default-" + what + "-id / TNT_NOTIFY_KERNEL_DEFAULT_"
                 + what.toUpperCase() + "_ID)");
     }

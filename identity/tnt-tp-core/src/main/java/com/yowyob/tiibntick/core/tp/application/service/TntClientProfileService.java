@@ -176,8 +176,8 @@ public class TntClientProfileService implements RegisterTntClientProfileUseCase 
      * @return a {@link Mono} emitting the updated profile (or empty if not found)
      */
     public Mono<TntClientProfile> updateLoyaltyTierOnProfile(UUID tenantId, UUID thirdPartyId, int points) {
+        // Empty when the third party has no tp-core profile: the loyalty account alone carries the tier.
         return profileRepository.findByThirdPartyId(tenantId, thirdPartyId)
-                .switchIfEmpty(Mono.error(new TntThirdPartyNotFoundException(thirdPartyId)))
                 .flatMap(profile -> profileRepository.save(profile.updateLoyaltyTier(points)));
     }
 
@@ -191,6 +191,15 @@ public class TntClientProfileService implements RegisterTntClientProfileUseCase 
     public Mono<TntClientProfile> incrementDeliveries(UUID tenantId, UUID thirdPartyId) {
         return profileRepository.findByThirdPartyId(tenantId, thirdPartyId)
                 .switchIfEmpty(Mono.error(new TntThirdPartyNotFoundException(thirdPartyId)))
+                .flatMap(profile -> profileRepository.save(profile.incrementDeliveries()));
+    }
+
+    /**
+     * Same as {@link #incrementDeliveries}, but completes empty when the third party has no tp-core client profile
+     * (a Go-Freelancer client has none) instead of failing.
+     */
+    public Mono<TntClientProfile> incrementDeliveriesIfProfiled(UUID tenantId, UUID thirdPartyId) {
+        return profileRepository.findByThirdPartyId(tenantId, thirdPartyId)
                 .flatMap(profile -> profileRepository.save(profile.incrementDeliveries()));
     }
 }

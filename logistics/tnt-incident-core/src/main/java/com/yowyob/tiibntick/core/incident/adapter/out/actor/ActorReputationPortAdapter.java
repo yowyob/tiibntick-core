@@ -147,7 +147,7 @@ public class ActorReputationPortAdapter implements IActorReputationPort {
      *
      * <p>The count is maintained locally in {@code tnt_actor} via the
      * {@code incident_history_count} column, incremented atomically by
-     * {@code IncidentEventConsumer} on each {@code tnt.incident.closed} event.
+     * tnt-actor-core's consumer on each {@code IncidentClosed} of {@code tnt.incident.events}.
      *
      * @param actorId UUID of the actor
      * @return the incident history count, or {@code 0} if no profile found

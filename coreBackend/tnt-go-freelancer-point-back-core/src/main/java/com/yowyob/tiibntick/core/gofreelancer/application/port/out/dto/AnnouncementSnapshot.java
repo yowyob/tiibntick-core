@@ -1,7 +1,7 @@
 package com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto;
 
 import com.yowyob.tiibntick.common.vo.Address;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.announcement.AnnouncementStatus;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.AnnouncementStatus;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -51,10 +51,32 @@ public record AnnouncementSnapshot(
         UUID selectedResponseId,
         UUID createdDeliveryId,
         String trackingCode,
-        List<AnnouncementResponseSnapshot> responses) {
+        List<AnnouncementResponseSnapshot> responses,
+        AnnouncementExtras extras) {
 
     public static final String PRICING_MODE_QUOTE_REQUEST = "QUOTE_REQUEST";
     public static final String PRICING_MODE_FIXED_PRICE = "FIXED_PRICE";
+
+    public AnnouncementSnapshot {
+        extras = extras != null ? extras : AnnouncementExtras.EMPTY;
+    }
+
+    /** Without complements. */
+    public AnnouncementSnapshot(
+            UUID id, UUID tenantId, UUID clientId, String title, String description,
+            AnnouncementStatus status, Instant createdAt, Instant updatedAt, BigDecimal offeredAmount,
+            String currency, String pricingMode, Address pickupAddress, Address deliveryAddress,
+            double packetVolumetricWeightDm3, Double packetWeightKg, Double packetWidthCm,
+            Double packetHeightCm, Double packetLengthCm, Boolean packetFragile, Boolean packetPerishable,
+            String packetDescription, String packetPhotoUrl, String recipientName, String recipientPhone,
+            UUID selectedResponseId, UUID createdDeliveryId, String trackingCode,
+            List<AnnouncementResponseSnapshot> responses) {
+        this(id, tenantId, clientId, title, description, status, createdAt, updatedAt, offeredAmount,
+                currency, pricingMode, pickupAddress, deliveryAddress, packetVolumetricWeightDm3,
+                packetWeightKg, packetWidthCm, packetHeightCm, packetLengthCm, packetFragile,
+                packetPerishable, packetDescription, packetPhotoUrl, recipientName, recipientPhone,
+                selectedResponseId, createdDeliveryId, trackingCode, responses, null);
+    }
 
     /**
      * Returns a copy with delivery linkage fields filled after selection.
@@ -68,6 +90,7 @@ public record AnnouncementSnapshot(
                 recipientName, recipientPhone, selectedResponseId,
                 deliveryId != null ? deliveryId : createdDeliveryId,
                 tracking != null ? tracking : trackingCode,
-                responses);
+                responses,
+                extras);
     }
 }

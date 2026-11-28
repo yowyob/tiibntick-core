@@ -1,0 +1,44 @@
+databaseChangeLog:
+  # Lot L1 of the Go-Freelancer de-duplication: parcel and delivery additions (ids gdd-l1-101..199).
+  # Additive only: nullable columns, IF NOT EXISTS, no rename.
+
+  - changeSet:
+      id: gdd-l1-101-parcel-designation-thickness
+      author: gdd-l1
+      labels: gdd-l1
+      comment: >
+        Parcel: commercial designation of the goods and thickness (cm). Generic characteristics of a parcel,
+        optional.
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE tnt_parcels ADD COLUMN IF NOT EXISTS designation  VARCHAR(255);
+              ALTER TABLE tnt_parcels ADD COLUMN IF NOT EXISTS thickness_cm DOUBLE PRECISION;
+
+  - changeSet:
+      id: gdd-l1-102-parcel-description-text
+      author: gdd-l1
+      labels: gdd-l1
+      comment: >
+        Parcel: a free description is not bounded to 500 characters (the same text lives in an unbounded
+        column elsewhere and must be carried over without truncation). Widening is lossless.
+      changes:
+        - sql:
+            sql: ALTER TABLE tnt_parcels ALTER COLUMN description TYPE TEXT;
+
+  - changeSet:
+      id: gdd-l1-110-delivery-agreed-terms
+      author: gdd-l1
+      labels: gdd-l1
+      comment: >
+        Delivery: price and pickup / hand-over windows agreed when the response was selected. All nullable.
+        (The originating announcement is already carried by tnt_deliveries.announcement_id.)
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS agreed_amount         NUMERIC(14,2);
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS agreed_currency       VARCHAR(3);
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS pickup_window_start   TIMESTAMPTZ;
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS pickup_window_end     TIMESTAMPTZ;
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS delivery_window_start TIMESTAMPTZ;
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS delivery_window_end   TIMESTAMPTZ;

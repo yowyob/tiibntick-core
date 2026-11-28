@@ -1,5 +1,9 @@
 package com.yowyob.tiibntick.core.delivery.adapter.out.persistence.mapper;
 
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryFailureReason;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryKind;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.ResponsibleParty;
+
 import com.yowyob.tiibntick.core.delivery.adapter.out.persistence.entity.DeliveryEntity;
 import com.yowyob.tiibntick.core.delivery.domain.model.aggregate.Delivery;
 import com.yowyob.tiibntick.core.delivery.domain.model.aggregate.Parcel;
@@ -37,7 +41,8 @@ public final class DeliveryPersistenceMapper {
                 .parcelId(parcel != null ? parcel.getId() : null)
                 .senderId(delivery.getSenderId())
                 .deliveryPersonId(delivery.getDeliveryPersonId())
-                .trackingCode(delivery.getTrackingCode())
+                // D-136: the code of record is the parcel's; only a pre-D-136 code stays on the delivery row
+                .trackingCode(delivery.getLegacyTrackingCode())
                 .status(delivery.getStatus().name())
                 .urgency(delivery.getUrgency().name())
                 // Pickup
@@ -69,6 +74,13 @@ public final class DeliveryPersistenceMapper {
                 .costCurrency(estCost != null ? estCost.currency() : null)
                 .finalCostTotal(delivery.getFinalCost() != null ? delivery.getFinalCost().total() : null)
                 .estimatedDistanceKm(delivery.getEstimatedDistanceKm())
+                // Agreed terms
+                .agreedAmount(delivery.getAgreedAmount())
+                .agreedCurrency(delivery.getAgreedCurrency())
+                .pickupWindowStart(delivery.getPickupWindowStart())
+                .pickupWindowEnd(delivery.getPickupWindowEnd())
+                .deliveryWindowStart(delivery.getDeliveryWindowStart())
+                .deliveryWindowEnd(delivery.getDeliveryWindowEnd())
                 // ETA
                 .etaEstimatedArrival(eta != null ? eta.estimatedArrival() : null)
                 .etaLowerBound(eta != null ? eta.lowerBound() : null)
@@ -92,7 +104,36 @@ public final class DeliveryPersistenceMapper {
                         ? delivery.getAssignedFreelancerRole().name() : null)
                 .selectedVehicleId(delivery.getSelectedVehicleId())
                 .activeEquipmentIdsJson(serializeList(delivery.getActiveEquipmentIds()))
-                .deliveryAttemptNumber(delivery.getDeliveryAttemptNumber())
+                .deliveryAttemptNumber(delivery.getAttemptCount())
+                .kind(delivery.getKind().name())
+                .parentDeliveryId(delivery.getParentDeliveryId())
+                .maxAttempts(delivery.getMaxAttempts())
+                .failureReason(name(delivery.getFailureReason()))
+                .lastAttemptReason(name(delivery.getLastAttemptReason()))
+                .cancellationReason(delivery.getCancellationReason())
+                .responsibleParty(name(delivery.getResponsibleParty()))
+                .returnCostPayer(name(delivery.getReturnCostPayer()))
+                .relayHubId(delivery.getRelayHubId())
+                .destinationHubId(delivery.getDestinationHubId())
+                .hubPackageEntryId(delivery.getHubPackageEntryId())
+                .relayDepositedAt(delivery.getRelayDepositedAt())
+                .requestedStorageDays(delivery.getRequestedStorageDays())
+                .relayStorageDays(delivery.getRelayStorageDays())
+                .relayStorageExpiresAt(delivery.getRelayStorageExpiresAt())
+                .storageReminderAt(delivery.getStorageReminderAt())
+                .storageReminderSentAt(delivery.getStorageReminderSentAt())
+                .late(delivery.isLate())
+                .lateSince(delivery.getLateSince())
+                .lastAlertType(delivery.getLastAlertType())
+                .activeAlerts(delivery.getActiveAlerts())
+                .lastPositionAt(delivery.getLastPositionAt())
+                .returnGuaranteeStatus(delivery.getReturnGuaranteeStatus() == null ? null
+                        : delivery.getReturnGuaranteeStatus().name())
+                .returnGuaranteeReason(delivery.getReturnGuaranteeReason())
+                .legStartLatitude(delivery.getLegStartLatitude())
+                .legStartLongitude(delivery.getLegStartLongitude())
+                .failedAt(delivery.getFailedAt())
+                .cancelledAt(delivery.getCancelledAt())
                 .requiresRefrigeration(delivery.isRequiresRefrigeration())
                 .requiresAssembly(delivery.isRequiresAssembly())
                 .requiresIDCheck(delivery.isRequiresIDCheck())
@@ -140,7 +181,7 @@ public final class DeliveryPersistenceMapper {
                 .parcel(parcel)
                 .senderId(e.getSenderId())
                 .deliveryPersonId(e.getDeliveryPersonId())
-                .trackingCode(e.getTrackingCode())
+                .legacyTrackingCode(e.getTrackingCode())
                 .pickupAddress(pickup)
                 .deliveryAddress(dest)
                 .recipient(recip)
@@ -149,6 +190,12 @@ public final class DeliveryPersistenceMapper {
                 .estimatedCost(estCost)
                 .estimatedDistanceKm(e.getEstimatedDistanceKm() != null ? e.getEstimatedDistanceKm() : 0.0)
                 .currentEta(eta)
+                .agreedAmount(e.getAgreedAmount())
+                .agreedCurrency(e.getAgreedCurrency())
+                .pickupWindowStart(e.getPickupWindowStart())
+                .pickupWindowEnd(e.getPickupWindowEnd())
+                .deliveryWindowStart(e.getDeliveryWindowStart())
+                .deliveryWindowEnd(e.getDeliveryWindowEnd())
                 .scheduledPickupTime(e.getScheduledPickupTime())
                 .estimatedDeliveryTime(e.getEstimatedDeliveryTime())
                 .actualPickupTime(e.getActualPickupTime())
@@ -166,7 +213,39 @@ public final class DeliveryPersistenceMapper {
                         ? FreelancerRole.valueOf(e.getAssignedFreelancerRole()) : null)
                 .selectedVehicleId(e.getSelectedVehicleId())
                 .activeEquipmentIds(deserializeList(e.getActiveEquipmentIdsJson()))
-                .deliveryAttemptNumber(e.getDeliveryAttemptNumber())
+                .attemptCount(e.getDeliveryAttemptNumber())
+                .kind(e.getKind() != null ? DeliveryKind.valueOf(e.getKind()) : DeliveryKind.OUTBOUND)
+                .parentDeliveryId(e.getParentDeliveryId())
+                .maxAttempts(e.getMaxAttempts() != null ? e.getMaxAttempts() : Delivery.DEFAULT_MAX_ATTEMPTS)
+                .failureReason(e.getFailureReason() != null ? DeliveryFailureReason.valueOf(e.getFailureReason()) : null)
+                .lastAttemptReason(e.getLastAttemptReason() != null
+                        ? DeliveryFailureReason.valueOf(e.getLastAttemptReason()) : null)
+                .cancellationReason(e.getCancellationReason())
+                .responsibleParty(e.getResponsibleParty() != null
+                        ? ResponsibleParty.valueOf(e.getResponsibleParty()) : null)
+                .returnCostPayer(e.getReturnCostPayer() != null ? ResponsibleParty.valueOf(e.getReturnCostPayer()) : null)
+                .relayHubId(e.getRelayHubId())
+                .destinationHubId(e.getDestinationHubId())
+                .hubPackageEntryId(e.getHubPackageEntryId())
+                .relayDepositedAt(e.getRelayDepositedAt())
+                .requestedStorageDays(e.getRequestedStorageDays())
+                .relayStorageDays(e.getRelayStorageDays())
+                .relayStorageExpiresAt(e.getRelayStorageExpiresAt())
+                .storageReminderAt(e.getStorageReminderAt())
+                .storageReminderSentAt(e.getStorageReminderSentAt())
+                .late(Boolean.TRUE.equals(e.getLate()))
+                .lateSince(e.getLateSince())
+                .lastAlertType(e.getLastAlertType())
+                .activeAlerts(e.getActiveAlerts())
+                .lastPositionAt(e.getLastPositionAt())
+                .returnGuaranteeStatus(e.getReturnGuaranteeStatus() == null ? null
+                        : com.yowyob.tiibntick.core.delivery.domain.model.enums.ReturnGuaranteeStatus.valueOf(
+                                e.getReturnGuaranteeStatus()))
+                .returnGuaranteeReason(e.getReturnGuaranteeReason())
+                .legStartLatitude(e.getLegStartLatitude())
+                .legStartLongitude(e.getLegStartLongitude())
+                .failedAt(e.getFailedAt())
+                .cancelledAt(e.getCancelledAt())
                 .requiresRefrigeration(e.isRequiresRefrigeration())
                 .requiresAssembly(e.isRequiresAssembly())
                 .requiresIDCheck(e.isRequiresIDCheck())
@@ -175,6 +254,10 @@ public final class DeliveryPersistenceMapper {
                 .updatedAt(e.getUpdatedAt())
                 .version(e.getVersion())
                 .build();
+    }
+
+    private static String name(Enum<?> value) {
+        return value == null ? null : value.name();
     }
 
     private static GeoCoordinates coords(Double lat, Double lon) {

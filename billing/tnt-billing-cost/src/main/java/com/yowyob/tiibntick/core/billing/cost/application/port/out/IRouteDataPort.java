@@ -13,30 +13,30 @@ public interface IRouteDataPort {
 
     /**
      * Fetches the total arc distance for a mission route.
-     * @param missionId mission identifier
+     * @param deliveryId mission identifier
      * @return distance in kilometres
      */
-    Mono<Double> getRouteDistanceKm(String missionId);
+    Mono<Double> getRouteDistanceKm(String deliveryId);
 
     /**
      * Fetches the estimated travel duration for a mission route.
-     * @param missionId mission identifier
+     * @param deliveryId mission identifier
      * @return duration in minutes
      */
-    Mono<Integer> getRouteDurationMin(String missionId);
+    Mono<Integer> getRouteDurationMin(String deliveryId);
 
     /**
      * Fetches the dominant road type for the mission route.
-     * @param missionId mission identifier
+     * @param deliveryId mission identifier
      * @return RoadType
      */
-    Mono<RoadType> getDominantRoadType(String missionId);
+    Mono<RoadType> getDominantRoadType(String deliveryId);
 
     /**
      * Fetches the current or forecast weather condition for a mission.
-     * @param missionId mission identifier
+     * @param deliveryId mission identifier
      * @param tenantId  tenant context (for geo-fencing)
      * @return WeatherCondition
      */
-    Mono<WeatherCondition> getWeatherCondition(String missionId, UUID tenantId);
+    Mono<WeatherCondition> getWeatherCondition(String deliveryId, UUID tenantId);
 }

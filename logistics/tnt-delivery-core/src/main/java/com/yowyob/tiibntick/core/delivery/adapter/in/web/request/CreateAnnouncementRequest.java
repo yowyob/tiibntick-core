@@ -3,10 +3,12 @@ package com.yowyob.tiibntick.core.delivery.adapter.in.web.request;
 import com.yowyob.tiibntick.core.delivery.application.port.in.command.CreateDeliveryAnnouncementCommand;
 import com.yowyob.tiibntick.core.delivery.domain.model.enums.AnnouncementPricingMode;
 import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryUrgency;
+import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.AnnouncementDetails;
 import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.DeliveryAddress;
 import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.GeoCoordinates;
 import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.PackageSpecification;
 import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.RecipientInfo;
+import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.SenderInfo;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -59,7 +61,23 @@ public record CreateAnnouncementRequest(
         @NotBlank String recipientPhone,
         String recipientAltPhone,
 
-        @NotNull DeliveryUrgency urgency
+        @NotNull DeliveryUrgency urgency,
+
+        // Optional complements (all nullable; absent = not specified)
+        String recipientEmail,
+        String senderName,
+        String senderPhone,
+        String senderEmail,
+        String requiredVehicleType,
+        String paymentMethod,
+        String transportMethod,
+        BigDecimal distanceKm,
+        Integer estimatedDurationMin,
+        UUID destinationHubId,
+        String handoverSignatureRef,
+        BigDecimal serviceFee,
+        String originRefType,
+        UUID originRefId
 ) {
 
     public CreateDeliveryAnnouncementCommand toCommand(UUID tenantId) {
@@ -74,12 +92,16 @@ public record CreateAnnouncementRequest(
                 deliveryDistrict, deliveryCity, "CM",
                 new GeoCoordinates(deliveryLatitude, deliveryLongitude));
 
-        RecipientInfo recipient = new RecipientInfo(recipientName, recipientPhone, recipientAltPhone);
+        RecipientInfo recipient = new RecipientInfo(recipientName, recipientPhone, recipientAltPhone, recipientEmail);
 
         AnnouncementPricingMode mode = pricingMode != null
                 ? pricingMode : AnnouncementPricingMode.FIXED_PRICE;
 
         return new CreateDeliveryAnnouncementCommand(tenantId, clientId, title, description,
-                offeredAmount, currency, mode, spec, pickup, delivery, recipient, urgency);
+                offeredAmount, currency, mode, spec, pickup, delivery, recipient, urgency, null,
+                new SenderInfo(senderName, senderPhone, senderEmail),
+                new AnnouncementDetails(requiredVehicleType, paymentMethod, transportMethod, distanceKm,
+                        estimatedDurationMin, destinationHubId, handoverSignatureRef, serviceFee,
+                        originRefType, originRefId));
     }
 }

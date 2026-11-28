@@ -199,5 +199,21 @@ public enum NotificationType {
      * Recipients: The client (SENDER or payer).
      * Channels: Push (optional — configurable via preferences).
      */
-    SURCHARGE_TRIGGERED
+    SURCHARGE_TRIGGERED,
+
+    // ── Marketplace domain (announcements and offers) ─────────────────────────
+
+    /**
+     * A published announcement matches the position and profile of a deliverer.
+     * Recipients: the eligible deliverers.
+     * Channels: Push + Email + in-app. Texts: i18n catalog, language of the recipient's account.
+     */
+    ANNOUNCEMENT_MATCHED,
+
+    /**
+     * A deliverer answered an announcement (offer, quote request or acceptance).
+     * Recipients: the announcement's owner.
+     * Channels: Push + in-app. Texts: i18n catalog, language of the recipient's account.
+     */
+    RESPONSE_RECEIVED
 }

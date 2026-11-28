@@ -13,20 +13,29 @@ import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.Announcem
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.AnnouncementSnapshot;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.PublishAnnouncementPortCommand;
 import com.yowyob.tiibntick.core.gofreelancer.application.usecase.MatchingUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.testsupport.InMemoryAnnouncementPort;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.AnnouncementExtras;
 import com.yowyob.tiibntick.core.gofreelancer.config.GofpDeliveryOtpProperties;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.Announcement;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.DeliveryNeed;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpFreelancer;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.announcement.AnnouncementStatus;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.AnnouncementStatus;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.deliveryNeed.DeliveryNeedStatus;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.freelancer.FreelancerStatus;
+import com.yowyob.tiibntick.core.geo.domain.exception.GeoNotFoundException;
+import com.yowyob.tiibntick.core.geo.domain.model.HubApprovalStatus;
+import com.yowyob.tiibntick.core.geo.domain.model.HubStatus;
+import com.yowyob.tiibntick.core.geo.domain.model.RelayHub;
+import com.yowyob.tiibntick.core.geo.domain.model.RoadNodeId;
+import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpRelayPoint;
+import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.relaypoint.RelayPointStatus;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.springframework.web.server.ResponseStatusException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.r2dbc.core.DatabaseClient;
-import org.springframework.r2dbc.core.RowsFetchSpec;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
@@ -48,8 +57,9 @@ import static org.mockito.Mockito.*;
  * restent un seul état de vérité.
  *
  * <p>Vrais {@link DeliveryNeedApplicationService}, {@link AnnouncementApplicationService} et
- * {@link NeedAnnouncementService} ; le port vers tnt-delivery-core et les dépôts sont simulés
- * (le miroir local d'annonce est un dépôt en mémoire, pour que le lien besoin → annonce soit relu).
+ * {@link NeedAnnouncementService} et {@link DeliveryNeedStateService} ; tnt-delivery-core est un
+ * port en mémoire ({@link InMemoryAnnouncementPort}) : l'annonce du core est le seul état, le lien
+ * besoin → annonce est sa référence d'origine, et le statut du besoin en est dérivé.
  */
 @DisplayName("Un besoin Go publie son annonce")
 class NeedAnnouncementLinkTest {
@@ -63,17 +73,18 @@ class NeedAnnouncementLinkTest {
     /** gofp_freelancers.id of the responder (the response carries its core freelancer id). */
     private final UUID gofpFreelancerId = UUID.randomUUID();
 
-    private final IDeliveryAnnouncementPort port = mock(IDeliveryAnnouncementPort.class);
+    private InMemoryAnnouncementPort port;
     private final TenantContextHolder tenant = mock(TenantContextHolder.class);
     private final IDeliveryNeedRepository needs = mock(IDeliveryNeedRepository.class);
     private final AddressUseCase addressUseCase = mock(AddressUseCase.class);
     private final GofpFreelancerRepository freelancers = mock(GofpFreelancerRepository.class);
     private final DeliveryRepository deliveries = mock(DeliveryRepository.class);
+    private final com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryLifecyclePort lifecycle =
+            mock(com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryLifecyclePort.class);
     private final DeliveryOtpService deliveryOtp = mock(DeliveryOtpService.class);
 
-    /** Miroir local des annonces, en mémoire. */
-    private final Map<UUID, Announcement> mirror = new HashMap<>();
     private final Map<UUID, DeliveryNeed> needStore = new HashMap<>();
+    private DeliveryNeedStateService state;
 
     private final FreelancerPriceQuoteUseCase quotes = mock(FreelancerPriceQuoteUseCase.class);
 
@@ -82,42 +93,41 @@ class NeedAnnouncementLinkTest {
 
     @BeforeEach
     void setUp() {
-        IAnnouncementRepository mirrorRepo = mock(IAnnouncementRepository.class);
-        when(mirrorRepo.save(any())).thenAnswer(inv -> {
-            Announcement a = inv.getArgument(0);
-            mirror.put(a.getId(), a);
-            return Mono.just(a);
-        });
-        when(mirrorRepo.findById(any(UUID.class))).thenAnswer(inv -> Mono.justOrEmpty(mirror.get(inv.getArgument(0))));
-        when(mirrorRepo.findByDeliveryNeedId(any())).thenAnswer(inv -> Mono.justOrEmpty(mirror.values().stream()
-                .filter(a -> inv.getArgument(0).equals(a.getDeliveryNeedId())).findFirst()));
+        port = spy(new InMemoryAnnouncementPort().nextAnnouncementId(announcementId).nextDeliveryId(deliveryId)
+                .nextResponseId(responseId));
+        when(lifecycle.findState(any(), any())).thenReturn(Mono.empty());
+        state = new DeliveryNeedStateService(port, lifecycle, tenant);
 
         when(needs.save(any())).thenAnswer(inv -> {
             DeliveryNeed n = inv.getArgument(0);
             needStore.put(n.getId(), n);
-            return Mono.just(n);
+            return state.hydrate(n);
         });
-        when(needs.findById(any(UUID.class))).thenAnswer(inv -> Mono.justOrEmpty(needStore.get(inv.getArgument(0))));
+        when(needs.findById(any(UUID.class))).thenAnswer(inv -> Mono.justOrEmpty(needStore.get(inv.getArgument(0)))
+                .flatMap(state::hydrate));
         when(needs.deleteById(any(UUID.class))).thenReturn(Mono.empty());
         when(tenant.currentTenantId()).thenReturn(Mono.just(tenantId));
 
-        NeedAnnouncementService link = new NeedAnnouncementService(port, tenant, mirrorRepo, needs, freelancers);
+        NeedAnnouncementService link = new NeedAnnouncementService(port, tenant);
 
         GofpUserRepository users = mock(GofpUserRepository.class);
         when(users.findByCoreUserId(any())).thenReturn(Mono.empty());
         needService = new DeliveryNeedApplicationService(
                 needs, mock(AdminRelayPointUseCase.class), mock(PushNotificationPort.class),
                 mock(MatchingUseCase.class), addressUseCase, users,
-                freelancers, quotes, mock(FreelancerEligibilityUseCase.class),
-                legacyUserExists());
+                freelancers, quotes, mock(FreelancerEligibilityUseCase.class));
         needService.setNeedAnnouncements(link);
 
         announcementService = new AnnouncementApplicationService(
                 port, tenant, mock(FreelancerQuotaService.class),
-                mock(INegotiationChatPort.class), mirrorRepo, mock(AnnouncementSubscriptionRepository.class),
+                mock(INegotiationChatPort.class),
                 freelancers, mock(GofpUserRepository.class), deliveries, deliveryOtp,
-                mock(GofpDeliveryOtpProperties.class));
-        announcementService.setNeedAnnouncements(link);
+                mock(GofpDeliveryOtpProperties.class), lifecycle);
+        // The agreed price and windows are recorded on the core delivery (lot L1).
+        com.yowyob.tiibntick.core.gofreelancer.TestDeliveries.acceptTerms(lifecycle);
+        when(lifecycle.recordAgreedTerms(any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenAnswer(inv -> Mono.just(new com.yowyob.tiibntick.core.gofreelancer.application.port.out
+                        .IDeliveryLifecyclePort.CoreDeliveryState(inv.getArgument(1), "CREATED", null, null, null, null)));
         needService.setAnnouncements(announcementService);
 
         when(addressUseCase.createAddress(any())).thenAnswer(inv -> {
@@ -125,13 +135,6 @@ class NeedAnnouncementLinkTest {
             return Mono.just(AddressDTO.builder().id(UUID.randomUUID()).address(in.getAddress()).build());
         });
         when(addressUseCase.getAddressById(any())).thenReturn(Mono.empty());
-        when(port.publish(any())).thenAnswer(inv -> {
-            PublishAnnouncementPortCommand c = inv.getArgument(0);
-            return Mono.just(snapshot(c.clientId(), c.pricingMode(), null, null, List.of()));
-        });
-        when(port.cancel(any(), any(), any())).thenReturn(Mono.empty());
-        when(port.findById(eq(tenantId), eq(announcementId))).thenAnswer(inv -> Mono.just(
-                snapshot(ownerId, "QUOTE_REQUEST", null, null, List.of(response()))));
         when(deliveries.findById(any(UUID.class))).thenReturn(Mono.empty());
         when(deliveries.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
         when(deliveryOtp.initOtpIfAbsentWithCodes(any())).thenReturn(Mono.empty());
@@ -139,36 +142,9 @@ class NeedAnnouncementLinkTest {
         when(freelancers.findByCoreFreelancerId(any())).thenReturn(Mono.empty());
     }
 
-    /** Table historique {@code users} simulée : la lecture et l'INSERT idempotent réussissent. */
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private static DatabaseClient legacyUserExists() {
-        DatabaseClient db = mock(DatabaseClient.class);
-        DatabaseClient.GenericExecuteSpec spec = mock(DatabaseClient.GenericExecuteSpec.class);
-        RowsFetchSpec rows = mock(RowsFetchSpec.class);
-        org.springframework.r2dbc.core.FetchSpec fetch = mock(org.springframework.r2dbc.core.FetchSpec.class);
-        when(db.sql(anyString())).thenReturn(spec);
-        when(spec.bind(anyString(), any())).thenReturn(spec);
-        when(spec.map(any(java.util.function.BiFunction.class))).thenReturn(rows);
-        when(rows.first()).thenReturn(Mono.just(1));
-        when(spec.fetch()).thenReturn(fetch);
-        when(fetch.rowsUpdated()).thenReturn(Mono.just(1L));
-        return db;
-    }
-
     private AnnouncementResponseSnapshot response() {
         return new AnnouncementResponseSnapshot(responseId, freelancerId, new BigDecimal("2500"), "XAF",
                 "SENT", Instant.now());
-    }
-
-    private AnnouncementSnapshot snapshot(UUID clientId, String pricingMode, UUID selected, UUID createdDelivery,
-                                          List<AnnouncementResponseSnapshot> responses) {
-        return new AnnouncementSnapshot(
-                announcementId, tenantId, clientId, "Colis", "desc",
-                selected != null ? AnnouncementStatus.ASSIGNED : AnnouncementStatus.PUBLISHED,
-                Instant.now(), Instant.now(), null, "XAF", pricingMode,
-                pickupAddress(), dropAddress(), 0.0,
-                null, null, null, null, null, null, null, null,
-                "Destinataire", "+237600000000", selected, createdDelivery, null, responses);
     }
 
     private static Address pickupAddress() {
@@ -210,12 +186,119 @@ class NeedAnnouncementLinkTest {
         assertThat(cmd.getValue().pickupAddress().getCoordinates()).isNotNull();
         assertThat(cmd.getValue().deliveryAddress().getLandmark()).contains("Carrefour Ndokoti");
 
-        Announcement local = mirror.get(announcementId);
-        assertThat(local).as("miroir local de l'annonce").isNotNull();
-        assertThat(local.getDeliveryNeedId()).isEqualTo(created.getId());
-        assertThat(local.getStatus()).isEqualTo(AnnouncementStatus.PUBLISHED);
-        assertThat(local.getPaymentMethod()).isEqualTo("CASH");
+        AnnouncementSnapshot published = port.get(announcementId);
+        assertThat(published.extras().originRefType()).isEqualTo(AnnouncementExtras.ORIGIN_DELIVERY_NEED);
+        assertThat(published.extras().originRefId()).as("référence d'origine = le besoin").isEqualTo(created.getId());
+        assertThat(published.status()).isEqualTo(AnnouncementStatus.PUBLISHED);
+        assertThat(published.extras().paymentMethod()).isEqualTo("CASH");
         assertThat(created.getAnnouncementId()).isEqualTo(announcementId);
+        assertThat(needStore.get(created.getId()).getAnnouncementId()).as("pointeur dénormalisé").isEqualTo(announcementId);
+        assertThat(created.getStatus()).isEqualTo(DeliveryNeedStatus.PENDING);
+    }
+
+    // ── destination relais (D-140, D-144) ──────────────────────────────────
+
+    private final GofpRelayPointRepository targetRelays = mock(GofpRelayPointRepository.class);
+    private final IRelayHubPort targetHubs = mock(IRelayHubPort.class);
+
+    private UUID wireTarget(RelayPointStatus relayStatus, boolean active, HubApprovalStatus approval, HubStatus hubStatus) {
+        return wireTarget(relayStatus, active, approval, hubStatus, 0);
+    }
+
+    private UUID wireTarget(RelayPointStatus relayStatus, boolean active, HubApprovalStatus approval, HubStatus hubStatus,
+                            int occupancy) {
+        UUID hubId = UUID.randomUUID();
+        when(targetRelays.findById(any())).thenReturn(Mono.empty());
+        when(targetRelays.findByCoreRelayPointId(any())).thenReturn(Mono.empty());
+        when(targetHubs.findHub(any(), any())).thenReturn(Mono.error(new GeoNotFoundException("RelayHub", "x")));
+        if (relayStatus != null) {
+            GofpRelayPoint rp = GofpRelayPoint.builder().id(UUID.randomUUID()).coreRelayPointId(hubId)
+                    .status(relayStatus).isActive(active).build();
+            when(targetRelays.findById(rp.getId())).thenReturn(Mono.just(rp));
+            when(targetRelays.findByCoreRelayPointId(hubId)).thenReturn(Mono.just(rp));
+        }
+        if (approval != null) {
+            Instant t = Instant.now();
+            when(targetHubs.findHub(eq(hubId), any())).thenReturn(Mono.just(RelayHub.rehydrate(hubId, tenantId, null,
+                    RoadNodeId.generate(), 4, occupancy, "op", hubStatus, approval, t, t, null, null, null)));
+        }
+        needService.setRelayPoints(targetRelays);
+        needService.setRelayHubs(targetHubs);
+        return hubId;
+    }
+
+    private void expectStatus(UUID target, int status) {
+        var r = request();
+        r.setTargetRelayPointId(target);
+        StepVerifier.create(needService.createDeliveryNeed(r, ownerId))
+                .expectErrorMatches(e -> e instanceof ResponseStatusException rse && rse.getStatusCode().value() == status)
+                .verify();
+        verify(port, never()).publish(any());
+        assertThat(needStore).isEmpty();
+    }
+
+    @ParameterizedTest(name = "relais Go {0} → 409, rien de créé")
+    @EnumSource(value = RelayPointStatus.class, names = "APPROVED", mode = EnumSource.Mode.EXCLUDE)
+    @DisplayName("D-140 : un relais Go non agréé n'est pas une destination")
+    void notApprovedRelayIsNoDestination(RelayPointStatus status) {
+        UUID hubId = wireTarget(status, true, HubApprovalStatus.APPROVED, HubStatus.ACTIVE);
+        expectStatus(hubId, 409);
+    }
+
+    @ParameterizedTest(name = "hub du cœur {0} → 409")
+    @EnumSource(value = HubApprovalStatus.class, names = "APPROVED", mode = EnumSource.Mode.EXCLUDE)
+    @DisplayName("D-144 : le registre du cœur fait foi, un hub non agréé est refusé même si le relais Go se dit agréé")
+    void notApprovedCoreHubIsNoDestination(HubApprovalStatus approval) {
+        UUID hubId = wireTarget(RelayPointStatus.APPROVED, true, approval, HubStatus.ACTIVE);
+        expectStatus(hubId, 409);
+    }
+
+    @ParameterizedTest(name = "hub {0} → 409")
+    @EnumSource(value = HubStatus.class, names = {"TEMPORARILY_CLOSED", "PERMANENTLY_CLOSED"})
+    @DisplayName("D-144 : un hub fermé n'est pas une destination")
+    void closedHubIsNoDestination(HubStatus closed) {
+        UUID hubId = wireTarget(RelayPointStatus.APPROVED, true, HubApprovalStatus.APPROVED, closed);
+        expectStatus(hubId, 409);
+    }
+
+    @Test
+    @DisplayName("D-144 : destination inconnue du registre → 404 (cible inconnue, ou relais Go sans hub du cœur)")
+    void unknownDestinationIs404() {
+        wireTarget(null, true, null, null);
+        expectStatus(UUID.randomUUID(), 404);
+        UUID relayHub = wireTarget(RelayPointStatus.APPROVED, true, null, null);
+        expectStatus(relayHub, 404);
+    }
+
+    @Test
+    @DisplayName("D-140 : un relais en pause (fermé par son propriétaire) → 409")
+    void pausedRelayIsNoDestination() {
+        UUID hubId = wireTarget(RelayPointStatus.APPROVED, false, HubApprovalStatus.APPROVED, HubStatus.ACTIVE);
+        expectStatus(hubId, 409);
+    }
+
+    @Test
+    @DisplayName("D-146 : un relais plein (statut FULL, ou plus aucune place) n'est pas une destination → 409")
+    void fullHubIsNoDestination() {
+        UUID full = wireTarget(RelayPointStatus.APPROVED, true, HubApprovalStatus.APPROVED, HubStatus.FULL, 4);
+        expectStatus(full, 409);
+        UUID noSlotLeft = wireTarget(RelayPointStatus.APPROVED, true, HubApprovalStatus.APPROVED, HubStatus.ACTIVE, 4);
+        expectStatus(noSlotLeft, 409);
+        UUID lastSlot = wireTarget(RelayPointStatus.APPROVED, true, HubApprovalStatus.APPROVED, HubStatus.ACTIVE, 3);
+        StepVerifier.create(needService.requireProposableTarget(lastSlot)).as("une place libre suffit").verifyComplete();
+    }
+
+    @Test
+    @DisplayName("D-144 : hub agréé et ouvert, désigné par le relais Go ou directement : destination acceptée")
+    void approvedDestinationsAreAccepted() {
+        UUID hubId = wireTarget(RelayPointStatus.APPROVED, true, HubApprovalStatus.APPROVED, HubStatus.ACTIVE);
+        var r = request();
+        r.setTargetRelayPointId(hubId);
+        var created = needService.createDeliveryNeed(r, ownerId).block();
+        assertThat(needStore.get(created.getId()).getTargetRelayPointId()).isEqualTo(hubId);
+
+        UUID bareHub = wireTarget(null, true, HubApprovalStatus.APPROVED, HubStatus.ACTIVE);
+        StepVerifier.create(needService.requireProposableTarget(bareHub)).verifyComplete();
     }
 
     @Test
@@ -238,9 +321,9 @@ class NeedAnnouncementLinkTest {
         assertThat(saved.getSenderFirstName()).isEqualTo("Awa Expéditrice");
         assertThat(saved.getRecipientPhone()).isEqualTo("+237677000001");
         assertThat(created.getSenderPhone()).as("relu par l'expéditeur").isEqualTo("+237690000416");
-        Announcement local = mirror.get(announcementId);
-        assertThat(local.getShipperFirstName()).as("vu par le livreur").isEqualTo("Awa Expéditrice");
-        assertThat(local.getRecipientPhone()).isEqualTo("+237677000001");
+        // The courier reads the core announcement (no local mirror any more): the sender contact travels in it.
+        assertThat(cmd.getValue().extras().senderName()).as("vu par le livreur").isEqualTo("Awa Expéditrice");
+        assertThat(cmd.getValue().extras().senderPhone()).isEqualTo("+237690000416");
     }
 
     @Test
@@ -252,6 +335,8 @@ class NeedAnnouncementLinkTest {
         verify(port).publish(cmd.capture());
         assertThat(cmd.getValue().recipientName()).isEqualTo("—");
         assertThat(cmd.getValue().recipientPhone()).isEqualTo("—");
+        assertThat(cmd.getValue().extras().senderName()).as("no sender contact invented").isNull();
+        assertThat(cmd.getValue().extras().senderPhone()).isNull();
     }
 
     @Test
@@ -264,52 +349,89 @@ class NeedAnnouncementLinkTest {
                 .verify();
     }
 
+    @Test
+    @DisplayName("L2 : republier un besoin déjà publié rend son annonce (aucune seconde publication, pas de 500)")
+    void republishing_isIdempotent() {
+        var created = needService.createDeliveryNeed(request(), ownerId).block();
+        NeedAnnouncementService link = new NeedAnnouncementService(port, tenant);
+
+        StepVerifier.create(link.publishFor(needStore.get(created.getId()), pickupAddress(), dropAddress(), null))
+                .expectNext(announcementId)
+                .verifyComplete();
+        verify(port, times(1)).publish(any());
+        assertThat(port.all()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("L2 : publication concurrente perdue sur l'index unique → l'annonce gagnante est relue")
+    void concurrentPublication_lostOnUniqueIndex_readsTheWinner() {
+        var created = needService.createDeliveryNeed(request(), ownerId).block();
+        // The concurrent request did not see the announcement yet; the core refuses the duplicate.
+        doReturn(Mono.empty()).doCallRealMethod().when(port).findByOrigin(any(), any(), any());
+        NeedAnnouncementService link = new NeedAnnouncementService(port, tenant);
+
+        StepVerifier.create(link.publishFor(needStore.get(created.getId()), pickupAddress(), dropAddress(), null))
+                .expectNext(announcementId)
+                .verifyComplete();
+        verify(port, times(2)).publish(any());
+        assertThat(port.all()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("L2 : autre échec de publication → l'erreur remonte telle quelle")
+    void otherPublicationFailure_propagates() {
+        var created = needService.createDeliveryNeed(request(), ownerId).block();
+        doReturn(Mono.empty()).when(port).findByOrigin(any(), any(), any());
+        doReturn(Mono.error(new IllegalStateException("delivery-core down"))).when(port).publish(any());
+        NeedAnnouncementService link = new NeedAnnouncementService(port, tenant);
+
+        StepVerifier.create(link.publishFor(needStore.get(created.getId()), pickupAddress(), dropAddress(), null))
+                .expectErrorMessage("delivery-core down")
+                .verify();
+    }
+
     // ── assignation par l'annonce ───────────────────────────────────────────
 
     @Test
     @DisplayName("l'expéditeur retient une réponse → le besoin passe ASSIGNED au même livreur, livraison rattachée au besoin")
     void assigningViaAnnouncement_assignsTheNeed() {
         UUID needId = createNeed();
-        when(port.selectResponse(tenantId, announcementId, ownerId, responseId)).thenReturn(Mono.just(
-                snapshot(ownerId, "QUOTE_REQUEST", responseId, deliveryId, List.of(response()))));
-        mirror.get(announcementId).setPaymentMethod("CASH");
-        when(freelancers.findByCoreFreelancerId(freelancerId)).thenReturn(Mono.just(GofpFreelancer.builder()
-                .id(gofpFreelancerId).coreFreelancerId(freelancerId).build()));
+        port.addResponse(announcementId, response());
 
         StepVerifier.create(announcementService.assignResponse(announcementId, ownerId, responseId))
                 .expectNextCount(1)
                 .verifyComplete();
 
-        DeliveryNeed need = needStore.get(needId);
-        assertThat(need.getStatus()).isEqualTo(DeliveryNeedStatus.ASSIGNED);
+        DeliveryNeed need = needs.findById(needId).block();
+        assertThat(need.getStatus()).as("dérivé : annonce ASSIGNED, livraison inconnue").isEqualTo(DeliveryNeedStatus.ASSIGNED);
         assertThat(need.getAssignedFreelancerId())
-                .as("translated to gofp_freelancers.id (FK of delivery_needs.assigned_freelancer_id)")
-                .isEqualTo(gofpFreelancerId);
+                .as("dérivé : id core du livreur dont la réponse est retenue")
+                .isEqualTo(freelancerId);
+        assertThat(need.getDeliveryId()).isEqualTo(deliveryId);
 
         ArgumentCaptor<Delivery> mirrored = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveries).save(mirrored.capture());
         assertThat(mirrored.getValue().getDeliveryNeedId())
                 .as("la livraison reste rattachée au besoin → le paiement lit le mode du besoin")
                 .isEqualTo(needId);
-        assertThat(mirrored.getValue().getTarif())
-                .as("tarif = prix proposé retenu : c'est le montant que DeliveryPaymentApplicationService fera payer")
-                .isEqualTo(2500.0);
+        assertThat(agreedPrice())
+                .as("tarif = prix proposé retenu, enregistré sur la livraison du core : c'est le montant que DeliveryPaymentApplicationService fera payer")
+                .isEqualByComparingTo("2500");
     }
 
     @Test
-    @DisplayName("répondant sans ligne gofp_freelancers → besoin ASSIGNED sans id (jamais une valeur hors clé étrangère)")
-    void assigningViaAnnouncement_unknownGofpFreelancer_keepsFkClean() {
+    @DisplayName("aucun statut n'est écrit sur le besoin : l'élection ne réenregistre pas le besoin")
+    void assigningViaAnnouncement_writesNothingOnTheNeed() {
         UUID needId = createNeed();
-        when(port.selectResponse(tenantId, announcementId, ownerId, responseId)).thenReturn(Mono.just(
-                snapshot(ownerId, "QUOTE_REQUEST", responseId, deliveryId, List.of(response()))));
+        port.addResponse(announcementId, response());
+        clearInvocations(needs);
 
         StepVerifier.create(announcementService.assignResponse(announcementId, ownerId, responseId))
                 .expectNextCount(1)
                 .verifyComplete();
 
-        DeliveryNeed need = needStore.get(needId);
-        assertThat(need.getStatus()).isEqualTo(DeliveryNeedStatus.ASSIGNED);
-        assertThat(need.getAssignedFreelancerId()).isNull();
+        verify(needs, never()).save(any());
+        assertThat(needs.findById(needId).block().getStatus()).isEqualTo(DeliveryNeedStatus.ASSIGNED);
     }
 
     // ── retrait de l'annonce ────────────────────────────────────────────────
@@ -322,7 +444,7 @@ class NeedAnnouncementLinkTest {
         needService.deleteDeliveryNeed(needId, ownerId).block();
 
         verify(port).cancel(tenantId, announcementId, ownerId);
-        assertThat(mirror.get(announcementId).getStatus()).isEqualTo(AnnouncementStatus.CANCELLED);
+        assertThat(port.get(announcementId).status()).isEqualTo(AnnouncementStatus.CANCELLED);
     }
 
     // ── assignation directe (lot C-46) : elle passe par l'annonce → livraison payable ─────────
@@ -342,16 +464,7 @@ class NeedAnnouncementLinkTest {
 
     /** L'annonce n'a encore aucune réponse ; respond l'ajoute ; selectResponse crée la livraison. */
     private void openAnnouncementWithoutResponse() {
-        java.util.concurrent.atomic.AtomicBoolean responded = new java.util.concurrent.atomic.AtomicBoolean();
-        when(port.findById(eq(tenantId), eq(announcementId))).thenAnswer(inv -> Mono.just(
-                snapshot(ownerId, "QUOTE_REQUEST", null, null,
-                        responded.get() ? List.of(responseAt("3000")) : List.of())));
-        when(port.respond(any())).thenAnswer(inv -> {
-            responded.set(true);
-            return Mono.just(snapshot(ownerId, "QUOTE_REQUEST", null, null, List.of(responseAt("3000"))));
-        });
-        when(port.selectResponse(tenantId, announcementId, ownerId, responseId)).thenReturn(Mono.just(
-                snapshot(ownerId, "QUOTE_REQUEST", responseId, deliveryId, List.of(responseAt("3000")))));
+        assertThat(port.get(announcementId).responses()).isEmpty();
     }
 
     private void serverQuote(double price) {
@@ -413,9 +526,10 @@ class NeedAnnouncementLinkTest {
         ArgumentCaptor<Delivery> created = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveries).save(created.capture());
         assertThat(created.getValue().getDeliveryNeedId()).isEqualTo(needId);
-        assertThat(created.getValue().getTarif()).isEqualTo(3000.0);
-        assertThat(needStore.get(needId).getStatus()).isEqualTo(DeliveryNeedStatus.ASSIGNED);
-        assertThat(needStore.get(needId).getAssignedFreelancerId()).isEqualTo(gofpFreelancerId);
+        assertThat(agreedPrice()).isEqualByComparingTo("3000");
+        DeliveryNeed need = needs.findById(needId).block();
+        assertThat(need.getStatus()).isEqualTo(DeliveryNeedStatus.ASSIGNED);
+        assertThat(need.getAssignedFreelancerId()).as("id core du livreur").isEqualTo(freelancerId);
         verify(port, never()).cancel(any(), any(), any());
     }
 
@@ -448,7 +562,7 @@ class NeedAnnouncementLinkTest {
                 .verify();
         verify(port, never()).respond(any());
         verify(deliveries, never()).save(any());
-        assertThat(needStore.get(needId).getStatus()).isNotEqualTo(DeliveryNeedStatus.ASSIGNED);
+        assertThat(needs.findById(needId).block().getStatus()).isNotEqualTo(DeliveryNeedStatus.ASSIGNED);
     }
 
     @Test
@@ -456,8 +570,7 @@ class NeedAnnouncementLinkTest {
     void directAssignment_existingResponseAtOtherPrice_refused() {
         UUID needId = createNeed();
         assignableCourier();
-        when(port.findById(eq(tenantId), eq(announcementId))).thenAnswer(inv -> Mono.just(
-                snapshot(ownerId, "QUOTE_REQUEST", null, null, List.of(responseAt("500")))));
+        port.addResponse(announcementId, responseAt("500"));
         serverQuote(3000);
 
         StepVerifier.create(needService.assignFreelancer(needId, gofpFreelancerId, ownerId))
@@ -474,21 +587,20 @@ class NeedAnnouncementLinkTest {
     @DisplayName("annonce attribuée : son mode de paiement et son prix ne changent plus (409) ; avant, ils changent")
     void assignedAnnouncement_paymentFrozen() {
         createNeed();
-        Announcement local = mirror.get(announcementId);
         var toCash = new com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.AnnouncementRequestDTO();
         toCash.setPaymentMethod("WALLET");
 
         StepVerifier.create(announcementService.updateAnnouncement(announcementId, toCash)).expectNextCount(1).verifyComplete();
-        assertThat(local.getPaymentMethod()).isEqualTo("WALLET");
+        assertThat(port.get(announcementId).extras().paymentMethod()).isEqualTo("WALLET");
 
-        local.setStatus(AnnouncementStatus.ASSIGNED);
-        local.setAssignedFreelancerId(gofpFreelancerId);
+        port.addResponse(announcementId, response());
+        port.selectResponse(tenantId, announcementId, ownerId, responseId).block();
         toCash.setPaymentMethod("CASH");
         StepVerifier.create(announcementService.updateAnnouncement(announcementId, toCash))
                 .expectErrorMatches(e -> e instanceof org.springframework.web.server.ResponseStatusException r
                         && r.getStatusCode().value() == 409)
                 .verify();
-        assertThat(local.getPaymentMethod()).isEqualTo("WALLET");
+        assertThat(port.get(announcementId).extras().paymentMethod()).isEqualTo("WALLET");
     }
 
     // ── lot C-52 : invitation au lieu d'assignation forcée ──────────────────
@@ -508,7 +620,7 @@ class NeedAnnouncementLinkTest {
         verify(port, never()).respond(any());
         verify(port, never()).selectResponse(any(), any(), any(), any());
         verify(deliveries, never()).save(any());
-        assertThat(needStore.get(needId).getStatus()).isNotEqualTo(DeliveryNeedStatus.ASSIGNED);
+        assertThat(needs.findById(needId).block().getStatus()).isNotEqualTo(DeliveryNeedStatus.ASSIGNED);
     }
 
     @Test
@@ -516,16 +628,13 @@ class NeedAnnouncementLinkTest {
     void clientAssign_applicant_ok() {
         UUID needId = createNeed();
         assignableCourier();
-        when(port.findById(eq(tenantId), eq(announcementId))).thenAnswer(inv -> Mono.just(
-                snapshot(ownerId, "QUOTE_REQUEST", null, null, List.of(responseAt("3000")))));
-        when(port.selectResponse(tenantId, announcementId, ownerId, responseId)).thenReturn(Mono.just(
-                snapshot(ownerId, "QUOTE_REQUEST", responseId, deliveryId, List.of(responseAt("3000")))));
+        port.addResponse(announcementId, responseAt("3000"));
         serverQuote(3000);
 
         needService.assignFreelancer(needId, gofpFreelancerId, ownerId, false).block();
 
         verify(port).selectResponse(tenantId, announcementId, ownerId, responseId);
-        assertThat(needStore.get(needId).getStatus()).isEqualTo(DeliveryNeedStatus.ASSIGNED);
+        assertThat(needs.findById(needId).block().getStatus()).isEqualTo(DeliveryNeedStatus.ASSIGNED);
     }
 
     private final UUID courierUserId = UUID.randomUUID();
@@ -579,9 +688,10 @@ class NeedAnnouncementLinkTest {
         assertThat(created.getValue().getDeliveryNeedId())
                 .as("livraison rattachée au besoin → le paiement (portefeuille ou espèces) lit le mode du besoin")
                 .isEqualTo(needId);
-        assertThat(created.getValue().getTarif()).isEqualTo(3000.0);
-        assertThat(needStore.get(needId).getStatus()).isEqualTo(DeliveryNeedStatus.ASSIGNED);
+        assertThat(agreedPrice()).isEqualByComparingTo("3000");
+        assertThat(needs.findById(needId).block().getStatus()).isEqualTo(DeliveryNeedStatus.ASSIGNED);
         assertThat(needStore.get(needId).getPaymentMethod()).isEqualTo("CASH");
+        assertThat(port.get(announcementId).extras().paymentMethod()).isEqualTo("CASH");
         assertThat(store.get(invId).getStatus()).isEqualTo("ACCEPTED");
     }
 
@@ -598,10 +708,10 @@ class NeedAnnouncementLinkTest {
         invitationService(store).decline(invId, courierUserId, "pas dispo").block();
 
         assertThat(store.get(invId).getStatus()).isEqualTo("DECLINED");
-        assertThat(mirror.get(announcementId).getStatus()).isEqualTo(AnnouncementStatus.PUBLISHED);
+        assertThat(port.get(announcementId).status()).isEqualTo(AnnouncementStatus.PUBLISHED);
         verify(port, never()).cancel(any(), any(), any());
         verify(port, never()).selectResponse(any(), any(), any(), any());
-        assertThat(needStore.get(needId).getStatus()).isEqualTo(DeliveryNeedStatus.PENDING);
+        assertThat(needs.findById(needId).block().getStatus()).isEqualTo(DeliveryNeedStatus.PENDING);
     }
 
     @Test
@@ -622,5 +732,12 @@ class NeedAnnouncementLinkTest {
         needService.assignFreelancer(needId, gofpFreelancerId, ownerId, true).block();
 
         verify(deliveryOtp).initOtpIfAbsent(created);
+    }
+
+    /** The price recorded on the core delivery when the response was selected. */
+    private java.math.BigDecimal agreedPrice() {
+        ArgumentCaptor<java.math.BigDecimal> price = ArgumentCaptor.forClass(java.math.BigDecimal.class);
+        verify(lifecycle).recordAgreedTerms(eq(tenantId), any(), price.capture(), any(), any(), any(), any(), any());
+        return price.getValue();
     }
 }

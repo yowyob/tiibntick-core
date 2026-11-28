@@ -20,7 +20,7 @@ public interface DisputeCorePort {
     record OpenDisputeRequest(
             UUID tenantId,
             UUID agencyId,
-            UUID missionId,
+            UUID deliveryId,
             String claimType,
             String description,
             String contactEmail
@@ -42,7 +42,7 @@ public interface DisputeCorePort {
             String status,
             String category,
             String priority,
-            String missionId,
+            String deliveryId,
             String trackingCode,
             String description,
             LocalDateTime filedAt
@@ -56,7 +56,7 @@ public interface DisputeCorePort {
             String status,
             String category,
             String priority,
-            String missionId,
+            String deliveryId,
             String trackingCode,
             String description,
             String claimantId,

@@ -54,8 +54,33 @@ public class DeliveryExceptionHandler {
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
         pd.setType(URI.create("urn:tiibntick:delivery:invalid-transition"));
         pd.setTitle("Invalid Delivery State Transition");
-        pd.setProperty("from", ex.getFrom().name());
-        pd.setProperty("to", ex.getTo().name());
+        pd.setProperty("from", String.valueOf(ex.getFrom()));
+        pd.setProperty("to", String.valueOf(ex.getTo()));
+        pd.setProperty("timestamp", Instant.now());
+        return Mono.just(pd);
+    }
+
+    /** A parcel/announcement/response transition refused by its table (spec §1.0: 409). */
+    @ExceptionHandler(com.yowyob.tiibntick.core.delivery.domain.exception.InvalidStateTransitionException.class)
+    public Mono<ProblemDetail> handleInvalidStateTransition(
+            com.yowyob.tiibntick.core.delivery.domain.exception.InvalidStateTransitionException ex) {
+        log.warn("Invalid state transition: {}", ex.getMessage());
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        pd.setType(URI.create("urn:tiibntick:" + ex.getAggregate().replace(' ', '-') + ":invalid-transition"));
+        pd.setTitle("Invalid State Transition");
+        pd.setProperty("from", ex.getFrom());
+        pd.setProperty("to", ex.getTo());
+        pd.setProperty("timestamp", Instant.now());
+        return Mono.just(pd);
+    }
+
+    /** The parcel is under a dispute that freezes its delivery (QO-7): 409. */
+    @ExceptionHandler(com.yowyob.tiibntick.core.delivery.domain.exception.DeliveryFrozenByDisputeException.class)
+    public Mono<ProblemDetail> handleFrozenByDispute(
+            com.yowyob.tiibntick.core.delivery.domain.exception.DeliveryFrozenByDisputeException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        pd.setType(URI.create("urn:tiibntick:delivery:frozen-by-dispute"));
+        pd.setTitle("Delivery Frozen By Dispute");
         pd.setProperty("timestamp", Instant.now());
         return Mono.just(pd);
     }

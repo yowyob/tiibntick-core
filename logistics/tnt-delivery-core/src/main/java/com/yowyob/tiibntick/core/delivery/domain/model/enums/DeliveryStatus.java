@@ -1,107 +1,101 @@
 package com.yowyob.tiibntick.core.delivery.domain.model.enums;
 
+import com.yowyob.tiibntick.core.delivery.domain.statemachine.DeliveryStateMachine;
+
+import java.util.EnumSet;
+import java.util.Set;
+
 /**
- * Represents every possible state in the delivery lifecycle.
+ * State of a delivery (spec {@code cible-evenements-colis-livraison.md} §1.1, decisions [C], [C bis]).
  *
- * <p>State machine:
- * <pre>
- *   CREATED ──(pickup confirmed)──► PICKED_UP
- *   PICKED_UP ──(driver departs)──► IN_TRANSIT
- *   IN_TRANSIT ──(delivered)──────► DELIVERED
- *   IN_TRANSIT ──(incident)───────► PAUSED_BY_INCIDENT
- *   PAUSED_BY_INCIDENT ──(resolved)► IN_TRANSIT | PICKED_UP (depending on what was paused)
- *   IN_TRANSIT ──(failure)────────► FAILED
- *   CREATED | PICKED_UP ──────────► CANCELLED
- *   IN_TRANSIT ──(hub stop)───────► AT_RELAY_POINT
- *   AT_RELAY_POINT ──(resumed)────► IN_TRANSIT
- *   FAILED ──(retry)──────────────► IN_TRANSIT
- * </pre>
+ * <p>The transitions are <b>not</b> described here: the single table that holds them is
+ * {@link DeliveryStateMachine#TABLE} (rows D1–D21). {@link #isTerminal()}, {@link #isActive()} and
+ * {@link #isIncidentState()} are derived from that table.
  *
- * <p> — Added statuses for tnt-incident-core integration:
- * <ul>
- *   <li>{@link #PAUSED_BY_INCIDENT} — delivery is blocked by an ongoing incident.
- *       Set by {@code IMissionStatusPort.pauseMission()}. The previous status is
- *       saved in {@code Delivery.previousStatusBeforePause} for restoration on resolution.</li>
- *   <li>{@link #TIMED_OUT} — delivery exceeded its scheduled SLA window.
- *       Published in {@code MissionStatusChangedEvent} to trigger auto-incident creation
- *       in {@code tnt-incident-core}.</li>
- *   <li>{@link #SLA_BREACHED} — soft SLA warning before full timeout.</li>
- * </ul>
- *
- * @author MANFOUO Braun
+ * <p>{@code TIMED_OUT} and {@code SLA_BREACHED} were removed [C.3] (late deliveries are alerts, not states);
+ * {@code AT_RELAY_POINT} was renamed {@link #AT_RELAY_HUB} (one name with the parcel, §2.3).
  */
 public enum DeliveryStatus {
 
-    /** Delivery request created and waiting for driver assignment or pickup. */
+    /** Created, no courier responsible yet. */
     CREATED,
-
-    /** Package has been physically collected by the delivery person. */
+    /** A courier is designated; the parcel is not collected yet. */
+    ASSIGNED,
+    /** The courier collected the parcel (hand-over code). */
     PICKED_UP,
-
-    /** Package is currently being transported to the destination. */
+    /** The courier carries the parcel towards the next stop. */
     IN_TRANSIT,
-
-    /** Package is temporarily stored at a relay / hub point. */
-    AT_RELAY_POINT,
-
-    /** Package has been successfully handed to the recipient. */
+    /** The parcel is deposited at a relay hub (intermediate stop or destination). */
+    AT_RELAY_HUB,
+    /** Last leg towards the recipient for one hand-over attempt. */
+    OUT_FOR_DELIVERY,
+    /** One hand-over attempt failed; another attempt is possible (attempt counter below the maximum). */
+    DELIVERY_ATTEMPT_FAILED,
+    /** Handed over to the recipient (or collected at the relay counter). Final. */
     DELIVERED,
-
-    /** Delivery attempt failed (incident, refusal, address not found, etc.). */
+    /** Finally failed (max attempts, refusal, not collected, incident without outcome, parcel lost/damaged). Final. */
     FAILED,
-
-    /** Delivery cancelled before package collection. */
+    /** Cancelled. Final. */
     CANCELLED,
-
-    /**
-     * Delivery is temporarily blocked by an active incident managed by tnt-incident-core.
-     *
-     * <p>Set by {@code MissionStatusPortAdapter.pauseMission(missionId, incidentId)}.
-     * The delivery's {@code pausedByIncidentId} field holds the blocking incident UUID,
-     * and {@code previousStatusBeforePause} holds the status to restore upon resolution.
-     *
-     * <p>Transitions out: → IN_TRANSIT | PICKED_UP (via {@code MissionStatusPortAdapter.resumeMission()})
-     * when the incident is resolved or closed.
-     */
+    /** The courier declared an incident; transient state until triage (QO-1). */
+    INCIDENT_REPORTED,
+    /** A blocking incident stops the delivery until it is handled. */
     PAUSED_BY_INCIDENT,
+    /** The parcel is being handed to a replacement courier. */
+    INCIDENT_HANDOVER;
 
-    /**
-     * Delivery has exceeded its scheduled delivery time window (SLA timeout).
-     *
-     * <p>This status is set by the SLA monitoring scheduler and published in a
-     * {@code MissionStatusChangedEvent} with status {@code TIMED_OUT} to
-     * trigger automatic incident creation in tnt-incident-core.
-     */
-    TIMED_OUT,
+    /** States in which the courier physically holds the parcel (spec §1.1, derived {@code courierHoldsParcel}). */
+    private static final Set<DeliveryStatus> COURIER_HOLDS =
+            EnumSet.of(PICKED_UP, IN_TRANSIT, OUT_FOR_DELIVERY, DELIVERY_ATTEMPT_FAILED);
 
-    /**
-     * Delivery is approaching its SLA deadline (soft warning).
-     *
-     * <p>Published as a {@code MissionStatusChangedEvent} to allow tnt-incident-core
-     * to pre-emptively escalate if no progress is made.
-     */
-    SLA_BREACHED;
-
-    /**
-     * Returns {@code true} when this status is a terminal state
-     * (no further transitions are expected).
-     */
+    /** @return whether this state has no exit in {@link DeliveryStateMachine#TABLE} */
     public boolean isTerminal() {
-        return this == DELIVERED || this == CANCELLED || this == FAILED;
+        return DeliveryStateMachine.TABLE.terminalStates().contains(this);
     }
 
-    /**
-     * Returns {@code true} when a delivery in this status is still active
-     * (ongoing logistics operation).
-     */
+    /** @return a non-terminal state other than {@link #CREATED}: a mission engaged with a courier */
     public boolean isActive() {
-        return this == PICKED_UP || this == IN_TRANSIT || this == AT_RELAY_POINT;
+        return !isTerminal() && this != CREATED;
+    }
+
+    /** @return a state left by restoring the memorised operational state (incident states) */
+    public boolean isIncidentState() {
+        return DeliveryStateMachine.TABLE.restoringStates().contains(this);
     }
 
     /**
-     * Returns {@code true} if this delivery is currently paused due to an incident.
+     * @return whether the courier holds the parcel in this operational state (incident states excluded: use the
+     *         memorised state for them)
      */
-    public boolean isPausedByIncident() {
-        return this == PAUSED_BY_INCIDENT;
+    public boolean courierHoldsParcel() {
+        return COURIER_HOLDS.contains(this);
+    }
+
+    /** The wire value of this status (its name), as exposed to API clients. */
+    public String getValue() {
+        return name();
+    }
+
+    /**
+     * Reads a status from its wire value, ignoring case. {@code AT_RELAY_POINT}, the name before lot evt-l2, is still
+     * read as {@link #AT_RELAY_HUB} (offline payloads and clients written before the rename); it is never written.
+     *
+     * @throws IllegalArgumentException when the value names no status
+     */
+    public static DeliveryStatus fromValue(String value) {
+        if ("AT_RELAY_POINT".equalsIgnoreCase(value)) {
+            return AT_RELAY_HUB;
+        }
+        for (DeliveryStatus status : values()) {
+            if (status.name().equalsIgnoreCase(value)) {
+                return status;
+            }
+        }
+        throw new IllegalArgumentException("Unknown delivery status: " + value);
+    }
+
+    /** @return the names of the terminal states, for SQL filters built from the table */
+    public static Set<DeliveryStatus> terminalStates() {
+        return DeliveryStateMachine.TABLE.terminalStates();
     }
 }

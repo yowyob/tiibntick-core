@@ -7,7 +7,7 @@ import java.util.concurrent.ConcurrentMap;
 
 /**
  * In-memory missionId → trackingCode lookup, populated from
- * {@code tnt-delivery-core}'s {@code MissionStatusChangedEvent} (consumed by
+ * the parcel events of {@code tnt.parcel.events} (current delivery → parcel code, consumed by
  * {@code MissionStatusEventConsumer}) and read by {@code KalmanEtaUpdaterAdapter}
  * when a GPS ping needs to resolve the tracking code for its mission.
  *

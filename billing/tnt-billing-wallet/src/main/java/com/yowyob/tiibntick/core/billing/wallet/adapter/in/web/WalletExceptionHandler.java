@@ -28,17 +28,6 @@ public class WalletExceptionHandler {
 
 
 
-    @ExceptionHandler(WalletFrozenException.class)
-    public Mono<ProblemDetail> handleWalletFrozen(WalletFrozenException ex) {
-        log.warn("Wallet frozen: {}", ex.getMessage());
-        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.valueOf(422), ex.getMessage());
-        pd.setType(URI.create("urn:tiibntick:billing:wallet-frozen"));
-        pd.setTitle("Wallet Frozen");
-        pd.setProperty("timestamp", Instant.now());
-        return Mono.just(pd);
-    }
-
-
     /**
      * Relays a Kernel HTTP error (wrong confirmation code, insufficient funds, unknown wallet…)
      * with its original 4xx status so clients can react; any Kernel 5xx becomes a 502.

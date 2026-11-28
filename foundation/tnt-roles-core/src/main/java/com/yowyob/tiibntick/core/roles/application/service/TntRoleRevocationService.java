@@ -47,8 +47,34 @@ public class TntRoleRevocationService implements RevokeTntRoleUseCase {
         this.permissionChangeNotifier = permissionChangeNotifier;
     }
 
+    /** Decision D-171: an id of the TNT_ADMIN registry is revoked there, under its rules (D-163, D-166). */
+    private com.yowyob.tiibntick.core.roles.application.port.in.ManagePlatformAdminsUseCase platformAdmins;
+
+    public void setPlatformAdmins(com.yowyob.tiibntick.core.roles.application.port.in.ManagePlatformAdminsUseCase admins) {
+        this.platformAdmins = admins;
+    }
+
+    static final String REVOKED_THROUGH_ROLES_API = "revoked through /api/v1/admin/roles/assignments";
+
     @Override
     public Mono<Void> revokeAssignment(UUID tenantId, UUID assignmentId) {
+        if (platformAdmins == null) {
+            return revokeTenantAssignment(tenantId, assignmentId);
+        }
+        return platformAdmins.find(assignmentId)
+                .map(java.util.Optional::of)
+                .onErrorResume(org.springframework.web.server.ResponseStatusException.class,
+                        e -> e.getStatusCode().value() == 404 ? Mono.just(java.util.Optional.empty()) : Mono.error(e))
+                .flatMap(grant -> grant.isPresent()
+                        ? PlatformAdminCallers.current()
+                                .switchIfEmpty(Mono.error(new org.springframework.web.server.ResponseStatusException(
+                                        org.springframework.http.HttpStatus.UNAUTHORIZED, "Authentication required")))
+                                .flatMap(caller -> platformAdmins.revoke(caller, assignmentId, REVOKED_THROUGH_ROLES_API))
+                                .then()
+                        : revokeTenantAssignment(tenantId, assignmentId));
+    }
+
+    private Mono<Void> revokeTenantAssignment(UUID tenantId, UUID assignmentId) {
         return assignmentRepository.findById(tenantId, assignmentId)
                 .switchIfEmpty(Mono.error(TntRoleException.assignmentNotFound(tenantId, assignmentId)))
                 .flatMap(assignment ->

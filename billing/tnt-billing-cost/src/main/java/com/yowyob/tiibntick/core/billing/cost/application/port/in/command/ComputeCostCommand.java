@@ -26,7 +26,7 @@ import java.util.UUID;
  * @author MANFOUO Braun
  */
 public record ComputeCostCommand(
-        String missionId,
+        String deliveryId,
         @NotNull UUID tenantId,
         @Positive double distanceKm,
         @PositiveOrZero int estimatedDurationMin,
@@ -67,11 +67,11 @@ public record ComputeCostCommand(
     /**
      * Backward-compatible constructor without new  fields.
      */
-    public static ComputeCostCommand basic(String missionId, UUID tenantId, double distanceKm,
+    public static ComputeCostCommand basic(String deliveryId, UUID tenantId, double distanceKm,
             int estimatedDurationMin, RoadType roadType, WeatherCondition weatherCondition,
             VehicleType vehicleType, MissionPriority priority,
             double payloadWeightKg, double vehicleCapacityKg) {
-        return new ComputeCostCommand(missionId, tenantId, distanceKm, estimatedDurationMin,
+        return new ComputeCostCommand(deliveryId, tenantId, distanceKm, estimatedDurationMin,
                 roadType, weatherCondition, vehicleType, priority, payloadWeightKg,
                 vehicleCapacityKg, null, null, null, null);
     }

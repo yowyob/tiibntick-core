@@ -1,6 +1,7 @@
 package com.yowyob.tiibntick.core.gofreelancer.application.service;
 
 import com.yowyob.tiibntick.core.billing.wallet.application.port.in.ISettlementUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpNotificationTemplates;
 import com.yowyob.tiibntick.core.billing.wallet.application.port.in.command.RecordSettlementCommand;
 import com.yowyob.tiibntick.core.billing.wallet.domain.enums.SettlementMethod;
 import com.yowyob.tiibntick.core.billing.wallet.domain.enums.SettlementStatus;
@@ -16,10 +17,10 @@ import com.yowyob.tiibntick.core.gofreelancer.application.port.out.RelayPointSub
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpRelayPoint;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpUser;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.RelayDeposit;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.logistics.RelayDepositStatus;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.relaypoint.RelayPointSubscriptionType;
 import com.yowyob.tiibntick.core.inventory.application.port.in.DepositHubPackageCommand;
 import com.yowyob.tiibntick.core.inventory.application.port.in.DepositHubPackageUseCase;
+import com.yowyob.tiibntick.core.inventory.application.port.in.FindHubPackagesUseCase;
 import com.yowyob.tiibntick.core.inventory.application.port.in.PickupHubPackageUseCase;
 import com.yowyob.tiibntick.core.trust.application.port.in.RecordCustodyTransferUseCase;
 import com.yowyob.tiibntick.core.trust.domain.model.enums.CustodyTransferType;
@@ -35,18 +36,15 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
- * Product-side mirror of a parcel deposited at a relay point.
+ * Parcels deposited at relay points.
  *
- * <p><strong>Source of truth:</strong> stock → {@code tnt-inventory-core}
- * ({@link DepositHubPackageUseCase}), occupancy → {@code tnt-geo-core}
- * ({@link IRelayHubPort}), delivery step → {@code tnt-delivery-core}
- * ({@code depositAtRelayPoint}). This local {@link RelayDeposit} remains as a
- * temporary GOFP UX/billing mirror until full cut-over.</p>
+ * <p>The deposit <strong>is</strong> the {@code tnt-inventory-core} hub package entry (owner = the
+ * client who collects it, storage fee and currency carried by the entry); occupancy is
+ * {@code tnt-geo-core} ({@link IRelayHubPort}); the delivery step is {@code tnt-delivery-core}.
+ * {@link RelayDeposit} is only the view the Go-Freelancer API returns (same id as the entry).</p>
  *
  * @author MANFOUO BRAUN
- * @deprecated Prefer inventory {@code HubPackageEntry} + delivery lifecycle; keep as sync mirror only.
  */
-@Deprecated
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -64,11 +62,13 @@ public class RelayDepositService {
     private final RelayPointSubscriptionRepository relayPointSubscriptionRepository;
     private final DepositHubPackageUseCase depositHubPackageUseCase;
     private final PickupHubPackageUseCase pickupHubPackageUseCase;
+    private final FindHubPackagesUseCase findHubPackagesUseCase;
     private final IRelayHubPort relayHubPort;
     private final DeliveryLifecycleUseCase deliveryLifecycleUseCase;
 
     /**
-     * Creates a product mirror deposit and synchronises inventory + geo occupancy.
+     * Deposits the parcel in the hub inventory (with its owner and storage fee) and counts it in
+     * the geo occupancy.
      *
      * @param packetId           parcel / delivery-need id
      * @param clientId           client who will pick up
@@ -86,21 +86,9 @@ public class RelayDepositService {
         return resolveRelayPoint(relayPointId)
                 .flatMap(rp -> {
                     UUID hubId = rp.getCoreRelayPointId();
-                    RelayDeposit deposit = RelayDeposit.builder()
-                            .id(UUID.randomUUID())
-                            .packetId(packetId)
-                            .clientId(clientId)
-                            .relayPointId(hubId)
-                            .storageFee(storageFee != null ? storageFee : 0.0)
-                            .currency("XAF")
-                            .status(RelayDepositStatus.DELIVERED)
-                            .createdAt(Instant.now())
-                            .build();
+                    log.info("Depositing packet={} at hub={} for client={}", packetId, hubId, clientId);
 
-                    log.info("Creating RelayDeposit (mirror) packet={} hub={} client={}",
-                            packetId, hubId, clientId);
-
-                    Mono<Void> inventoryDeposit = depositHubPackageUseCase.depositPackage(
+                    Mono<RelayDeposit> inventoryDeposit = depositHubPackageUseCase.depositPackage(
                                     new DepositHubPackageCommand(
                                             tenantId,
                                             hubId,
@@ -108,13 +96,17 @@ public class RelayDepositService {
                                             packetId.toString(),
                                             null,
                                             depositedByActorId,
-                                            null))
+                                            null,
+                                            clientId,
+                                            java.math.BigDecimal.valueOf(storageFee != null ? storageFee : 0.0)
+                                                    .setScale(2, java.math.RoundingMode.HALF_UP),
+                                            "XAF"))
                             .doOnSuccess(e -> log.info("Inventory HubPackageEntry {} deposited at hub={}",
                                     e.id(), hubId))
                             .doOnError(e -> log.error(
                                     "Inventory deposit FAILED for packet={} hub={} — not masking as success",
                                     packetId, hubId, e))
-                            .then();
+                            .map(RelayDepositViews::of);
 
                     // Soft: geo hub may be missing during migration — warn, don't invent success occupancy
                     Mono<Void> geoOccupancy = relayHubPort.incrementOccupancy(hubId, tenantId)
@@ -132,8 +124,8 @@ public class RelayDepositService {
                                 return Mono.error(e);
                             });
 
-                    return Mono.when(inventoryDeposit, geoOccupancy)
-                            .then(relayDepositRepository.save(deposit))
+                    return Mono.zip(inventoryDeposit, geoOccupancy.thenReturn(Boolean.TRUE))
+                            .map(reactor.util.function.Tuple2::getT1)
                             .flatMap(saved -> bumpDepositCounters(rp).thenReturn(saved));
                 });
     }
@@ -171,7 +163,7 @@ public class RelayDepositService {
     }
 
     /**
-     * Marks a relay deposit as RETRIEVED.
+     * Hands a deposited parcel over to its client (the inventory entry is picked up).
      *
      * <p><strong>Ordering matters:</strong> the parcel is only persisted as RETRIEVED
      * once the steps that represent an irreversible, real-world/system-of-record fact
@@ -190,16 +182,19 @@ public class RelayDepositService {
     public Mono<RelayDeposit> markAsRetrieved(UUID id, String otpCode) {
         UUID tenantId = TenantContextHolder.SYSTEM_TENANT;
 
-        return relayDepositRepository.findById(id)
+        return findHubPackagesUseCase.findEntry(id)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("RelayDeposit not found: " + id)))
-                .flatMap(deposit -> {
+                .flatMap(entry -> {
+                    RelayDeposit deposit = RelayDepositViews.of(entry);
                     if (otpCode == null || otpCode.isBlank()) {
                         return Mono.error(new IllegalArgumentException(
                                 "Un code OTP est requis pour récupérer le colis."));
                     }
 
+                    // A deposit is keyed on the parcel id (the need's packet); older ones on the need id.
                     return deliveryRepository.findByDeliveryNeedId(deposit.getPacketId())
                             .switchIfEmpty(deliveryRepository.findByAnnouncementId(deposit.getPacketId()))
+                            .switchIfEmpty(Mono.defer(() -> deliveryRepository.findByParcelId(deposit.getPacketId())))
                             .switchIfEmpty(Mono.error(new IllegalArgumentException(
                                     "No delivery found for packet: " + deposit.getPacketId())))
                             .flatMap(delivery -> {
@@ -209,12 +204,10 @@ public class RelayDepositService {
                                 }
 
                                 Instant retrievedTime = Instant.now();
-                                deposit.setStatus(RelayDepositStatus.RETRIEVED);
-                                deposit.setRetrievedAt(retrievedTime);
 
                                 // ── Irreversible / system-of-record steps — hard-fail ────────
                                 Mono<Void> inventoryPickup = pickupHubPackageUseCase
-                                        .pickupPackage(deposit.getPacketId().toString(), deposit.getClientId())
+                                        .pickupPackage(entry.trackingCode(), deposit.getClientId())
                                         .doOnError(e -> log.error(
                                                 "Inventory pickup FAILED for packet={} — propagating",
                                                 deposit.getPacketId(), e));
@@ -241,7 +234,8 @@ public class RelayDepositService {
                                         .onErrorResume(e -> Mono.empty());
 
                                 return Mono.when(inventoryPickup, coreComplete, geoDec)
-                                        .then(relayDepositRepository.save(deposit))
+                                        .then(Mono.defer(() -> findHubPackagesUseCase.findEntry(id)))
+                                        .map(RelayDepositViews::of)
                                         .flatMap(saved -> postRetrievalBestEffortTail(saved, retrievedTime)
                                                 .thenReturn(saved))
                                         // Lot C-36 — sender, courier and relay: the parcel was handed over.
@@ -400,21 +394,18 @@ public class RelayDepositService {
                     if (clientPersonId != null) {
                         clientNotif = notificationService.sendEvaluationRequest(
                                 clientPersonId,
-                                deposit.getPacketId(),
                                 client.getEmail(),
-                                "Colis récupéré — Évaluez le Point Relais !",
-                                "Vous avez récupéré votre colis au " + rpName
-                                        + ". Merci de donner votre avis et de noter le point relais.");
+                                GofpNotificationTemplates.EVALUATION_CLIENT_PICKUP,
+                                java.util.Map.of("relayName", rpName));
                     }
 
                     Mono<Void> rpNotif = Mono.empty();
                     if (rp.getCoreFreelancerId() != null) {
                         rpNotif = notificationService.sendEvaluationRequest(
                                 rp.getCoreFreelancerId(),
-                                deposit.getPacketId(),
                                 rp.getOwnerEmail(),
-                                "Retrait effectué — Évaluez le client !",
-                                "Le colis a été remis au client. Prenez un instant pour évaluer votre interaction.");
+                                GofpNotificationTemplates.EVALUATION_RELAY_HANDOVER,
+                                java.util.Map.of());
                     }
 
                     return Mono.when(clientNotif, rpNotif)

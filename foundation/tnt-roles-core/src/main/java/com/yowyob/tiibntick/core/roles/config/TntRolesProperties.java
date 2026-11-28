@@ -12,7 +12,7 @@ import java.util.UUID;
  * <pre>
  * tnt:
  *   roles:
- *     system-tenant-id: 00000000-0000-0000-0000-000000000001
+ *     system-tenant-id: ${TNT_SYSTEM_TENANT_ID}   # required, no default
  *     provision-on-startup: true
  *     permission-cache-ttl-seconds: 300
  *     aop-enabled: true
@@ -27,7 +27,7 @@ public class TntRolesProperties {
      * The UUID of the system tenant used for seeding global/system-scoped roles.
      * Must be a stable, well-known UUID configured consistently across environments.
      */
-    private UUID systemTenantId = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private UUID systemTenantId = com.yowyob.tiibntick.common.tenant.SystemTenant.id();
 
     /**
      * When true, {@link com.yowyob.tiibntick.core.roles.application.service.TntRoleInitializationService}
@@ -42,6 +42,12 @@ public class TntRolesProperties {
      * Default: 300 seconds (5 minutes).
      */
     private int permissionCacheTtlSeconds = 300;
+
+    /**
+     * TTL in seconds of the per-instance "is a platform administrator" cache (decision D-168). Every grant or
+     * revocation also evicts it on all instances through {@code tnt.roles.permission-changed}.
+     */
+    private int platformAdminCacheTtlSeconds = 60;
 
     /**
      * When true, the {@link com.yowyob.tiibntick.core.roles.adapter.in.web.TntPermissionAspect}
@@ -65,6 +71,11 @@ public class TntRolesProperties {
     public int getPermissionCacheTtlSeconds() { return permissionCacheTtlSeconds; }
     public void setPermissionCacheTtlSeconds(int permissionCacheTtlSeconds) {
         this.permissionCacheTtlSeconds = permissionCacheTtlSeconds;
+    }
+
+    public int getPlatformAdminCacheTtlSeconds() { return platformAdminCacheTtlSeconds; }
+    public void setPlatformAdminCacheTtlSeconds(int platformAdminCacheTtlSeconds) {
+        this.platformAdminCacheTtlSeconds = platformAdminCacheTtlSeconds;
     }
 
     public boolean isAopEnabled() { return aopEnabled; }

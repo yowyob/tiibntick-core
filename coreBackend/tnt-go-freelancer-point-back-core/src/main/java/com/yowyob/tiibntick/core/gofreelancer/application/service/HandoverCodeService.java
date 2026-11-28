@@ -5,7 +5,7 @@ import com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepos
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryNeedRepository;
 import com.yowyob.tiibntick.core.gofreelancer.domain.exception.CodedStatusException;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryStatus;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
@@ -33,8 +33,8 @@ public class HandoverCodeService {
 
     /** Statuses in which the parcel has not been picked up yet: the pickup code is still needed. */
     private static final Set<DeliveryStatus> BEFORE_PICKUP = EnumSet.of(
-            DeliveryStatus.CREATED, DeliveryStatus.PAUSED_BY_INCIDENT, DeliveryStatus.TIMED_OUT,
-            DeliveryStatus.SLA_BREACHED);
+            DeliveryStatus.CREATED, DeliveryStatus.ASSIGNED, DeliveryStatus.PAUSED_BY_INCIDENT,
+            DeliveryStatus.INCIDENT_REPORTED);
 
     /** Statuses after which no code is needed any more. */
     private static final Set<DeliveryStatus> FINISHED = EnumSet.of(

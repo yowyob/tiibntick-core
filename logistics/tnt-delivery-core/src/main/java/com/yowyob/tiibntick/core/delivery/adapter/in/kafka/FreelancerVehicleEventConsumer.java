@@ -4,13 +4,13 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yowyob.tiibntick.core.delivery.application.port.in.DeliveryLifecycleUseCase;
 import lombok.extern.slf4j.Slf4j;
+import com.yowyob.tiibntick.common.kafka.ReactiveListenerSupport;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
-import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -46,11 +46,14 @@ public class FreelancerVehicleEventConsumer {
 
     private final DeliveryLifecycleUseCase deliveryLifecycleUseCase;
     private final ObjectMapper objectMapper;
+    private final ReactiveListenerSupport listenerSupport;
 
     public FreelancerVehicleEventConsumer(DeliveryLifecycleUseCase deliveryLifecycleUseCase,
-            @Qualifier("deliveryObjectMapper") ObjectMapper objectMapper) {
+            @Qualifier("deliveryObjectMapper") ObjectMapper objectMapper,
+            ReactiveListenerSupport listenerSupport) {
         this.deliveryLifecycleUseCase = deliveryLifecycleUseCase;
         this.objectMapper = objectMapper;
+        this.listenerSupport = listenerSupport;
     }
 
     /**
@@ -58,59 +61,41 @@ public class FreelancerVehicleEventConsumer {
      * Records vehicleId and equipment IDs on the Delivery aggregate.
      */
     @KafkaListener(
-            topics = "tnt.vehicle.assigned_to_mission",
-            groupId = "${spring.kafka.consumer.group-id:tnt-delivery-core}",
+            topics = com.yowyob.tiibntick.common.kafka.TntTopics.VEHICLE_ASSIGNED_TO_MISSION,
+            groupId = "${tnt.kafka.consumer.groups.delivery-vehicle:tnt-delivery-vehicle-consumer}",
             containerFactory = "deliveryKafkaListenerContainerFactory"
     )
-    public void handleVehicleAssignedToMission(ConsumerRecord<String, String> record) {
+    public void handleVehicleAssignedToMission(ConsumerRecord<String, String> record) throws IOException {
         log.info("Received tnt.vehicle.assigned_to_mission: key={}", record.key());
-
-        Mono.fromCallable(() -> objectMapper.readTree(record.value()))
-                .flatMap(json -> {
-                    UUID deliveryId = extractUUID(json, "missionId");
-                    if (deliveryId == null) {
-                        log.warn("tnt.vehicle.assigned_to_mission: missing missionId in payload");
-                        return Mono.empty();
-                    }
-                    String vehicleId = extractString(json, "vehicleId");
-                    List<String> equipmentIds = extractStringList(json, "activeEquipmentIds");
-
-                    return deliveryLifecycleUseCase.recordFreelancerVehicleAssigned(
-                            deliveryId, vehicleId, equipmentIds)
-                            .doOnSuccess(d -> log.info("Recorded vehicle={} for delivery={}",
-                                    vehicleId, deliveryId))
-                            .doOnError(e -> log.warn("Failed to record vehicle={} for delivery={}: {}",
-                                    vehicleId, deliveryId, e.getMessage()))
-                            .onErrorResume(e -> Mono.empty());
-                })
-                .subscribeOn(Schedulers.boundedElastic())
-                .subscribe();
+        // Lot L7 (spec §3.10): awaited on the container thread; an unreadable record, a missing missionId, an
+        // unknown delivery or a database error reaches the container: retries, then tnt.dlq.
+        JsonNode json = objectMapper.readTree(record.value());
+        UUID deliveryId = extractUUID(json, "missionId");
+        if (deliveryId == null) {
+            throw new IllegalArgumentException("tnt.vehicle.assigned_to_mission: missing or invalid missionId");
+        }
+        String vehicleId = extractString(json, "vehicleId");
+        List<String> equipmentIds = extractStringList(json, "activeEquipmentIds");
+        listenerSupport.await(deliveryLifecycleUseCase.recordFreelancerVehicleAssigned(
+                deliveryId, vehicleId, equipmentIds));
+        log.info("Recorded vehicle={} for delivery={}", vehicleId, deliveryId);
     }
 
     /**
      * Handles FreelancerVehicle release from mission.
-     * Logs the release — no delivery state change needed (informational event).
+     * Logs the release — no delivery state change needed (informational event). An unreadable record reaches the
+     * container (retries, then tnt.dlq).
      */
     @KafkaListener(
-            topics = "tnt.vehicle.released_from_mission",
-            groupId = "${spring.kafka.consumer.group-id:tnt-delivery-core}",
+            topics = com.yowyob.tiibntick.common.kafka.TntTopics.VEHICLE_RELEASED_FROM_MISSION,
+            groupId = "${tnt.kafka.consumer.groups.delivery-vehicle:tnt-delivery-vehicle-consumer}",
             containerFactory = "deliveryKafkaListenerContainerFactory"
     )
-    public void handleVehicleReleasedFromMission(ConsumerRecord<String, String> record) {
+    public void handleVehicleReleasedFromMission(ConsumerRecord<String, String> record) throws IOException {
         log.info("Received tnt.vehicle.released_from_mission: key={}", record.key());
-
-        Mono.fromCallable(() -> objectMapper.readTree(record.value()))
-                .doOnNext(json -> {
-                    UUID deliveryId = extractUUID(json, "missionId");
-                    String vehicleId = extractString(json, "vehicleId");
-                    log.debug("Vehicle={} released from delivery={}", vehicleId, deliveryId);
-                })
-                .onErrorResume(e -> {
-                    log.warn("Error processing tnt.vehicle.released_from_mission: {}", e.getMessage());
-                    return Mono.empty();
-                })
-                .subscribeOn(Schedulers.boundedElastic())
-                .subscribe();
+        JsonNode json = objectMapper.readTree(record.value());
+        log.debug("Vehicle={} released from delivery={}", extractString(json, "vehicleId"),
+                extractUUID(json, "missionId"));
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────

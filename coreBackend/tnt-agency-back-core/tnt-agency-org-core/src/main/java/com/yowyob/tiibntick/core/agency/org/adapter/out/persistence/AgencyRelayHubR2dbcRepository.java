@@ -15,6 +15,9 @@ public interface AgencyRelayHubR2dbcRepository extends ReactiveCrudRepository<Ag
 
     Mono<AgencyRelayHubEntity> findByCoreHubIdAndTenantId(UUID coreHubId, UUID tenantId);
 
+    /** Lot evt-l2: the agency relay behind a core hub, whatever the tenant (relay storage thresholds). */
+    Flux<AgencyRelayHubEntity> findByCoreHubId(UUID coreHubId);
+
     Mono<AgencyRelayHubEntity> findByOperatorUserIdAndTenantId(UUID operatorUserId, UUID tenantId);
 
     Mono<Boolean> existsByCode(String code);

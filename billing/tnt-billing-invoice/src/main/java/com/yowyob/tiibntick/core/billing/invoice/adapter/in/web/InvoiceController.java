@@ -85,7 +85,7 @@ public class InvoiceController {
     public Flux<InvoiceResponse> listByMission(
             @CurrentUser TntUserIdentity currentUser,
             @PathVariable String missionId) {
-        return access.readable(invoiceService.listByMissionId(missionId, currentUser.tenantId()), currentUser)
+        return access.readable(invoiceService.listByDeliveryId(missionId, currentUser.tenantId()), currentUser)
                 .map(mapper::toResponse);
     }
 

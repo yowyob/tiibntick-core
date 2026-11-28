@@ -21,7 +21,7 @@ public interface FreelancerLocationUseCase {
      * @param speedKmh      current speed in km/h (0.0 if unknown)
      * @param bearing       heading in degrees [0, 360] (0.0 if unknown)
      * @param accuracy      GPS accuracy in meters (0.0 if unknown)
-     * @param missionId     optional active mission ID (nullable)
+     * @param deliveryId     optional active mission ID (nullable)
      * @param freelancerOrgId optional FreelancerOrg UUID for fleet tracking (nullable)
      * @return Mono completing when the full pipeline has been triggered
      */
@@ -32,6 +32,6 @@ public interface FreelancerLocationUseCase {
                               double speedKmh,
                               double bearing,
                               double accuracy,
-                              String missionId,
+                              String deliveryId,
                               String freelancerOrgId);
 }

@@ -3,7 +3,7 @@ package com.yowyob.tiibntick.core.realtime.adapter.in.rest;
 import com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser;
 import com.yowyob.tiibntick.core.auth.domain.model.TntUserIdentity;
 import com.yowyob.tiibntick.core.realtime.application.port.in.IProcessGpsPingUseCase;
-import com.yowyob.tiibntick.core.realtime.application.port.out.IMissionAssignmentPort;
+import com.yowyob.tiibntick.core.realtime.application.port.out.IDeliveryAssignmentPort;
 import org.springframework.web.server.ResponseStatusException;
 import com.yowyob.tiibntick.core.realtime.domain.model.GPSStreamEntry;
 import com.yowyob.tiibntick.core.realtime.domain.model.GeoCoordinates;
@@ -34,24 +34,24 @@ public class GpsPingRestController {
     private static final Logger log = LoggerFactory.getLogger(GpsPingRestController.class);
 
     private final IProcessGpsPingUseCase processGpsPing;
-    private final java.util.function.Supplier<IMissionAssignmentPort> missionAssignment;
+    private final java.util.function.Supplier<IDeliveryAssignmentPort> deliveryAssignment;
 
     @org.springframework.beans.factory.annotation.Autowired
     public GpsPingRestController(IProcessGpsPingUseCase processGpsPing,
-                                 org.springframework.beans.factory.ObjectProvider<IMissionAssignmentPort> missionAssignment) {
+                                 org.springframework.beans.factory.ObjectProvider<IDeliveryAssignmentPort> deliveryAssignment) {
         this.processGpsPing = processGpsPing;
-        this.missionAssignment = missionAssignment::getIfAvailable;
+        this.deliveryAssignment = deliveryAssignment::getIfAvailable;
     }
 
-    public GpsPingRestController(IProcessGpsPingUseCase processGpsPing, IMissionAssignmentPort missionAssignment) {
+    public GpsPingRestController(IProcessGpsPingUseCase processGpsPing, IDeliveryAssignmentPort deliveryAssignment) {
         this.processGpsPing = processGpsPing;
-        this.missionAssignment = () -> missionAssignment;
+        this.deliveryAssignment = () -> deliveryAssignment;
     }
 
     /** Without a mission-assignment check (tests, deployments without a delivery owner). */
     public GpsPingRestController(IProcessGpsPingUseCase processGpsPing) {
         this.processGpsPing = processGpsPing;
-        this.missionAssignment = () -> null;
+        this.deliveryAssignment = () -> null;
     }
 
     @PostMapping("/ping")
@@ -73,7 +73,7 @@ public class GpsPingRestController {
 
     /** A deliverer may only feed the mission they carry. */
     private Mono<Void> assertMissionBelongsToCaller(TntUserIdentity caller, String missionId) {
-        IMissionAssignmentPort port = missionAssignment.get();
+        IDeliveryAssignmentPort port = deliveryAssignment.get();
         if (port == null || missionId == null || missionId.isBlank()) {
             return Mono.empty();
         }
@@ -83,7 +83,7 @@ public class GpsPingRestController {
         } catch (IllegalArgumentException notAUuid) {
             return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "missionId must be a UUID"));
         }
-        return port.isMissionAssignedTo(caller.tenantId(), mission, caller.userId())
+        return port.isDeliveryAssignedTo(caller.tenantId(), mission, caller.userId())
                 .flatMap(ok -> {
                     if (Boolean.TRUE.equals(ok)) {
                         return Mono.<Void>empty();

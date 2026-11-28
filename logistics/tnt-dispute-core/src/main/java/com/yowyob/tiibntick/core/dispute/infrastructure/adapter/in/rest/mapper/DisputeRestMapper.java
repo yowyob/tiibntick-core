@@ -68,7 +68,10 @@ public final class DisputeRestMapper {
                 ResolutionType.valueOf(req.resolutionType()),
                 req.compensationRequired(),
                 compensation,
-                req.summary());
+                req.summary(),
+                req.responsibleParty() == null || req.responsibleParty().isBlank() ? null
+                        : com.yowyob.tiibntick.core.dispute.domain.enums.DisputeResponsibleParty
+                                .valueOf(req.responsibleParty()));
     }
 
     public static EscalateDisputeCommand toCommand(DisputeRequests.EscalateDisputeRequest req, String disputeId, String tenantId) {
@@ -150,7 +153,10 @@ public final class DisputeRestMapper {
                         .map(c -> new CommentResponse(
                                 c.getId(), c.getAuthorId(), c.getAuthorType().name(),
                                 c.getContent(), c.isInternal(), c.getPostedAt()))
-                        .toList());
+                        .toList(),
+                dispute.getResponsibleParty() == null ? null : dispute.getResponsibleParty().name(),
+                dispute.getIncidentId(),
+                dispute.getClosedAt());
     }
 
     public static DisputeStatsResponse toStatsResponse(DisputeStats stats) {

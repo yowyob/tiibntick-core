@@ -38,7 +38,7 @@ Selection logic in `TntRolesAutoConfiguration.reactivePermissionResolver()` — 
 | `tnt.roles.permission.mode` | `LOCAL` | `LOCAL`/`REMOTE`/`HYBRID` |
 | `tnt.roles.permission-cache-ttl-seconds` | `300` | Caffeine TTL |
 | `tnt.roles.aop-enabled` | `true` | Master switch for `TntPermissionAspect` bean registration (only `false` in test profile) |
-| `tnt.roles.system-tenant-id` | `00000000-0000-0000-0000-000000000001` | Seeds global role definitions |
+| `tnt.roles.system-tenant-id` | env `TNT_SYSTEM_TENANT_ID` (REQUIRED, no default) | Seeds global role definitions |
 | `tnt.roles.provision-on-startup` | `true` | Idempotent role provisioning to Kernel at startup |
 
 ## `TntPermission` catalog

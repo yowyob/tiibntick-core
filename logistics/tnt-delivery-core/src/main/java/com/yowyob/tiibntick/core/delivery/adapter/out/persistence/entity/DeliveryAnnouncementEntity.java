@@ -83,11 +83,45 @@ public class DeliveryAnnouncementEntity implements Persistable<UUID> {
     @Column("recipient_phone")     private String recipientPhone;
     @Column("recipient_alt_phone") private String recipientAltPhone;
 
+    // Sender contact (optional)
+    @Column("sender_name")  private String senderName;
+    @Column("sender_phone") private String senderPhone;
+    @Column("sender_email") private String senderEmail;
+
+    // Recipient e-mail (optional)
+    @Column("recipient_email") private String recipientEmail;
+
+    // Generic details (optional)
+    @Column("required_vehicle_type")   private String requiredVehicleType;
+    @Column("payment_method")          private String paymentMethod;
+    @Column("transport_method")        private String transportMethod;
+    @Column("distance_km")             private BigDecimal distanceKm;
+    @Column("estimated_duration_min")  private Integer estimatedDurationMin;
+    @Column("destination_hub_id")      private UUID destinationHubId;
+    @Column("handover_signature_ref")  private String handoverSignatureRef;
+    @Column("service_fee")             private BigDecimal serviceFee;
+    @Column("origin_ref_type")         private String originRefType;
+    @Column("origin_ref_id")           private UUID originRefId;
+
     @Column("selected_response_id")
     private UUID selectedResponseId;
 
     @Column("created_delivery_id")
     private UUID createdDeliveryId;
+
+    // ── lot evt-l2 (spec §1.5) ────────────────────────────────────────────────────────────────
+    @Column("kind")
+    private String kind;
+    @Column("creator_role")
+    private String creatorRole;
+    @Column("outcome")
+    private String outcome;
+    @Column("published_at")
+    private Instant publishedAt;
+    @Column("assigned_at")
+    private Instant assignedAt;
+    @Column("closed_at")
+    private Instant closedAt;
 
     @Column("created_at")
     private Instant createdAt;

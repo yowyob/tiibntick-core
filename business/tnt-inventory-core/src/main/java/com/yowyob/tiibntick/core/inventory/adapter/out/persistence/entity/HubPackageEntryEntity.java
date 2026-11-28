@@ -5,6 +5,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.Transient;
 import org.springframework.data.domain.Persistable;
 import org.springframework.data.relational.core.mapping.Table;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -25,6 +26,10 @@ public class HubPackageEntryEntity implements Persistable<UUID> {
     private UUID pickedUpByActorId;
     private String recipientPhone;
     private boolean notified;
+    private UUID ownerActorId;
+    private BigDecimal storageFee;
+    private BigDecimal penaltyFee;
+    private String feeCurrency;
 
     public static HubPackageEntryEntity fromDomain(HubPackageEntry h) {
         HubPackageEntryEntity e = new HubPackageEntryEntity();
@@ -34,13 +39,15 @@ public class HubPackageEntryEntity implements Persistable<UUID> {
         e.pickedUpAt = h.pickedUpAt(); e.depositedByActorId = h.depositedByActorId();
         e.pickedUpByActorId = h.pickedUpByActorId(); e.recipientPhone = h.recipientPhone();
         e.notified = h.isNotified();
+        e.ownerActorId = h.ownerActorId(); e.storageFee = h.storageFee();
+        e.penaltyFee = h.penaltyFee(); e.feeCurrency = h.feeCurrency();
         return e;
     }
 
     public HubPackageEntry toDomain() {
         return HubPackageEntry.rehydrate(id, tenantId, hubId, packageId, trackingCode,
                 storageLocation, depositedAt, pickedUpAt, depositedByActorId,
-                pickedUpByActorId, recipientPhone, notified);
+                pickedUpByActorId, recipientPhone, notified, ownerActorId, storageFee, penaltyFee, feeCurrency);
     }
 
     @Override public boolean isNew() { return isNew; }
@@ -58,4 +65,8 @@ public class HubPackageEntryEntity implements Persistable<UUID> {
     public UUID getPickedUpByActorId() { return pickedUpByActorId; } public void setPickedUpByActorId(UUID pickedUpByActorId) { this.pickedUpByActorId = pickedUpByActorId; }
     public String getRecipientPhone() { return recipientPhone; } public void setRecipientPhone(String recipientPhone) { this.recipientPhone = recipientPhone; }
     public boolean isNotified() { return notified; } public void setNotified(boolean notified) { this.notified = notified; }
+    public UUID getOwnerActorId() { return ownerActorId; } public void setOwnerActorId(UUID ownerActorId) { this.ownerActorId = ownerActorId; }
+    public BigDecimal getStorageFee() { return storageFee; } public void setStorageFee(BigDecimal storageFee) { this.storageFee = storageFee; }
+    public BigDecimal getPenaltyFee() { return penaltyFee; } public void setPenaltyFee(BigDecimal penaltyFee) { this.penaltyFee = penaltyFee; }
+    public String getFeeCurrency() { return feeCurrency; } public void setFeeCurrency(String feeCurrency) { this.feeCurrency = feeCurrency; }
 }

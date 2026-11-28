@@ -64,5 +64,11 @@ public enum VehicleType {
      * Suitable for bulk last-mile deliveries in dense urban areas.
      * DSL variable: {@code vehicleType == VELO_CARGO}.
      */
-    VELO_CARGO
+    VELO_CARGO,
+
+    // ── Independent couriers (added by the Go-Freelancer de-duplication, lot L3) ──
+
+    SCOOTER,
+
+    BUS
 }

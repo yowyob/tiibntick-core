@@ -49,7 +49,7 @@ class GofpUserProvisioningServiceTest {
                 .thenAnswer(inv -> Mono.just(inv.getArgument(0)));
 
         StepVerifier.create(provisioningService.provisionIfAbsent(sub))
-                .expectNextMatches(user -> sub.equals(user.getCoreUserId()))
+                .expectNextMatches(user -> sub.equals(user.getCoreUserId()) && sub.equals(user.getId()))
                 .verifyComplete();
 
         verify(userRepository).save(any(GofpUser.class));

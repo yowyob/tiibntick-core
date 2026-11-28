@@ -5,6 +5,7 @@ import com.yowyob.kernel.event.application.port.in.PublishEventUseCase;
 import com.yowyob.kernel.event.domain.model.DomainEventEnvelope;
 import com.yowyob.tiibntick.core.marketback.application.port.out.IMarketEventPublisher;
 import com.yowyob.tiibntick.core.marketback.domain.event.MarketDomainEvent;
+import com.yowyob.tiibntick.common.kafka.TntTopics;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -38,7 +39,21 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class MarketKafkaEventPublisher implements IMarketEventPublisher {
 
-    private static final String PREFIX = "tnt.market.";
+    /**
+     * Topic of each Market event (lot L8, spec annex 9.1: the topic was built by concatenating "tnt.market." with the
+     * class name; it is now the {@code TntTopics} constant, declared as a {@code NewTopic}). Same names as before.
+     */
+    static final java.util.Map<Class<?>, String> TOPICS = java.util.Map.of(
+            com.yowyob.tiibntick.core.marketback.domain.event.MarketListingPublishedEvent.class, TntTopics.MARKET_LISTING_PUBLISHED,
+            com.yowyob.tiibntick.core.marketback.domain.event.MarketListingApprovedEvent.class, TntTopics.MARKET_LISTING_APPROVED,
+            com.yowyob.tiibntick.core.marketback.domain.event.MarketListingRejectedEvent.class, TntTopics.MARKET_LISTING_REJECTED,
+            com.yowyob.tiibntick.core.marketback.domain.event.MerchantContractSignedEvent.class, TntTopics.MARKET_MERCHANT_CONTRACT_SIGNED,
+            com.yowyob.tiibntick.core.marketback.domain.event.MarketOrderCreatedEvent.class, TntTopics.MARKET_ORDER_CREATED,
+            com.yowyob.tiibntick.core.marketback.domain.event.MarketOrderCompletedEvent.class, TntTopics.MARKET_ORDER_COMPLETED,
+            com.yowyob.tiibntick.core.marketback.domain.event.MarketOrderPaidEvent.class, TntTopics.MARKET_ORDER_PAID,
+            com.yowyob.tiibntick.core.marketback.domain.event.ProviderReviewPublishedEvent.class, TntTopics.MARKET_PROVIDER_REVIEW_PUBLISHED,
+            com.yowyob.tiibntick.core.marketback.domain.event.QuoteRequestCreatedEvent.class, TntTopics.MARKET_QUOTE_REQUEST_CREATED,
+            com.yowyob.tiibntick.core.marketback.domain.event.QuoteResponseSubmittedEvent.class, TntTopics.MARKET_QUOTE_RESPONSE_SUBMITTED);
     private static final String SOLUTION_CODE = "TNT";
     private static final String DEFAULT_AGGREGATE_TYPE = "Market";
 
@@ -51,7 +66,7 @@ public class MarketKafkaEventPublisher implements IMarketEventPublisher {
                 .flatMap(publishEventUseCase::publish)
                 .doOnSuccess(v -> log.debug("Enqueued event {} to outbox (topic={})",
                         event.getClass().getSimpleName(),
-                        PREFIX + toTopicSuffix(event.getClass().getSimpleName())))
+                        topicOf(event)))
                 .doOnError(e -> log.error("Failed to enqueue event {} to outbox: {}",
                         event.getClass().getSimpleName(), e.getMessage()));
     }
@@ -59,7 +74,7 @@ public class MarketKafkaEventPublisher implements IMarketEventPublisher {
     // ── Private helpers ───────────────────────────────────────────────
 
     private DomainEventEnvelope toEnvelope(Object event, String tenantId) throws Exception {
-        String topic = PREFIX + toTopicSuffix(event.getClass().getSimpleName());
+        String topic = topicOf(event);
         // Kafka record key = aggregate id, so tnt-sync-core's EntityChangedEventConsumer
         // (which prefers record.key() over parsing the payload) can index the delta
         // under the right aggregate_id instead of falling back to "unknown".
@@ -81,14 +96,11 @@ public class MarketKafkaEventPublisher implements IMarketEventPublisher {
                 .build();
     }
 
-    private String toTopicSuffix(String className) {
-        // e.g. MarketListingPublishedEvent -> listing.published
-        return className
-                .replace("Event", "")
-                .replaceAll("([A-Z])", "-$1")
-                .toLowerCase()
-                .replaceFirst("^-", "")
-                .replace("market-", "")
-                .replace("-", ".");
+    static String topicOf(Object event) {
+        String topic = TOPICS.get(event.getClass());
+        if (topic == null) {
+            throw new IllegalArgumentException("No Market topic for " + event.getClass().getName());
+        }
+        return topic;
     }
 }

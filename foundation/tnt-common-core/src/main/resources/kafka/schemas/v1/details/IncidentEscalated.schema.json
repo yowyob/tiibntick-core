@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:tnt:kafka:v1:details:IncidentEscalated",
+  "title": "details of IncidentEscalated",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["level"],
+  "properties": {"level": {"type": "integer", "minimum": 1}, "toRole": {"type": ["string", "null"]}}
+}

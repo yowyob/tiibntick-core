@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:tnt:kafka:v1:details:AnnouncementResponseReceived",
+  "title": "details of AnnouncementResponseReceived",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "responseId"
+  ],
+  "properties": {
+    "responseId": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

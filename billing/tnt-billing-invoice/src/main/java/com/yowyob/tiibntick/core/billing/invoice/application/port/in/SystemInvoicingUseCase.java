@@ -25,4 +25,10 @@ public interface SystemInvoicingUseCase {
      * invoice, that invoice is returned (marked paid if it still is not) instead of a duplicate.
      */
     Mono<Invoice> issuePaidInvoiceAsSystem(GenerateInvoiceCommand command, String paymentRef);
+
+    /**
+     * Lot L8: the invoice of a delivered mission, once — when the mission already has one (e.g. the paid invoice issued
+     * by the delivery-payment flow), that invoice is returned unchanged.
+     */
+    Mono<Invoice> generateOnceAsSystem(GenerateInvoiceCommand command);
 }

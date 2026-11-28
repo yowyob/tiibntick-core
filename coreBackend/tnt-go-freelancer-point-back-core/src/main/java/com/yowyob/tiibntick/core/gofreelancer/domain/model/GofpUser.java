@@ -83,10 +83,6 @@ public class GofpUser implements Persistable<UUID>, TntPersistableEntity {
     @Column("nui")
     private String nui;
 
-    /** BCrypt-hashed password (replicated for offline/local auth fallback). */
-    @Column("password_hash")
-    private String passwordHash;
-
     @Column("profile_photo_url")
     private String profilePhotoUrl;
 

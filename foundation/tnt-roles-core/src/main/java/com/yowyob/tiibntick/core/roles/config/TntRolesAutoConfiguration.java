@@ -261,10 +261,14 @@ public class TntRolesAutoConfiguration {
             TntRolesProperties properties,
             IPermissionChangeNotifier permissionChangeNotifier,
             org.springframework.beans.factory.ObjectProvider<ITntRoleAssignmentPort> kernelAssignmentPort,
-            TntRoleDefinitionRegistry definitionRegistry) {
-        return new TntRoleAssignmentService(roleRepository, assignmentRepository, outboxRepository,
-                transactionalOperator, objectMapper, properties.getSystemTenantId(), permissionChangeNotifier,
-                kernelAssignmentPort.getIfAvailable(), definitionRegistry);
+            TntRoleDefinitionRegistry definitionRegistry,
+            org.springframework.beans.factory.ObjectProvider<
+                    com.yowyob.tiibntick.core.roles.application.port.in.ManagePlatformAdminsUseCase> platformAdmins) {
+        TntRoleAssignmentService service = new TntRoleAssignmentService(roleRepository, assignmentRepository,
+                outboxRepository, transactionalOperator, objectMapper, properties.getSystemTenantId(),
+                permissionChangeNotifier, kernelAssignmentPort.getIfAvailable(), definitionRegistry);
+        service.setPlatformAdmins(platformAdmins.getIfAvailable());
+        return service;
     }
 
     @Bean
@@ -274,9 +278,13 @@ public class TntRolesAutoConfiguration {
             RoleSyncOutboxRepository outboxRepository,
             TransactionalOperator transactionalOperator,
             ObjectMapper objectMapper,
-            IPermissionChangeNotifier permissionChangeNotifier) {
-        return new TntRoleRevocationService(assignmentRepository, outboxRepository, transactionalOperator,
-                objectMapper, permissionChangeNotifier);
+            IPermissionChangeNotifier permissionChangeNotifier,
+            org.springframework.beans.factory.ObjectProvider<
+                    com.yowyob.tiibntick.core.roles.application.port.in.ManagePlatformAdminsUseCase> platformAdmins) {
+        TntRoleRevocationService service = new TntRoleRevocationService(assignmentRepository, outboxRepository,
+                transactionalOperator, objectMapper, permissionChangeNotifier);
+        service.setPlatformAdmins(platformAdmins.getIfAvailable());
+        return service;
     }
 
     @Bean
@@ -347,6 +355,55 @@ public class TntRolesAutoConfiguration {
     @ConditionalOnMissingBean
     public PermissionCache permissionCache(TntRolesProperties properties) {
         return new PermissionCache(properties.getPermissionCacheTtlSeconds());
+    }
+
+    // ── Agency/organisation roles of the token confirmed by the Core's assignments (decision D-176) ──
+
+    @Bean
+    @ConditionalOnMissingBean
+    public com.yowyob.tiibntick.core.roles.application.service.ScopedRoleConfirmationService scopedRoleConfirmationService(
+            TntRolesProperties properties,
+            UserRoleAssignmentRepository assignmentRepository,
+            RoleRepository roleRepository,
+            TntRoleDefinitionRegistry registry) {
+        // always the Core's own assignments, whatever tnt.roles.permission.mode: they are the proof (D-176)
+        return new com.yowyob.tiibntick.core.roles.application.service.ScopedRoleConfirmationService(
+                new LocalReactivePermissionResolver(assignmentRepository, roleRepository, registry,
+                        properties.getSystemTenantId()),
+                properties.getPlatformAdminCacheTtlSeconds());
+    }
+
+    // ── Platform administrators (TNT_ADMIN registry, decisions D-159 to D-175) ──
+
+    @Bean
+    @ConditionalOnMissingBean
+    public com.yowyob.tiibntick.core.roles.application.service.PlatformAdminCache platformAdminCache(
+            TntRolesProperties properties) {
+        return new com.yowyob.tiibntick.core.roles.application.service.PlatformAdminCache(
+                properties.getPlatformAdminCacheTtlSeconds());
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(com.yowyob.tiibntick.core.roles.application.port.out.PlatformRoleGrantRepository.class)
+    public com.yowyob.tiibntick.core.roles.application.port.out.PlatformRoleGrantRepository platformRoleGrantRepository(
+            org.springframework.r2dbc.core.DatabaseClient databaseClient) {
+        return new com.yowyob.tiibntick.core.roles.adapter.out.persistence.PlatformRoleGrantRepositoryAdapter(
+                databaseClient);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(com.yowyob.tiibntick.core.roles.application.port.in.ManagePlatformAdminsUseCase.class)
+    public com.yowyob.tiibntick.core.roles.application.service.PlatformAdminService platformAdminService(
+            com.yowyob.tiibntick.core.roles.application.port.out.PlatformRoleGrantRepository repository,
+            com.yowyob.tiibntick.core.roles.application.service.PlatformAdminCache cache,
+            IPermissionChangeNotifier permissionChangeNotifier,
+            TransactionalOperator transactionalOperator,
+            org.springframework.beans.factory.ObjectProvider<
+                    com.yowyob.tiibntick.core.roles.application.port.out.IPlatformAdminAlertPort> alerts,
+            TntRolesProperties properties) {
+        return new com.yowyob.tiibntick.core.roles.application.service.PlatformAdminService(repository, cache,
+                permissionChangeNotifier, transactionalOperator, alerts.orderedStream().toList(),
+                properties.getSystemTenantId(), java.time.Clock.systemUTC());
     }
 
     /**

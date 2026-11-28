@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="
+           http://www.liquibase.org/xml/ns/dbchangelog
+           http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.23.xsd">
+
+    <!-- Lot evt-l5 — payment through the Kernel escrow (spec cible-evenements-colis-livraison.md §4). -->
+
+    <changeSet id="evt-l5-001-drop-delivery-receive-code" author="evt-l5" labels="evt-l5">
+        <comment>
+            Decision H.1 of 2026-11-26 (user): the payment of a delivery goes through the Kernel escrow, held with
+            the client's code; the receive-code transfer to the delivery person is gone, with its columns (added by
+            changeset 071). No data to keep: a receive code lives a few minutes.
+        </comment>
+        <sql splitStatements="false">
+            ALTER TABLE deliveries DROP COLUMN IF EXISTS receive_code;
+            ALTER TABLE deliveries DROP COLUMN IF EXISTS receive_code_expires_at;
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

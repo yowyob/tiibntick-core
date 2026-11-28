@@ -43,7 +43,14 @@ public class ThirdPartyRatingRepositoryAdapter implements ThirdPartyRatingReposi
     }
 
     @Override
-    public Mono<Boolean> existsByMissionIdAndRaterActorId(String missionId, UUID raterActorId) {
+    public Mono<Boolean> existsByDeliveryIdAndRaterActorId(String missionId, UUID raterActorId) {
         return r2dbcRepo.existsByMissionIdAndRaterActorId(missionId, raterActorId);
+    }
+
+    @Override
+    public Mono<Boolean> existsByDeliveryIdAndRaterActorIdAndSubjectKind(String missionId, UUID raterActorId,
+                                                                        String subjectKind) {
+        return r2dbcRepo.existsByMissionIdAndRaterActorIdAndSubjectKind(missionId, raterActorId,
+                subjectKind != null ? subjectKind : "");
     }
 }

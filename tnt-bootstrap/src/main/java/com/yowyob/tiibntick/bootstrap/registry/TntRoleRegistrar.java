@@ -40,7 +40,7 @@ public class TntRoleRegistrar {
     @Value("${tnt.roles.provision-on-startup:true}")
     private boolean provisionOnStartup;
 
-    @Value("${tnt.roles.system-tenant-id:00000000-0000-0000-0000-000000000001}")
+    @Value("${tnt.roles.system-tenant-id}")
     private String systemTenantId;
 
     /**

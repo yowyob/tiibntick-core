@@ -165,6 +165,29 @@ public class IncidentEntity implements Persistable<UUID> {
     @Column("tracking_code")
     private String trackingCode;
 
+    // ── lot L3 ───────────────────────────────────────────────────────────────
+
+    @Column("blocking")
+    private boolean blocking;
+
+    @Column("blocking_forced_by_courier")
+    private boolean blockingForcedByCourier;
+
+    @Column("delivery_outcome")
+    private String deliveryOutcome;
+
+    @Column("responsible_party")
+    private String responsibleParty;
+
+    @Column("resolution_note")
+    private String resolutionNote;
+
+    @Column("resolution_proposed_at")
+    private java.time.Instant resolutionProposedAt;
+
+    @Column("event_sequence")
+    private long eventSequence;
+
     @Version
     private long version;
 

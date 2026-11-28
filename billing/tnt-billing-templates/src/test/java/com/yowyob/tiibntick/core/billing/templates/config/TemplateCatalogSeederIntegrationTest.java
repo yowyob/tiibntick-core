@@ -143,6 +143,38 @@ class TemplateCatalogSeederIntegrationTest {
         assertThat(repository.findByTemplateCode("TPL-BASE-STD").block().getName()).isEqualTo("Mon tarif maison");
     }
 
+    @Test
+    @DisplayName("hand-written or legacy rows never hide the catalog: unknown owner types are skipped, FREELANCER means FREELANCER_ORG, an unreadable row is left out")
+    void oneBadRowDoesNotEmptyTheCatalog() throws Exception {
+        TemplateCatalogSeeder seeder = new TemplateCatalogSeeder(repository);
+        seeder.syncCatalog().block(Duration.ofSeconds(60));
+        try (Connection conn = DriverManager.getConnection(
+                POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+             var st = conn.createStatement()) {
+            st.executeUpdate("INSERT INTO billing_policy_templates (id, template_code, name, category, applicable_to_json, is_active) "
+                    + "VALUES (gen_random_uuid(), 'TPL-LEGACY', 'Legacy', 'BASE', '[\"FREELANCER\",\"NOT_A_TYPE\"]', true)");
+            st.executeUpdate("INSERT INTO billing_policy_templates (id, template_code, name, category, applicable_to_json, is_active) "
+                    + "VALUES (gen_random_uuid(), 'TPL-BROKEN', 'Broken', 'NOT_A_CATEGORY', '[\"FREELANCER_ORG\"]', true)");
+        }
+
+        List<PolicyTemplate> offered = forFreelancer();
+
+        assertThat(offered).extracting(PolicyTemplate::getTemplateCode)
+                .contains("TPL-BASE-STD", "TPL-FRAGILE", "TPL-LEGACY")
+                .doesNotContain("TPL-BROKEN");
+        assertThat(offered.stream().filter(t -> t.getTemplateCode().equals("TPL-LEGACY")).findFirst().orElseThrow()
+                .getApplicableTo()).containsExactly(PolicyOwnerType.FREELANCER_ORG);
+        // and the seeder keeps going past a row it cannot read
+        seeder.syncCatalog().block(Duration.ofSeconds(60));
+
+        // the container is shared with the other tests: leave the catalog as the seeder made it
+        try (Connection conn = DriverManager.getConnection(
+                POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+             var st = conn.createStatement()) {
+            st.executeUpdate("DELETE FROM billing_policy_templates WHERE template_code IN ('TPL-LEGACY', 'TPL-BROKEN')");
+        }
+    }
+
     private static Long totalParameters() {
         return repository.findAll().flatMapIterable(PolicyTemplate::getParameters).count().block();
     }

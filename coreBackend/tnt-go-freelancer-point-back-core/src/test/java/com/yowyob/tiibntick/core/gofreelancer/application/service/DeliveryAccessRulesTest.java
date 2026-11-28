@@ -83,8 +83,8 @@ class DeliveryAccessRulesTest {
         delivery = new Delivery();
         delivery.setId(DELIVERY);
         delivery.setDeliveryNeedId(NEED);
-        delivery.setFreelancerId(PROFILE);
-        delivery.setTarif(2500.0);
+        com.yowyob.tiibntick.core.gofreelancer.TestDeliveries.driver(delivery, PROFILE);
+        com.yowyob.tiibntick.core.gofreelancer.TestDeliveries.tarif(delivery, 2500.0);
         DeliveryNeed need = new DeliveryNeed();
         need.setId(NEED);
         need.setUserId(CLIENT);
@@ -126,9 +126,13 @@ class DeliveryAccessRulesTest {
     }
 
     @Test
-    @DisplayName("once the delivery person generated a receive code, not even staff can change the price")
-    void priceFrozenOnceReceiveCodeExists() {
-        delivery.setReceiveCode("RC-1");
+    @DisplayName("lot L5: once a payment intent exists (escrow or cash), not even staff can change the price")
+    void priceFrozenOnceIntentExists() {
+        var escrows = org.mockito.Mockito.mock(
+                com.yowyob.tiibntick.core.billing.wallet.application.port.in.IEscrowUseCase.class);
+        when(escrows.intentOfDelivery(DELIVERY)).thenReturn(Mono.just(org.mockito.Mockito.mock(
+                com.yowyob.tiibntick.core.billing.wallet.domain.model.PaymentIntent.class)));
+        rules.setEscrows(escrows);
         StepVerifier.create(rules.assertCallerCanUpdateDelivery(DELIVERY, true, user(STRANGER, "ROLE_TNT_ADMIN")))
                 .expectErrorMatches(e -> e instanceof ResponseStatusException r
                         && r.getStatusCode() == HttpStatus.CONFLICT)

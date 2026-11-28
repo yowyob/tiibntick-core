@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:tnt:kafka:v1:details:IncidentPendingConfirmation",
+  "title": "details of IncidentPendingConfirmation",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["deliveryOutcome"],
+  "properties": {"deliveryOutcome": {"enum": ["RESUMED", "FAILED", "DISPUTE"]}, "responsibleParty": {"type": ["string", "null"]}}
+}

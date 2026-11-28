@@ -52,6 +52,11 @@ public class IncidentWebMapper {
                 .responsibleOrgId(d.getResponsibleOrgId())
                 .responsibleOrgType(d.getResponsibleOrgType())
                 .trackingCode(d.getTrackingCode())
+                .blocking(d.isBlocking())
+                .deliveryOutcome(d.getDeliveryOutcome())
+                .responsibleParty(d.getResponsibleParty())
+                .resolutionNote(d.getResolutionNote())
+                .resolutionProposedAt(d.getResolutionProposedAt())
                 .build();
     }
 

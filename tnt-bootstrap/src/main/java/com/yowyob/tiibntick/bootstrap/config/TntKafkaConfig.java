@@ -3,6 +3,8 @@ package com.yowyob.tiibntick.bootstrap.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.yowyob.tiibntick.common.kafka.ReactiveListenerSupport;
+import com.yowyob.tiibntick.common.kafka.TntEventMasking;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,6 +18,7 @@ import org.springframework.kafka.core.ProducerFactory;
 import reactor.kafka.sender.KafkaSender;
 import reactor.kafka.sender.SenderOptions;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -86,6 +89,28 @@ public class TntKafkaConfig {
         return new ObjectMapper()
                 .registerModule(new JavaTimeModule())
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+    }
+
+    /**
+     * Single masking point of the personal data published in the aggregate events (decision [G.3], lot L0):
+     * coordinates rounded to {@code tnt.kafka.masking.coordinate-decimals} decimals — 2 by decision QO-17.
+     */
+    @Bean
+    @ConditionalOnMissingBean(TntEventMasking.class)
+    public TntEventMasking tntEventMasking(
+            @Value("${" + TntEventMasking.COORDINATE_DECIMALS_PROPERTY + ":2}") int coordinateDecimals) {
+        return new TntEventMasking(coordinateDecimals);
+    }
+
+    /**
+     * Bounded blocking wait of a Kafka listener's reactive work (decision [G.8], lot L0): an error or the
+     * {@code tnt.kafka.listener.timeout} (30 s) reaches the container, which retries then dead-letters.
+     */
+    @Bean
+    @ConditionalOnMissingBean(ReactiveListenerSupport.class)
+    public ReactiveListenerSupport reactiveListenerSupport(
+            @Value("${" + ReactiveListenerSupport.TIMEOUT_PROPERTY + ":30s}") Duration timeout) {
+        return new ReactiveListenerSupport(timeout);
     }
 
     /**

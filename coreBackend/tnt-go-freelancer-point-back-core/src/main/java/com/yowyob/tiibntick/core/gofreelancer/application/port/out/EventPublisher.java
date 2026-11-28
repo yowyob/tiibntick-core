@@ -1,6 +1,5 @@
 package com.yowyob.tiibntick.core.gofreelancer.application.port.out;
 
-import com.yowyob.tiibntick.core.gofreelancer.adapter.out.kafka.event.AnnouncementPublishedEvent;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.kafka.event.FreelancerCreatedEvent;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.kafka.event.FreelancerValidatedEvent;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.kafka.event.MatchingNotificationEvent;
@@ -16,7 +15,6 @@ public interface EventPublisher {
 
     void publishFreelancerValidated(FreelancerValidatedEvent event);
 
-    void publishAnnouncementPublished(AnnouncementPublishedEvent event);
 
     void publishSubscriptionAttempt(SubscriptionAttemptEvent event);
 

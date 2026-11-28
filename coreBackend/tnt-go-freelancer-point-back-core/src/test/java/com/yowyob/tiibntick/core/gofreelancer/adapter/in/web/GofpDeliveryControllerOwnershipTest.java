@@ -7,7 +7,7 @@ import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.DeliverySta
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.DeliveryUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.application.service.DeliveryStatusApplicationService;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryStatus;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryStatus;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -59,7 +59,7 @@ class GofpDeliveryControllerOwnershipTest {
     void assignedActorGets200() {
         Delivery saved = new Delivery();
         saved.setId(DELIVERY_ID);
-        saved.setStatus(DeliveryStatus.DELIVERED);
+        com.yowyob.tiibntick.core.gofreelancer.TestDeliveries.status(saved, DeliveryStatus.DELIVERED);
 
         when(deliveryStatusApplicationService.assertCallerIsAssignedDeliveryPerson(
                 eq(DELIVERY_ID), eq(ASSIGNED_ACTOR)))
@@ -102,7 +102,7 @@ class GofpDeliveryControllerOwnershipTest {
         clientFor(UNASSIGNED_ACTOR)
                 .patch().uri("/api/v1/deliveries/{id}/status", DELIVERY_ID)
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue("{\"status\":\"AT_RELAY_POINT\",\"relayPointId\":\"" + UUID.randomUUID() + "\"}")
+                .bodyValue("{\"status\":\"AT_RELAY_HUB\",\"relayPointId\":\"" + UUID.randomUUID() + "\"}")
                 .exchange()
                 .expectStatus().isForbidden();
         org.mockito.Mockito.verify(deliveryStatusApplicationService, org.mockito.Mockito.never())

@@ -1,12 +1,12 @@
 package com.yowyob.tiibntick.core.agency.org.hubops.adapter.in.messaging;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yowyob.tiibntick.core.agency.org.adapter.out.persistence.AgencyRelayHubR2dbcRepository;
 import com.yowyob.tiibntick.core.agency.org.adapter.out.persistence.entity.AgencyRelayHubEntity;
 import com.yowyob.tiibntick.core.agency.org.hubops.adapter.out.persistence.HubParcelRecordR2dbcRepository;
 import com.yowyob.tiibntick.core.agency.org.hubops.application.mapper.HubParcelMapper;
 import com.yowyob.tiibntick.core.agency.org.hubops.application.service.HubOccupancyService;
+import com.yowyob.tiibntick.core.agency.org.hubops.application.service.HubParcelExpiryService;
 import com.yowyob.tiibntick.core.agency.org.hubops.domain.HubParcelRecord;
 import com.yowyob.tiibntick.core.agency.org.hubops.domain.vo.ParcelStatus;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -23,7 +23,15 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Inventory Kafka → Agency hubops: parcel projection + occupancy refresh.
+ * Parcel custody → Agency hubops: parcel projection + occupancy refresh (lot L8, spec §3.7). Reads
+ * {@code tnt.parcel.events} (was {@code tnt.inventory.hub.package.deposited / .pickedup}): a parcel entering
+ * {@code AT_RELAY_HUB} is deposited at {@code custody.hubId}; a parcel leaving it is withdrawn from the hub it was in
+ * ({@code previousState.custody.hubId}). A parcel not collected at the end of its storage
+ * ({@code AT_RELAY_HUB → RETURN_REQUESTED}, {@code returnCause = NOT_COLLECTED_AT_RELAY}: the parcel effect of
+ * {@code DeliveryFailed(NOT_COLLECTED_AT_RELAY)}, row D12/P11) stays in the hub waiting for its return and is marked
+ * EXPIRED — this replaces the agency's own expiry job (spec §6, lot L8): the storage deadline is the common one
+ * (§5.2). Other changes and legacy records are ignored. The work is awaited (lot L7 rule): a failure is retried, then
+ * dead-lettered to {@code tnt.dlq}.
  */
 @Component
 @ConditionalOnProperty(name = "tnt.agency.kafka.consumers.enabled", havingValue = "true", matchIfMissing = true)
@@ -34,70 +42,99 @@ public class InventoryHubConsumer {
     private final AgencyRelayHubR2dbcRepository hubRepo;
     private final HubParcelRecordR2dbcRepository parcelRepo;
     private final HubOccupancyService occupancyService;
+    private final HubParcelExpiryService expiryService;
     private final ObjectMapper objectMapper;
 
     public InventoryHubConsumer(AgencyRelayHubR2dbcRepository hubRepo,
                                 HubParcelRecordR2dbcRepository parcelRepo,
                                 HubOccupancyService occupancyService,
+                                HubParcelExpiryService expiryService,
                                 ObjectMapper objectMapper) {
         this.hubRepo = hubRepo;
         this.parcelRepo = parcelRepo;
         this.occupancyService = occupancyService;
+        this.expiryService = expiryService;
         this.objectMapper = objectMapper;
     }
 
+    static final String AT_RELAY_HUB = "AT_RELAY_HUB";
+    static final String RETURN_REQUESTED = "RETURN_REQUESTED";
+    static final String NOT_COLLECTED_AT_RELAY = "NOT_COLLECTED_AT_RELAY";
+
     @KafkaListener(
-            topics = "${tnt.kafka.topics.consumed.core-inventory-deposited}",
+            topics = com.yowyob.tiibntick.common.kafka.TntTopics.PARCEL_EVENTS,
             groupId = "${tnt.kafka.topics.groups.agency-erp-inventory:tnt-agency-erp-inventory-consumer}",
             containerFactory = "agencyOrgHubKafkaListenerFactory"
     )
-    public void onPackageDeposited(ConsumerRecord<String, String> record, Acknowledgment ack) {
-        handle(record, ack, true);
-    }
-
-    @KafkaListener(
-            topics = "${tnt.kafka.topics.consumed.core-inventory-pickedup}",
-            groupId = "${tnt.kafka.topics.groups.agency-erp-inventory:tnt-agency-erp-inventory-consumer}",
-            containerFactory = "agencyOrgHubKafkaListenerFactory"
-    )
-    public void onPackagePickedUp(ConsumerRecord<String, String> record, Acknowledgment ack) {
-        handle(record, ack, false);
-    }
-
-    private void handle(ConsumerRecord<String, String> record, Acknowledgment ack, boolean deposited) {
-        try {
-            Map<String, Object> payload = objectMapper.readValue(record.value(), new TypeReference<>() {});
-            String trackingCode = stringVal(payload.get("trackingCode"));
-            String tenantIdStr = stringVal(payload.get("tenantId"));
-            if (trackingCode == null || tenantIdStr == null) {
-                ack.acknowledge();
-                return;
-            }
-            UUID tenantId = UUID.fromString(tenantIdStr);
-            parcelRepo.findByTrackingCodeAndTenantId(trackingCode, tenantId)
-                    .map(HubParcelMapper::toDomain)
-                    .flatMap(parcel -> applyProjection(parcel, payload, deposited))
-                    .switchIfEmpty(Mono.defer(() -> createProjection(payload, tenantId, trackingCode, deposited)))
-                    .flatMap(parcel -> refreshOccupancy(payload, tenantId).thenReturn(parcel))
-                    .doOnError(e -> log.warn("[InventoryHubConsumer] sync failed code={}: {}",
-                            trackingCode, e.getMessage()))
-                    .onErrorResume(e -> Mono.empty())
-                    .doFinally(s -> ack.acknowledge())
-                    .subscribe();
-        } catch (Exception e) {
-            log.warn("[InventoryHubConsumer] parse error: {}", e.getMessage());
-            ack.acknowledge();
+    public void onParcelEvent(ConsumerRecord<String, String> record, Acknowledgment ack) throws Exception {
+        Map<String, Object> projection = projection(objectMapper.readTree(record.value()));
+        if (projection != null && Boolean.TRUE.equals(projection.get("expired"))) {
+            UUID tenantId = UUID.fromString((String) projection.get("tenantId"));
+            com.yowyob.tiibntick.common.kafka.ReactiveListenerSupport.awaitBounded(
+                    expiryService.expireDeposited((String) projection.get("trackingCode"), tenantId, Instant.now())
+                            .then(Mono.just(true)),
+                    java.time.Duration.ofSeconds(30));
+        } else if (projection != null) {
+            boolean deposited = Boolean.TRUE.equals(projection.get("deposited"));
+            String trackingCode = (String) projection.get("trackingCode");
+            UUID tenantId = UUID.fromString((String) projection.get("tenantId"));
+            com.yowyob.tiibntick.common.kafka.ReactiveListenerSupport.awaitBounded(
+                    parcelRepo.findByTrackingCodeAndTenantId(trackingCode, tenantId)
+                            .map(HubParcelMapper::toDomain)
+                            .flatMap(parcel -> applyProjection(parcel, projection, deposited))
+                            .switchIfEmpty(Mono.defer(() -> createProjection(projection, tenantId, trackingCode,
+                                    deposited)))
+                            .flatMap(parcel -> refreshOccupancy(projection, tenantId).thenReturn(parcel)),
+                    java.time.Duration.ofSeconds(30));
         }
+        ack.acknowledge();
     }
 
+    /**
+     * The hub movement of a parcel event in the former inventory shape ({@code trackingCode}, {@code tenantId},
+     * {@code hubId}, {@code packageId}, {@code missionId}, {@code deposited}); null when it is not one.
+     */
+    static Map<String, Object> projection(com.fasterxml.jackson.databind.JsonNode event) {
+        if (!com.yowyob.tiibntick.common.kafka.TntAggregateEvent.isAggregateEvent(event)
+                || !event.hasNonNull("tenantId")) {
+            return null;
+        }
+        com.fasterxml.jackson.databind.JsonNode p = event.path("payload");
+        com.fasterxml.jackson.databind.JsonNode previous = event.path("previousState");
+        String status = p.path("status").asText(null);
+        String before = previous.path("status").asText(null);
+        boolean entered = AT_RELAY_HUB.equals(status) && !AT_RELAY_HUB.equals(before);
+        boolean left = AT_RELAY_HUB.equals(before) && !AT_RELAY_HUB.equals(status);
+        boolean expired = left && RETURN_REQUESTED.equals(status)
+                && NOT_COLLECTED_AT_RELAY.equals(p.path("returnCause").asText(null));
+        String trackingCode = p.path("trackingCode").asText(null);
+        if (!(entered || left) || trackingCode == null) {
+            return null;
+        }
+        String hub = left && previous.path("custody").hasNonNull("hubId")
+                ? previous.path("custody").path("hubId").asText() : p.path("custody").path("hubId").asText(null);
+        Map<String, Object> m = new java.util.HashMap<>();
+        m.put("trackingCode", trackingCode);
+        m.put("tenantId", event.path("tenantId").asText());
+        m.put("hubId", hub);
+        m.put("packageId", event.path("aggregateId").asText());
+        m.put("missionId", p.path("currentDeliveryId").asText(null));
+        m.put("deposited", entered);
+        m.put("expired", expired);
+        return m;
+    }
+
+    /**
+     * Refreshes the hub occupancy. A failure reaches the container (retries, then {@code tnt.dlq}, decision G.8):
+     * replaying the record is harmless, the projection being idempotent.
+     */
     private Mono<Void> refreshOccupancy(Map<String, Object> payload, UUID tenantId) {
         UUID coreHubId = uuidVal(payload.get("hubId"));
         if (coreHubId == null) {
             return Mono.empty();
         }
         return hubRepo.findByCoreHubIdAndTenantId(coreHubId, tenantId)
-                .flatMap(hub -> occupancyService.getOccupancy(tenantId, hub.getId()).then())
-                .onErrorResume(e -> Mono.empty());
+                .flatMap(hub -> occupancyService.getOccupancy(tenantId, hub.getId()).then());
     }
 
     private Mono<HubParcelRecord> applyProjection(

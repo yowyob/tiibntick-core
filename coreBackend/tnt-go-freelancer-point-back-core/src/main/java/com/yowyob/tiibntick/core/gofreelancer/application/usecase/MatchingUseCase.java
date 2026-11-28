@@ -16,7 +16,7 @@ import com.yowyob.tiibntick.core.gofreelancer.application.service.NotificationSe
 import com.yowyob.tiibntick.core.gofreelancer.application.service.TenantContextHolder;
 import com.yowyob.tiibntick.core.gofreelancer.application.usecase.TopsisRankingUseCase.FreelancerCandidate;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.FreelancerVehicle;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.announcement.AnnouncementStatus;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.AnnouncementStatus;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpFreelancerRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -67,6 +67,15 @@ public class MatchingUseCase {
         this.courierCards = courierCards;
     }
 
+    /** Lot L7 rule (spec §3.10): the listener awaits its work. Optional (setter) for slim test contexts. */
+    private com.yowyob.tiibntick.common.kafka.ReactiveListenerSupport listenerSupport =
+            com.yowyob.tiibntick.common.kafka.ReactiveListenerSupport.withDefaultTimeout();
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setListenerSupport(com.yowyob.tiibntick.common.kafka.ReactiveListenerSupport listenerSupport) {
+        if (listenerSupport != null) this.listenerSupport = listenerSupport;
+    }
+
     private static final double INITIAL_DELTA_KM = 1.5;
     private static final double DELTA_INCREMENT_KM = 0.5;
     private static final double MAX_DELTA_KM = 10.0;
@@ -96,23 +105,45 @@ public class MatchingUseCase {
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * Lot evt-l2: the matching runs once per publication, on {@code AnnouncementPublished} of the announcement topic
+     * ({@code tnt.announcement.events}, key = announcement id). It used to listen to both
+     * {@code tnt.delivery.announcement.published} and {@code gofp.announcement.published}, which delivery-core both
+     * fed: every announcement was matched twice. Other event types of the topic, and legacy records, are ignored.
+     */
     @KafkaListener(
-            topics = {
-                    TntTopics.DELIVERY_ANNOUNCEMENT_PUBLISHED,
-                    TntTopics.GOFP_ANNOUNCEMENT_PUBLISHED
-            },
-            groupId = "tnt-go-freelancer-core-group")
-    public void onAnnouncementPublished(String payload) {
+            topics = TntTopics.ANNOUNCEMENT_EVENTS,
+            groupId = "tnt-go-freelancer-core-group",
+            containerFactory = "gofpJsonKafkaListenerContainerFactory")
+    public void onAnnouncementEvent(org.apache.kafka.clients.consumer.ConsumerRecord<String, String> record) {
+        // The raw record: the factory's JSON message converter would try to read the aggregate envelope (a JSON
+        // object) into a String parameter and fail every record.
+        String payload = record.value();
+        if (!isAnnouncementPublished(payload)) {
+            return;
+        }
         UUID announcementId = extractAnnouncementId(payload);
         if (announcementId == null) {
             log.warn("[Matching] Could not extract announcementId from payload: {}", payload);
             return;
         }
-        log.info("[Matching] Received announcement-published event: {}", announcementId);
-        processMatchingForAnnouncement(announcementId)
+        log.info("[Matching] Received AnnouncementPublished: {}", announcementId);
+        // Awaited (lot L7 rule): a failure is retried, then dead-lettered on tnt.dlq instead of being lost.
+        listenerSupport.await(processMatchingForAnnouncement(announcementId)
                 .doOnError(e -> log.error("[Matching] Failed for announcement {}: {}",
-                        announcementId, e.getMessage()))
-                .subscribe();
+                        announcementId, e.getMessage())));
+    }
+
+    /** @return whether the record is an {@code AnnouncementPublished} aggregate event */
+    boolean isAnnouncementPublished(String payload) {
+        try {
+            JsonNode root = objectMapper.readTree(payload);
+            return root != null && com.yowyob.tiibntick.common.kafka.TntAggregateEvent.isAggregateEvent(root)
+                    && "AnnouncementPublished".equals(root.path("eventType").asText());
+        } catch (Exception e) {
+            log.debug("[Matching] Not an aggregate event, ignored: {}", e.getMessage());
+            return false;
+        }
     }
 
     public Mono<Void> processMatchingForAnnouncement(UUID announcementId) {
@@ -231,10 +262,7 @@ public class MatchingUseCase {
 
         Mono<Void> publishRanked = eventPublisherPort
                 .publish(TntTopics.GOFP_ANNOUNCEMENT_CANDIDATES_RANKED, rankedPayload)
-                .onErrorResume(e -> {
-                    log.warn("[Matching] Failed to publish ranked candidates: {}", e.getMessage());
-                    return Mono.empty();
-                });
+                .doOnError(e -> log.warn("[Matching] Failed to publish ranked candidates: {}", e.getMessage()));
 
         AnnouncementDocument annDoc = AnnouncementDocument.builder()
                 .id(announcement.id())
@@ -253,10 +281,7 @@ public class MatchingUseCase {
         Mono<Void> notify = notificationService
                 .notifyEligibleFreelancers(freelancers, annDoc)
                 .then()
-                .onErrorResume(e -> {
-                    log.warn("[Matching] Notification failed: {}", e.getMessage());
-                    return Mono.empty();
-                });
+                .doOnError(e -> log.warn("[Matching] Notification failed: {}", e.getMessage()));
 
         return Mono.when(publishRanked, notify);
     }
@@ -373,7 +398,8 @@ public class MatchingUseCase {
                                     .switchIfEmpty(Mono.defer(
                                             () -> gofpFreelancerRepository.findByCoreFreelancerId(fId)));
 
-                    return Mono.zip(vehicleMono, occupiedM3, freelancerMono.onErrorResume(e -> Mono.empty()))
+                    // a lookup error fails the matching (retried, then dead-lettered) instead of dropping the candidate
+                    return Mono.zip(vehicleMono, occupiedM3, freelancerMono)
                             .map(t -> {
                                 FreelancerVehicle vehicle = t.getT1();
                                 double occupied = t.getT2();

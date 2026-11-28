@@ -45,6 +45,13 @@
             <artifactId>tnt-common-core</artifactId>
         </dependency>
 
+        <!-- ══ tnt-geo-core (L3) — this module implements geo's IRelayHubCustodyPort (parcels in custody of a
+             revoked hub, D-129): the higher layer owns the dependency edge. ══ -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-geo-core</artifactId>
+        </dependency>
+
         <!-- ══ TiiBnTick L0 — Event bus ═════════════════════════════════════ -->
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>

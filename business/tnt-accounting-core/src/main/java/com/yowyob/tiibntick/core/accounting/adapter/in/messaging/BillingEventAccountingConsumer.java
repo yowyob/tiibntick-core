@@ -2,237 +2,86 @@ package com.yowyob.tiibntick.core.accounting.adapter.in.messaging;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yowyob.tiibntick.common.kafka.EventPayloads;
+import com.yowyob.tiibntick.common.kafka.ReactiveListenerSupport;
 import com.yowyob.tiibntick.common.kafka.TntTopics;
-import com.yowyob.tiibntick.core.accounting.application.port.in.JournalEntryLineCommand;
-import com.yowyob.tiibntick.core.accounting.application.port.in.PostJournalEntryCommand;
-import com.yowyob.tiibntick.core.accounting.application.service.AccountingApplicationService;
-import com.yowyob.tiibntick.core.accounting.domain.model.JournalType;
+import com.yowyob.tiibntick.core.accounting.application.service.KernelBookkeepingService;
+import com.yowyob.tiibntick.core.accounting.domain.model.kernel.BookkeepingFact;
+import com.yowyob.tiibntick.core.accounting.domain.service.BookkeepingFactPolicy;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
-import java.util.List;
-import java.util.UUID;
+import java.util.function.Function;
 
 /**
- * Inbound Kafka consumer that listens to billing events and auto-generates
- * OHADA journal entries in tnt-accounting-core.
- *
- * Topics consumed:
- *   - tnt.billing.invoice.paid        → Debit 411000 (Client), Credit 704000 (Livraison revenue)
- *   - tnt.billing.wallet.commission.calculated → Debit 651000 (Commission charge), Credit 481000 (Commission payable)
- *   - tnt.billing.wallet.payment.confirmed   → Debit 521100/521200 (MoMo), Credit 411000 (Client)
- *
- * Author: MANFOUO Braun
+ * Books the money events in the Kernel accounting service (lot L6, cible §4.6, decisions H.3, QO-20, QO-21). Blocking
+ * listeners (§3.10): the listener thread waits for the entry, an unavailable Kernel fails the record (retried, then
+ * {@code tnt.dlq}); the booking is idempotent per fact, so a replay never books twice.
+ * <ul>
+ *   <li>{@code tnt.billing.wallet.commission.calculated} — platform commission, once {@code SETTLED};</li>
+ *   <li>{@code tnt.billing.compensation.paid} — dispute indemnity or return paid by the fund;</li>
+ *   <li>{@code tnt.billing.invoice.paid} — in the book of the issuing organisation.</li>
+ * </ul>
+ * Removed in L5/L6: {@code payment.confirmed} (the courier's share is booked nowhere, H.3; no MERCHANT share exists
+ * yet), {@code tnt.delivery.freelancer_org.assigned} (not an accounting fact), {@code split_executed} (topic removed).
+ * The local journal is no longer written (QO-21).
  */
+@Slf4j
 @Component
 public class BillingEventAccountingConsumer {
 
-    private static final String SYSTEM_USER = "SYSTEM_ACCOUNTING";
-    private static final String DEFAULT_CURRENCY = "XAF";
+    static final String GROUP = "tnt-accounting-core";
 
-    private final AccountingApplicationService accountingService;
+    private final KernelBookkeepingService bookkeeping;
     private final ObjectMapper objectMapper;
+    private final ReactiveListenerSupport listenerSupport;
 
-    public BillingEventAccountingConsumer(AccountingApplicationService accountingService,
-                                          @Qualifier("tntObjectMapper") ObjectMapper objectMapper) {
-        this.accountingService = accountingService;
+    public BillingEventAccountingConsumer(KernelBookkeepingService bookkeeping,
+                                          @Qualifier("tntObjectMapper") ObjectMapper objectMapper,
+                                          ObjectProvider<ReactiveListenerSupport> listenerSupport) {
+        this.bookkeeping = bookkeeping;
         this.objectMapper = objectMapper;
+        this.listenerSupport = listenerSupport.getIfAvailable(ReactiveListenerSupport::withDefaultTimeout);
     }
 
-    @KafkaListener(topics = TntTopics.BILLING_INVOICE_PAID, groupId = "tnt-accounting-core", containerFactory = "accountingKafkaListenerContainerFactory")
-    public void onInvoicePaid(ConsumerRecord<String, String> record) {
-        try {
-            JsonNode node = objectMapper.readTree(record.value());
-            UUID tenantId = UUID.fromString(node.get("tenantId").asText());
-            UUID organizationId = UUID.fromString(node.get("organizationId").asText());
-            String invoiceId = node.get("invoiceId").asText();
-            BigDecimal amount = new BigDecimal(node.get("amount").asText());
-
-            // Debit 411000 (Client AR), Credit 704000 (Revenue from delivery services)
-            PostJournalEntryCommand cmd = new PostJournalEntryCommand(
-                    tenantId, organizationId, JournalType.SALES,
-                    "INVOICE", invoiceId,
-                    List.of(
-                            new JournalEntryLineCommand(null, "411000",
-                                    "Client — facture " + invoiceId, amount, BigDecimal.ZERO, DEFAULT_CURRENCY),
-                            new JournalEntryLineCommand(null, "704000",
-                                    "Prestation livraison — facture " + invoiceId, BigDecimal.ZERO, amount, DEFAULT_CURRENCY)
-                    ),
-                    "Auto-entry: invoice paid " + invoiceId,
-                    SYSTEM_USER
-            );
-            accountingService.postJournalEntry(cmd).subscribe();
-
-        } catch (Exception e) {
-            // Log and skip — idempotency handled via invoiceId referenceId deduplication
-        }
-    }
-
-    @KafkaListener(topics = TntTopics.BILLING_WALLET_COMMISSION_CALCULATED, groupId = "tnt-accounting-core", containerFactory = "accountingKafkaListenerContainerFactory")
+    @KafkaListener(topics = TntTopics.BILLING_WALLET_COMMISSION_CALCULATED, groupId = GROUP,
+            containerFactory = "accountingKafkaListenerContainerFactory")
     public void onCommissionCalculated(ConsumerRecord<String, String> record) {
-        try {
-            JsonNode node = objectMapper.readTree(record.value());
-            UUID tenantId = UUID.fromString(node.get("tenantId").asText());
-            UUID organizationId = UUID.fromString(node.get("organizationId").asText());
-            String missionId = node.get("missionId").asText();
-            BigDecimal commission = new BigDecimal(node.get("commission").asText());
-
-            // Debit 651000 (Commission expense), Credit 481000 (Commission payable to courier)
-            PostJournalEntryCommand cmd = new PostJournalEntryCommand(
-                    tenantId, organizationId, JournalType.COMMISSION,
-                    "MISSION", missionId,
-                    List.of(
-                            new JournalEntryLineCommand(null, "651000",
-                                    "Commission livreur — mission " + missionId, commission, BigDecimal.ZERO, DEFAULT_CURRENCY),
-                            new JournalEntryLineCommand(null, "481000",
-                                    "Commission à payer — mission " + missionId, BigDecimal.ZERO, commission, DEFAULT_CURRENCY)
-                    ),
-                    "Auto-entry: commission calculated for mission " + missionId,
-                    SYSTEM_USER
-            );
-            accountingService.postJournalEntry(cmd).subscribe();
-
-        } catch (Exception e) {
-            // Log and skip
-        }
+        book(record, BookkeepingFactPolicy::commission);
     }
 
-    @KafkaListener(topics = TntTopics.BILLING_WALLET_PAYMENT_CONFIRMED, groupId = "tnt-accounting-core", containerFactory = "accountingKafkaListenerContainerFactory")
-    public void onPaymentConfirmed(ConsumerRecord<String, String> record) {
-        try {
-            JsonNode node = objectMapper.readTree(record.value());
-            UUID tenantId = UUID.fromString(node.get("tenantId").asText());
-            UUID organizationId = UUID.fromString(node.get("organizationId").asText());
-            String paymentId = node.get("paymentId").asText();
-            BigDecimal amount = new BigDecimal(node.get("amount").asText());
-            String method = node.has("method") ? node.get("method").asText("MOMO_MTN") : "MOMO_MTN";
-
-            // Select bank account based on payment method
-            String bankCode = "ORANGE_MONEY".equalsIgnoreCase(method) ? "521200" : "521100";
-            String bankLabel = "ORANGE_MONEY".equalsIgnoreCase(method)
-                    ? "Orange Money" : "MTN MoMo";
-
-            // Debit 521100/521200 (Mobile Money received), Credit 411000 (Client AR cleared)
-            PostJournalEntryCommand cmd = new PostJournalEntryCommand(
-                    tenantId, organizationId, JournalType.BANK,
-                    "PAYMENT", paymentId,
-                    List.of(
-                            new JournalEntryLineCommand(null, bankCode,
-                                    bankLabel + " — paiement " + paymentId, amount, BigDecimal.ZERO, DEFAULT_CURRENCY),
-                            new JournalEntryLineCommand(null, "411000",
-                                    "Règlement client — paiement " + paymentId, BigDecimal.ZERO, amount, DEFAULT_CURRENCY)
-                    ),
-                    "Auto-entry: payment confirmed " + paymentId,
-                    SYSTEM_USER
-            );
-            accountingService.postJournalEntry(cmd).subscribe();
-
-        } catch (Exception e) {
-            // Log and skip
-        }
-    }
-    // ── : FreelancerOrg billing events ─────────────────────────────────────
-
-    /**
-     * Handles mission assignment to a FreelancerOrg.
-     * When a delivery is assigned to a FreelancerOrg, pre-records a suspense entry
-     * on account 706-FRL-{orgId} (Revenue from services — pending confirmation).
-     */
-    @KafkaListener(topics = TntTopics.DELIVERY_FREELANCER_ORG_ASSIGNED, groupId = "tnt-accounting-core", containerFactory = "accountingKafkaListenerContainerFactory")
-    public void onFreelancerOrgAssigned(ConsumerRecord<String, String> record) {
-        try {
-            JsonNode node = objectMapper.readTree(record.value());
-            UUID tenantId = UUID.fromString(node.path("tenantId").asText(""));
-            UUID organizationId = UUID.fromString(node.path("tenantId").asText("00000000-0000-0000-0000-000000000001"));
-            String freelancerOrgId = node.path("freelancerOrgId").asText();
-            String deliveryId = node.path("deliveryId").asText("");
-            if (tenantId.toString().isBlank() || freelancerOrgId.isBlank()) return;
-
-            // Derive short ID for account code lookup
-            String shortId = freelancerOrgId.replace("-", "").substring(0, Math.min(8, freelancerOrgId.replace("-", "").length()));
-            String revenueAccount = "706-FRL-" + shortId;
-            String transitAccount = "471000"; // Compte de régularisation transitoire
-
-            // Transitoire debit 471000, credit 706-FRL-{id} (revenue recognized on assignment)
-            PostJournalEntryCommand cmd = new PostJournalEntryCommand(
-                    tenantId, organizationId, JournalType.SALES,
-                    "DELIVERY", deliveryId,
-                    List.of(
-                            new JournalEntryLineCommand(null, transitAccount,
-                                    "Mission assignée FreelancerOrg — " + deliveryId,
-                                    java.math.BigDecimal.ZERO, java.math.BigDecimal.ONE, DEFAULT_CURRENCY),
-                            new JournalEntryLineCommand(null, revenueAccount,
-                                    "Revenu prestation FreelancerOrg " + freelancerOrgId,
-                                    java.math.BigDecimal.ONE, java.math.BigDecimal.ZERO, DEFAULT_CURRENCY)
-                    ),
-                    "Auto-entry: FreelancerOrg assigned to delivery " + deliveryId,
-                    SYSTEM_USER
-            );
-            // Note: Amount=1 is symbolic; real amounts come from tnt.billing.wallet.split_executed
-            accountingService.postJournalEntry(cmd)
-                    .onErrorResume(e -> reactor.core.publisher.Mono.empty())
-                    .subscribe();
-        } catch (Exception e) {
-            // Log and skip — best-effort accounting entry
-        }
+    @KafkaListener(topics = TntTopics.BILLING_COMPENSATION_PAID, groupId = GROUP,
+            containerFactory = "accountingKafkaListenerContainerFactory")
+    public void onCompensationPaid(ConsumerRecord<String, String> record) {
+        book(record, BookkeepingFactPolicy::compensation);
     }
 
-    /**
-     * Handles wallet payment split execution for FreelancerOrg revenue distribution.
-     * Records the actual split amounts:
-     * - Debit 411-FRL-{orgId} (Client AR), Credit 706-FRL-{orgId} (Revenue)
-     * - Debit 706-FRL-{orgId}, Credit 421-FRL-{orgId} (Sub-deliverer payable)
-     */
-    @KafkaListener(topics = TntTopics.BILLING_WALLET_SPLIT_EXECUTED, groupId = "tnt-accounting-core", containerFactory = "accountingKafkaListenerContainerFactory")
-    public void onWalletSplitExecuted(ConsumerRecord<String, String> record) {
-        try {
-            JsonNode node = objectMapper.readTree(record.value());
-            UUID tenantId = UUID.fromString(node.path("tenantId").asText("00000000-0000-0000-0000-000000000001"));
-            UUID organizationId = UUID.fromString(node.path("tenantId").asText("00000000-0000-0000-0000-000000000001"));
-            String freelancerOrgId = node.path("freelancerOrgId").asText();
-            String missionId = node.path("missionId").asText("");
-            java.math.BigDecimal orgRevenue = new java.math.BigDecimal(node.path("orgRevenue").asText("0"));
-            java.math.BigDecimal subDelivererComm = new java.math.BigDecimal(node.path("subDelivererCommission").asText("0"));
-
-            if (freelancerOrgId.isBlank() || orgRevenue.signum() == 0) return;
-
-            String shortId = freelancerOrgId.replace("-", "").substring(0, Math.min(8, freelancerOrgId.replace("-", "").length()));
-            String clientAccount    = "411-FRL-" + shortId;
-            String revenueAccount   = "706-FRL-" + shortId;
-            String subPayAccount    = "421-FRL-" + shortId;
-            //String transitAccount   = "471000";
-
-            List<JournalEntryLineCommand> lines = new java.util.ArrayList<>(List.of(
-                    new JournalEntryLineCommand(null, clientAccount,
-                            "Règlement client mission " + missionId, orgRevenue, java.math.BigDecimal.ZERO, DEFAULT_CURRENCY),
-                    new JournalEntryLineCommand(null, revenueAccount,
-                            "Produit prestation FreelancerOrg mission " + missionId, java.math.BigDecimal.ZERO, orgRevenue, DEFAULT_CURRENCY)
-            ));
-
-            // If sub-deliverer commission, add payable entry
-            if (subDelivererComm.signum() > 0) {
-                lines.add(new JournalEntryLineCommand(null, revenueAccount,
-                        "Quote-part commission sub-livreur mission " + missionId, subDelivererComm, java.math.BigDecimal.ZERO, DEFAULT_CURRENCY));
-                lines.add(new JournalEntryLineCommand(null, subPayAccount,
-                        "Commission à payer sub-livreur mission " + missionId, java.math.BigDecimal.ZERO, subDelivererComm, DEFAULT_CURRENCY));
-            }
-
-            PostJournalEntryCommand cmd = new PostJournalEntryCommand(
-                    tenantId, organizationId, JournalType.SALES,
-                    "WALLET_SPLIT", missionId,
-                    lines,
-                    "Auto-entry: wallet split FreelancerOrg " + freelancerOrgId + " mission " + missionId,
-                    SYSTEM_USER
-            );
-            accountingService.postJournalEntry(cmd)
-                    .onErrorResume(e -> reactor.core.publisher.Mono.empty())
-                    .subscribe();
-        } catch (Exception e) {
-            // Log and skip
-        }
+    @KafkaListener(topics = TntTopics.BILLING_INVOICE_PAID, groupId = GROUP,
+            containerFactory = "accountingKafkaListenerContainerFactory")
+    public void onInvoicePaid(ConsumerRecord<String, String> record) {
+        book(record, BookkeepingFactPolicy::invoicePaid);
     }
 
+    private void book(ConsumerRecord<String, String> record, Function<JsonNode, BookkeepingFact> policy) {
+        JsonNode event;
+        try {
+            event = EventPayloads.parse(objectMapper, record.value());
+        } catch (Exception e) {
+            // a poison message cannot be booked by a retry: logged, skipped
+            log.error("ACCOUNTING_EVENT_UNREADABLE topic={} offset={}: {}", record.topic(), record.offset(),
+                    e.toString());
+            return;
+        }
+        BookkeepingFact fact = policy.apply(event);
+        if (fact == null) {
+            log.warn("ACCOUNTING_EVENT_INCOMPLETE topic={} offset={} — no identifier, nothing booked",
+                    record.topic(), record.offset());
+            return;
+        }
+        listenerSupport.await(bookkeeping.book(fact));
+    }
 }

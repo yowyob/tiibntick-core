@@ -23,4 +23,6 @@ public class RelayPointUpdateRequest {
     private Double storageHeight;
     /** Unit for storage dimensions: "m", "cm", "mm", "in". Defaults to "m" when absent. */
     private String storageDimensionUnit;
+    /** D-130: storage duration in days of this independent relay (platform bounds, 3–30 by default). */
+    private Integer storageDays;
 }

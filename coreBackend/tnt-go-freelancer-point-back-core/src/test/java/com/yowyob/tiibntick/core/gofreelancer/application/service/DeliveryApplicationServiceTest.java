@@ -17,7 +17,7 @@ import com.yowyob.tiibntick.core.gofreelancer.domain.model.Announcement;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.DeliveryNeed;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpFreelancer;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryStatus;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryStatus;
 import com.yowyob.tiibntick.core.realtime.application.port.in.IGetPresenceUseCase;
 import com.yowyob.tiibntick.core.realtime.domain.model.GeoCoordinates;
 import com.yowyob.tiibntick.core.realtime.domain.model.PresenceRecord;
@@ -638,18 +638,18 @@ class DeliveryApplicationServiceTest {
         Delivery d = new Delivery();
         d.setId(deliveryId);
         d.setAnnouncementId(announcementId);
-        d.setFreelancerId(freelancerId);
+        com.yowyob.tiibntick.core.gofreelancer.TestDeliveries.driver(d, freelancerId);
         d.setDeliveryNeedId(deliveryNeedId);
-        d.setStatus(DeliveryStatus.CREATED);
+        com.yowyob.tiibntick.core.gofreelancer.TestDeliveries.status(d, DeliveryStatus.CREATED);
         return d;
     }
 
     private Delivery deliveryWithFreelancer() {
         Delivery d = new Delivery();
         d.setId(deliveryId);
-        d.setFreelancerId(freelancerId);
+        com.yowyob.tiibntick.core.gofreelancer.TestDeliveries.driver(d, freelancerId);
         d.setDeliveryNeedId(deliveryNeedId);
-        d.setStatus(DeliveryStatus.CREATED);
+        com.yowyob.tiibntick.core.gofreelancer.TestDeliveries.status(d, DeliveryStatus.CREATED);
         return d;
     }
 

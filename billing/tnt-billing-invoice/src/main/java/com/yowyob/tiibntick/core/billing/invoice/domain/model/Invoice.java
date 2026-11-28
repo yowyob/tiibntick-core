@@ -324,7 +324,8 @@ public final class Invoice {
                 version, createdAt, Instant.now(), new ArrayList<>(),
                 issuerOrgType, issuerOrgId, issuerTradeName,
                 vatApplicable, surchargeLines, isFromTemplate, appliedTemplateName);
-        paid.domainEvents.add(new InvoicePaid(id, paymentRef, netAmount, Instant.now(), tenantId));
+        paid.domainEvents.add(new InvoicePaid(id, paymentRef, netAmount, Instant.now(), tenantId, issuerOrgType,
+                issuerOrgId));
         return paid;
     }
 

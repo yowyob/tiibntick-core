@@ -1,11 +1,13 @@
 package com.yowyob.tiibntick.core.delivery.application.service;
 
+import com.yowyob.tiibntick.core.delivery.application.port.in.AnnouncementLookupUseCase;
 import com.yowyob.tiibntick.core.delivery.application.port.in.CreateDirectDeliveryUseCase;
 import com.yowyob.tiibntick.core.delivery.application.port.in.DeliveryAnnouncementUseCase;
 import com.yowyob.tiibntick.core.delivery.application.port.in.command.CreateDeliveryAnnouncementCommand;
 import com.yowyob.tiibntick.core.delivery.application.port.in.command.CreateDirectDeliveryCommand;
 import com.yowyob.tiibntick.core.delivery.application.port.in.command.RespondToAnnouncementCommand;
 import com.yowyob.tiibntick.core.delivery.application.port.in.command.SelectAnnouncementResponseCommand;
+import com.yowyob.tiibntick.core.delivery.application.port.in.command.UpdateDeliveryAnnouncementCommand;
 import com.yowyob.tiibntick.core.delivery.application.port.out.*;
 import com.yowyob.tiibntick.core.delivery.domain.model.aggregate.Delivery;
 import com.yowyob.tiibntick.core.delivery.domain.model.aggregate.DeliveryAnnouncement;
@@ -15,13 +17,18 @@ import com.yowyob.tiibntick.core.delivery.domain.exception.AnnouncementNotFoundE
 import com.yowyob.tiibntick.core.delivery.domain.exception.DeliveryDomainException;
 import com.yowyob.tiibntick.core.delivery.domain.model.entity.AnnouncementResponse;
 import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.GeoCoordinates;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.AnnouncementKind;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryKind;
+import com.yowyob.tiibntick.common.kafka.TntEventActor;
 import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.Collection;
 import java.util.UUID;
 
 /**
@@ -38,14 +45,16 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class DeliveryAnnouncementService implements DeliveryAnnouncementUseCase, CreateDirectDeliveryUseCase {
+public class DeliveryAnnouncementService
+        implements DeliveryAnnouncementUseCase, CreateDirectDeliveryUseCase, AnnouncementLookupUseCase {
 
     private final DeliveryAnnouncementRepository announcementRepository;
     private final DeliveryRepository deliveryRepository;
     private final DeliveryPersonRepository deliveryPersonRepository;
     private final DeliveryCostComputationPort costComputationPort;
     private final EtaComputationPort etaComputationPort;
-    private final DeliveryEventPublisher eventPublisher;
+    private final DeliveryTransitionExecutor transitionExecutor;
+    private final DeliveryThresholdsPort thresholds;
 
     @Override
     @Transactional
@@ -53,7 +62,10 @@ public class DeliveryAnnouncementService implements DeliveryAnnouncementUseCase,
     public Mono<DeliveryAnnouncement> publishAnnouncement(CreateDeliveryAnnouncementCommand cmd) {
         log.info("Publishing delivery announcement for client={} tenant={}", cmd.clientId(), cmd.tenantId());
 
-        Parcel parcel = Parcel.create(cmd.packageSpec());
+        Parcel parcel = cmd.existingParcel() != null
+                ? cmd.existingParcel()
+                : Parcel.create(cmd.packageSpec(), cmd.tenantId(), cmd.clientId(),
+                        TntEventActor.of(TntEventActor.Type.SENDER, cmd.clientId()));
 
         DeliveryAnnouncement announcement = DeliveryAnnouncement.createDraft(
                 cmd.tenantId(),
@@ -67,18 +79,22 @@ public class DeliveryAnnouncementService implements DeliveryAnnouncementUseCase,
                 cmd.pickupAddress(),
                 cmd.deliveryAddress(),
                 cmd.recipient(),
-                cmd.urgency());
+                cmd.urgency(),
+                cmd.sender(),
+                cmd.details());
 
-        announcement.publish();
-
+        // One transition per save (A1 then A2): aggregateVersion strictly increases (spec §3.3).
         return announcementRepository.save(announcement)
-                .flatMap(saved -> eventPublisher.publishAll(saved.getDomainEvents())
-                        .doOnSuccess(v -> saved.clearDomainEvents())
-                        .thenReturn(saved))
+                .flatMap(draft -> {
+                    draft.publish();
+                    return announcementRepository.save(draft);
+                })
+                .flatMap(saved -> transitionExecutor.publish(saved, saved.getParcel()).thenReturn(saved))
                 .doOnSuccess(a -> log.info("Announcement {} published", a.getId()));
     }
 
     @Override
+    @Transactional
     @RequirePermission(resource = "announcement", action = "respond")
     public Mono<DeliveryAnnouncement> respondToAnnouncement(RespondToAnnouncementCommand cmd) {
         log.info("Delivery person={} responding to announcement={}", cmd.deliveryPersonId(), cmd.announcementId());
@@ -100,7 +116,8 @@ public class DeliveryAnnouncementService implements DeliveryAnnouncementUseCase,
                                             ? cmd.proposedCurrency()
                                             : announcement.getCurrency());
                             announcement.addResponse(response);
-                            return announcementRepository.save(announcement);
+                            return announcementRepository.save(announcement)
+                                    .flatMap(saved -> transitionExecutor.publish(saved).thenReturn(saved));
                         }));
     }
 
@@ -114,21 +131,20 @@ public class DeliveryAnnouncementService implements DeliveryAnnouncementUseCase,
                 .switchIfEmpty(Mono.error(new AnnouncementNotFoundException(cmd.announcementId())))
                 .flatMap(announcement -> {
                     AnnouncementResponse selected = announcement.selectResponse(cmd.responseId());
-                    return createDeliveryFromSelection(cmd.tenantId(), announcement, selected)
+                    // D1 and D2 are two saves of the delivery (one transition per save, spec §3.3).
+                    return createDeliveryFromSelection(cmd.tenantId(), announcement, selected, cmd.deliveryId())
                             .flatMap(delivery -> {
                                 announcement.linkDelivery(delivery.getId());
                                 return announcementRepository.save(announcement)
-                                        .flatMap(saved -> deliveryRepository.save(delivery)
-                                                .flatMap(savedDelivery -> {
-                                                    var allEvents = new java.util.ArrayList<>(saved.getDomainEvents());
-                                                    allEvents.addAll(savedDelivery.getDomainEvents());
-                                                    return eventPublisher.publishAll(allEvents)
-                                                            .doOnSuccess(v -> {
-                                                                saved.clearDomainEvents();
-                                                                savedDelivery.clearDomainEvents();
-                                                            })
-                                                            .thenReturn(saved);
-                                                }));
+                                        .then(deliveryRepository.save(delivery))
+                                        .flatMap(created -> {
+                                            created.assignDeliveryPerson(selected.getDeliveryPersonId(),
+                                                    created.getEstimatedCost(), created.getEstimatedDistanceKm(),
+                                                    created.getEstimatedDeliveryTime());
+                                            return transitionExecutor.saveAndPublish(created);
+                                        })
+                                        .then(transitionExecutor.publish(announcement))
+                                        .thenReturn(announcement);
                             });
                 });
     }
@@ -140,7 +156,8 @@ public class DeliveryAnnouncementService implements DeliveryAnnouncementUseCase,
         log.info("Creating direct delivery for tenant={} sender={} agency={}",
                 cmd.tenantId(), cmd.senderId(), cmd.agencyId());
 
-        Parcel parcel = Parcel.create(cmd.packageSpecification());
+        Parcel parcel = Parcel.create(cmd.packageSpecification(), cmd.tenantId(), cmd.senderId(),
+                TntEventActor.of(TntEventActor.Type.SENDER, cmd.senderId()));
         Delivery delivery = Delivery.create(
                 cmd.tenantId(),
                 null,
@@ -157,15 +174,13 @@ public class DeliveryAnnouncementService implements DeliveryAnnouncementUseCase,
             delivery.setAgencyContext(cmd.agencyId(), "AGENCY");
         }
 
-        return deliveryRepository.save(delivery)
-                .flatMap(saved -> eventPublisher.publishAll(saved.getDomainEvents())
-                        .doOnSuccess(v -> saved.clearDomainEvents())
-                        .thenReturn(saved))
+        return transitionExecutor.saveAndPublish(delivery)
                 .doOnSuccess(d -> log.info("Direct delivery {} created, trackingCode={}",
                         d.getId(), d.getTrackingCode()));
     }
 
     @Override
+    @Transactional
     public Mono<Void> cancelAnnouncement(UUID tenantId, UUID announcementId, UUID clientId) {
         return announcementRepository.findById(tenantId, announcementId)
                 .switchIfEmpty(Mono.error(new AnnouncementNotFoundException(announcementId)))
@@ -175,22 +190,67 @@ public class DeliveryAnnouncementService implements DeliveryAnnouncementUseCase,
                             "Only the client who created the announcement can cancel it"));
                     }
                     announcement.cancel();
-                    return announcementRepository.save(announcement).then();
+                    return announcementRepository.save(announcement)
+                            .flatMap(saved -> transitionExecutor.publish(saved));
                 });
+    }
+
+    @Override
+    @Transactional
+    @RequirePermission(resource = "announcement", action = "update")
+    public Mono<DeliveryAnnouncement> updateAnnouncement(UpdateDeliveryAnnouncementCommand cmd) {
+        return announcementRepository.findById(cmd.tenantId(), cmd.announcementId())
+                .switchIfEmpty(Mono.error(new AnnouncementNotFoundException(cmd.announcementId())))
+                .flatMap(announcement -> {
+                    if (!announcement.getClientId().equals(cmd.clientId())) {
+                        return Mono.error(new DeliveryDomainException(
+                            "Only the client who created the announcement can update it"));
+                    }
+                    announcement.updateTerms(cmd.offeredAmount(), cmd.currency());
+                    announcement.updateDetails(cmd.sender(), cmd.details());
+                    return announcementRepository.save(announcement)
+                            .flatMap(saved -> transitionExecutor.publish(saved).thenReturn(saved));
+                });
+    }
+
+    @Override
+    public Mono<DeliveryAnnouncement> findAnnouncementByOrigin(UUID tenantId, String originType, UUID originId) {
+        return announcementRepository.findByOrigin(tenantId, originType, originId);
+    }
+
+    @Override
+    public Flux<DeliveryAnnouncement> findAnnouncementsByOrigins(UUID tenantId, String originType,
+                                                                 Collection<UUID> originIds) {
+        if (originIds == null || originIds.isEmpty()) {
+            return Flux.empty();
+        }
+        return announcementRepository.findByOrigins(tenantId, originType, originIds);
+    }
+
+    @Override
+    public Flux<DeliveryAnnouncement> findAnnouncementsRespondedBy(UUID tenantId,
+                                                                   Collection<UUID> deliveryPersonIds) {
+        if (deliveryPersonIds == null || deliveryPersonIds.isEmpty()) {
+            return Flux.empty();
+        }
+        return announcementRepository.findRespondedBy(tenantId, deliveryPersonIds);
     }
 
     // ── Private helpers ───────────────────────────────────────────────
 
     private Mono<Delivery> createDeliveryFromSelection(UUID tenantId,
                                                        DeliveryAnnouncement announcement,
-                                                       AnnouncementResponse selected) {
+                                                       AnnouncementResponse selected,
+                                                       UUID deliveryId) {
         GeoCoordinates pickup = resolveCoords(announcement.getPickupAddress());
         GeoCoordinates dropoff = resolveCoords(announcement.getDeliveryAddress());
         double routeKm = Math.max(1.0, pickup.haversineDistanceTo(dropoff));
 
         return courierOf(tenantId, selected.getDeliveryPersonId())
+                // D2 guard: the courier is APPROVED
+                .filter(DeliveryPerson::isAvailable)
                 .switchIfEmpty(Mono.error(new DeliveryDomainException(
-                        "Delivery person not found: " + selected.getDeliveryPersonId())))
+                        "Delivery person is not approved: " + selected.getDeliveryPersonId())))
                 .flatMap(dp -> costComputationPort.compute(
                         pickup,
                         dropoff,
@@ -200,9 +260,16 @@ public class DeliveryAnnouncementService implements DeliveryAnnouncementUseCase,
                         dp.getCurrentLocation() != null ? dp.getCurrentLocation() : pickup,
                         dropoff,
                         routeKm)
-                .map(eta -> {
+                .zipWith(thresholds.forAgency(null).map(DeliveryThresholdsPort.Thresholds::maxDeliveryAttempts)
+                        .defaultIfEmpty(Delivery.DEFAULT_MAX_ATTEMPTS))
+                .map(etaAndMax -> {
+                    var eta = etaAndMax.getT1();
                     Parcel parcel = announcement.getParcel();
+                    boolean isReturn = announcement.getKind() == AnnouncementKind.RETURN;
+                    UUID parent = isReturn && announcement.getDetails() != null
+                            ? announcement.getDetails().originRefId() : null;
                     Delivery delivery = Delivery.create(
+                            deliveryId,
                             tenantId,
                             announcement.getId(),
                             announcement.getClientId(),
@@ -212,13 +279,14 @@ public class DeliveryAnnouncementService implements DeliveryAnnouncementUseCase,
                             announcement.getRecipient(),
                             announcement.getUrgency(),
                             selected.getEstimatedArrivalTime(),
-                            null);
-
-                    delivery.assignDeliveryPerson(
-                            selected.getDeliveryPersonId(),
-                            cost,
-                            routeKm,
-                            eta.estimatedArrival());
+                            null,
+                            isReturn && parent != null ? DeliveryKind.RETURN : DeliveryKind.OUTBOUND,
+                            isReturn ? parent : null,
+                            etaAndMax.getT2());
+                    if (announcement.getDetails() != null) {
+                        delivery.setDestinationHub(announcement.getDetails().destinationHubId());
+                    }
+                    delivery.recordSelectionEstimate(cost, routeKm, eta.estimatedArrival());
                     return delivery;
                 })));
     }

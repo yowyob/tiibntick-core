@@ -29,7 +29,7 @@ import java.util.UUID;
 public class IncidentSlaMonitorScheduler {
     private final IIncidentRepository incidentRepository;
     private final IEscalateIncidentUseCase escalateUseCase;
-    private static final UUID SYSTEM_ACTOR = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private static final UUID SYSTEM_ACTOR = com.yowyob.tiibntick.common.tenant.SystemTenant.systemActorId();
 
     /**
      * Scheduled every 5 minutes. Finds all active incidents with a breached SLA

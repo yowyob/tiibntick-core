@@ -45,7 +45,17 @@ public final class DisputeRequests {
             BigDecimal compensationAmount,
             String compensationCurrency,
             String compensationMethod,
-            String beneficiaryId) {}
+            String beneficiaryId,
+            /** Lot L4: party at fault (SENDER, RECIPIENT, COURIER, PLATFORM, RELAY, AGENCY, NONE), may be null. */
+            String responsibleParty) {
+
+        public RuleDisputeRequest(String resolutionType, boolean compensationRequired, String mediatorId,
+                                  String summary, BigDecimal compensationAmount, String compensationCurrency,
+                                  String compensationMethod, String beneficiaryId) {
+            this(resolutionType, compensationRequired, mediatorId, summary, compensationAmount, compensationCurrency,
+                    compensationMethod, beneficiaryId, null);
+        }
+    }
 
     public record EscalateDisputeRequest(
             String escalatedBy,

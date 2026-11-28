@@ -6,22 +6,18 @@ import reactor.core.publisher.Mono;
 import java.util.UUID;
 
 /**
- * Pays a delivery from the client's own Kernel wallet to the delivery person's Kernel wallet.
- *
- * <p>Flow (the platform never holds the money nor a ledger — the Kernel does):
+ * Pays an elected delivery into a Kernel escrow (lot L5, spec §4.1; the paid selection is
+ * {@code SelectionPaymentService}). The platform never holds the money nor a ledger — the Kernel does.
  * <ol>
- *   <li>the assigned delivery person calls {@link #generateReceiveCode}: a short-lived Kernel
- *       receive code is generated with <em>their</em> token and stored on the delivery;</li>
- *   <li>the client calls {@link #startPayment}: the Core asks the Kernel for a transfer
- *       challenge towards that code (the Kernel sends a one-time confirmation code to the client);</li>
- *   <li>the client calls {@link #confirmPayment} with the challenge token and the code: the
- *       Kernel moves the money and the Core records the settlement.</li>
+ *   <li>the client calls {@link #startPayment}: a payment intent is created (split PLATFORM / COURIER) and the
+ *       Kernel sends the client a one-time code;</li>
+ *   <li>the client calls {@link #confirmPayment} with the challenge token and the code: the Kernel holds the
+ *       escrow. It is released to the courier at the hand-over (or at once when the delivery is already
+ *       delivered), and the settlement recorded then.</li>
  * </ol>
- * All Kernel calls run with the caller's own bearer token.
+ * The receive-code transfer of the delivery person is gone (decision H.1).
  */
 public interface DeliveryPaymentUseCase {
-
-    Mono<DeliveryPaymentDtos.ReceiveCodeResponse> generateReceiveCode(UUID deliveryId, UUID callerUserId);
 
     Mono<DeliveryPaymentDtos.PaymentChallengeResponse> startPayment(UUID deliveryId, UUID callerUserId);
 

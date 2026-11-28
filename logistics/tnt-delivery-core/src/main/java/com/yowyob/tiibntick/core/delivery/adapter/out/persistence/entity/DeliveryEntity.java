@@ -115,6 +115,20 @@ public class DeliveryEntity implements Persistable<UUID> {
     @Column("estimated_distance_km")
     private Double estimatedDistanceKm;
 
+    // Agreed terms
+    @Column("agreed_amount")
+    private BigDecimal agreedAmount;
+    @Column("agreed_currency")
+    private String agreedCurrency;
+    @Column("pickup_window_start")
+    private Instant pickupWindowStart;
+    @Column("pickup_window_end")
+    private Instant pickupWindowEnd;
+    @Column("delivery_window_start")
+    private Instant deliveryWindowStart;
+    @Column("delivery_window_end")
+    private Instant deliveryWindowEnd;
+
     // ETA
     @Column("eta_estimated_arrival")
     private Instant etaEstimatedArrival;
@@ -174,10 +188,74 @@ public class DeliveryEntity implements Persistable<UUID> {
     @Column("active_equipment_ids_json")
     private String activeEquipmentIdsJson;
 
-    /** Delivery attempt number (1 = first, 2 = re-delivery, etc.). */
+    /** Failed hand-over attempts ({@code attemptCount}, spec §1.1): starts at 0, incremented by D9/D10 only. */
     @Column("delivery_attempt_number")
     @Builder.Default
-    private int deliveryAttemptNumber = 1;
+    private int deliveryAttemptNumber = 0;
+
+    // ── lot evt-l2 (spec §1.1, §5) ────────────────────────────────────────────────────────────
+    @Column("kind")
+    private String kind;
+    @Column("parent_delivery_id")
+    private UUID parentDeliveryId;
+    @Column("max_attempts")
+    private Integer maxAttempts;
+    @Column("failure_reason")
+    private String failureReason;
+    @Column("last_attempt_reason")
+    private String lastAttemptReason;
+    @Column("cancellation_reason")
+    private String cancellationReason;
+    @Column("responsible_party")
+    private String responsibleParty;
+    @Column("return_cost_payer")
+    private String returnCostPayer;
+    @Column("relay_hub_id")
+    private UUID relayHubId;
+    @Column("destination_hub_id")
+    private UUID destinationHubId;
+    @Column("hub_package_entry_id")
+    private UUID hubPackageEntryId;
+    @Column("relay_deposited_at")
+    private Instant relayDepositedAt;
+    @Column("requested_storage_days")
+    private Integer requestedStorageDays;
+    @Column("relay_storage_days")
+    private Integer relayStorageDays;
+    @Column("relay_storage_expires_at")
+    private Instant relayStorageExpiresAt;
+    @Column("storage_reminder_at")
+    private Instant storageReminderAt;
+    @Column("storage_reminder_sent_at")
+    private Instant storageReminderSentAt;
+    @Column("late")
+    private Boolean late;
+    @Column("late_since")
+    private Instant lateSince;
+    @Column("last_alert_type")
+    private String lastAlertType;
+
+    @Column("active_alerts")
+    private String activeAlerts;
+
+    @Column("last_position_at")
+    private Instant lastPositionAt;
+    /** D-147, D-151: return guarantee of a delivery to a relay hub (changeset evt-l2-013). */
+    @Column("return_guarantee_status")
+    private String returnGuaranteeStatus;
+    @Column("return_guarantee_reason")
+    private String returnGuaranteeReason;
+
+    /** QO-11 / D-153: start of the current courier's leg (last hand-over point); NULL = the pickup address. */
+    @Column("leg_start_latitude")
+    private Double legStartLatitude;
+
+    @Column("leg_start_longitude")
+    private Double legStartLongitude;
+    @Column("failed_at")
+    private Instant failedAt;
+    @Column("cancelled_at")
+    private Instant cancelledAt;
 
     /** Whether active refrigeration is required for this delivery. */
     @Column("requires_refrigeration")

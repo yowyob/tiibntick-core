@@ -1,31 +1,38 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.out.delivery;
 
 import com.yowyob.tiibntick.common.vo.Address;
+import com.yowyob.tiibntick.core.delivery.application.port.in.AnnouncementLookupUseCase;
 import com.yowyob.tiibntick.core.delivery.application.port.in.DeliveryAnnouncementUseCase;
 import com.yowyob.tiibntick.core.delivery.application.port.in.DeliveryQueryUseCase;
 import com.yowyob.tiibntick.core.delivery.application.port.in.command.CreateDeliveryAnnouncementCommand;
 import com.yowyob.tiibntick.core.delivery.application.port.in.command.RespondToAnnouncementCommand;
 import com.yowyob.tiibntick.core.delivery.application.port.in.command.SelectAnnouncementResponseCommand;
+import com.yowyob.tiibntick.core.delivery.application.port.in.command.UpdateDeliveryAnnouncementCommand;
 import com.yowyob.tiibntick.core.delivery.domain.model.aggregate.DeliveryAnnouncement;
 import com.yowyob.tiibntick.core.delivery.domain.model.entity.AnnouncementResponse;
 import com.yowyob.tiibntick.core.delivery.domain.model.enums.AnnouncementPricingMode;
 import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryUrgency;
+import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.AnnouncementDetails;
 import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.DeliveryAddress;
 import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.GeoCoordinates;
 import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.PackageSpecification;
 import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.RecipientInfo;
+import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.SenderInfo;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryAnnouncementPort;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.AnnouncementExtras;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.AnnouncementResponseSnapshot;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.AnnouncementSnapshot;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.PublishAnnouncementPortCommand;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.RespondToAnnouncementPortCommand;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.announcement.AnnouncementStatus;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.UpdateAnnouncementPortCommand;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.AnnouncementStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -47,10 +54,27 @@ public class DeliveryAnnouncementPortAdapter implements IDeliveryAnnouncementPor
 
     private final DeliveryAnnouncementUseCase deliveryAnnouncementUseCase;
     private final DeliveryQueryUseCase deliveryQueryUseCase;
+    private final AnnouncementLookupUseCase announcementLookupUseCase;
+
+    /** Optional (setter): without it a command naming a parcel is published with a parcel of its own. */
+    private com.yowyob.tiibntick.core.delivery.application.port.in.ParcelUseCase parcels;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setParcels(com.yowyob.tiibntick.core.delivery.application.port.in.ParcelUseCase parcels) {
+        this.parcels = parcels;
+    }
 
     @Override
     public Mono<AnnouncementSnapshot> publish(PublishAnnouncementPortCommand command) {
-        return deliveryAnnouncementUseCase.publishAnnouncement(toCreateCommand(command))
+        // The goods registered beforehand keep their id: the announcement carries that very parcel.
+        Mono<java.util.Optional<com.yowyob.tiibntick.core.delivery.domain.model.aggregate.Parcel>> existing =
+                command.parcelId() == null || parcels == null
+                        ? Mono.just(java.util.Optional.empty())
+                        : parcels.findParcelById(command.parcelId()).map(java.util.Optional::of)
+                                .defaultIfEmpty(java.util.Optional.empty());
+        return existing
+                .flatMap(parcel -> deliveryAnnouncementUseCase.publishAnnouncement(
+                        toCreateCommand(command, parcel.orElse(null))))
                 .map(this::toSnapshot);
     }
 
@@ -75,9 +99,15 @@ public class DeliveryAnnouncementPortAdapter implements IDeliveryAnnouncementPor
     @Override
     public Mono<AnnouncementSnapshot> selectResponse(
             UUID tenantId, UUID announcementId, UUID clientId, UUID responseId) {
+        return selectResponse(tenantId, announcementId, clientId, responseId, null);
+    }
+
+    @Override
+    public Mono<AnnouncementSnapshot> selectResponse(
+            UUID tenantId, UUID announcementId, UUID clientId, UUID responseId, UUID deliveryId) {
         return deliveryAnnouncementUseCase
                 .selectResponse(new SelectAnnouncementResponseCommand(
-                        tenantId, announcementId, clientId, responseId))
+                        tenantId, announcementId, clientId, responseId, deliveryId))
                 .map(this::toSnapshot)
                 .flatMap(snap -> enrichTracking(tenantId, snap));
     }
@@ -123,6 +153,34 @@ public class DeliveryAnnouncementPortAdapter implements IDeliveryAnnouncementPor
     }
 
     @Override
+    public Mono<AnnouncementSnapshot> update(UpdateAnnouncementPortCommand command) {
+        AnnouncementExtras x = command.extras();
+        return deliveryAnnouncementUseCase.updateAnnouncement(new UpdateDeliveryAnnouncementCommand(
+                        command.tenantId(), command.announcementId(), command.clientId(),
+                        command.offeredAmount(), command.currency(),
+                        toSender(x), toDetails(x)))
+                .map(this::toSnapshot);
+    }
+
+    @Override
+    public Mono<AnnouncementSnapshot> findByOrigin(UUID tenantId, String originType, UUID originId) {
+        return announcementLookupUseCase.findAnnouncementByOrigin(tenantId, originType, originId)
+                .map(this::toSnapshot);
+    }
+
+    @Override
+    public Flux<AnnouncementSnapshot> findByOrigins(UUID tenantId, String originType, Collection<UUID> originIds) {
+        return announcementLookupUseCase.findAnnouncementsByOrigins(tenantId, originType, originIds)
+                .map(this::toSnapshot);
+    }
+
+    @Override
+    public Flux<AnnouncementSnapshot> findRespondedBy(UUID tenantId, Collection<UUID> deliveryPersonIds) {
+        return announcementLookupUseCase.findAnnouncementsRespondedBy(tenantId, deliveryPersonIds)
+                .map(this::toSnapshot);
+    }
+
+    @Override
     public Mono<Boolean> hasResponse(UUID announcementId, UUID freelancerId) {
         return deliveryQueryUseCase.hasFreelancerResponded(announcementId, freelancerId);
     }
@@ -134,7 +192,8 @@ public class DeliveryAnnouncementPortAdapter implements IDeliveryAnnouncementPor
 
     // ── gofp command -> tnt-delivery-core command ───────────────────────
 
-    private CreateDeliveryAnnouncementCommand toCreateCommand(PublishAnnouncementPortCommand cmd) {
+    private CreateDeliveryAnnouncementCommand toCreateCommand(PublishAnnouncementPortCommand cmd,
+            com.yowyob.tiibntick.core.delivery.domain.model.aggregate.Parcel existingParcel) {
         AnnouncementPricingMode mode = parsePricingMode(cmd.pricingMode());
         PackageSpecification spec = new PackageSpecification(
                 cmd.packageWeightKg(), cmd.packageWidthCm(), cmd.packageHeightCm(), cmd.packageLengthCm(),
@@ -150,8 +209,49 @@ public class DeliveryAnnouncementPortAdapter implements IDeliveryAnnouncementPor
                 spec,
                 toDeliveryAddress(cmd.pickupAddress(), "Pickup"),
                 toDeliveryAddress(cmd.deliveryAddress(), "Delivery"),
-                RecipientInfo.of(cmd.recipientName(), cmd.recipientPhone()),
-                DeliveryUrgency.STANDARD);
+                new RecipientInfo(cmd.recipientName(), cmd.recipientPhone(), null,
+                        blankToNull(cmd.extras().recipientEmail())),
+                parseUrgency(cmd.extras().urgency()),
+                existingParcel,
+                toSender(cmd.extras()),
+                toDetails(cmd.extras()));
+    }
+
+    /**
+     * Wire urgency to the core's: absent or blank = {@code STANDARD}; the legacy Go value
+     * {@code NORMAL} is tolerated as an alias of {@code STANDARD}; anything else must be a core value.
+     */
+    static DeliveryUrgency parseUrgency(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return DeliveryUrgency.STANDARD;
+        }
+        String normalized = raw.trim().toUpperCase(Locale.ROOT);
+        if ("NORMAL".equals(normalized)) {
+            return DeliveryUrgency.STANDARD;
+        }
+        try {
+            return DeliveryUrgency.valueOf(normalized);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Unknown urgency: " + raw
+                    + " (expected STANDARD, EXPRESS, SAME_DAY or SCHEDULED)");
+        }
+    }
+
+    private static SenderInfo toSender(AnnouncementExtras x) {
+        SenderInfo s = new SenderInfo(blankToNull(x.senderName()), blankToNull(x.senderPhone()),
+                blankToNull(x.senderEmail()));
+        return s.isEmpty() ? null : s;
+    }
+
+    private static AnnouncementDetails toDetails(AnnouncementExtras x) {
+        return new AnnouncementDetails(blankToNull(x.requiredVehicleType()), blankToNull(x.paymentMethod()),
+                blankToNull(x.transportMethod()), x.distanceKm(), x.estimatedDurationMin(),
+                x.destinationHubId(), blankToNull(x.handoverSignatureRef()), x.serviceFee(),
+                blankToNull(x.originRefType()), x.originRefId());
+    }
+
+    private static String blankToNull(String s) {
+        return s == null || s.isBlank() ? null : s;
     }
 
     /**
@@ -239,7 +339,22 @@ public class DeliveryAnnouncementPortAdapter implements IDeliveryAnnouncementPor
                 a.getSelectedResponseId(),
                 a.getCreatedDeliveryId(),
                 null,
-                responses);
+                responses,
+                toExtras(a));
+    }
+
+    private static AnnouncementExtras toExtras(DeliveryAnnouncement a) {
+        SenderInfo sender = a.getSender();
+        AnnouncementDetails d = a.getDetails() != null ? a.getDetails() : AnnouncementDetails.EMPTY;
+        return new AnnouncementExtras(
+                sender != null ? sender.name() : null,
+                sender != null ? sender.phoneNumber() : null,
+                sender != null ? sender.email() : null,
+                a.getRecipient() != null ? a.getRecipient().email() : null,
+                a.getUrgency() != null ? a.getUrgency().name() : null,
+                d.requiredVehicleType(), d.paymentMethod(), d.transportMethod(), d.distanceKm(),
+                d.estimatedDurationMin(), d.destinationHubId(), d.handoverSignatureRef(), d.serviceFee(),
+                d.originRefType(), d.originRefId());
     }
 
     private AnnouncementResponseSnapshot toResponseSnapshot(AnnouncementResponse r) {

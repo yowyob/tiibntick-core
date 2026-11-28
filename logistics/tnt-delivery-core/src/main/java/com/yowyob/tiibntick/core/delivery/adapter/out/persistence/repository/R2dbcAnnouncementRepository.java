@@ -6,6 +6,7 @@ import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.Collection;
 import java.util.UUID;
 
 /**
@@ -23,6 +24,21 @@ public interface R2dbcAnnouncementRepository extends ReactiveCrudRepository<Deli
 
     @Query("SELECT * FROM tnt_delivery_announcements WHERE tenant_id = :tenantId AND status = :status ORDER BY created_at DESC")
     Flux<DeliveryAnnouncementEntity> findByTenantIdAndStatus(UUID tenantId, String status);
+
+    @Query("SELECT * FROM tnt_delivery_announcements WHERE tenant_id = :tenantId AND origin_ref_type = :originType AND origin_ref_id = :originId")
+    Mono<DeliveryAnnouncementEntity> findByOrigin(UUID tenantId, String originType, UUID originId);
+
+    @Query("SELECT * FROM tnt_delivery_announcements WHERE tenant_id = :tenantId AND origin_ref_type = :originType AND origin_ref_id IN (:originIds)")
+    Flux<DeliveryAnnouncementEntity> findByOrigins(UUID tenantId, String originType, Collection<UUID> originIds);
+
+    @Query("""
+            SELECT a.* FROM tnt_delivery_announcements a
+            WHERE a.tenant_id = :tenantId
+              AND EXISTS (SELECT 1 FROM tnt_announcement_responses r
+                           WHERE r.announcement_id = a.id AND r.delivery_person_id IN (:deliveryPersonIds))
+            ORDER BY a.created_at DESC
+            """)
+    Flux<DeliveryAnnouncementEntity> findRespondedBy(UUID tenantId, Collection<UUID> deliveryPersonIds);
 
     @Query("""
             SELECT * FROM tnt_delivery_announcements

@@ -539,6 +539,11 @@ public class MarketOrderApplicationService implements IManageMarketOrderUseCase 
     }
 
     @Override
+    public Flux<MarketOrderResponse> getOrdersByDelivery(UUID deliveryId, String tenantId) {
+        return orderRepository.findByDeliveryId(deliveryId, tenantId).map(this::toResponse);
+    }
+
+    @Override
     public Flux<MarketOrderResponse> getOrdersByClient(UUID clientId, String tenantId) {
         return orderRepository.findByClientId(clientId, tenantId).map(this::toResponse);
     }

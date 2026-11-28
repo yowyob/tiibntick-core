@@ -63,6 +63,13 @@ public class IncidentMapper {
                 .responsibleOrgId(d.getResponsibleOrgId())
                 .responsibleOrgType(d.getResponsibleOrgType())
                 .trackingCode(d.getTrackingCode())
+                .blocking(d.isBlocking())
+                .blockingForcedByCourier(d.isBlockingForcedByCourier())
+                .deliveryOutcome(d.getDeliveryOutcome() == null ? null : d.getDeliveryOutcome().name())
+                .responsibleParty(d.getResponsibleParty() == null ? null : d.getResponsibleParty().name())
+                .resolutionNote(d.getResolutionNote())
+                .resolutionProposedAt(d.getResolutionProposedAt())
+                .eventSequence(d.getEventSequence())
                 .build();
 
         if (d.getGeoSnapshot() != null) {
@@ -151,6 +158,15 @@ public class IncidentMapper {
                 .responsibleOrgId(e.getResponsibleOrgId())
                 .responsibleOrgType(e.getResponsibleOrgType())
                 .trackingCode(e.getTrackingCode())
+                .blocking(e.isBlocking())
+                .blockingForcedByCourier(e.isBlockingForcedByCourier())
+                .deliveryOutcome(e.getDeliveryOutcome() == null ? null
+                        : com.yowyob.tiibntick.core.incident.domain.enums.IncidentDeliveryOutcome.valueOf(e.getDeliveryOutcome()))
+                .responsibleParty(e.getResponsibleParty() == null ? null
+                        : com.yowyob.tiibntick.core.incident.domain.enums.IncidentResponsibleParty.valueOf(e.getResponsibleParty()))
+                .resolutionNote(e.getResolutionNote())
+                .resolutionProposedAt(e.getResolutionProposedAt())
+                .eventSequence(e.getEventSequence())
                 .build();
     }
 

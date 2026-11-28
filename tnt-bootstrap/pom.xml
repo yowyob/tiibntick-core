@@ -444,6 +444,13 @@
             <artifactId>archunit-junit5</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- JSON Schema validation of the aggregate events produced on a real broker
+             (TntApplicationFullStackIT, lot L0, cible-evenements-colis-livraison.md §3.6). -->
+        <dependency>
+            <groupId>com.networknt</groupId>
+            <artifactId>json-schema-validator</artifactId>
+            <scope>test</scope>
+        </dependency>
 
         <!-- ── Distributed scheduler lock (Chantier D · Audit n°6 · S2) ──
              TntSchedulerLockConfig is the ONLY place the LockProvider bean is defined —
@@ -525,5 +532,25 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- The jar is repackaged by spring-boot-maven-plugin (classes under BOOT-INF/classes): failsafe must run
+             against target/classes, otherwise a full-application *IT (TntApplicationFullStackIT) cannot find
+             @SpringBootConfiguration. Merged with the root integration-tests profile. -->
+        <profile>
+            <id>integration-tests</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-failsafe-plugin</artifactId>
+                        <configuration>
+                            <classesDirectory>${project.build.outputDirectory}</classesDirectory>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 </project>

@@ -20,7 +20,7 @@ public interface IncidentCorePort {
     record ReportIncidentRequest(
             UUID tenantId,
             UUID agencyId,
-            UUID missionId,
+            UUID deliveryId,
             String incidentType,
             String description,
             UUID reportedByActorId
@@ -39,7 +39,7 @@ public interface IncidentCorePort {
     record IncidentSummary(
             UUID id,
             String referenceCode,
-            UUID missionId,
+            UUID deliveryId,
             String type,
             String status,
             String description,
@@ -49,7 +49,7 @@ public interface IncidentCorePort {
     record IncidentDetail(
             UUID id,
             String referenceCode,
-            UUID missionId,
+            UUID deliveryId,
             String type,
             String status,
             String severity,

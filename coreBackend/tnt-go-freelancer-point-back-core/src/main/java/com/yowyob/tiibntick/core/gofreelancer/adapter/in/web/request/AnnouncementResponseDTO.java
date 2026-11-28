@@ -3,7 +3,7 @@ package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.AddressDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.PacketDTO;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.announcement.AnnouncementStatus;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.AnnouncementStatus;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.Data;

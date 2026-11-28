@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:tnt:kafka:v1:details:DisputeEvidenceAdded",
+  "title": "details of DisputeEvidenceAdded",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["evidenceId", "evidenceType"],
+  "properties": {"evidenceId": {"type": "string", "format": "uuid"}, "evidenceType": {"type": ["string", "null"]}}
+}

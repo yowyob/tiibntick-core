@@ -29,8 +29,8 @@ public class DeliveryNeedController {
      * <p>On retient {@code userId()} et non {@code actorId()} : {@code actorId} pointe vers
      * {@code DelivererProfile}/{@code FreelancerProfile} de {@code tnt-actor-core}, un espace
      * d'identité sans rapport avec {@code delivery_needs.user_id}. Ce dernier vit dans l'espace
-     * {@code gofp_users.core_user_id} — c'est ce que fait déjà
-     * {@code DeliveryNeedApplicationService#ensureLegacyUser}.
+     * {@code gofp_users.core_user_id} (la table héritée {@code users} et sa clé étrangère ont disparu
+     * à la clôture gdd-final).
      *
      * <p>Pourquoi {@code required = false} plutôt que {@code @CurrentUser} seul : la chaîne de
      * sécurité ({@code TntSecurityConfig @Order(20)}) refuse déjà les requêtes non authentifiées

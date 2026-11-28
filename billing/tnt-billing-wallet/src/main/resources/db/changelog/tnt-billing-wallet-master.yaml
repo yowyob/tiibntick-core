@@ -14,3 +14,18 @@ databaseChangeLog:
   - include:
       file: db/changelog/changes/005-drop-legacy-ledger-tables.yaml
       relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/006-evt-l5-wallet-compensations.yaml
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/007-evt-l5-escrow-mirrors.yaml
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/008-evt-l5-drop-wallet-holds.yaml
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/009-evt-l5-wallet-debts.yaml
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/010-evt-qo11-courier-legs.yaml
+      relativeToChangelogFile: false

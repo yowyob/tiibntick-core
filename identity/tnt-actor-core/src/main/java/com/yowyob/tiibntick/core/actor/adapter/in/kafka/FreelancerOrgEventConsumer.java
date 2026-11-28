@@ -2,6 +2,7 @@ package com.yowyob.tiibntick.core.actor.adapter.in.kafka;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yowyob.tiibntick.common.kafka.ReactiveListenerSupport;
 import com.yowyob.tiibntick.common.kafka.TntTopics;
 import com.yowyob.tiibntick.core.actor.application.command.LinkFreelancerOrgCommand;
 import com.yowyob.tiibntick.core.actor.application.command.UnlinkFreelancerOrgCommand;
@@ -12,7 +13,6 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import java.util.UUID;
 
@@ -42,13 +42,18 @@ import java.util.UUID;
 @Slf4j
 @Component
 public class FreelancerOrgEventConsumer {
+    // Lot L7 (spec §3.10): every listener awaits its work on the container thread (ReactiveListenerSupport); an
+    // unreadable record, a missing field or a processing error reaches the container: retries, then tnt.dlq.
+    // Linking/unlinking is idempotent in ILinkFreelancerOrgUseCase, so a replay has no extra effect.
 
     private final ILinkFreelancerOrgUseCase linkUseCase;
     private final ObjectMapper objectMapper;
+    private final ReactiveListenerSupport listenerSupport;
 
-    public FreelancerOrgEventConsumer(ILinkFreelancerOrgUseCase linkUseCase) {
+    public FreelancerOrgEventConsumer(ILinkFreelancerOrgUseCase linkUseCase, ReactiveListenerSupport listenerSupport) {
         this.linkUseCase = linkUseCase;
         this.objectMapper = new ObjectMapper();
+        this.listenerSupport = listenerSupport;
     }
 
     // ── tnt.freelancer_org.created ────────────────────────────────────────────
@@ -69,30 +74,23 @@ public class FreelancerOrgEventConsumer {
      */
     @KafkaListener(
             topics = TntTopics.FREELANCER_ORG_CREATED,
-            groupId = "${spring.kafka.consumer.group-id:tiibntick-core}",
+            groupId = "${tnt.kafka.consumer.groups.actor-freelancer-org:tnt-actor-freelancer-org-consumer}",
             containerFactory = "actorKafkaListenerContainerFactory")
     public void onFreelancerOrgCreated(ConsumerRecord<String, String> record) {
         log.debug("Received tnt.freelancer_org.created: key={}", record.key());
-        Mono.fromCallable(() -> objectMapper.readTree(record.value()))
+        listenerSupport.await(Mono.fromCallable(() -> objectMapper.readTree(record.value()))
                 .flatMap(payload -> {
                     UUID orgId        = extractUuid(payload, "orgId");
                     UUID ownerActorId = extractUuid(payload, "ownerActorId");
                     UUID tenantId     = extractUuid(payload, "tenantId");
 
                     if (orgId == null || ownerActorId == null || tenantId == null) {
-                        log.warn("tnt.freelancer_org.created: missing required fields in payload");
-                        return Mono.empty();
+                        return Mono.error(new IllegalArgumentException("tnt.freelancer_org.created: missing required fields in payload"));
                     }
                     LinkFreelancerOrgCommand cmd = new LinkFreelancerOrgCommand(
                             tenantId, ownerActorId, orgId, FreelancerRole.OWNER, false);
                     return linkUseCase.linkToFreelancerOrg(cmd);
-                })
-                .subscribeOn(Schedulers.boundedElastic())
-                .subscribe(
-                        profile -> log.info("OWNER {} linked to org {}", profile.actorId(),
-                                profile.freelancerOrgId()),
-                        error -> log.error("Failed to process tnt.freelancer_org.created: {}",
-                                error.getMessage(), error));
+                }));
     }
 
     // ── tnt.freelancer_org.sub_deliverer.associated ───────────────────────────
@@ -113,19 +111,18 @@ public class FreelancerOrgEventConsumer {
      */
     @KafkaListener(
             topics = TntTopics.FREELANCER_ORG_SUB_DELIVERER_ASSOCIATED,
-            groupId = "${spring.kafka.consumer.group-id:tiibntick-core}",
+            groupId = "${tnt.kafka.consumer.groups.actor-freelancer-org:tnt-actor-freelancer-org-consumer}",
             containerFactory = "actorKafkaListenerContainerFactory")
     public void onSubDelivererAssociated(ConsumerRecord<String, String> record) {
         log.debug("Received tnt.freelancer_org.sub_deliverer.associated: key={}", record.key());
-        Mono.fromCallable(() -> objectMapper.readTree(record.value()))
+        listenerSupport.await(Mono.fromCallable(() -> objectMapper.readTree(record.value()))
                 .flatMap(payload -> {
                     UUID orgId          = extractUuid(payload, "orgId");
                     UUID subDeliverId   = extractUuid(payload, "subDelivererId");
                     UUID tenantId       = extractUuid(payload, "tenantId");
 
                     if (orgId == null || subDeliverId == null || tenantId == null) {
-                        log.warn("tnt.freelancer_org.sub_deliverer.associated: missing fields");
-                        return Mono.empty();
+                        return Mono.error(new IllegalArgumentException("tnt.freelancer_org.sub_deliverer.associated: missing fields"));
                     }
                     // org is already verified if the owner was verified before inviting
                     boolean isOrgVerified = extractBoolean(payload, "isOrgVerified");
@@ -133,14 +130,7 @@ public class FreelancerOrgEventConsumer {
                             tenantId, subDeliverId, orgId, FreelancerRole.SUB_DELIVERER,
                             isOrgVerified);
                     return linkUseCase.linkToFreelancerOrg(cmd);
-                })
-                .subscribeOn(Schedulers.boundedElastic())
-                .subscribe(
-                        profile -> log.info("SUB_DELIVERER {} linked to org {}",
-                                profile.actorId(), profile.freelancerOrgId()),
-                        error -> log.error(
-                                "Failed to process tnt.freelancer_org.sub_deliverer.associated: {}",
-                                error.getMessage(), error));
+                }));
     }
 
     // ── tnt.freelancer_org.sub_deliverer.revoked ──────────────────────────────
@@ -161,31 +151,23 @@ public class FreelancerOrgEventConsumer {
      */
     @KafkaListener(
             topics = TntTopics.FREELANCER_ORG_SUB_DELIVERER_REVOKED,
-            groupId = "${spring.kafka.consumer.group-id:tiibntick-core}",
+            groupId = "${tnt.kafka.consumer.groups.actor-freelancer-org:tnt-actor-freelancer-org-consumer}",
             containerFactory = "actorKafkaListenerContainerFactory")
     public void onSubDelivererRevoked(ConsumerRecord<String, String> record) {
         log.debug("Received tnt.freelancer_org.sub_deliverer.revoked: key={}", record.key());
-        Mono.fromCallable(() -> objectMapper.readTree(record.value()))
+        listenerSupport.await(Mono.fromCallable(() -> objectMapper.readTree(record.value()))
                 .flatMap(payload -> {
                     UUID orgId        = extractUuid(payload, "orgId");
                     UUID subDeliverId = extractUuid(payload, "subDelivererId");
                     UUID tenantId     = extractUuid(payload, "tenantId");
 
                     if (orgId == null || subDeliverId == null || tenantId == null) {
-                        log.warn("tnt.freelancer_org.sub_deliverer.revoked: missing fields");
-                        return Mono.empty();
+                        return Mono.error(new IllegalArgumentException("tnt.freelancer_org.sub_deliverer.revoked: missing fields"));
                     }
                     UnlinkFreelancerOrgCommand cmd = new UnlinkFreelancerOrgCommand(
                             tenantId, subDeliverId, orgId);
                     return linkUseCase.unlinkFromFreelancerOrg(cmd);
-                })
-                .subscribeOn(Schedulers.boundedElastic())
-                .subscribe(
-                        profile -> log.info("SUB_DELIVERER {} unlinked from org",
-                                profile.actorId()),
-                        error -> log.error(
-                                "Failed to process tnt.freelancer_org.sub_deliverer.revoked: {}",
-                                error.getMessage(), error));
+                }));
     }
 
     // ── tnt.freelancer_org.verified ───────────────────────────────────────────
@@ -205,24 +187,18 @@ public class FreelancerOrgEventConsumer {
      */
     @KafkaListener(
             topics = TntTopics.FREELANCER_ORG_VERIFIED,
-            groupId = "${spring.kafka.consumer.group-id:tiibntick-core}",
+            groupId = "${tnt.kafka.consumer.groups.actor-freelancer-org:tnt-actor-freelancer-org-consumer}",
             containerFactory = "actorKafkaListenerContainerFactory")
     public void onFreelancerOrgVerified(ConsumerRecord<String, String> record) {
         log.debug("Received tnt.freelancer_org.verified: key={}", record.key());
-        Mono.fromCallable(() -> objectMapper.readTree(record.value()))
+        listenerSupport.await(Mono.fromCallable(() -> objectMapper.readTree(record.value()))
                 .flatMap(payload -> {
                     UUID orgId = extractUuid(payload, "orgId");
                     if (orgId == null) {
-                        log.warn("tnt.freelancer_org.verified: missing orgId in payload");
-                        return Mono.empty();
+                        return Mono.error(new IllegalArgumentException("tnt.freelancer_org.verified: missing orgId in payload"));
                     }
                     return linkUseCase.updateOrgVerificationStatus(orgId, true);
-                })
-                .subscribeOn(Schedulers.boundedElastic())
-                .subscribe(
-                        null,
-                        error -> log.error("Failed to process tnt.freelancer_org.verified: {}",
-                                error.getMessage(), error));
+                }));
     }
 
     // ── Private helpers ────────────────────────────────────────────────────────

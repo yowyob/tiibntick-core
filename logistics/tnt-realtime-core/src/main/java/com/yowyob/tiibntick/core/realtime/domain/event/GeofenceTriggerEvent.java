@@ -11,7 +11,7 @@ import com.yowyob.tiibntick.core.realtime.domain.model.GeofenceTrigger;
  */
 public class GeofenceTriggerEvent extends RealtimeDomainEvent {
 
-    private static final String TOPIC = "tnt.realtime.geofence.triggered";
+    private static final String TOPIC = com.yowyob.tiibntick.common.kafka.TntTopics.REALTIME_GEOFENCE_TRIGGERED;
 
     private final GeofenceTrigger trigger;
 

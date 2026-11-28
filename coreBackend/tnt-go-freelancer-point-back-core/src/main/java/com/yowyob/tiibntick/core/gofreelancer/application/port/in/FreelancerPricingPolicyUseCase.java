@@ -17,9 +17,8 @@ public interface FreelancerPricingPolicyUseCase {
     Mono<FreelancerPricingDTO> getPolicy(UUID freelancerId);
 
     /**
-     * Same as {@link #upsertPolicy(UUID, FreelancerPricingDTO, UUID)} without a tenant: only an
-     * already-existing billing policy can be updated, otherwise the grid is kept in the legacy
-     * table until a tenant-scoped call creates the policy.
+     * Same as {@link #upsertPolicy(UUID, FreelancerPricingDTO, UUID)} without a tenant: a new grid
+     * policy is created in the system tenant.
      */
     default Mono<FreelancerPricingDTO> upsertPolicy(UUID freelancerId, FreelancerPricingDTO request) {
         return upsertPolicy(freelancerId, request, null);

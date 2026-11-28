@@ -53,6 +53,11 @@ public final class DisputePersistenceMapper {
         entity.setRespondentOrgId(dispute.getRespondentOrgId());
         entity.setImpliedSubDelivererId(dispute.getImpliedSubDelivererId());
         entity.setSubDelivererInvolved(dispute.getSubDelivererInvolved());
+        // Lot L4
+        entity.setResponsibleParty(dispute.getResponsibleParty() != null ? dispute.getResponsibleParty().name() : null);
+        entity.setIncidentId(dispute.getIncidentId());
+        entity.setClosedAt(dispute.getClosedAt());
+        entity.setEventSequence(dispute.getEventSequence());
 
         // Resolution
         if (dispute.getResolution() != null) {
@@ -134,7 +139,11 @@ public final class DisputePersistenceMapper {
                 entity.getVersion() != null ? entity.getVersion() : 0,
                 entity.getRespondentOrgId(),
                 entity.getImpliedSubDelivererId(),
-                entity.getSubDelivererInvolved());
+                entity.getSubDelivererInvolved())
+                .restoreLifecycle(entity.getResponsibleParty() != null
+                                ? DisputeResponsibleParty.valueOf(entity.getResponsibleParty()) : null,
+                        entity.getIncidentId(), entity.getClosedAt(),
+                        entity.getEventSequence() != null ? entity.getEventSequence() : 0L);
     }
 
     /**

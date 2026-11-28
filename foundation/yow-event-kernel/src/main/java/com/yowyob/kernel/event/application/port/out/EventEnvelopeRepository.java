@@ -6,6 +6,7 @@ import com.yowyob.kernel.event.domain.enums.EnvelopeStatus;
 import com.yowyob.kernel.event.domain.model.DomainEventEnvelope;
 import com.yowyob.kernel.event.domain.vo.EnvelopeId;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 
 /**
@@ -97,6 +98,45 @@ public interface EventEnvelopeRepository {
             String lastError,
             int retryCount,
             int version);
+
+    // ── Outbox relay (R2: automatic re-publication) ──────────────────────────
+
+    /**
+     * Envelopes the outbox relay must (re)publish, oldest first, across all tenants:
+     * <ul>
+     *   <li>FAILED or RETRYING whose {@code next_attempt_at} is due (a RETRYING row is only due
+     *       once its claim has expired, i.e. its relay instance died mid-attempt);</li>
+     *   <li>PENDING older than {@code pendingGrace} (persisted, but the process died before the
+     *       direct publish recorded its outcome).</li>
+     * </ul>
+     * Time is evaluated by the database ({@code NOW()}) so that application/DB clock or time-zone
+     * skew cannot make a fresh envelope look stale.
+     *
+     * @param pendingGrace minimum age of a PENDING envelope before the relay takes it over
+     * @param limit        maximum number of envelopes returned
+     * @return due envelopes, oldest first
+     */
+    Flux<DomainEventEnvelope> findRelayCandidates(Duration pendingGrace, int limit);
+
+    /**
+     * Atomically claims an envelope for one relay attempt: status RETRYING, version
+     * {@code expectedVersion + 1}, and {@code next_attempt_at = NOW() + claimTimeout} (after which
+     * another instance may take it over if this one died). Optimistic: fails when the row's
+     * version is no longer {@code expectedVersion}.
+     *
+     * @return {@code true} if this caller won the claim
+     */
+    Mono<Boolean> claimForRelay(EnvelopeId id, int expectedVersion, Duration claimTimeout);
+
+    /**
+     * Records a failed relay attempt: status (FAILED or DEAD), error, retry counter, the
+     * already-incremented version (matched against {@code version - 1}) and the next attempt
+     * time {@code NOW() + retryIn}.
+     *
+     * @return the updated row count (0 on an optimistic-lock conflict)
+     */
+    Mono<Integer> recordRelayFailure(EnvelopeId id, EnvelopeStatus status, String lastError,
+                                     int retryCount, int version, Duration retryIn);
 
     /**
      * Counts the total number of envelopes in a given status for a tenant.

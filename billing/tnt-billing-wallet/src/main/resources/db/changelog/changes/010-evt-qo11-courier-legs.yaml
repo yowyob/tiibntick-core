@@ -1,0 +1,32 @@
+databaseChangeLog:
+  - changeSet:
+      id: evt-qo11-001-wallet-courier-legs
+      author: evt-qo11
+      labels: evt-qo11
+      comment: >
+        QO-11 / D-153 (2026-11-27, maintainer): the Kernel escrow pays the whole courier part to the courier named at
+        the hold; the compensation fund pays each replacement courier at the prorata of the distance and the first
+        courier owes it back (wallet_debts, reason COURIER_REPLACEMENT). One row per delivery event that changed the
+        courier (details of tnt.delivery.events), read when the escrow is released. Additive.
+      changes:
+        - createTable:
+            schemaName: billing
+            tableName: wallet_courier_legs
+            columns:
+              - column: { name: id, type: UUID, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: tenant_id, type: UUID, constraints: { nullable: false } }
+              - column: { name: delivery_id, type: UUID, constraints: { nullable: false } }
+              - column: { name: event_id, type: UUID, constraints: { nullable: false, unique: true, uniqueConstraintName: uq_wallet_courier_leg_event } }
+              - column: { name: aggregate_version, type: BIGINT, constraints: { nullable: false } }
+              - column: { name: replaced_courier_id, type: UUID, constraints: { nullable: false } }
+              - column: { name: replacement_courier_id, type: UUID, constraints: { nullable: false } }
+              - column: { name: replaced_leg_km, type: "NUMERIC(10,3)", remarks: "leg of the courier who left; NULL = unknown point" }
+              - column: { name: remaining_km, type: "NUMERIC(10,3)", remarks: "hand-over point to the delivery address; NULL = unknown" }
+              - column: { name: created_at, type: TIMESTAMP, defaultValueComputed: NOW(), constraints: { nullable: false } }
+        - createIndex:
+            schemaName: billing
+            tableName: wallet_courier_legs
+            indexName: idx_wallet_courier_legs_delivery
+            columns:
+              - column: { name: delivery_id }
+              - column: { name: aggregate_version }

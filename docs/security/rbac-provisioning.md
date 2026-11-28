@@ -6,7 +6,7 @@
 
 Au démarrage de l'application (`TNT_ROLES_PROVISION_ON_STARTUP=true`), `TntRoleInitializationService`
 provisionne les 9 rôles canoniques TiiBnTick dans `tnt_roles` **uniquement pour le tenant système**
-(`00000000-0000-0000-0000-000000000001`). Ces rôles couvrent FREELANCER, CLIENT, ORG_ADMIN, etc.
+(`<SYSTEM_TENANT_ID>`). Ces rôles couvrent FREELANCER, CLIENT, ORG_ADMIN, etc.
 
 Les assignations (`tnt_user_role_assignments`) ne sont **pas** créées automatiquement. Pour qu'un
 utilisateur accède à une route protégée par `@RequirePermission`, une ligne doit exister dans

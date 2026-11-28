@@ -31,6 +31,13 @@ public class FreelancerPricingDTO {
     @Min(0)
     private Double baseFee;
 
+    /**
+     * Minimum price of a delivery (the computed price is raised to it). Optional; absent = no minimum
+     * (decision D-058, platform grid of {@code docs/architecture/chantiers/tarifs-par-vehicule.md}).
+     */
+    @Min(0)
+    private Double minimumFee;
+
     /** Price per minute of waiting at pickup/delivery (billed from the declared waiting time). */
     @Min(0)
     private Double waitingFeePerMinute;

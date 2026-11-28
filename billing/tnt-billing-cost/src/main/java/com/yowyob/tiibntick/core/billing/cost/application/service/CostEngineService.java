@@ -50,7 +50,7 @@ public class CostEngineService implements ICostUseCase {
     @Override
     public Mono<OperationalCost> computeOperationalCost(ComputeCostCommand command) {
         log.debug("Computing operational cost for missionId={} tenantId={} ownerOrgId={}",
-                command.missionId(), command.tenantId(), command.ownerOrgId());
+                command.deliveryId(), command.tenantId(), command.ownerOrgId());
 
         // Resolve fleet parameters: prefer command-embedded, fall back to persistence lookup
         Mono<FleetCostParameters> fleetParamsMono = resolveFleetParams(command);
@@ -70,7 +70,7 @@ public class CostEngineService implements ICostUseCase {
                     OperationalCost cost = CostComputationDomainService.compute(context, params);
 
                     log.info("Cost computed: missionId={} total={} fleet={}",
-                            command.missionId(), cost.total(),
+                            command.deliveryId(), cost.total(),
                             fleetParams != null ? "custom[" + fleetParams.ownerOrgId() + "]" : "global");
                     return Mono.just(cost);
                 });
@@ -127,7 +127,7 @@ public class CostEngineService implements ICostUseCase {
     @Override
     public Mono<EquipmentCostResult> computeEquipmentCost(ComputeEquipmentCostCommand command) {
         log.debug("Computing equipment cost for missionId={} equipments={}",
-                command.missionId(), command.equipmentTypes());
+                command.deliveryId(), command.equipmentTypes());
         if (command.equipmentTypes() == null || command.equipmentTypes().isEmpty()) {
             return Mono.just(EquipmentCostResult.zero());
         }
@@ -168,8 +168,8 @@ public class CostEngineService implements ICostUseCase {
         if (command.roadType() != null && command.roadType() != RoadType.UNKNOWN) {
             return Mono.just(command.roadType());
         }
-        if (command.missionId() == null) return Mono.just(RoadType.URBAN_PAVED);
-        return routeDataPort.getDominantRoadType(command.missionId())
+        if (command.deliveryId() == null) return Mono.just(RoadType.URBAN_PAVED);
+        return routeDataPort.getDominantRoadType(command.deliveryId())
                 .onErrorReturn(RoadType.URBAN_PAVED);
     }
 
@@ -177,8 +177,8 @@ public class CostEngineService implements ICostUseCase {
         if (command.weatherCondition() != null && command.weatherCondition() != WeatherCondition.UNKNOWN) {
             return Mono.just(command.weatherCondition());
         }
-        if (command.missionId() == null) return Mono.just(WeatherCondition.CLEAR);
-        return routeDataPort.getWeatherCondition(command.missionId(), command.tenantId())
+        if (command.deliveryId() == null) return Mono.just(WeatherCondition.CLEAR);
+        return routeDataPort.getWeatherCondition(command.deliveryId(), command.tenantId())
                 .onErrorReturn(WeatherCondition.CLEAR);
     }
 
@@ -186,7 +186,7 @@ public class CostEngineService implements ICostUseCase {
                                      RoadType roadType, WeatherCondition weather,
                                      FleetCostParameters fleetParams) {
         return CostContext.builder()
-                .missionId(command.missionId())
+                .missionId(command.deliveryId())
                 .tenantId(command.tenantId())
                 .distanceKm(command.distanceKm())
                 .estimatedDurationMin(command.estimatedDurationMin())

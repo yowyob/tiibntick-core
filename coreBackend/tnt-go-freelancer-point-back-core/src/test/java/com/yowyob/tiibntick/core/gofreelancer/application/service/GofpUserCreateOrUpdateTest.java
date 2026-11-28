@@ -64,4 +64,19 @@ class GofpUserCreateOrUpdateTest {
                 .isFalse();
         assertThat(captor.getValue().getId()).isEqualTo(existingPk);
     }
+
+    @Test
+    void createOrUpdate_newRecord_takesTheActorIdAsId() {
+        UUID actor = UUID.randomUUID();
+        com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpUser incoming =
+                new com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpUser();
+        incoming.setId(UUID.randomUUID()); // ignored: one identity
+        incoming.setCoreUserId(actor);
+        when(userRepository.findByCoreUserId(actor)).thenReturn(Mono.empty());
+        when(userRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+
+        StepVerifier.create(service.createOrUpdate(incoming))
+                .expectNextMatches(u -> actor.equals(u.getId()))
+                .verifyComplete();
+    }
 }

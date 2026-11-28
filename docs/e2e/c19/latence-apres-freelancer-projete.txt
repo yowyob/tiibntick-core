@@ -22,7 +22,7 @@ jeton expire : 02:09:42Z
 
 ── Journal core pendant la mesure 2 (provisioning / projection / erreurs) ──
 2026-10-02 01:55:37.834 [main] INFO  [] [] c.y.t.bootstrap.startup.StartupStep - [5/9] Starting: RoleRegistration — Provision 9 canonical TntRole definitions via tnt-roles-core (TntRoleInitializationService, idempotent, system tenant)
-2026-10-02 01:55:37.839 [main] INFO  [] [] c.y.t.b.registry.TntRoleRegistrar - TiiBnTick role provisioning completed via tnt-roles-core — 9 roles provisioned for system tenant [00000000-0000-0000-0000-000000000001]
+2026-10-02 01:55:37.839 [main] INFO  [] [] c.y.t.b.registry.TntRoleRegistrar - TiiBnTick role provisioning completed via tnt-roles-core — 9 roles provisioned for system tenant [<SYSTEM_TENANT_ID>]
 2026-10-02 01:56:30.512 [main] INFO  [] [] c.y.t.bootstrap.startup.StartupStep - [5/9] Starting: RoleRegistration — Provision 9 canonical TntRole definitions via tnt-roles-core (TntRoleInitializationService, idempotent, system tenant)
-2026-10-02 01:56:30.516 [main] INFO  [] [] c.y.t.b.registry.TntRoleRegistrar - TiiBnTick role provisioning completed via tnt-roles-core — 9 roles provisioned for system tenant [00000000-0000-0000-0000-000000000001]
+2026-10-02 01:56:30.516 [main] INFO  [] [] c.y.t.b.registry.TntRoleRegistrar - TiiBnTick role provisioning completed via tnt-roles-core — 9 roles provisioned for system tenant [<SYSTEM_TENANT_ID>]
 ═══ fin ═══

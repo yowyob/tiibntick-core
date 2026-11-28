@@ -2,7 +2,7 @@ package com.yowyob.tiibntick.core.gofreelancer.application.port.in;
 
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpClient;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.client.ClientStatus;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.user.LoyaltyStatus;
+import com.yowyob.tiibntick.core.tp.domain.model.enums.LoyaltyTier;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -27,7 +27,7 @@ public interface GofpClientUseCase {
 
     Mono<GofpClient> updateStatus(UUID id, ClientStatus status);
 
-    Mono<GofpClient> updateLoyaltyStatus(UUID id, LoyaltyStatus loyaltyStatus);
+    Mono<GofpClient> updateLoyaltyStatus(UUID id, LoyaltyTier loyaltyStatus);
 
     /** Increments totalOrders and recomputes loyalty tier. */
     Mono<GofpClient> recordOrder(UUID coreClientId);

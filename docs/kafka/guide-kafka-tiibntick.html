@@ -1,0 +1,2724 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guide Kafka TiiBnTick</title>
+<style>
+:root { --bg:#ffffff; --fg:#1c2330; --muted:#5d6878; --line:#d9dee6; --soft:#f3f5f8; --accent:#1f5fbf; --agg:#0f7b4a; --dlq:#b4361e; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#12161d; --fg:#e4e8ef; --muted:#9aa5b5; --line:#2b3340; --soft:#1a202a; --accent:#7fb0ff; --agg:#5fd39a; --dlq:#ff8a70; } }
+:root[data-theme="dark"] { --bg:#12161d; --fg:#e4e8ef; --muted:#9aa5b5; --line:#2b3340; --soft:#1a202a; --accent:#7fb0ff; --agg:#5fd39a; --dlq:#ff8a70; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+main { max-width:1180px; margin:0 auto; padding:24px 16px 64px; }
+h1 { font-size:1.7rem; margin:.2em 0; } h2 { margin-top:2.2em; border-bottom:1px solid var(--line); padding-bottom:.25em; }
+h3 { margin-top:1.6em; }
+a { color:var(--accent); }
+code, pre { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.88em; }
+code { background:var(--soft); padding:.05em .3em; border-radius:4px; overflow-wrap:anywhere; }
+pre { background:var(--soft); padding:12px; border-radius:6px; overflow-x:auto; }
+pre code { background:none; padding:0; }
+.table-wrap { overflow-x:auto; }
+table { border-collapse:collapse; width:100%; margin:.6em 0; }
+th, td { border:1px solid var(--line); padding:6px 8px; vertical-align:top; text-align:left; }
+th { background:var(--soft); position:sticky; top:0; }
+.small { font-size:.86em; } .muted { color:var(--muted); }
+.tag { font-size:.72em; font-weight:600; padding:.05em .45em; border-radius:9px; border:1px solid currentColor; margin-left:.3em; }
+.agg { color:var(--agg); } .dlq { color:var(--dlq); }
+.note { border-left:4px solid var(--accent); background:var(--soft); padding:8px 12px; border-radius:4px; }
+nav ol { columns:2; } @media (max-width:640px) { nav ol { columns:1; } }
+details { margin:.3em 0; } summary { cursor:pointer; }
+input#q { width:100%; max-width:420px; padding:6px 8px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--fg); }
+</style>
+</head>
+<body>
+<main>
+<h1>Guide Kafka TiiBnTick</h1>
+<p class="muted">Lot L9 <code>evt-guide-kafka-html</code> · fichier local du dépôt, à ne pas publier en ligne · généré le 2026-11-27
+depuis le code fusionné par <code>docs/kafka/gen_kafka_guide.py</code> (relancer après chaque changement de topic).</p>
+<p><strong>101</strong> topics déclarés (<code>TntTopics</code>), dont <strong>42</strong> lus par au moins
+un consommateur du Core ; <strong>30</strong> groupes de consommateurs internes.</p>
+
+<nav><ol>
+<li><a href="#connexion">Se connecter au cluster</a></li>
+<li><a href="#agregats">Les cinq topics d'agrégat</a></li>
+<li><a href="#distinguer">Distinguer les événements d'un même topic</a></li>
+<li><a href="#enveloppe">Enveloppe, en-têtes et schémas</a></li>
+<li><a href="#catalogue">Catalogue des topics</a></li>
+<li><a href="#groupes">Groupes de consommateurs du Core</a></li>
+<li><a href="#externes">Plateformes externes : groupes et ACL</a></li>
+<li><a href="#pratiques">Bonnes pratiques</a></li>
+<li><a href="#ancien-nouveau">Ancien → nouveau</a></li>
+<li><a href="#dlq">Relancer un message de <code>tnt.dlq</code></a></li>
+<li><a href="#exploitation">Exploitation : anciens topics</a></li>
+</ol></nav>
+
+<h2 id="connexion">1. Se connecter au cluster</h2>
+<ul>
+<li>Adresse : propriété <code>spring.kafka.bootstrap-servers</code> = <code>${KAFKA_BOOTSTRAP:localhost:9092}</code>.</li>
+<li>Clé : chaîne UTF-8 (<code>StringSerializer</code>) ; valeur : JSON UTF-8 en octets (<code>ByteArraySerializer</code>).</li>
+<li>Producteur du Core : <code>acks=all</code>, idempotence activée, une requête en vol par connexion (ordre par clé).
+Les événements d'agrégat passent par l'outbox de <code>yow-event-kernel</code> : publication « au moins une fois ».</li>
+<li>Topics créés au démarrage (<code>TntKafkaTopicsConfig</code>) : <code>KAFKA_PARTITIONS</code> partitions (3),
+réplication <code>KAFKA_REPLICATION</code> (1 en local) ; topics d'agrégat en <code>cleanup.policy=delete</code>,
+rétention <code>TNT_KAFKA_AGGREGATE_RETENTION_MS</code> (30 jours) pour qu'une plateforme externe puisse rattraper son retard.</li>
+<li>Démarrage d'un nouveau lecteur : <code>auto.offset.reset=earliest</code> lit les 30 derniers jours ; un projecteur
+doit donc supporter un historique complet (voir <a href="#pratiques">bonnes pratiques</a>).</li>
+</ul>
+
+<h2 id="agregats">2. Les cinq topics d'agrégat</h2>
+<p>Un topic par agrégat ; chaque enregistrement est un <strong>événement complet</strong> : instantané masqué après le
+changement (<code>payload</code>), état précédent (<code>previousState</code>), cause (<code>trigger</code>, <code>actor</code>)
+et données propres au type (<code>details</code>). Clé = identifiant de l'agrégat.</p>
+<div class="table-wrap"><table>
+<tr><th>Topic</th><th>Clé</th><th>Types d'événements</th></tr>
+<tr><td><code>tnt.delivery.events</code></td><td><code>deliveryId</code></td><td class="small">13 transitions :
+<code>DeliveryCreated</code>, <code>DeliveryAssigned</code>, <code>DeliveryPickedUp</code>, <code>DeliveryInTransit</code>,
+<code>DeliveryAtRelayHub</code>, <code>DeliveryOutForDelivery</code>, <code>DeliveryAttemptFailed</code>,
+<code>DeliveryDelivered</code>, <code>DeliveryFailed</code>, <code>DeliveryCancelled</code>, <code>DeliveryIncidentReported</code>,
+<code>DeliveryPausedByIncident</code>, <code>DeliveryIncidentHandover</code> ; sans transition : <code>DeliveryEtaUpdated</code>,
+<code>DeliveryVehicleChanged</code>, <code>DeliveryFreelancerOrgAssigned</code>, <code>DeliveryPaymentUpdated</code>,
+<code>DeliveryAlertRaised</code> (<code>PICKUP_LATE</code>, <code>DELIVERY_LATE</code>, <code>ETA_EXCEEDED</code>,
+<code>GPS_SIGNAL_LOST</code>, <code>TRAJECTORY_DEVIATION</code>, <code>PROLONGED_STOP</code>, <code>GEOFENCE_EXIT</code>,
+<code>RELAY_STORAGE_EXPIRING</code>), <code>DeliveryAlertCleared</code></td></tr>
+<tr><td><code>tnt.parcel.events</code></td><td><code>parcelId</code></td><td class="small">14 transitions :
+<code>ParcelCreated</code>, <code>ParcelAssigned</code>, <code>ParcelPickedUp</code>, <code>ParcelInTransit</code>,
+<code>ParcelAtRelayHub</code>, <code>ParcelOutForDelivery</code>, <code>ParcelDeliveryFailed</code>, <code>ParcelDelivered</code>,
+<code>ParcelUnderDispute</code>, <code>ParcelReturnRequested</code>, <code>ParcelReturnInTransit</code>, <code>ParcelReturned</code>,
+<code>ParcelLost</code>, <code>ParcelDamaged</code> ; sans transition : <code>ParcelCustodyChanged</code>, <code>ParcelDetailsUpdated</code></td></tr>
+<tr><td><code>tnt.incident.events</code></td><td><code>incidentId</code></td><td class="small">18 transitions
+(<code>IncidentReported</code> … <code>IncidentCancelled</code>, une par état) ; sans transition :
+<code>IncidentEscalatedToDispute</code>, <code>IncidentHandoverConfirmed</code>, <code>IncidentHandlerAssigned</code></td></tr>
+<tr><td><code>tnt.dispute.events</code></td><td><code>disputeId</code></td><td class="small">10 transitions
+(<code>DisputeOpen</code> … <code>DisputeClosedExpired</code>) ; sans transition : <code>DisputeEvidenceAdded</code></td></tr>
+<tr><td><code>tnt.announcement.events</code></td><td><code>announcementId</code> (candidatures comprises)</td><td class="small">
+6 transitions : <code>AnnouncementDraft</code>, <code>AnnouncementPublished</code>, <code>AnnouncementInNegotiation</code>,
+<code>AnnouncementAssigned</code>, <code>AnnouncementCompleted</code>, <code>AnnouncementCancelled</code> ; sans transition :
+<code>AnnouncementUpdated</code>, <code>AnnouncementResponseReceived</code>, <code>AnnouncementResponseWithdrawn</code></td></tr>
+</table></div>
+
+<h2 id="distinguer">3. Distinguer les événements d'un même topic</h2>
+<p>Tous les types d'événements continuent d'être produits et traités ; regrouper les topics n'en supprime aucun. Un
+consommateur choisit ce qui le concerne ainsi :</p>
+<ol>
+<li><strong><code>eventType</code></strong> (corps) ou l'en-tête <code>X-Yow-Event-Type</code> : le nom exact
+(<code>DeliveryDelivered</code>, <code>ParcelReturnRequested</code>…). Filtrer sur l'en-tête évite de désérialiser le corps.</li>
+<li><strong><code>aggregateType</code></strong> (<code>PARCEL</code>, <code>DELIVERY</code>, <code>ANNOUNCEMENT</code>,
+<code>INCIDENT</code>, <code>DISPUTE</code>, en-tête <code>X-Yow-Aggregate-Type</code>) : un seul par topic.</li>
+<li><strong>La transition</strong> <code>previousState.status</code> → <code>payload.status</code> : un même type peut suffire
+(ex. <code>ParcelReturnRequested</code>), mais une réaction précise lit la transition et les champs (ex. l'agence
+expire un colis sur <code>AT_RELAY_HUB → RETURN_REQUESTED</code> avec <code>returnCause = NOT_COLLECTED_AT_RELAY</code>).
+<code>previousState = null</code> = création.</li>
+<li><strong><code>details</code></strong> : les données propres au type (motif d'échec, alerte, indemnisation…), décrites
+par un schéma par type (<a href="#enveloppe">§4</a>).</li>
+<li>Un enregistrement sans <code>schemaVersion</code> (ancien format) est ignoré : <code>TntAggregateEvent.isAggregateEvent</code>.</li>
+</ol>
+<p>Ordre et doublons : la clé est l'id de l'agrégat (même partition, donc ordre de publication), mais l'outbox peut rejouer
+un ancien enregistrement. <code>aggregateVersion</code> croît d'une unité par sauvegarde : un projecteur ignore une
+version ≤ la dernière appliquée. Un effet unique (paiement, ouverture de litige) se protège par <code>eventId</code>
+(table <code>event_bus.processed_events</code> dans le Core). Règle du Core : une transition par sauvegarde.</p>
+<pre><code>// Exemple (Java, Spring Kafka) — ne réagir qu'à la remise au destinataire
+@KafkaListener(topics = TntTopics.DELIVERY_EVENTS, groupId = "ma-plateforme-delivery")
+void on(ConsumerRecord&lt;String, String&gt; r) throws Exception {
+    JsonNode ev = mapper.readTree(r.value());
+    if (!TntAggregateEvent.isAggregateEvent(ev) || !"DeliveryDelivered".equals(ev.path("eventType").asText())) return;
+    if (ev.path("aggregateVersion").asLong() &lt;= lastApplied(ev.path("aggregateId").asText())) return; // rejeu
+    apply(ev.path("payload"));
+}</code></pre>
+
+<h2 id="enveloppe">4. Enveloppe, en-têtes et schémas</h2>
+<p>Champs obligatoires : <code>eventId</code>, <code>eventType</code>, <code>schemaVersion</code>, <code>occurredAt</code>,
+<code>aggregateType</code>, <code>aggregateId</code>, <code>aggregateVersion</code>, <code>tenantId</code>, <code>trigger</code>,
+<code>actor</code> (<code>type</code> parmi <code>COURIER</code>, <code>SENDER</code>, <code>RECIPIENT</code>, <code>RELAY_OP</code>,
+<code>AGENCY</code>, <code>SUPPORT</code>, <code>SYSTEM</code>), <code>previousState</code>, <code>payload</code>, <code>details</code>.
+Facultatifs : <code>correlationId</code>, <code>causationId</code>. Des champs peuvent être ajoutés sans préavis ; un
+changement cassant incrémente <code>schemaVersion</code>.</p>
+<p>En-têtes : <code>X-Yow-Event-Id</code>, <code>X-Yow-Event-Type</code>, <code>X-Yow-Aggregate-Type</code>,
+<code>X-Yow-Aggregate-Id</code>, <code>X-Yow-Schema-Version</code>, <code>X-Yow-Tenant-Id</code>, <code>X-Yow-Correlation-Id</code>,
+<code>X-Yow-Envelope-Id</code>, <code>X-Yow-Solution-Code</code> ; <code>X-Yow-Replay: true</code> seulement sur une relance
+manuelle (<a href="#dlq">§10</a>). Les en-têtes reprennent le corps à l'identique.</p>
+<p>Données personnelles masquées : pas de téléphone ni d'adresse exacte (quartier, ville, pays, coordonnées arrondies à
+2 décimales, environ 1,1 km), nom affiché « Prénom N. ». Le détail s'obtient par l'API, avec les droits.</p>
+<p>Schémas JSON (draft 2020-12, <code>foundation/tnt-common-core/src/main/resources/kafka/schemas/v1</code>) ; types
+ayant un schéma de <code>details</code> : <code>AnnouncementResponseReceived</code>, <code>AnnouncementResponseWithdrawn</code>, <code>DeliveryAlertCleared</code>, <code>DeliveryAlertRaised</code>, <code>DeliveryAttemptFailed</code>, <code>DeliveryCancelled</code>, <code>DeliveryEtaUpdated</code>, <code>DeliveryFailed</code>, <code>DisputeAwaitingEvidence</code>, <code>DisputeClosedResolved</code>, <code>DisputeCompensated</code>, <code>DisputeEvidenceAdded</code>, <code>DisputeOpen</code>, <code>DisputePendingArbitration</code>, <code>DisputePendingCompensation</code>, <code>IncidentCancelled</code>, <code>IncidentEscalated</code>, <code>IncidentEscalatedToDispute</code>, <code>IncidentHandlerAssigned</code>, <code>IncidentHandoverConfirmed</code>, <code>IncidentPendingConfirmation</code>, <code>IncidentReported</code>, <code>IncidentResolved</code>, <code>IncidentTriaged</code>, <code>ParcelCustodyChanged</code>, <code>ParcelDamaged</code>, <code>ParcelLost</code>, <code>ParcelReturnDeliveryCancelled</code>, <code>ParcelReturnRequested</code>.</p>
+<details><summary><code>announcement.payload.schema.json</code> <span class="muted">Payload of tnt.announcement.events (spec §3.6), masked announcement state after the event</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:announcement.payload&quot;,
+  &quot;title&quot;: &quot;Payload of tnt.announcement.events (spec §3.6), masked announcement state after the event&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;announcementId&quot;,
+    &quot;kind&quot;,
+    &quot;creatorId&quot;,
+    &quot;creatorRole&quot;,
+    &quot;parcelId&quot;,
+    &quot;status&quot;,
+    &quot;pricingMode&quot;,
+    &quot;proposedPrice&quot;,
+    &quot;currency&quot;,
+    &quot;pickupAddress&quot;,
+    &quot;deliveryAddress&quot;,
+    &quot;relayHubId&quot;,
+    &quot;pickupWindow&quot;,
+    &quot;deliveryWindow&quot;,
+    &quot;requestedStorageDays&quot;,
+    &quot;responses&quot;,
+    &quot;selectedResponseId&quot;,
+    &quot;deliveryId&quot;,
+    &quot;outcome&quot;,
+    &quot;publishedAt&quot;,
+    &quot;assignedAt&quot;,
+    &quot;closedAt&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;announcementId&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;kind&quot;: {
+      &quot;enum&quot;: [
+        &quot;OUTBOUND&quot;,
+        &quot;RETURN&quot;
+      ]
+    },
+    &quot;creatorId&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;creatorRole&quot;: {
+      &quot;enum&quot;: [
+        &quot;CLIENT&quot;,
+        &quot;RELAY&quot;,
+        null
+      ]
+    },
+    &quot;parcelId&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;status&quot;: {
+      &quot;enum&quot;: [
+        &quot;DRAFT&quot;,
+        &quot;PUBLISHED&quot;,
+        &quot;IN_NEGOTIATION&quot;,
+        &quot;ASSIGNED&quot;,
+        &quot;COMPLETED&quot;,
+        &quot;CANCELLED&quot;
+      ]
+    },
+    &quot;pricingMode&quot;: {
+      &quot;enum&quot;: [
+        &quot;FIXED_PRICE&quot;,
+        &quot;QUOTE_REQUEST&quot;,
+        null
+      ]
+    },
+    &quot;proposedPrice&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;currency&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;pickupAddress&quot;: {
+      &quot;$ref&quot;: &quot;#/$defs/maskedAddress&quot;
+    },
+    &quot;deliveryAddress&quot;: {
+      &quot;$ref&quot;: &quot;#/$defs/maskedAddress&quot;
+    },
+    &quot;relayHubId&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;pickupWindow&quot;: {
+      &quot;type&quot;: [
+        &quot;object&quot;,
+        &quot;null&quot;
+      ],
+      &quot;required&quot;: [
+        &quot;start&quot;,
+        &quot;end&quot;
+      ],
+      &quot;properties&quot;: {
+        &quot;start&quot;: {
+          &quot;type&quot;: [
+            &quot;string&quot;,
+            &quot;null&quot;
+          ],
+          &quot;format&quot;: &quot;date-time&quot;
+        },
+        &quot;end&quot;: {
+          &quot;type&quot;: [
+            &quot;string&quot;,
+            &quot;null&quot;
+          ],
+          &quot;format&quot;: &quot;date-time&quot;
+        }
+      }
+    },
+    &quot;deliveryWindow&quot;: {
+      &quot;type&quot;: [
+        &quot;object&quot;,
+        &quot;null&quot;
+      ],
+      &quot;required&quot;: [
+        &quot;start&quot;,
+        &quot;end&quot;
+      ],
+      &quot;properties&quot;: {
+        &quot;start&quot;: {
+          &quot;type&quot;: [
+            &quot;string&quot;,
+            &quot;null&quot;
+          ],
+          &quot;format&quot;: &quot;date-time&quot;
+        },
+        &quot;end&quot;: {
+          &quot;type&quot;: [
+            &quot;string&quot;,
+            &quot;null&quot;
+          ],
+          &quot;format&quot;: &quot;date-time&quot;
+        }
+      }
+    },
+    &quot;requestedStorageDays&quot;: {
+      &quot;type&quot;: [
+        &quot;integer&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;responses&quot;: {
+      &quot;type&quot;: &quot;array&quot;,
+      &quot;items&quot;: {
+        &quot;type&quot;: &quot;object&quot;,
+        &quot;required&quot;: [
+          &quot;responseId&quot;,
+          &quot;courierId&quot;,
+          &quot;price&quot;,
+          &quot;status&quot;,
+          &quot;createdAt&quot;
+        ],
+        &quot;properties&quot;: {
+          &quot;responseId&quot;: {
+            &quot;type&quot;: &quot;string&quot;,
+            &quot;format&quot;: &quot;uuid&quot;
+          },
+          &quot;courierId&quot;: {
+            &quot;type&quot;: [
+              &quot;string&quot;,
+              &quot;null&quot;
+            ],
+            &quot;format&quot;: &quot;uuid&quot;
+          },
+          &quot;price&quot;: {
+            &quot;type&quot;: [
+              &quot;string&quot;,
+              &quot;null&quot;
+            ]
+          },
+          &quot;status&quot;: {
+            &quot;enum&quot;: [
+              &quot;SENT&quot;,
+              &quot;ACCEPTED&quot;,
+              &quot;REJECTED&quot;,
+              &quot;CANCELLED&quot;
+            ]
+          },
+          &quot;createdAt&quot;: {
+            &quot;type&quot;: [
+              &quot;string&quot;,
+              &quot;null&quot;
+            ],
+            &quot;format&quot;: &quot;date-time&quot;
+          }
+        }
+      }
+    },
+    &quot;selectedResponseId&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;deliveryId&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;outcome&quot;: {
+      &quot;enum&quot;: [
+        &quot;DELIVERED&quot;,
+        &quot;FAILED&quot;,
+        null
+      ]
+    },
+    &quot;publishedAt&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;date-time&quot;
+    },
+    &quot;assignedAt&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;date-time&quot;
+    },
+    &quot;closedAt&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;date-time&quot;
+    }
+  },
+  &quot;$defs&quot;: {
+    &quot;maskedAddress&quot;: {
+      &quot;type&quot;: &quot;object&quot;,
+      &quot;additionalProperties&quot;: true,
+      &quot;description&quot;: &quot;Masked address (decision G.3): no street, landmark, postal code or exact position; coordinates rounded (QO-17). Copy of envelope.schema.json $defs/maskedAddress.&quot;,
+      &quot;required&quot;: [
+        &quot;district&quot;,
+        &quot;city&quot;,
+        &quot;country&quot;,
+        &quot;approxLatitude&quot;,
+        &quot;approxLongitude&quot;
+      ],
+      &quot;not&quot;: {
+        &quot;anyOf&quot;: [
+          {
+            &quot;required&quot;: [
+              &quot;street&quot;
+            ]
+          },
+          {
+            &quot;required&quot;: [
+              &quot;landmark&quot;
+            ]
+          },
+          {
+            &quot;required&quot;: [
+              &quot;postalCode&quot;
+            ]
+          },
+          {
+            &quot;required&quot;: [
+              &quot;latitude&quot;
+            ]
+          },
+          {
+            &quot;required&quot;: [
+              &quot;longitude&quot;
+            ]
+          }
+        ]
+      },
+      &quot;properties&quot;: {
+        &quot;district&quot;: {
+          &quot;type&quot;: [
+            &quot;string&quot;,
+            &quot;null&quot;
+          ]
+        },
+        &quot;city&quot;: {
+          &quot;type&quot;: [
+            &quot;string&quot;,
+            &quot;null&quot;
+          ]
+        },
+        &quot;country&quot;: {
+          &quot;type&quot;: [
+            &quot;string&quot;,
+            &quot;null&quot;
+          ]
+        },
+        &quot;approxLatitude&quot;: {
+          &quot;type&quot;: [
+            &quot;number&quot;,
+            &quot;null&quot;
+          ],
+          &quot;minimum&quot;: -90,
+          &quot;maximum&quot;: 90
+        },
+        &quot;approxLongitude&quot;: {
+          &quot;type&quot;: [
+            &quot;number&quot;,
+            &quot;null&quot;
+          ],
+          &quot;minimum&quot;: -180,
+          &quot;maximum&quot;: 180
+        }
+      }
+    }
+  }
+}</pre></details><details><summary><code>delivery.payload.schema.json</code> <span class="muted">Payload of tnt.delivery.events (spec §3.6), full masked delivery state after the event</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:delivery.payload&quot;,
+  &quot;title&quot;: &quot;Payload of tnt.delivery.events (spec §3.6), full masked delivery state after the event&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;deliveryId&quot;,
+    &quot;parcelId&quot;,
+    &quot;kind&quot;,
+    &quot;parentDeliveryId&quot;,
+    &quot;status&quot;,
+    &quot;previousStatusBeforeIncident&quot;,
+    &quot;announcementId&quot;,
+    &quot;agencyId&quot;,
+    &quot;platform&quot;,
+    &quot;senderId&quot;,
+    &quot;senderDisplayName&quot;,
+    &quot;recipientActorId&quot;,
+    &quot;recipientDisplayName&quot;,
+    &quot;courierId&quot;,
+    &quot;vehicleId&quot;,
+    &quot;freelancerOrgId&quot;,
+    &quot;pickupAddress&quot;,
+    &quot;deliveryAddress&quot;,
+    &quot;relayHubId&quot;,
+    &quot;pickupWindow&quot;,
+    &quot;deliveryWindow&quot;,
+    &quot;eta&quot;,
+    &quot;attemptCount&quot;,
+    &quot;maxAttempts&quot;,
+    &quot;failureReason&quot;,
+    &quot;lastAttemptReason&quot;,
+    &quot;cancellationReason&quot;,
+    &quot;returnCostPayer&quot;,
+    &quot;late&quot;,
+    &quot;lateSince&quot;,
+    &quot;activeAlerts&quot;,
+    &quot;openIncidentId&quot;,
+    &quot;frozenByDispute&quot;,
+    &quot;agreedAmount&quot;,
+    &quot;currency&quot;,
+    &quot;payment&quot;,
+    &quot;relayStorageExpiresAt&quot;,
+    &quot;createdAt&quot;,
+    &quot;updatedAt&quot;,
+    &quot;deliveredAt&quot;,
+    &quot;failedAt&quot;,
+    &quot;cancelledAt&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;deliveryId&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;parcelId&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;kind&quot;: {
+      &quot;enum&quot;: [
+        &quot;OUTBOUND&quot;,
+        &quot;RETURN&quot;,
+        &quot;REDELIVERY&quot;
+      ]
+    },
+    &quot;parentDeliveryId&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;status&quot;: {
+      &quot;enum&quot;: [
+        &quot;CREATED&quot;,
+        &quot;ASSIGNED&quot;,
+        &quot;PICKED_UP&quot;,
+        &quot;IN_TRANSIT&quot;,
+        &quot;AT_RELAY_HUB&quot;,
+        &quot;OUT_FOR_DELIVERY&quot;,
+        &quot;DELIVERY_ATTEMPT_FAILED&quot;,
+        &quot;DELIVERED&quot;,
+        &quot;FAILED&quot;,
+        &quot;CANCELLED&quot;,
+        &quot;INCIDENT_REPORTED&quot;,
+        &quot;PAUSED_BY_INCIDENT&quot;,
+        &quot;INCIDENT_HANDOVER&quot;
+      ]
+    },
+    &quot;previousStatusBeforeIncident&quot;: {
+      &quot;enum&quot;: [
+        &quot;CREATED&quot;,
+        &quot;ASSIGNED&quot;,
+        &quot;PICKED_UP&quot;,
+        &quot;IN_TRANSIT&quot;,
+        &quot;AT_RELAY_HUB&quot;,
+        &quot;OUT_FOR_DELIVERY&quot;,
+        &quot;DELIVERY_ATTEMPT_FAILED&quot;,
+        &quot;DELIVERED&quot;,
+        &quot;FAILED&quot;,
+        &quot;CANCELLED&quot;,
+        &quot;INCIDENT_REPORTED&quot;,
+        &quot;PAUSED_BY_INCIDENT&quot;,
+        &quot;INCIDENT_HANDOVER&quot;,
+        null
+      ]
+    },
+    &quot;announcementId&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;agencyId&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;platform&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;senderId&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;senderDisplayName&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;recipientActorId&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;recipientDisplayName&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;courierId&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;vehicleId&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;freelancerOrgId&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;pickupAddress&quot;: {
+      &quot;$ref&quot;: &quot;#/$defs/maskedAddress&quot;
+    },
+    &quot;deliveryAddress&quot;: {
+      &quot;$ref&quot;: &quot;#/$defs/maskedAddress&quot;
+    },
+    &quot;relayHubId&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;pickupWindow&quot;: {
+      &quot;type&quot;: [
+        &quot;object&quot;,
+        &quot;null&quot;
+      ],
+      &quot;required&quot;: [
+        &quot;start&quot;,
+        &quot;end&quot;
+      ],
+      &quot;properties&quot;: {
+        &quot;start&quot;: {
+          &quot;type&quot;: [
+            &quot;string&quot;,
+            &quot;null&quot;
+          ],
+          &quot;format&quot;: &quot;date-time&quot;
+        },
+        &quot;end&quot;: {
+          &quot;type&quot;: [
+            &quot;string&quot;,
+            &quot;null&quot;
+          ],
+          &quot;format&quot;: &quot;date-time&quot;
+        }
+      }
+    },
+    &quot;deliveryWindow&quot;: {
+      &quot;type&quot;: [
+        &quot;object&quot;,
+        &quot;null&quot;
+      ],
+      &quot;required&quot;: [
+        &quot;start&quot;,
+        &quot;end&quot;
+      ],
+      &quot;properties&quot;: {
+        &quot;start&quot;: {
+          &quot;type&quot;: [
+            &quot;string&quot;,
+            &quot;null&quot;
+          ],
+          &quot;format&quot;: &quot;date-time&quot;
+        },
+        &quot;end&quot;: {
+          &quot;type&quot;: [
+            &quot;string&quot;,
+            &quot;null&quot;
+          ],
+          &quot;format&quot;: &quot;date-time&quot;
+        }
+      }
+    },
+    &quot;eta&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;date-time&quot;
+    },
+    &quot;attemptCount&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;minimum&quot;: 0
+    },
+    &quot;maxAttempts&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;minimum&quot;: 1
+    },
+    &quot;failureReason&quot;: {
+      &quot;enum&quot;: [
+        &quot;CLIENT_ABSENT_AT_DELIVERY&quot;,
+        &quot;CLIENT_PHONE_UNREACHABLE&quot;,
+        &quot;CLIENT_REFUSED_RECEPTION&quot;,
+        &quot;CLIENT_REFUSED_OTP_VALIDATION&quot;,
+        &quot;CLIENT_WRONG_ADDRESS&quot;,
+        &quot;CLIENT_INCOMPLETE_ADDRESS&quot;,
+        &quot;CLIENT_BUILDING_ACCESS_BLOCKED&quot;,
+        &quot;MAX_ATTEMPTS_REACHED&quot;,
+        &quot;NOT_COLLECTED_AT_RELAY&quot;,
+        &quot;INCIDENT_UNRESOLVED&quot;,
+        &quot;PARCEL_LOST&quot;,
+        &quot;PARCEL_DAMAGED&quot;,
+        null
+      ]
+    },
+    &quot;lastAttemptReason&quot;: {
+      &quot;enum&quot;: [
+        &quot;CLIENT_ABSENT_AT_DELIVERY&quot;,
+        &quot;CLIENT_PHONE_UNREACHABLE&quot;,
+        &quot;CLIENT_REFUSED_RECEPTION&quot;,
+        &quot;CLIENT_REFUSED_OTP_VALIDATION&quot;,
+        &quot;CLIENT_WRONG_ADDRESS&quot;,
+        &quot;CLIENT_INCOMPLETE_ADDRESS&quot;,
+        &quot;CLIENT_BUILDING_ACCESS_BLOCKED&quot;,
+        &quot;MAX_ATTEMPTS_REACHED&quot;,
+        &quot;NOT_COLLECTED_AT_RELAY&quot;,
+        &quot;INCIDENT_UNRESOLVED&quot;,
+        &quot;PARCEL_LOST&quot;,
+        &quot;PARCEL_DAMAGED&quot;,
+        null
+      ]
+    },
+    &quot;cancellationReason&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;returnCostPayer&quot;: {
+      &quot;enum&quot;: [
+        &quot;SENDER&quot;,
+        &quot;RECIPIENT&quot;,
+        &quot;COURIER&quot;,
+        &quot;PLATFORM&quot;,
+        &quot;RELAY&quot;,
+        &quot;AGENCY&quot;,
+        &quot;NONE&quot;,
+        null
+      ]
+    },
+    &quot;late&quot;: {
+      &quot;type&quot;: &quot;boolean&quot;
+    },
+    &quot;lateSince&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;date-time&quot;
+    },
+    &quot;activeAlerts&quot;: {
+      &quot;type&quot;: &quot;array&quot;,
+      &quot;items&quot;: {
+        &quot;type&quot;: &quot;string&quot;
+      }
+    },
+    &quot;openIncidentId&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;frozenByDispute&quot;: {
+      &quot;type&quot;: &quot;boolean&quot;
+    },
+    &quot;agreedAmount&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;currency&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;payment&quot;: {
+      &quot;type&quot;: &quot;object&quot;,
+      &quot;required&quot;: [
+        &quot;mode&quot;,
+        &quot;status&quot;
+      ],
+      &quot;properties&quot;: {
+        &quot;mode&quot;: {
+          &quot;enum&quot;: [
+            &quot;ESCROW&quot;,
+            &quot;CASH&quot;,
+            &quot;NONE&quot;
+          ]
+        },
+        &quot;status&quot;: {
+          &quot;type&quot;: [
+            &quot;string&quot;,
+            &quot;null&quot;
+          ]
+        }
+      }
+    },
+    &quot;relayStorageExpiresAt&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;date-time&quot;
+    },
+    &quot;createdAt&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;date-time&quot;
+    },
+    &quot;updatedAt&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;date-time&quot;
+    },
+    &quot;deliveredAt&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;date-time&quot;
+    },
+    &quot;failedAt&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;date-time&quot;
+    },
+    &quot;cancelledAt&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;date-time&quot;
+    }
+  },
+  &quot;$defs&quot;: {
+    &quot;maskedAddress&quot;: {
+      &quot;type&quot;: &quot;object&quot;,
+      &quot;additionalProperties&quot;: true,
+      &quot;description&quot;: &quot;Masked address (decision G.3): no street, landmark, postal code or exact position; coordinates rounded (QO-17). Copy of envelope.schema.json $defs/maskedAddress.&quot;,
+      &quot;required&quot;: [
+        &quot;district&quot;,
+        &quot;city&quot;,
+        &quot;country&quot;,
+        &quot;approxLatitude&quot;,
+        &quot;approxLongitude&quot;
+      ],
+      &quot;not&quot;: {
+        &quot;anyOf&quot;: [
+          {
+            &quot;required&quot;: [
+              &quot;street&quot;
+            ]
+          },
+          {
+            &quot;required&quot;: [
+              &quot;landmark&quot;
+            ]
+          },
+          {
+            &quot;required&quot;: [
+              &quot;postalCode&quot;
+            ]
+          },
+          {
+            &quot;required&quot;: [
+              &quot;latitude&quot;
+            ]
+          },
+          {
+            &quot;required&quot;: [
+              &quot;longitude&quot;
+            ]
+          }
+        ]
+      },
+      &quot;properties&quot;: {
+        &quot;district&quot;: {
+          &quot;type&quot;: [
+            &quot;string&quot;,
+            &quot;null&quot;
+          ]
+        },
+        &quot;city&quot;: {
+          &quot;type&quot;: [
+            &quot;string&quot;,
+            &quot;null&quot;
+          ]
+        },
+        &quot;country&quot;: {
+          &quot;type&quot;: [
+            &quot;string&quot;,
+            &quot;null&quot;
+          ]
+        },
+        &quot;approxLatitude&quot;: {
+          &quot;type&quot;: [
+            &quot;number&quot;,
+            &quot;null&quot;
+          ],
+          &quot;minimum&quot;: -90,
+          &quot;maximum&quot;: 90
+        },
+        &quot;approxLongitude&quot;: {
+          &quot;type&quot;: [
+            &quot;number&quot;,
+            &quot;null&quot;
+          ],
+          &quot;minimum&quot;: -180,
+          &quot;maximum&quot;: 180
+        }
+      }
+    }
+  }
+}</pre></details><details><summary><code>details/AnnouncementResponseReceived.schema.json</code> <span class="muted">details of AnnouncementResponseReceived</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:details:AnnouncementResponseReceived&quot;,
+  &quot;title&quot;: &quot;details of AnnouncementResponseReceived&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;responseId&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;responseId&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;uuid&quot;
+    }
+  }
+}</pre></details><details><summary><code>details/AnnouncementResponseWithdrawn.schema.json</code> <span class="muted">details of AnnouncementResponseWithdrawn</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:details:AnnouncementResponseWithdrawn&quot;,
+  &quot;title&quot;: &quot;details of AnnouncementResponseWithdrawn&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;responseId&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;responseId&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;uuid&quot;
+    }
+  }
+}</pre></details><details><summary><code>details/DeliveryAlertCleared.schema.json</code> <span class="muted">details of DeliveryAlertCleared</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:details:DeliveryAlertCleared&quot;,
+  &quot;title&quot;: &quot;details of DeliveryAlertCleared&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;alertType&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;alertType&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    },
+    &quot;observedValue&quot;: {},
+    &quot;threshold&quot;: {}
+  }
+}</pre></details><details><summary><code>details/DeliveryAlertRaised.schema.json</code> <span class="muted">details of DeliveryAlertRaised</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:details:DeliveryAlertRaised&quot;,
+  &quot;title&quot;: &quot;details of DeliveryAlertRaised&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;alertType&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;alertType&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    },
+    &quot;observedValue&quot;: {},
+    &quot;threshold&quot;: {}
+  }
+}</pre></details><details><summary><code>details/DeliveryAttemptFailed.schema.json</code> <span class="muted">details of DeliveryAttemptFailed</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:details:DeliveryAttemptFailed&quot;,
+  &quot;title&quot;: &quot;details of DeliveryAttemptFailed&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;reason&quot;,
+    &quot;attemptNumber&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;reason&quot;: {
+      &quot;enum&quot;: [
+        &quot;CLIENT_ABSENT_AT_DELIVERY&quot;,
+        &quot;CLIENT_PHONE_UNREACHABLE&quot;,
+        &quot;CLIENT_REFUSED_RECEPTION&quot;,
+        &quot;CLIENT_REFUSED_OTP_VALIDATION&quot;,
+        &quot;CLIENT_WRONG_ADDRESS&quot;,
+        &quot;CLIENT_INCOMPLETE_ADDRESS&quot;,
+        &quot;CLIENT_BUILDING_ACCESS_BLOCKED&quot;,
+        &quot;MAX_ATTEMPTS_REACHED&quot;,
+        &quot;NOT_COLLECTED_AT_RELAY&quot;,
+        &quot;INCIDENT_UNRESOLVED&quot;,
+        &quot;PARCEL_LOST&quot;,
+        &quot;PARCEL_DAMAGED&quot;
+      ]
+    },
+    &quot;attemptNumber&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;minimum&quot;: 1
+    }
+  }
+}</pre></details><details><summary><code>details/DeliveryCancelled.schema.json</code> <span class="muted">details of DeliveryCancelled</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:details:DeliveryCancelled&quot;,
+  &quot;title&quot;: &quot;details of DeliveryCancelled&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;reason&quot;,
+    &quot;cancelledBy&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;reason&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;cancelledBy&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    }
+  }
+}</pre></details><details><summary><code>details/DeliveryEtaUpdated.schema.json</code> <span class="muted">details of DeliveryEtaUpdated</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:details:DeliveryEtaUpdated&quot;,
+  &quot;title&quot;: &quot;details of DeliveryEtaUpdated&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;previousEta&quot;,
+    &quot;eta&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;previousEta&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;date-time&quot;
+    },
+    &quot;eta&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;date-time&quot;
+    }
+  }
+}</pre></details><details><summary><code>details/DeliveryFailed.schema.json</code> <span class="muted">details of DeliveryFailed</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:details:DeliveryFailed&quot;,
+  &quot;title&quot;: &quot;details of DeliveryFailed&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;reason&quot;,
+    &quot;responsibleParty&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;reason&quot;: {
+      &quot;enum&quot;: [
+        &quot;CLIENT_ABSENT_AT_DELIVERY&quot;,
+        &quot;CLIENT_PHONE_UNREACHABLE&quot;,
+        &quot;CLIENT_REFUSED_RECEPTION&quot;,
+        &quot;CLIENT_REFUSED_OTP_VALIDATION&quot;,
+        &quot;CLIENT_WRONG_ADDRESS&quot;,
+        &quot;CLIENT_INCOMPLETE_ADDRESS&quot;,
+        &quot;CLIENT_BUILDING_ACCESS_BLOCKED&quot;,
+        &quot;MAX_ATTEMPTS_REACHED&quot;,
+        &quot;NOT_COLLECTED_AT_RELAY&quot;,
+        &quot;INCIDENT_UNRESOLVED&quot;,
+        &quot;PARCEL_LOST&quot;,
+        &quot;PARCEL_DAMAGED&quot;
+      ]
+    },
+    &quot;responsibleParty&quot;: {
+      &quot;enum&quot;: [
+        &quot;SENDER&quot;,
+        &quot;RECIPIENT&quot;,
+        &quot;COURIER&quot;,
+        &quot;PLATFORM&quot;,
+        &quot;RELAY&quot;,
+        &quot;AGENCY&quot;,
+        &quot;NONE&quot;,
+        null
+      ]
+    }
+  }
+}</pre></details><details><summary><code>details/DisputeAwaitingEvidence.schema.json</code> <span class="muted">details of DisputeAwaitingEvidence</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:details:DisputeAwaitingEvidence&quot;,
+  &quot;title&quot;: &quot;details of DisputeAwaitingEvidence&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;requestedFrom&quot;,
+    &quot;deadline&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;requestedFrom&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;deadline&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    }
+  }
+}</pre></details><details><summary><code>details/DisputeClosedResolved.schema.json</code> <span class="muted">details of DisputeClosedResolved</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:details:DisputeClosedResolved&quot;,
+  &quot;title&quot;: &quot;details of DisputeClosedResolved&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;resolutionType&quot;,
+    &quot;closureType&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;resolutionType&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;closureType&quot;: {
+      &quot;enum&quot;: [
+        &quot;ADMINISTRATIVE_CLOSURE&quot;,
+        null
+      ]
+    }
+  }
+}</pre></details><details><summary><code>details/DisputeCompensated.schema.json</code> <span class="muted">details of DisputeCompensated</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:details:DisputeCompensated&quot;,
+  &quot;title&quot;: &quot;details of DisputeCompensated&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;amount&quot;,
+    &quot;currency&quot;,
+    &quot;paymentRef&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;amount&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;pattern&quot;: &quot;^[0-9]+(\\.[0-9]+)?$&quot;
+    },
+    &quot;currency&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;paymentRef&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    }
+  }
+}</pre></details><details><summary><code>details/DisputeEvidenceAdded.schema.json</code> <span class="muted">details of DisputeEvidenceAdded</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:details:DisputeEvidenceAdded&quot;,
+  &quot;title&quot;: &quot;details of DisputeEvidenceAdded&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;evidenceId&quot;,
+    &quot;evidenceType&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;evidenceId&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;evidenceType&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    }
+  }
+}</pre></details><details><summary><code>details/DisputeOpen.schema.json</code> <span class="muted">details of DisputeOpen</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:details:DisputeOpen&quot;,
+  &quot;title&quot;: &quot;details of DisputeOpen&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;openedFromIncidentId&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;openedFromIncidentId&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;uuid&quot;
+    }
+  }
+}</pre></details><details><summary><code>details/DisputePendingArbitration.schema.json</code> <span class="muted">details of DisputePendingArbitration</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:details:DisputePendingArbitration&quot;,
+  &quot;title&quot;: &quot;details of DisputePendingArbitration&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;reason&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;reason&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    }
+  }
+}</pre></details><details><summary><code>details/DisputePendingCompensation.schema.json</code> <span class="muted">details of DisputePendingCompensation</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:details:DisputePendingCompensation&quot;,
+  &quot;title&quot;: &quot;details of DisputePendingCompensation&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;amount&quot;,
+    &quot;currency&quot;,
+    &quot;paymentRef&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;amount&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;pattern&quot;: &quot;^[0-9]+(\\.[0-9]+)?$&quot;
+    },
+    &quot;currency&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;paymentRef&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    }
+  }
+}</pre></details><details><summary><code>details/IncidentCancelled.schema.json</code> <span class="muted">details of IncidentCancelled</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:details:IncidentCancelled&quot;,
+  &quot;title&quot;: &quot;details of IncidentCancelled&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;reason&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;reason&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    }
+  }
+}</pre></details><details><summary><code>details/IncidentEscalated.schema.json</code> <span class="muted">details of IncidentEscalated</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:details:IncidentEscalated&quot;,
+  &quot;title&quot;: &quot;details of IncidentEscalated&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;level&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;level&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;minimum&quot;: 1
+    },
+    &quot;toRole&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    }
+  }
+}</pre></details><details><summary><code>details/IncidentEscalatedToDispute.schema.json</code> <span class="muted">details of IncidentEscalatedToDispute</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:details:IncidentEscalatedToDispute&quot;,
+  &quot;title&quot;: &quot;details of IncidentEscalatedToDispute&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;reason&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;reason&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    }
+  }
+}</pre></details><details><summary><code>details/IncidentHandlerAssigned.schema.json</code> <span class="muted">details of IncidentHandlerAssigned</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:details:IncidentHandlerAssigned&quot;,
+  &quot;title&quot;: &quot;details of IncidentHandlerAssigned&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;handlerId&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;handlerId&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;uuid&quot;
+    }
+  }
+}</pre></details><details><summary><code>details/IncidentHandoverConfirmed.schema.json</code> <span class="muted">details of IncidentHandoverConfirmed</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:details:IncidentHandoverConfirmed&quot;,
+  &quot;title&quot;: &quot;details of IncidentHandoverConfirmed&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;side&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;side&quot;: {
+      &quot;enum&quot;: [
+        &quot;ORIGINAL&quot;,
+        &quot;REPLACEMENT&quot;
+      ]
+    }
+  }
+}</pre></details><details><summary><code>details/IncidentPendingConfirmation.schema.json</code> <span class="muted">details of IncidentPendingConfirmation</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:details:IncidentPendingConfirmation&quot;,
+  &quot;title&quot;: &quot;details of IncidentPendingConfirmation&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;deliveryOutcome&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;deliveryOutcome&quot;: {
+      &quot;enum&quot;: [
+        &quot;RESUMED&quot;,
+        &quot;FAILED&quot;,
+        &quot;DISPUTE&quot;
+      ]
+    },
+    &quot;responsibleParty&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    }
+  }
+}</pre></details><details><summary><code>details/IncidentReported.schema.json</code> <span class="muted">details of IncidentReported</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:details:IncidentReported&quot;,
+  &quot;title&quot;: &quot;details of IncidentReported&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;type&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;type&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    }
+  }
+}</pre></details><details><summary><code>details/IncidentResolved.schema.json</code> <span class="muted">details of IncidentResolved</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:details:IncidentResolved&quot;,
+  &quot;title&quot;: &quot;details of IncidentResolved&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;deliveryOutcome&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;deliveryOutcome&quot;: {
+      &quot;enum&quot;: [
+        &quot;RESUMED&quot;,
+        &quot;FAILED&quot;,
+        &quot;DISPUTE&quot;
+      ]
+    },
+    &quot;responsibleParty&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;resolutionMode&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    }
+  }
+}</pre></details><details><summary><code>details/IncidentTriaged.schema.json</code> <span class="muted">details of IncidentTriaged</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:details:IncidentTriaged&quot;,
+  &quot;title&quot;: &quot;details of IncidentTriaged&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;severity&quot;,
+    &quot;blocking&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;severity&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;blocking&quot;: {
+      &quot;type&quot;: &quot;boolean&quot;
+    }
+  }
+}</pre></details><details><summary><code>details/ParcelCustodyChanged.schema.json</code> <span class="muted">details of ParcelCustodyChanged</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:details:ParcelCustodyChanged&quot;,
+  &quot;title&quot;: &quot;details of ParcelCustodyChanged&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;from&quot;,
+    &quot;to&quot;,
+    &quot;movement&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;from&quot;: {
+      &quot;type&quot;: &quot;object&quot;,
+      &quot;additionalProperties&quot;: true,
+      &quot;required&quot;: [
+        &quot;holderType&quot;,
+        &quot;holderId&quot;,
+        &quot;hubId&quot;,
+        &quot;hubPackageEntryId&quot;
+      ],
+      &quot;properties&quot;: {
+        &quot;holderType&quot;: {
+          &quot;enum&quot;: [
+            &quot;SENDER&quot;,
+            &quot;COURIER&quot;,
+            &quot;RELAY&quot;,
+            &quot;RECIPIENT&quot;,
+            &quot;NONE&quot;
+          ]
+        },
+        &quot;holderId&quot;: {
+          &quot;type&quot;: [
+            &quot;string&quot;,
+            &quot;null&quot;
+          ],
+          &quot;format&quot;: &quot;uuid&quot;
+        },
+        &quot;hubId&quot;: {
+          &quot;type&quot;: [
+            &quot;string&quot;,
+            &quot;null&quot;
+          ],
+          &quot;format&quot;: &quot;uuid&quot;
+        },
+        &quot;hubPackageEntryId&quot;: {
+          &quot;type&quot;: [
+            &quot;string&quot;,
+            &quot;null&quot;
+          ],
+          &quot;format&quot;: &quot;uuid&quot;
+        }
+      }
+    },
+    &quot;to&quot;: {
+      &quot;type&quot;: &quot;object&quot;,
+      &quot;additionalProperties&quot;: true,
+      &quot;required&quot;: [
+        &quot;holderType&quot;,
+        &quot;holderId&quot;,
+        &quot;hubId&quot;,
+        &quot;hubPackageEntryId&quot;
+      ],
+      &quot;properties&quot;: {
+        &quot;holderType&quot;: {
+          &quot;enum&quot;: [
+            &quot;SENDER&quot;,
+            &quot;COURIER&quot;,
+            &quot;RELAY&quot;,
+            &quot;RECIPIENT&quot;,
+            &quot;NONE&quot;
+          ]
+        },
+        &quot;holderId&quot;: {
+          &quot;type&quot;: [
+            &quot;string&quot;,
+            &quot;null&quot;
+          ],
+          &quot;format&quot;: &quot;uuid&quot;
+        },
+        &quot;hubId&quot;: {
+          &quot;type&quot;: [
+            &quot;string&quot;,
+            &quot;null&quot;
+          ],
+          &quot;format&quot;: &quot;uuid&quot;
+        },
+        &quot;hubPackageEntryId&quot;: {
+          &quot;type&quot;: [
+            &quot;string&quot;,
+            &quot;null&quot;
+          ],
+          &quot;format&quot;: &quot;uuid&quot;
+        }
+      }
+    },
+    &quot;movement&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    }
+  }
+}</pre></details><details><summary><code>details/ParcelDamaged.schema.json</code> <span class="muted">details of ParcelDamaged</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:details:ParcelDamaged&quot;,
+  &quot;title&quot;: &quot;details of ParcelDamaged&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;disputeId&quot;,
+    &quot;compensationAmount&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;disputeId&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;compensationAmount&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    }
+  }
+}</pre></details><details><summary><code>details/ParcelLost.schema.json</code> <span class="muted">details of ParcelLost</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:details:ParcelLost&quot;,
+  &quot;title&quot;: &quot;details of ParcelLost&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;disputeId&quot;,
+    &quot;compensationAmount&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;disputeId&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;compensationAmount&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    }
+  }
+}</pre></details><details><summary><code>details/ParcelReturnDeliveryCancelled.schema.json</code> <span class="muted">details of ParcelReturnDeliveryCancelled (D-148: return cancelled before pickup, the parcel stays RETURN_REQUESTED)</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:details:ParcelReturnDeliveryCancelled&quot;,
+  &quot;title&quot;: &quot;details of ParcelReturnDeliveryCancelled (D-148: return cancelled before pickup, the parcel stays RETURN_REQUESTED)&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;returnCause&quot;,
+    &quot;returnCostPayer&quot;,
+    &quot;failedReturnCount&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;returnCause&quot;: {
+      &quot;enum&quot;: [
+        &quot;RETURN_DELIVERY_CANCELLED&quot;
+      ]
+    },
+    &quot;returnCostPayer&quot;: {
+      &quot;enum&quot;: [
+        &quot;SENDER&quot;,
+        &quot;RECIPIENT&quot;,
+        &quot;COURIER&quot;,
+        &quot;PLATFORM&quot;,
+        &quot;RELAY&quot;,
+        &quot;AGENCY&quot;,
+        &quot;NONE&quot;,
+        null
+      ]
+    },
+    &quot;failedReturnCount&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;minimum&quot;: 1
+    }
+  }
+}</pre></details><details><summary><code>details/ParcelReturnRequested.schema.json</code> <span class="muted">details of ParcelReturnRequested</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:details:ParcelReturnRequested&quot;,
+  &quot;title&quot;: &quot;details of ParcelReturnRequested&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;returnCause&quot;,
+    &quot;returnCostPayer&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;returnCause&quot;: {
+      &quot;enum&quot;: [
+        &quot;MAX_ATTEMPTS_REACHED&quot;,
+        &quot;CLIENT_REFUSED_RECEPTION&quot;,
+        &quot;NOT_COLLECTED_AT_RELAY&quot;,
+        &quot;INCIDENT_UNRESOLVED&quot;,
+        &quot;SENDER_CANCELLED_AFTER_PICKUP&quot;,
+        &quot;DISPUTE_RETURN_TO_SENDER_ORDERED&quot;,
+        &quot;RETURN_DELIVERY_CANCELLED&quot;,
+        &quot;RETURN_DELIVERY_FAILED&quot;,
+        &quot;RELAY_REVOKED&quot;
+      ]
+    },
+    &quot;returnCostPayer&quot;: {
+      &quot;enum&quot;: [
+        &quot;SENDER&quot;,
+        &quot;RECIPIENT&quot;,
+        &quot;COURIER&quot;,
+        &quot;PLATFORM&quot;,
+        &quot;RELAY&quot;,
+        &quot;AGENCY&quot;,
+        &quot;NONE&quot;,
+        null
+      ]
+    }
+  }
+}</pre></details><details><summary><code>dispute.payload.schema.json</code> <span class="muted">Payload of tnt.dispute.events (spec §3.6), full dispute state after the event, masked (§3.4: no description, no comment, no evidence content)</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:dispute.payload&quot;,
+  &quot;title&quot;: &quot;Payload of tnt.dispute.events (spec §3.6), full dispute state after the event, masked (§3.4: no description, no comment, no evidence content)&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;disputeId&quot;,
+    &quot;reference&quot;,
+    &quot;parcelId&quot;,
+    &quot;deliveryId&quot;,
+    &quot;incidentId&quot;,
+    &quot;cause&quot;,
+    &quot;status&quot;,
+    &quot;claimantType&quot;,
+    &quot;claimantId&quot;,
+    &quot;respondentType&quot;,
+    &quot;mediatorId&quot;,
+    &quot;resolutionType&quot;,
+    &quot;responsibleParty&quot;,
+    &quot;compensationAmount&quot;,
+    &quot;currency&quot;,
+    &quot;compensationPaymentRef&quot;,
+    &quot;evidenceCount&quot;,
+    &quot;deadline&quot;,
+    &quot;openedAt&quot;,
+    &quot;resolvedAt&quot;,
+    &quot;closedAt&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;disputeId&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;reference&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    },
+    &quot;parcelId&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;deliveryId&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;incidentId&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;cause&quot;: {
+      &quot;enum&quot;: [
+        &quot;PACKAGE_LOST&quot;,
+        &quot;PACKAGE_DAMAGED&quot;,
+        &quot;DELIVERY_DELAYED&quot;,
+        &quot;WRONG_CONTENT&quot;,
+        &quot;NON_DELIVERY&quot;,
+        &quot;FRAUD&quot;,
+        &quot;HUB_INCIDENT&quot;,
+        &quot;NETWORK_INCIDENT&quot;,
+        &quot;PAYMENT_DISPUTE&quot;,
+        &quot;OTHER&quot;
+      ]
+    },
+    &quot;category&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;priority&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;status&quot;: {
+      &quot;enum&quot;: [
+        &quot;OPEN&quot;,
+        &quot;UNDER_INVESTIGATION&quot;,
+        &quot;AWAITING_EVIDENCE&quot;,
+        &quot;MEDIATION_IN_PROGRESS&quot;,
+        &quot;PENDING_ARBITRATION&quot;,
+        &quot;PENDING_COMPENSATION&quot;,
+        &quot;COMPENSATED&quot;,
+        &quot;CLOSED_RESOLVED&quot;,
+        &quot;CLOSED_WITHDRAWN&quot;,
+        &quot;CLOSED_EXPIRED&quot;
+      ]
+    },
+    &quot;claimantType&quot;: {
+      &quot;enum&quot;: [
+        &quot;CLIENT&quot;,
+        &quot;RECIPIENT&quot;,
+        &quot;FREELANCER&quot;,
+        &quot;PERMANENT_DELIVERER&quot;,
+        &quot;HUB_OPERATOR&quot;,
+        &quot;AGENCY_MANAGER&quot;,
+        &quot;SYSTEM&quot;
+      ]
+    },
+    &quot;claimantId&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;respondentType&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;mediatorId&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;resolutionType&quot;: {
+      &quot;enum&quot;: [
+        &quot;COMPENSATION_GRANTED&quot;,
+        &quot;PARTIAL_COMPENSATION&quot;,
+        &quot;TOTAL_LOSS_COMPENSATED&quot;,
+        &quot;DAMAGE_COMPENSATED&quot;,
+        &quot;COMPLAINT_DISMISSED&quot;,
+        &quot;MUTUAL_AGREEMENT&quot;,
+        &quot;REDELIVERY_ORDERED&quot;,
+        &quot;RETURN_TO_SENDER_ORDERED&quot;,
+        null
+      ]
+    },
+    &quot;responsibleParty&quot;: {
+      &quot;enum&quot;: [
+        &quot;SENDER&quot;,
+        &quot;RECIPIENT&quot;,
+        &quot;COURIER&quot;,
+        &quot;PLATFORM&quot;,
+        &quot;RELAY&quot;,
+        &quot;AGENCY&quot;,
+        &quot;NONE&quot;,
+        null
+      ]
+    },
+    &quot;compensationAmount&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;pattern&quot;: &quot;^[0-9]+(\\.[0-9]+)?$&quot;
+    },
+    &quot;currency&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;compensationPaymentRef&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;evidenceCount&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;minimum&quot;: 0
+    },
+    &quot;deadline&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;date-time&quot;
+    },
+    &quot;openedAt&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;date-time&quot;
+    },
+    &quot;resolvedAt&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;date-time&quot;
+    },
+    &quot;closedAt&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;date-time&quot;
+    }
+  },
+  &quot;not&quot;: {
+    &quot;anyOf&quot;: [
+      {
+        &quot;required&quot;: [
+          &quot;description&quot;
+        ]
+      },
+      {
+        &quot;required&quot;: [
+          &quot;summary&quot;
+        ]
+      },
+      {
+        &quot;required&quot;: [
+          &quot;comments&quot;
+        ]
+      }
+    ]
+  }
+}</pre></details><details><summary><code>envelope.schema.json</code> <span class="muted">TiiBnTick aggregate event envelope, schemaVersion 1</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:envelope&quot;,
+  &quot;title&quot;: &quot;TiiBnTick aggregate event envelope, schemaVersion 1&quot;,
+  &quot;description&quot;: &quot;Body of every record of tnt.parcel.events, tnt.delivery.events, tnt.incident.events, tnt.dispute.events and tnt.announcement.events (cible-evenements-colis-livraison.md §3.3). Fields may be added; a breaking change increments schemaVersion.&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;eventId&quot;,
+    &quot;eventType&quot;,
+    &quot;schemaVersion&quot;,
+    &quot;occurredAt&quot;,
+    &quot;aggregateType&quot;,
+    &quot;aggregateId&quot;,
+    &quot;aggregateVersion&quot;,
+    &quot;tenantId&quot;,
+    &quot;trigger&quot;,
+    &quot;actor&quot;,
+    &quot;previousState&quot;,
+    &quot;payload&quot;,
+    &quot;details&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;eventId&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;eventType&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;pattern&quot;: &quot;^[A-Z][A-Za-z]+$&quot;
+    },
+    &quot;schemaVersion&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;minimum&quot;: 1
+    },
+    &quot;occurredAt&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;date-time&quot;
+    },
+    &quot;aggregateType&quot;: {
+      &quot;enum&quot;: [
+        &quot;PARCEL&quot;,
+        &quot;DELIVERY&quot;,
+        &quot;INCIDENT&quot;,
+        &quot;DISPUTE&quot;,
+        &quot;ANNOUNCEMENT&quot;
+      ]
+    },
+    &quot;aggregateId&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;aggregateVersion&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;minimum&quot;: 0
+    },
+    &quot;tenantId&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;correlationId&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;causationId&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;trigger&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    },
+    &quot;actor&quot;: {
+      &quot;type&quot;: &quot;object&quot;,
+      &quot;required&quot;: [
+        &quot;type&quot;
+      ],
+      &quot;properties&quot;: {
+        &quot;type&quot;: {
+          &quot;enum&quot;: [
+            &quot;COURIER&quot;,
+            &quot;SENDER&quot;,
+            &quot;RECIPIENT&quot;,
+            &quot;RELAY_OP&quot;,
+            &quot;AGENCY&quot;,
+            &quot;SUPPORT&quot;,
+            &quot;SYSTEM&quot;
+          ]
+        },
+        &quot;id&quot;: {
+          &quot;type&quot;: [
+            &quot;string&quot;,
+            &quot;null&quot;
+          ],
+          &quot;format&quot;: &quot;uuid&quot;
+        }
+      }
+    },
+    &quot;previousState&quot;: {
+      &quot;type&quot;: [
+        &quot;object&quot;,
+        &quot;null&quot;
+      ],
+      &quot;properties&quot;: {
+        &quot;status&quot;: {
+          &quot;type&quot;: &quot;string&quot;
+        }
+      }
+    },
+    &quot;payload&quot;: {
+      &quot;type&quot;: &quot;object&quot;
+    },
+    &quot;details&quot;: {
+      &quot;type&quot;: &quot;object&quot;
+    }
+  },
+  &quot;$defs&quot;: {
+    &quot;maskedAddress&quot;: {
+      &quot;description&quot;: &quot;Address published without street, landmark, postal code or exact position (decision G.3); coordinates rounded to tnt.kafka.masking.coordinate-decimals decimals (2, decision QO-17).&quot;,
+      &quot;type&quot;: &quot;object&quot;,
+      &quot;additionalProperties&quot;: true,
+      &quot;required&quot;: [
+        &quot;district&quot;,
+        &quot;city&quot;,
+        &quot;country&quot;,
+        &quot;approxLatitude&quot;,
+        &quot;approxLongitude&quot;
+      ],
+      &quot;properties&quot;: {
+        &quot;district&quot;: {
+          &quot;type&quot;: [
+            &quot;string&quot;,
+            &quot;null&quot;
+          ]
+        },
+        &quot;city&quot;: {
+          &quot;type&quot;: [
+            &quot;string&quot;,
+            &quot;null&quot;
+          ]
+        },
+        &quot;country&quot;: {
+          &quot;type&quot;: [
+            &quot;string&quot;,
+            &quot;null&quot;
+          ]
+        },
+        &quot;approxLatitude&quot;: {
+          &quot;type&quot;: [
+            &quot;number&quot;,
+            &quot;null&quot;
+          ],
+          &quot;minimum&quot;: -90,
+          &quot;maximum&quot;: 90
+        },
+        &quot;approxLongitude&quot;: {
+          &quot;type&quot;: [
+            &quot;number&quot;,
+            &quot;null&quot;
+          ],
+          &quot;minimum&quot;: -180,
+          &quot;maximum&quot;: 180
+        }
+      }
+    }
+  }
+}</pre></details><details><summary><code>incident.payload.schema.json</code> <span class="muted">Payload of tnt.incident.events (spec §3.6), full incident state after the event, masked (§3.4)</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:incident.payload&quot;,
+  &quot;title&quot;: &quot;Payload of tnt.incident.events (spec §3.6), full incident state after the event, masked (§3.4)&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;incidentId&quot;,
+    &quot;referenceCode&quot;,
+    &quot;deliveryId&quot;,
+    &quot;status&quot;,
+    &quot;type&quot;,
+    &quot;category&quot;,
+    &quot;severity&quot;,
+    &quot;blocking&quot;,
+    &quot;deliveryOutcome&quot;,
+    &quot;responsibleParty&quot;,
+    &quot;escalationLevel&quot;,
+    &quot;reportedByActorId&quot;,
+    &quot;reportedByRole&quot;,
+    &quot;affectedParcelIds&quot;,
+    &quot;reportedAt&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;incidentId&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;referenceCode&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    },
+    &quot;deliveryId&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;trackingCode&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;agencyId&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;platform&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;status&quot;: {
+      &quot;enum&quot;: [
+        &quot;REPORTED&quot;,
+        &quot;ACKNOWLEDGED&quot;,
+        &quot;TRIAGED&quot;,
+        &quot;AUTO_RESOLVING&quot;,
+        &quot;REASSIGNING_DRIVER&quot;,
+        &quot;AWAITING_HANDOVER&quot;,
+        &quot;REROUTING&quot;,
+        &quot;TRANSFERRING_TO_HUB&quot;,
+        &quot;AUTO_RESOLUTION_FAILED&quot;,
+        &quot;PENDING_AGENCY_ASSIGNMENT&quot;,
+        &quot;AGENCY_HANDLING&quot;,
+        &quot;WAITING_INTERAGENCY&quot;,
+        &quot;INTERAGENCY_IN_PROGRESS&quot;,
+        &quot;ESCALATED&quot;,
+        &quot;PENDING_CONFIRMATION&quot;,
+        &quot;RESOLVED&quot;,
+        &quot;CLOSED&quot;,
+        &quot;CANCELLED&quot;
+      ]
+    },
+    &quot;type&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    },
+    &quot;category&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;severity&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;blocking&quot;: {
+      &quot;type&quot;: &quot;boolean&quot;
+    },
+    &quot;deliveryOutcome&quot;: {
+      &quot;enum&quot;: [
+        &quot;RESUMED&quot;,
+        &quot;FAILED&quot;,
+        &quot;DISPUTE&quot;,
+        null
+      ]
+    },
+    &quot;responsibleParty&quot;: {
+      &quot;enum&quot;: [
+        &quot;SENDER&quot;,
+        &quot;RECIPIENT&quot;,
+        &quot;COURIER&quot;,
+        &quot;PLATFORM&quot;,
+        &quot;RELAY&quot;,
+        &quot;AGENCY&quot;,
+        &quot;NONE&quot;,
+        null
+      ]
+    },
+    &quot;escalationLevel&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;minimum&quot;: 0
+    },
+    &quot;reportedByActorId&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;reportedByRole&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;affectedParcelIds&quot;: {
+      &quot;type&quot;: &quot;array&quot;,
+      &quot;items&quot;: {
+        &quot;type&quot;: &quot;string&quot;,
+        &quot;format&quot;: &quot;uuid&quot;
+      }
+    },
+    &quot;approxLatitude&quot;: {
+      &quot;type&quot;: [
+        &quot;number&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;approxLongitude&quot;: {
+      &quot;type&quot;: [
+        &quot;number&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;resolutionProposedAt&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;date-time&quot;
+    },
+    &quot;reportedAt&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;date-time&quot;
+    },
+    &quot;resolvedAt&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;date-time&quot;
+    },
+    &quot;closedAt&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;date-time&quot;
+    }
+  },
+  &quot;not&quot;: {
+    &quot;anyOf&quot;: [
+      {
+        &quot;required&quot;: [
+          &quot;description&quot;
+        ]
+      }
+    ]
+  }
+}</pre></details><details><summary><code>parcel.payload.schema.json</code> <span class="muted">Payload of tnt.parcel.events (spec §3.6), full parcel state after the event</span></summary><pre>{
+  &quot;$schema&quot;: &quot;https://json-schema.org/draft/2020-12/schema&quot;,
+  &quot;$id&quot;: &quot;urn:tnt:kafka:v1:parcel.payload&quot;,
+  &quot;title&quot;: &quot;Payload of tnt.parcel.events (spec §3.6), full parcel state after the event&quot;,
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: true,
+  &quot;required&quot;: [
+    &quot;parcelId&quot;,
+    &quot;trackingCode&quot;,
+    &quot;status&quot;,
+    &quot;previousStatusBeforeDispute&quot;,
+    &quot;openDisputeId&quot;,
+    &quot;currentDeliveryId&quot;,
+    &quot;deliveryIds&quot;,
+    &quot;custody&quot;,
+    &quot;specification&quot;,
+    &quot;hasPhoto&quot;,
+    &quot;returnCause&quot;,
+    &quot;returnCostPayer&quot;,
+    &quot;closedReason&quot;,
+    &quot;failedReturnCount&quot;,
+    &quot;createdAt&quot;,
+    &quot;updatedAt&quot;,
+    &quot;statusChangedAt&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;parcelId&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;trackingCode&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;pattern&quot;: &quot;^TNT-[0-9]{8}-[A-Z0-9]{8}$&quot;
+    },
+    &quot;status&quot;: {
+      &quot;enum&quot;: [
+        &quot;CREATED&quot;,
+        &quot;ASSIGNED&quot;,
+        &quot;PICKED_UP&quot;,
+        &quot;IN_TRANSIT&quot;,
+        &quot;AT_RELAY_HUB&quot;,
+        &quot;OUT_FOR_DELIVERY&quot;,
+        &quot;DELIVERED&quot;,
+        &quot;DELIVERY_FAILED&quot;,
+        &quot;UNDER_DISPUTE&quot;,
+        &quot;RETURNED&quot;,
+        &quot;RETURN_REQUESTED&quot;,
+        &quot;RETURN_IN_TRANSIT&quot;,
+        &quot;LOST&quot;,
+        &quot;DAMAGED&quot;
+      ]
+    },
+    &quot;previousStatusBeforeDispute&quot;: {
+      &quot;enum&quot;: [
+        &quot;CREATED&quot;,
+        &quot;ASSIGNED&quot;,
+        &quot;PICKED_UP&quot;,
+        &quot;IN_TRANSIT&quot;,
+        &quot;AT_RELAY_HUB&quot;,
+        &quot;OUT_FOR_DELIVERY&quot;,
+        &quot;DELIVERED&quot;,
+        &quot;DELIVERY_FAILED&quot;,
+        &quot;UNDER_DISPUTE&quot;,
+        &quot;RETURNED&quot;,
+        &quot;RETURN_REQUESTED&quot;,
+        &quot;RETURN_IN_TRANSIT&quot;,
+        &quot;LOST&quot;,
+        &quot;DAMAGED&quot;,
+        null
+      ]
+    },
+    &quot;openDisputeId&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;currentDeliveryId&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;deliveryIds&quot;: {
+      &quot;type&quot;: &quot;array&quot;,
+      &quot;items&quot;: {
+        &quot;type&quot;: &quot;string&quot;,
+        &quot;format&quot;: &quot;uuid&quot;
+      }
+    },
+    &quot;custody&quot;: {
+      &quot;$ref&quot;: &quot;#/$defs/custody&quot;
+    },
+    &quot;specification&quot;: {
+      &quot;type&quot;: &quot;object&quot;,
+      &quot;required&quot;: [
+        &quot;weightKg&quot;,
+        &quot;dimensionsCm&quot;,
+        &quot;category&quot;,
+        &quot;fragile&quot;,
+        &quot;declaredValue&quot;
+      ],
+      &quot;properties&quot;: {
+        &quot;weightKg&quot;: {
+          &quot;type&quot;: [
+            &quot;number&quot;,
+            &quot;null&quot;
+          ]
+        },
+        &quot;dimensionsCm&quot;: {
+          &quot;type&quot;: [
+            &quot;object&quot;,
+            &quot;null&quot;
+          ]
+        },
+        &quot;category&quot;: {
+          &quot;type&quot;: [
+            &quot;string&quot;,
+            &quot;null&quot;
+          ]
+        },
+        &quot;fragile&quot;: {
+          &quot;type&quot;: &quot;boolean&quot;
+        },
+        &quot;declaredValue&quot;: {
+          &quot;type&quot;: [
+            &quot;string&quot;,
+            &quot;null&quot;
+          ]
+        }
+      }
+    },
+    &quot;hasPhoto&quot;: {
+      &quot;type&quot;: &quot;boolean&quot;
+    },
+    &quot;returnCause&quot;: {
+      &quot;enum&quot;: [
+        &quot;MAX_ATTEMPTS_REACHED&quot;,
+        &quot;CLIENT_REFUSED_RECEPTION&quot;,
+        &quot;NOT_COLLECTED_AT_RELAY&quot;,
+        &quot;INCIDENT_UNRESOLVED&quot;,
+        &quot;SENDER_CANCELLED_AFTER_PICKUP&quot;,
+        &quot;DISPUTE_RETURN_TO_SENDER_ORDERED&quot;,
+        &quot;RETURN_DELIVERY_CANCELLED&quot;,
+        &quot;RETURN_DELIVERY_FAILED&quot;,
+        &quot;RELAY_REVOKED&quot;,
+        null
+      ]
+    },
+    &quot;returnCostPayer&quot;: {
+      &quot;enum&quot;: [
+        &quot;SENDER&quot;,
+        &quot;RECIPIENT&quot;,
+        &quot;COURIER&quot;,
+        &quot;PLATFORM&quot;,
+        &quot;RELAY&quot;,
+        &quot;AGENCY&quot;,
+        &quot;NONE&quot;,
+        null
+      ]
+    },
+    &quot;closedReason&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;failedReturnCount&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;minimum&quot;: 0
+    },
+    &quot;createdAt&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;date-time&quot;
+    },
+    &quot;updatedAt&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;date-time&quot;
+    },
+    &quot;statusChangedAt&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;date-time&quot;
+    }
+  },
+  &quot;$defs&quot;: {
+    &quot;custody&quot;: {
+      &quot;type&quot;: &quot;object&quot;,
+      &quot;additionalProperties&quot;: true,
+      &quot;required&quot;: [
+        &quot;holderType&quot;,
+        &quot;holderId&quot;,
+        &quot;hubId&quot;,
+        &quot;hubPackageEntryId&quot;
+      ],
+      &quot;properties&quot;: {
+        &quot;holderType&quot;: {
+          &quot;enum&quot;: [
+            &quot;SENDER&quot;,
+            &quot;COURIER&quot;,
+            &quot;RELAY&quot;,
+            &quot;RECIPIENT&quot;,
+            &quot;NONE&quot;
+          ]
+        },
+        &quot;holderId&quot;: {
+          &quot;type&quot;: [
+            &quot;string&quot;,
+            &quot;null&quot;
+          ],
+          &quot;format&quot;: &quot;uuid&quot;
+        },
+        &quot;hubId&quot;: {
+          &quot;type&quot;: [
+            &quot;string&quot;,
+            &quot;null&quot;
+          ],
+          &quot;format&quot;: &quot;uuid&quot;
+        },
+        &quot;hubPackageEntryId&quot;: {
+          &quot;type&quot;: [
+            &quot;string&quot;,
+            &quot;null&quot;
+          ],
+          &quot;format&quot;: &quot;uuid&quot;
+        }
+      }
+    }
+  }
+}</pre></details>
+
+<h2 id="catalogue">5. Catalogue des topics</h2>
+<p class="muted small">Producteurs = classes du Core qui référencent le topic hors d'un <code>@KafkaListener</code> ;
+consommateurs = <code>@KafkaListener</code> du Core avec leur groupe. Topics sans consommateur interne (sortants, lus
+par les plateformes ou en attente d'usage) : <code>tnt.realtime.eta.updated</code>, <code>tnt.realtime.actor.connected</code>, <code>tnt.realtime.actor.disconnected</code>, <code>tnt.route.tour.events</code>, <code>tnt.route.eta.updated</code>, <code>tnt.route.reroute.events</code>, <code>tnt.route.vrp.events</code>, <code>tnt.geo.traffic.events</code>, <code>tnt.geo.node.events</code>, <code>tnt.geo.zone.events</code>, <code>tnt.sync.conflict.detected</code>, <code>tnt.sync.completed</code>, <code>tnt.notifications.sent</code>, <code>tnt.notifications.failed</code>, <code>tnt.admin.freelancer_org.blacklisted</code>, <code>tnt.actor.status.changed</code>, <code>tnt.actor.location.updated</code>, <code>tnt.actor.badge.earned</code>, <code>tnt.actor.mission.assigned</code>, <code>tnt.freelancer_org.suspended</code>, <code>tnt.freelancer_org.kyc.upgraded</code>, <code>tnt.actor.freelancer.associated</code>, <code>tnt.actor.freelancer.dissociated</code>, <code>tnt.actor.freelancer.org.linked</code>, <code>tnt.actor.freelancer.org.unlinked</code>, <code>tnt.tp.client.profile.events</code>, <code>tnt.tp.kyc.events</code>, <code>tnt.tp.loyalty.events</code>, <code>tnt.tp.phone.alias.events</code>, <code>tnt.tp.rating.events</code>, <code>tnt.tp.unknown.events</code>, <code>tnt.resource.freelancer.vehicle.registered</code>, <code>tnt.resource.vehicle.registered</code>, <code>tnt.resource.vehicle.assigned</code>, <code>tnt.resource.vehicle.unassigned</code>, <code>tnt.resource.vehicle.maintenance</code>, <code>tnt.resource.vehicle.retired</code>, <code>tnt.resource.vehicle.location</code>, <code>tnt.resource.maintenance.alert</code>, <code>tnt.resource.equipment.assigned</code>, <code>tnt.product.created</code>, <code>tnt.product.offer.published</code>, <code>tnt.inventory.stock.low</code>, <code>tnt.sales.order.confirmed</code>, <code>tnt.sales.order.dispatched</code>, <code>tnt.sales.order.delivered</code>, <code>tnt.sales.order.cancelled</code>, <code>tnt.accounting.journal-entry.posted</code>, <code>tnt.accounting.period.closed</code>, <code>tnt.billing.custom_template.saved</code>, <code>tnt.link.tracking.position.latest</code>, <code>gofp.announcement.candidates.ranked</code>, <code>gofp.freelancer.created</code>, <code>tnt.agency.events</code>, <code>tnt.agency.mission.request</code>, <code>tnt.agency.staff.events</code>, <code>tnt.agency.contract.events</code>, <code>yow.trust.events</code>, <code>tnt.dlq</code>. Topics sans producteur relevé (alimentés par une propriété
+ou de l'extérieur) : <code>yow.trust.events</code>, <code>yow.trust.events.committed</code>.</p>
+<input id="q" type="search" placeholder="Filtrer (nom, classe, groupe…)" aria-label="Filtrer les topics">
+<div class="table-wrap"><table id="cat">
+<tr><th>Topic</th><th>Rôle</th><th>Producteurs</th><th>Consommateurs (groupe)</th><th>Lecture externe</th></tr>
+<tr id="t-tnt.announcement.events"><td><code>tnt.announcement.events</code> <span class="tag agg">agrégat</span><div class="muted small"><code>TntTopics.ANNOUNCEMENT_EVENTS</code></div></td><td class="small">Announcement aggregate and its courier responses — producer tnt-delivery-core (lot L2).</td><td class="small"><code>DeliveryAnnouncement → AggregateEvent (outbox)</code> <span class="muted">tnt-delivery-core</span></td><td class="small"><code>EntityChangedEventConsumer</code> <span class="muted">tnt-sync-core · groupe <code>tnt-sync-core</code></span><br><code>MatchingUseCase</code> <span class="muted">tnt-go-freelancer-point-back-core · groupe <code>tnt-go-freelancer-core-group</code></span></td><td class="small">Mobile BFF, Point Relais</td></tr>
+<tr id="t-tnt.delivery.events"><td><code>tnt.delivery.events</code> <span class="tag agg">agrégat</span><div class="muted small"><code>TntTopics.DELIVERY_EVENTS</code></div></td><td class="small">Delivery aggregate (DeliveryStatus, ETA, courier, alerts, payment state) — producer tnt-delivery-core.</td><td class="small"><code>Delivery → AggregateEvent (outbox)</code> <span class="muted">tnt-delivery-core</span></td><td class="small"><code>CoreDeliveryAlertConsumer</code> <span class="muted">tnt-go-freelancer-point-back-core · groupe <code>tnt-gofp-delivery-alerts</code></span><br><code>CoreMissionStatusConsumer</code> <span class="muted">tnt-go-freelancer-point-back-core · groupe <code>tnt-gofp-delivery-projection</code></span><br><code>DeliveryEventConsumer</code> <span class="muted">tnt-tp-core · groupe <code>tnt-tp-core-group</code></span><br><code>DeliveryEventSalesConsumer</code> <span class="muted">tnt-sales-core · groupe <code>tnt-sales-core-delivery</code></span><br><code>DeliveryStatusConsumer</code> <span class="muted">tnt-agency-assignment-core · groupe <code>tnt-agency-erp-delivery-consumer</code></span><br><code>EntityChangedEventConsumer</code> <span class="muted">tnt-sync-core · groupe <code>tnt-sync-core</code></span><br><code>FreelancerOrgKafkaEventConsumer</code> <span class="muted">tnt-notify-core · groupe <code>tnt-notify-core</code></span><br><code>InvoiceBillingEventConsumer</code> <span class="muted">tnt-billing-invoice · groupe <code>tnt-billing-invoice-group</code></span><br><code>MarketKafkaConsumer</code> <span class="muted">tnt-market-back-core · groupe <code>tnt-market-group</code></span><br><code>MissionStatusEventConsumer</code> <span class="muted">tnt-realtime-core · groupe <code>tnt-realtime-core</code></span><br><code>ReactiveListenerSupport</code> <span class="muted">tnt-common-core · groupe <code>...</code></span><br><code>WalletPaymentLifecycleConsumer</code> <span class="muted">tnt-billing-wallet · groupe <code>tnt-billing-wallet-delivery</code></span></td><td class="small">Mobile BFF, Agency, Link, Market, Point Relais</td></tr>
+<tr id="t-tnt.dispute.events"><td><code>tnt.dispute.events</code> <span class="tag agg">agrégat</span><div class="muted small"><code>TntTopics.DISPUTE_EVENTS</code></div></td><td class="small">Dispute aggregate — producer tnt-dispute-core (lot L4).</td><td class="small"><code>DisputeAggregateEventOutboxPublisher</code> <span class="muted">tnt-dispute-core</span></td><td class="small"><code>EntityChangedEventConsumer</code> <span class="muted">tnt-sync-core · groupe <code>tnt-sync-core</code></span><br><code>WalletPaymentLifecycleConsumer</code> <span class="muted">tnt-billing-wallet · groupe <code>tnt-billing-wallet-dispute</code></span></td><td class="small">Mobile BFF, Agency, Point Relais</td></tr>
+<tr id="t-tnt.incident.events"><td><code>tnt.incident.events</code> <span class="tag agg">agrégat</span><div class="muted small"><code>TntTopics.INCIDENT_EVENTS</code></div></td><td class="small">Incident aggregate — producer tnt-incident-core (lot L3).</td><td class="small"><code>IncidentAggregateEventOutboxPublisher</code> <span class="muted">tnt-incident-core</span></td><td class="small"><code>DisputeEventConsumer</code> <span class="muted">tnt-dispute-core · groupe <code>(groupe de la fabrique)</code></span><br><code>EntityChangedEventConsumer</code> <span class="muted">tnt-sync-core · groupe <code>tnt-sync-core</code></span><br><code>IncidentEventConsumer</code> <span class="muted">tnt-actor-core · groupe <code>tnt-actor-incident-consumer</code></span></td><td class="small">Mobile BFF, Agency, Link</td></tr>
+<tr id="t-tnt.parcel.events"><td><code>tnt.parcel.events</code> <span class="tag agg">agrégat</span><div class="muted small"><code>TntTopics.PARCEL_EVENTS</code></div></td><td class="small">Parcel aggregate (ParcelStatus, custody, relay deposits/withdrawals) — producer tnt-delivery-core (lot L2).</td><td class="small"><code>Parcel → AggregateEvent (outbox)</code> <span class="muted">tnt-delivery-core</span></td><td class="small"><code>EntityChangedEventConsumer</code> <span class="muted">tnt-sync-core · groupe <code>tnt-sync-core</code></span><br><code>InventoryHubConsumer</code> <span class="muted">tnt-agency-org-core · groupe <code>tnt-agency-erp-inventory-consumer</code></span><br><code>MissionStatusEventConsumer</code> <span class="muted">tnt-realtime-core · groupe <code>tnt-realtime-core</code></span></td><td class="small">Mobile BFF, Agency, Point Relais</td></tr>
+<tr id="t-gofp.announcement.candidates.ranked"><td><code>gofp.announcement.candidates.ranked</code><div class="muted small"><code>TntTopics.GOFP_ANNOUNCEMENT_CANDIDATES_RANKED</code></div></td><td class="small">Ranked freelancer candidates for an announcement (TOPSIS output).</td><td class="small"><code>MatchingUseCase</code> <span class="muted">tnt-go-freelancer-point-back-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-gofp.freelancer.created"><td><code>gofp.freelancer.created</code><div class="muted small"><code>TntTopics.GOFP_FREELANCER_CREATED</code></div></td><td class="small">Freelancer account created in GOFP.</td><td class="small"><code>KafkaEventPublisher</code> <span class="muted">tnt-go-freelancer-point-back-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-gofp.matching.notifications"><td><code>gofp.matching.notifications</code><div class="muted small"><code>TntTopics.GOFP_MATCHING_NOTIFICATIONS</code></div></td><td class="small">Push/SSE matching notifications to freelancers after TOPSIS ranking.</td><td class="small"><code>KafkaEventPublisher</code> <span class="muted">tnt-go-freelancer-point-back-core</span></td><td class="small"><code>MatchingNotificationConsumer</code> <span class="muted">tnt-go-freelancer-point-back-core · groupe <code>tiibntick-stream-group</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-gofp.subscription.attempts"><td><code>gofp.subscription.attempts</code><div class="muted small"><code>TntTopics.GOFP_SUBSCRIPTION_ATTEMPTS</code></div></td><td class="small">Freelancer subscription attempt on a published announcement (async confirmation pipeline).</td><td class="small"><code>KafkaEventPublisher</code> <span class="muted">tnt-go-freelancer-point-back-core</span></td><td class="small"><code>SubscriptionConfirmationConsumer</code> <span class="muted">tnt-go-freelancer-point-back-core · groupe <code>tnt-go-freelancer-core-subscription-group</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.accounting.journal-entry.posted"><td><code>tnt.accounting.journal-entry.posted</code><div class="muted small"><code>TntTopics.ACCOUNTING_JOURNAL_ENTRY_POSTED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>AccountingEventPublisherAdapter</code> <span class="muted">tnt-accounting-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.accounting.period.closed"><td><code>tnt.accounting.period.closed</code><div class="muted small"><code>TntTopics.ACCOUNTING_PERIOD_CLOSED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>AccountingEventPublisherAdapter</code> <span class="muted">tnt-accounting-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.actor.badge.earned"><td><code>tnt.actor.badge.earned</code><div class="muted small"><code>TntTopics.ACTOR_BADGE_EARNED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>KafkaActorEventPublisher</code> <span class="muted">tnt-actor-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.actor.freelancer.associated"><td><code>tnt.actor.freelancer.associated</code><div class="muted small"><code>TntTopics.ACTOR_FREELANCER_ASSOCIATED</code></div></td><td class="small">Lot L8 (annex 9.1): literals of actor-core&#x27;s KafkaActorEventPublisher; outbound.</td><td class="small"><code>KafkaActorEventPublisher</code> <span class="muted">tnt-actor-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.actor.freelancer.dissociated"><td><code>tnt.actor.freelancer.dissociated</code><div class="muted small"><code>TntTopics.ACTOR_FREELANCER_DISSOCIATED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>KafkaActorEventPublisher</code> <span class="muted">tnt-actor-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.actor.freelancer.org.linked"><td><code>tnt.actor.freelancer.org.linked</code><div class="muted small"><code>TntTopics.ACTOR_FREELANCER_ORG_LINKED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>KafkaActorEventPublisher</code> <span class="muted">tnt-actor-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.actor.freelancer.org.unlinked"><td><code>tnt.actor.freelancer.org.unlinked</code><div class="muted small"><code>TntTopics.ACTOR_FREELANCER_ORG_UNLINKED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>KafkaActorEventPublisher</code> <span class="muted">tnt-actor-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.actor.kyc.validated"><td><code>tnt.actor.kyc.validated</code><div class="muted small"><code>TntTopics.ACTOR_KYC_VALIDATED</code></div></td><td class="small">Consumed by agency-workforce&#x27;s ActorKycConsumer (property core-actor-kyc, Audit n5 P-01 fix).</td><td class="small"><code>KafkaActorEventPublisher</code> <span class="muted">tnt-actor-core</span><br><code>KafkaEventPublisher</code> <span class="muted">tnt-go-freelancer-point-back-core</span></td><td class="small"><code>ActorKycConsumer</code> <span class="muted">tnt-agency-workforce-core · groupe <code>tnt-agency-erp-actor-consumer</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.actor.location.updated"><td><code>tnt.actor.location.updated</code><div class="muted small"><code>TntTopics.ACTOR_LOCATION_UPDATED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>KafkaActorEventPublisher</code> <span class="muted">tnt-actor-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.actor.mission.assigned"><td><code>tnt.actor.mission.assigned</code><div class="muted small"><code>TntTopics.ACTOR_MISSION_ASSIGNED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>KafkaActorEventPublisher</code> <span class="muted">tnt-actor-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.actor.profile.updated"><td><code>tnt.actor.profile.updated</code><div class="muted small"><code>TntTopics.ACTOR_PROFILE_UPDATED</code></div></td><td class="small">Published by KafkaActorEventPublisher on ActorProfileUpdatedEvent, emitted after every profile mutation already wired end-to-end elsewhere: KYC submission/validation (ActorKycService), rating (ActorRatingService), badges (ActorBadgeService), client loyalty points (ClientProfileService#addLoyaltyPoints). Consumed by tnt-sync-core. Fixed 2026-07-23 — this Javadoc previously said no update mutation existed anywhere in tnt-actor-core (Audit n5 P-01, documented debt); the mutations existed and were already persisted, they just never announced themselves on this topic.</td><td class="small"><code>KafkaActorEventPublisher</code> <span class="muted">tnt-actor-core</span></td><td class="small"><code>EntityChangedEventConsumer</code> <span class="muted">tnt-sync-core · groupe <code>tnt-sync-core</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.actor.status.changed"><td><code>tnt.actor.status.changed</code><div class="muted small"><code>TntTopics.ACTOR_STATUS_CHANGED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>KafkaActorEventPublisher</code> <span class="muted">tnt-actor-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.admin.freelancer_org.blacklisted"><td><code>tnt.admin.freelancer_org.blacklisted</code><div class="muted small"><code>TntTopics.ADMIN_FREELANCER_ORG_BLACKLISTED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>FreelancerOrgAdminService</code> <span class="muted">tnt-administration-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.admin.freelancer_org.kyc_approved"><td><code>tnt.admin.freelancer_org.kyc_approved</code><div class="muted small"><code>TntTopics.ADMIN_FREELANCER_ORG_KYC_APPROVED</code></div></td><td class="small">Published by FreelancerOrgAdminService (tnt-administration-core) via TntAdministrationEventPublisherAdapter&#x27;s outbox-backed publish() (Chantier C P5); consumed by tnt-notify-core. Fixed 2026-07-23 — this Javadoc previously said &quot;never published&quot; (Audit n5 P-01, documented debt), that is no longer accurate.</td><td class="small"><code>FreelancerOrgAdminService</code> <span class="muted">tnt-administration-core</span></td><td class="small"><code>FreelancerOrgKafkaEventConsumer</code> <span class="muted">tnt-notify-core · groupe <code>tnt-notify-core</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.admin.freelancer_org.kyc_rejected"><td><code>tnt.admin.freelancer_org.kyc_rejected</code><div class="muted small"><code>TntTopics.ADMIN_FREELANCER_ORG_KYC_REJECTED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>FreelancerOrgAdminService</code> <span class="muted">tnt-administration-core</span></td><td class="small"><code>FreelancerOrgKafkaEventConsumer</code> <span class="muted">tnt-notify-core · groupe <code>tnt-notify-core</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.admin.freelancer_org.suspended"><td><code>tnt.admin.freelancer_org.suspended</code><div class="muted small"><code>TntTopics.ADMIN_FREELANCER_ORG_SUSPENDED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>FreelancerOrgAdminService</code> <span class="muted">tnt-administration-core</span></td><td class="small"><code>FreelancerOrgKafkaEventConsumer</code> <span class="muted">tnt-notify-core · groupe <code>tnt-notify-core</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.admin.freelancer_org.unsuspended"><td><code>tnt.admin.freelancer_org.unsuspended</code><div class="muted small"><code>TntTopics.ADMIN_FREELANCER_ORG_UNSUSPENDED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>FreelancerOrgAdminService</code> <span class="muted">tnt-administration-core</span></td><td class="small"><code>FreelancerOrgKafkaEventConsumer</code> <span class="muted">tnt-notify-core · groupe <code>tnt-notify-core</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.administration.events"><td><code>tnt.administration.events</code><div class="muted small"><code>TntTopics.ADMINISTRATION_EVENTS</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>TntAdministrationEventPublisherAdapter</code> <span class="muted">tnt-administration-core</span></td><td class="small"><code>DeliveryThresholdsChangedConsumer</code> <span class="muted">tnt-delivery-core · groupe <code>tnt-delivery-thresholds-cache-${random.uuid}</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.agency.contract.events"><td><code>tnt.agency.contract.events</code><div class="muted small"><code>TntTopics.AGENCY_CONTRACT_EVENTS</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>KafkaAgencyEventPublisher</code> <span class="muted">tnt-agency-eventing-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.agency.events"><td><code>tnt.agency.events</code><div class="muted small"><code>TntTopics.AGENCY_EVENTS</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>KafkaAgencyEventPublisher</code> <span class="muted">tnt-agency-eventing-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.agency.mission.request"><td><code>tnt.agency.mission.request</code><div class="muted small"><code>TntTopics.AGENCY_MISSION_REQUEST</code></div></td><td class="small">Produced but not consumed by any Core module — Agency mission creation is actually driven through the platform HTTP gateway, not this topic (Audit n5 §3.3).</td><td class="small"><code>KafkaAgencyEventPublisher</code> <span class="muted">tnt-agency-eventing-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.agency.staff.events"><td><code>tnt.agency.staff.events</code><div class="muted small"><code>TntTopics.AGENCY_STAFF_EVENTS</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>KafkaAgencyEventPublisher</code> <span class="muted">tnt-agency-eventing-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.billing.compensation.paid"><td><code>tnt.billing.compensation.paid</code><div class="muted small"><code>TntTopics.BILLING_COMPENSATION_PAID</code></div></td><td class="small">Published by tnt-billing-wallet (CompensationOutboxEventPublisher, lot L5) once the Kernel compensation fund has paid a dispute compensation (POST /api/payments/compensations, spec §4.3): disputeId, compensationId, paymentReference, beneficiaryActorId, amount, currency, fundWalletId. Consumed by tnt-dispute-core&#x27;s DisputeEventConsumer (LT9 when the synchronous payment&#x27;s dispute transaction did not commit; a no-op when the dispute is already COMPENSATED). tnt.billing.compensation.initiated is gone (lot L5): the payment is a synchronous call of IDisputeCompensationPort.</td><td class="small"><code>CompensationOutboxEventPublisher</code> <span class="muted">tnt-billing-wallet</span></td><td class="small"><code>BillingEventAccountingConsumer</code> <span class="muted">tnt-accounting-core · groupe <code>(groupe de la fabrique)</code></span><br><code>DisputeEventConsumer</code> <span class="muted">tnt-dispute-core · groupe <code>(groupe de la fabrique)</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.billing.custom_template.saved"><td><code>tnt.billing.custom_template.saved</code><div class="muted small"><code>TntTopics.BILLING_CUSTOM_TEMPLATE_SAVED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>CustomTemplateSavedEvent</code> <span class="muted">tnt-billing-templates</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.billing.invoice.events"><td><code>tnt.billing.invoice.events</code><div class="muted small"><code>TntTopics.BILLING_INVOICE_EVENTS</code></div></td><td class="small">Envelope topic. Consumed by tnt-billing-report&#x27;s InvoiceEventReportConsumer.</td><td class="small"><code>KafkaInvoiceEventPublisher</code> <span class="muted">tnt-billing-invoice</span></td><td class="small"><code>InvoiceEventReportConsumer</code> <span class="muted">tnt-billing-report · groupe <code>tnt-billing-report-group</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.billing.invoice.paid"><td><code>tnt.billing.invoice.paid</code><div class="muted small"><code>TntTopics.BILLING_INVOICE_PAID</code></div></td><td class="small">Published by KafkaInvoiceEventPublisher on InvoicePaid, in addition to the catch-all #BILLING_INVOICE_EVENTS. Consumed by tnt-accounting-core. Fixed 2026-07-23 — this Javadoc previously said &quot;never published&quot; (Audit n5 P-01, documented debt).</td><td class="small"><code>KafkaInvoiceEventPublisher</code> <span class="muted">tnt-billing-invoice</span></td><td class="small"><code>BillingEventAccountingConsumer</code> <span class="muted">tnt-accounting-core · groupe <code>(groupe de la fabrique)</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.billing.template.applied"><td><code>tnt.billing.template.applied</code><div class="muted small"><code>TntTopics.BILLING_TEMPLATE_APPLIED</code></div></td><td class="small">Consumed by tnt-notify-core, tnt-billing-report.</td><td class="small"><code>TemplateAppliedEvent</code> <span class="muted">tnt-billing-templates</span></td><td class="small"><code>FreelancerOrgKafkaEventConsumer</code> <span class="muted">tnt-notify-core · groupe <code>tnt-notify-core</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.billing.wallet.commission.calculated"><td><code>tnt.billing.wallet.commission.calculated</code><div class="muted small"><code>TntTopics.BILLING_WALLET_COMMISSION_CALCULATED</code></div></td><td class="small">Consumed by tnt-billing-wallet itself (intra-module) and tnt-accounting-core (Audit n5 P-01 fix — was tnt.billing.wallet.commission-calculated / tnt.billing.commission.calculated).</td><td class="small"><code>SettlementOutboxEventPublisher</code> <span class="muted">tnt-billing-wallet</span></td><td class="small"><code>BillingEventAccountingConsumer</code> <span class="muted">tnt-accounting-core · groupe <code>(groupe de la fabrique)</code></span><br><code>WalletBillingEventConsumer</code> <span class="muted">tnt-billing-wallet · groupe <code>tnt-billing-wallet-commission</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.billing.wallet.payment.confirmed"><td><code>tnt.billing.wallet.payment.confirmed</code><div class="muted small"><code>TntTopics.BILLING_WALLET_PAYMENT_CONFIRMED</code></div></td><td class="small">Consumed by tnt-billing-invoice, tnt-market-back-core and agency-commission (tnt-accounting-core stopped listening in lot L6) (Audit n5 P-01 fix — was tnt.billing.wallet.payment-confirmed / tnt.billing.payment.confirmed).</td><td class="small"><code>SettlementOutboxEventPublisher</code> <span class="muted">tnt-billing-wallet</span></td><td class="small"><code>InvoiceBillingEventConsumer</code> <span class="muted">tnt-billing-invoice · groupe <code>tnt-billing-invoice-group</code></span><br><code>MarketKafkaConsumer</code> <span class="muted">tnt-market-back-core · groupe <code>tnt-market-group</code></span><br><code>WalletPayoutConsumer</code> <span class="muted">tnt-agency-commission-core · groupe <code>tnt-agency-erp-billing-consumer</code></span></td><td class="small">Agency, Market</td></tr>
+<tr id="t-tnt.dlq"><td><code>tnt.dlq</code> <span class="tag dlq">file morte</span><div class="muted small"><code>TntTopics.DLQ</code></div></td><td class="small">Common dead-letter topic of the Kafka consumers (decision [G.8], lot L0): a record whose listener still fails after tnt.kafka.retry.max-attempts attempts is published here by the DeadLetterPublishingRecoverer that TntKafkaErrorHandlingPostProcessor (yow-event-kernel) installs on every listener container factory, with the original headers and the kafka_dlt-* headers (original topic/partition/offset/group, exception).</td><td class="small"><code>LinkKafkaConsumerConfig</code> <span class="muted">tnt-link-back-core</span><br><code>TntKafkaErrorHandlingPostProcessor</code> <span class="muted">yow-event-kernel</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.freelancer_org.created"><td><code>tnt.freelancer_org.created</code><div class="muted small"><code>TntTopics.FREELANCER_ORG_CREATED</code></div></td><td class="small">Published by tnt-organization-core&#x27;s FreelancerOrgEventPublisherAdapter via the outbox (Chantier C P5, fixed 2026-07-23 — it was previously publishing through a dead ApplicationEventPublisher with no listener, silently losing every event; see the P5 inventory doc). Consumed by actor-core&#x27;s FreelancerOrgEventConsumer. This Javadoc previously said &quot;never published&quot; (Audit n5 P-01, documented debt), no longer accurate.</td><td class="small"><code>FreelancerOrgEventPublisherAdapter</code> <span class="muted">tnt-organization-core</span></td><td class="small"><code>FreelancerOrgEventConsumer</code> <span class="muted">tnt-actor-core · groupe <code>tnt-actor-freelancer-org-consumer</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.freelancer_org.kyc.upgraded"><td><code>tnt.freelancer_org.kyc.upgraded</code><div class="muted small"><code>TntTopics.FREELANCER_ORG_KYC_UPGRADED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>FreelancerOrgEventPublisherAdapter</code> <span class="muted">tnt-organization-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.freelancer_org.sub_deliverer.associated"><td><code>tnt.freelancer_org.sub_deliverer.associated</code><div class="muted small"><code>TntTopics.FREELANCER_ORG_SUB_DELIVERER_ASSOCIATED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>FreelancerOrgEventPublisherAdapter</code> <span class="muted">tnt-organization-core</span></td><td class="small"><code>FreelancerOrgEventConsumer</code> <span class="muted">tnt-actor-core · groupe <code>tnt-actor-freelancer-org-consumer</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.freelancer_org.sub_deliverer.revoked"><td><code>tnt.freelancer_org.sub_deliverer.revoked</code><div class="muted small"><code>TntTopics.FREELANCER_ORG_SUB_DELIVERER_REVOKED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>FreelancerOrgEventPublisherAdapter</code> <span class="muted">tnt-organization-core</span></td><td class="small"><code>FreelancerOrgEventConsumer</code> <span class="muted">tnt-actor-core · groupe <code>tnt-actor-freelancer-org-consumer</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.freelancer_org.suspended"><td><code>tnt.freelancer_org.suspended</code><div class="muted small"><code>TntTopics.FREELANCER_ORG_SUSPENDED</code></div></td><td class="small">Lot L8 (annex 9.1): literals of organization-core&#x27;s FreelancerOrgEventPublisherAdapter; outbound.</td><td class="small"><code>FreelancerOrgEventPublisherAdapter</code> <span class="muted">tnt-organization-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.freelancer_org.verified"><td><code>tnt.freelancer_org.verified</code><div class="muted small"><code>TntTopics.FREELANCER_ORG_VERIFIED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>FreelancerOrgEventPublisherAdapter</code> <span class="muted">tnt-organization-core</span></td><td class="small"><code>FreelancerOrgEventConsumer</code> <span class="muted">tnt-actor-core · groupe <code>tnt-actor-freelancer-org-consumer</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.geo.alert.created"><td><code>tnt.geo.alert.created</code><div class="muted small"><code>TntTopics.GEO_ALERT_CREATED</code></div></td><td class="small">Published by KafkaGeoEventPublisher whenever a TrafficConditionChangedEvent reaches it — that only happens when TrafficConditionChangedEvent#isSignificant() was already true (&amp;gt;20% congestion swing), the domain&#x27;s own existing definition of alert-worthy. Consumed by tnt-sync-core. Fixed 2026-07-23 — this Javadoc previously said no &quot;alert&quot; concept existed in tnt-geo-core at all (Audit n5 P-01, documented debt); it did, just not exposed as its own topic.</td><td class="small"><code>KafkaGeoEventPublisher</code> <span class="muted">tnt-geo-core</span></td><td class="small"><code>EntityChangedEventConsumer</code> <span class="muted">tnt-sync-core · groupe <code>tnt-sync-core</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.geo.node.events"><td><code>tnt.geo.node.events</code><div class="muted small"><code>TntTopics.GEO_NODE_EVENTS</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>KafkaGeoEventPublisher</code> <span class="muted">tnt-geo-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.geo.traffic.events"><td><code>tnt.geo.traffic.events</code><div class="muted small"><code>TntTopics.GEO_TRAFFIC_EVENTS</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>KafkaGeoEventPublisher</code> <span class="muted">tnt-geo-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.geo.zone.events"><td><code>tnt.geo.zone.events</code><div class="muted small"><code>TntTopics.GEO_ZONE_EVENTS</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>KafkaGeoEventPublisher</code> <span class="muted">tnt-geo-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.inventory.stock.low"><td><code>tnt.inventory.stock.low</code><div class="muted small"><code>TntTopics.INVENTORY_STOCK_LOW</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>InventoryKafkaEventPublisher</code> <span class="muted">tnt-inventory-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.link.tracking.position.latest"><td><code>tnt.link.tracking.position.latest</code><div class="muted small"><code>TntTopics.LINK_TRACKING_POSITION_LATEST</code></div></td><td class="small">Compacted (cleanup.policy=compact), keyed by nodeId — last-known-position snapshot for the Link live map (Chantier G, Audit n5 P-17 / Audit n6 S26). First compacted topic in this codebase. Named with the tnt.link.* module prefix (Audit n5 P-12 convention) rather than the audit doc&#x27;s original tnt.tracking.position.latest suggestion, which had no module prefix. Consumed by tnt-link-back-core&#x27;s own materialization path (read model, not this topic itself — see LinkPositionRedisRepository); published by NetworkNodeApplicationService.updateLocation via the shared outbox.</td><td class="small"><code>GpsPositionKafkaConsumer</code> <span class="muted">tnt-link-back-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.market.listing.approved"><td><code>tnt.market.listing.approved</code><div class="muted small"><code>TntTopics.MARKET_LISTING_APPROVED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>MarketKafkaEventPublisher</code> <span class="muted">tnt-market-back-core</span></td><td class="small"><code>EntityChangedEventConsumer</code> <span class="muted">tnt-sync-core · groupe <code>tnt-sync-core</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.market.listing.published"><td><code>tnt.market.listing.published</code><div class="muted small"><code>TntTopics.MARKET_LISTING_PUBLISHED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>MarketKafkaEventPublisher</code> <span class="muted">tnt-market-back-core</span></td><td class="small"><code>EntityChangedEventConsumer</code> <span class="muted">tnt-sync-core · groupe <code>tnt-sync-core</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.market.listing.rejected"><td><code>tnt.market.listing.rejected</code><div class="muted small"><code>TntTopics.MARKET_LISTING_REJECTED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>MarketKafkaEventPublisher</code> <span class="muted">tnt-market-back-core</span></td><td class="small"><code>EntityChangedEventConsumer</code> <span class="muted">tnt-sync-core · groupe <code>tnt-sync-core</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.market.merchant.contract.signed"><td><code>tnt.market.merchant.contract.signed</code><div class="muted small"><code>TntTopics.MARKET_MERCHANT_CONTRACT_SIGNED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>MarketKafkaEventPublisher</code> <span class="muted">tnt-market-back-core</span></td><td class="small"><code>EntityChangedEventConsumer</code> <span class="muted">tnt-sync-core · groupe <code>tnt-sync-core</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.market.order.completed"><td><code>tnt.market.order.completed</code><div class="muted small"><code>TntTopics.MARKET_ORDER_COMPLETED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>MarketKafkaEventPublisher</code> <span class="muted">tnt-market-back-core</span></td><td class="small"><code>EntityChangedEventConsumer</code> <span class="muted">tnt-sync-core · groupe <code>tnt-sync-core</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.market.order.created"><td><code>tnt.market.order.created</code><div class="muted small"><code>TntTopics.MARKET_ORDER_CREATED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>MarketKafkaEventPublisher</code> <span class="muted">tnt-market-back-core</span></td><td class="small"><code>EntityChangedEventConsumer</code> <span class="muted">tnt-sync-core · groupe <code>tnt-sync-core</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.market.order.paid"><td><code>tnt.market.order.paid</code><div class="muted small"><code>TntTopics.MARKET_ORDER_PAID</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>MarketKafkaEventPublisher</code> <span class="muted">tnt-market-back-core</span></td><td class="small"><code>EntityChangedEventConsumer</code> <span class="muted">tnt-sync-core · groupe <code>tnt-sync-core</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.market.provider.review.published"><td><code>tnt.market.provider.review.published</code><div class="muted small"><code>TntTopics.MARKET_PROVIDER_REVIEW_PUBLISHED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>MarketKafkaEventPublisher</code> <span class="muted">tnt-market-back-core</span></td><td class="small"><code>EntityChangedEventConsumer</code> <span class="muted">tnt-sync-core · groupe <code>tnt-sync-core</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.market.quote.request.created"><td><code>tnt.market.quote.request.created</code><div class="muted small"><code>TntTopics.MARKET_QUOTE_REQUEST_CREATED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>MarketKafkaEventPublisher</code> <span class="muted">tnt-market-back-core</span></td><td class="small"><code>EntityChangedEventConsumer</code> <span class="muted">tnt-sync-core · groupe <code>tnt-sync-core</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.market.quote.response.submitted"><td><code>tnt.market.quote.response.submitted</code><div class="muted small"><code>TntTopics.MARKET_QUOTE_RESPONSE_SUBMITTED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>MarketKafkaEventPublisher</code> <span class="muted">tnt-market-back-core</span></td><td class="small"><code>EntityChangedEventConsumer</code> <span class="muted">tnt-sync-core · groupe <code>tnt-sync-core</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.notifications.failed"><td><code>tnt.notifications.failed</code><div class="muted small"><code>TntTopics.NOTIFY_NOTIFICATIONS_FAILED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>IPublishNotificationEventPort</code> <span class="muted">tnt-notify-core</span><br><code>NotifyProperties</code> <span class="muted">tnt-notify-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.notifications.sent"><td><code>tnt.notifications.sent</code><div class="muted small"><code>TntTopics.NOTIFY_NOTIFICATIONS_SENT</code></div></td><td class="small">Lot L8 (annex 9.1): literals of NotifyProperties made constants; outbound, no internal consumer.</td><td class="small"><code>IPublishNotificationEventPort</code> <span class="muted">tnt-notify-core</span><br><code>NotifyProperties</code> <span class="muted">tnt-notify-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.organization.hub.updated"><td><code>tnt.organization.hub.updated</code><div class="muted small"><code>TntTopics.ORGANIZATION_HUB_UPDATED</code></div></td><td class="small">Published by HubEventPublisherAdapter on HubRelaisUpdatedEvent, emitted by HubRelaisService#updateCapacity/assignOperator/suspendHub/resumeHub. Consumed by tnt-sync-core. Fixed 2026-07-23 — this Javadoc previously said no update/patch operation existed on HubRelais (Audit n5 P-01, documented debt); the domain aggregate already had updateCapacity/assignOperator/suspend/ resume methods, they were simply never exposed through any use case.</td><td class="small"><code>HubEventPublisherAdapter</code> <span class="muted">tnt-organization-core</span></td><td class="small"><code>EntityChangedEventConsumer</code> <span class="muted">tnt-sync-core · groupe <code>tnt-sync-core</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.product.created"><td><code>tnt.product.created</code><div class="muted small"><code>TntTopics.PRODUCT_CREATED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>ProductKafkaEventPublisher</code> <span class="muted">tnt-product-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.product.offer.published"><td><code>tnt.product.offer.published</code><div class="muted small"><code>TntTopics.PRODUCT_OFFER_PUBLISHED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>ProductKafkaEventPublisher</code> <span class="muted">tnt-product-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.realtime.actor.connected"><td><code>tnt.realtime.actor.connected</code><div class="muted small"><code>TntTopics.REALTIME_ACTOR_CONNECTED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>ActorConnectedEvent</code> <span class="muted">tnt-realtime-core</span><br><code>RealtimeProperties</code> <span class="muted">tnt-realtime-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.realtime.actor.disconnected"><td><code>tnt.realtime.actor.disconnected</code><div class="muted small"><code>TntTopics.REALTIME_ACTOR_DISCONNECTED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>ActorDisconnectedEvent</code> <span class="muted">tnt-realtime-core</span><br><code>RealtimeProperties</code> <span class="muted">tnt-realtime-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.realtime.eta.updated"><td><code>tnt.realtime.eta.updated</code><div class="muted small"><code>TntTopics.REALTIME_ETA_UPDATED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>ETAUpdatedEvent</code> <span class="muted">tnt-realtime-core</span><br><code>RealtimeProperties</code> <span class="muted">tnt-realtime-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.realtime.geofence.triggered"><td><code>tnt.realtime.geofence.triggered</code><div class="muted small"><code>TntTopics.REALTIME_GEOFENCE_TRIGGERED</code></div></td><td class="small">Geofence breach events. Consumed by tnt-incident-core, tnt-sync-core.</td><td class="small"><code>GeofenceTriggerEvent</code> <span class="muted">tnt-realtime-core</span><br><code>RealtimeProperties</code> <span class="muted">tnt-realtime-core</span></td><td class="small"><code>DeliveryWatchConsumer</code> <span class="muted">tnt-delivery-core · groupe <code>tnt-delivery-watch</code></span><br><code>EntityChangedEventConsumer</code> <span class="muted">tnt-sync-core · groupe <code>tnt-sync-core</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.realtime.gps.position.updated"><td><code>tnt.realtime.gps.position.updated</code><div class="muted small"><code>TntTopics.REALTIME_GPS_POSITION_UPDATED</code></div></td><td class="small">Enriched GPS position events. Consumed by tnt-incident-core.</td><td class="small"><code>GpsPositionUpdatedEvent</code> <span class="muted">tnt-realtime-core</span><br><code>RealtimeProperties</code> <span class="muted">tnt-realtime-core</span></td><td class="small"><code>DeliveryWatchConsumer</code> <span class="muted">tnt-delivery-core · groupe <code>tnt-delivery-watch</code></span><br><code>GpsPositionKafkaConsumer</code> <span class="muted">tnt-link-back-core · groupe <code>tnt-link-back-core</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.resource.equipment.assigned"><td><code>tnt.resource.equipment.assigned</code><div class="muted small"><code>TntTopics.RESOURCE_EQUIPMENT_ASSIGNED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>ResourceCoreProperties</code> <span class="muted">tnt-resource-core</span><br><code>ResourceKafkaEventPublisher</code> <span class="muted">tnt-resource-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.resource.freelancer.vehicle.registered"><td><code>tnt.resource.freelancer.vehicle.registered</code><div class="muted small"><code>TntTopics.RESOURCE_FREELANCER_VEHICLE_REGISTERED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>ResourceKafkaEventPublisher</code> <span class="muted">tnt-resource-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.resource.maintenance.alert"><td><code>tnt.resource.maintenance.alert</code><div class="muted small"><code>TntTopics.RESOURCE_MAINTENANCE_ALERT</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>ResourceCoreProperties</code> <span class="muted">tnt-resource-core</span><br><code>ResourceKafkaEventPublisher</code> <span class="muted">tnt-resource-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.resource.vehicle.assigned"><td><code>tnt.resource.vehicle.assigned</code><div class="muted small"><code>TntTopics.RESOURCE_VEHICLE_ASSIGNED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>ResourceCoreProperties</code> <span class="muted">tnt-resource-core</span><br><code>ResourceKafkaEventPublisher</code> <span class="muted">tnt-resource-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.resource.vehicle.location"><td><code>tnt.resource.vehicle.location</code><div class="muted small"><code>TntTopics.RESOURCE_VEHICLE_LOCATION</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>ResourceCoreProperties</code> <span class="muted">tnt-resource-core</span><br><code>ResourceKafkaEventPublisher</code> <span class="muted">tnt-resource-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.resource.vehicle.maintenance"><td><code>tnt.resource.vehicle.maintenance</code><div class="muted small"><code>TntTopics.RESOURCE_VEHICLE_MAINTENANCE</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>ResourceCoreProperties</code> <span class="muted">tnt-resource-core</span><br><code>ResourceKafkaEventPublisher</code> <span class="muted">tnt-resource-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.resource.vehicle.registered"><td><code>tnt.resource.vehicle.registered</code><div class="muted small"><code>TntTopics.RESOURCE_VEHICLE_REGISTERED</code></div></td><td class="small">Lot L8 (annex 9.1): literals of ResourceKafkaEventPublisher / ResourceCoreProperties; outbound.</td><td class="small"><code>ResourceCoreProperties</code> <span class="muted">tnt-resource-core</span><br><code>ResourceKafkaEventPublisher</code> <span class="muted">tnt-resource-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.resource.vehicle.retired"><td><code>tnt.resource.vehicle.retired</code><div class="muted small"><code>TntTopics.RESOURCE_VEHICLE_RETIRED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>ResourceCoreProperties</code> <span class="muted">tnt-resource-core</span><br><code>ResourceKafkaEventPublisher</code> <span class="muted">tnt-resource-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.resource.vehicle.unassigned"><td><code>tnt.resource.vehicle.unassigned</code><div class="muted small"><code>TntTopics.RESOURCE_VEHICLE_UNASSIGNED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>ResourceCoreProperties</code> <span class="muted">tnt-resource-core</span><br><code>ResourceKafkaEventPublisher</code> <span class="muted">tnt-resource-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.roles.permission-changed"><td><code>tnt.roles.permission-changed</code><div class="muted small"><code>TntTopics.ROLES_PERMISSION_CHANGED</code></div></td><td class="small">Published by tnt-roles-core&#x27;s PermissionChangeEventPublisher on every role assignment/revocation. Consumed by PermissionCacheInvalidationListener (same module, every instance). Fixed 2026-07-23 — this Javadoc previously said &quot;never published&quot; (Audit n5 P-01/P-20, documented debt); the TTL-based self-expiry remains as a fallback for any instance that misses the broadcast.</td><td class="small"><code>PermissionChangeEventPublisher</code> <span class="muted">tnt-roles-core</span></td><td class="small"><code>PermissionCacheInvalidationListener</code> <span class="muted">tnt-roles-core · groupe <code>#{&#x27;tnt-roles-cache-&#x27; + T(java.util.UUID).randomUUID()}</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.route.eta.updated"><td><code>tnt.route.eta.updated</code><div class="muted small"><code>TntTopics.ROUTE_ETA_UPDATED</code></div></td><td class="small">Consumed by tnt-realtime-core&#x27;s ETAUpdateEventConsumer.</td><td class="small"><code>KafkaRouteEventPublisher</code> <span class="muted">tnt-route-core</span><br><code>RealtimeProperties</code> <span class="muted">tnt-realtime-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.route.reroute.events"><td><code>tnt.route.reroute.events</code><div class="muted small"><code>TntTopics.ROUTE_REROUTE_EVENTS</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>KafkaRouteEventPublisher</code> <span class="muted">tnt-route-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.route.tour.events"><td><code>tnt.route.tour.events</code><div class="muted small"><code>TntTopics.ROUTE_TOUR_EVENTS</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>KafkaRouteEventPublisher</code> <span class="muted">tnt-route-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.route.vrp.events"><td><code>tnt.route.vrp.events</code><div class="muted small"><code>TntTopics.ROUTE_VRP_EVENTS</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>KafkaRouteEventPublisher</code> <span class="muted">tnt-route-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.sales.order.cancelled"><td><code>tnt.sales.order.cancelled</code><div class="muted small"><code>TntTopics.SALES_ORDER_CANCELLED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>SalesEventPublisherAdapter</code> <span class="muted">tnt-sales-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.sales.order.confirmed"><td><code>tnt.sales.order.confirmed</code><div class="muted small"><code>TntTopics.SALES_ORDER_CONFIRMED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>SalesEventPublisherAdapter</code> <span class="muted">tnt-sales-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.sales.order.delivered"><td><code>tnt.sales.order.delivered</code><div class="muted small"><code>TntTopics.SALES_ORDER_DELIVERED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>SalesEventPublisherAdapter</code> <span class="muted">tnt-sales-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.sales.order.dispatched"><td><code>tnt.sales.order.dispatched</code><div class="muted small"><code>TntTopics.SALES_ORDER_DISPATCHED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>SalesEventPublisherAdapter</code> <span class="muted">tnt-sales-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.sync.completed"><td><code>tnt.sync.completed</code><div class="muted small"><code>TntTopics.SYNC_COMPLETED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>SyncCompletedEvent</code> <span class="muted">tnt-sync-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.sync.conflict.detected"><td><code>tnt.sync.conflict.detected</code><div class="muted small"><code>TntTopics.SYNC_CONFLICT_DETECTED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>SyncConflictDetectedEvent</code> <span class="muted">tnt-sync-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.tp.client.profile.events"><td><code>tnt.tp.client.profile.events</code><div class="muted small"><code>TntTopics.TP_CLIENT_PROFILE_EVENTS</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>KafkaTntTpEventPublisher</code> <span class="muted">tnt-tp-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.tp.kyc.events"><td><code>tnt.tp.kyc.events</code><div class="muted small"><code>TntTopics.TP_KYC_EVENTS</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>KafkaTntTpEventPublisher</code> <span class="muted">tnt-tp-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.tp.loyalty.events"><td><code>tnt.tp.loyalty.events</code><div class="muted small"><code>TntTopics.TP_LOYALTY_EVENTS</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>KafkaTntTpEventPublisher</code> <span class="muted">tnt-tp-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.tp.phone.alias.events"><td><code>tnt.tp.phone.alias.events</code><div class="muted small"><code>TntTopics.TP_PHONE_ALIAS_EVENTS</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>KafkaTntTpEventPublisher</code> <span class="muted">tnt-tp-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.tp.rating.events"><td><code>tnt.tp.rating.events</code><div class="muted small"><code>TntTopics.TP_RATING_EVENTS</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>KafkaTntTpEventPublisher</code> <span class="muted">tnt-tp-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.tp.unknown.events"><td><code>tnt.tp.unknown.events</code><div class="muted small"><code>TntTopics.TP_UNKNOWN_EVENTS</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>KafkaTntTpEventPublisher</code> <span class="muted">tnt-tp-core</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.vehicle.assigned_to_mission"><td><code>tnt.vehicle.assigned_to_mission</code><div class="muted small"><code>TntTopics.VEHICLE_ASSIGNED_TO_MISSION</code></div></td><td class="small">6-partitioned (high-throughput fleet tracking). Consumed by tnt-delivery-core&#x27;s FreelancerVehicleEventConsumer. Legacy underscore name.</td><td class="small"><code>ResourceKafkaEventPublisher</code> <span class="muted">tnt-resource-core</span></td><td class="small"><code>FreelancerVehicleEventConsumer</code> <span class="muted">tnt-delivery-core · groupe <code>tnt-delivery-vehicle-consumer</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-tnt.vehicle.released_from_mission"><td><code>tnt.vehicle.released_from_mission</code><div class="muted small"><code>TntTopics.VEHICLE_RELEASED_FROM_MISSION</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><code>ResourceKafkaEventPublisher</code> <span class="muted">tnt-resource-core</span></td><td class="small"><code>FreelancerVehicleEventConsumer</code> <span class="muted">tnt-delivery-core · groupe <code>tnt-delivery-vehicle-consumer</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-yow.trust.events"><td><code>yow.trust.events</code><div class="muted small"><code>TntTopics.TRUST_EVENTS</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class="muted">—</span></td><td class="small"><span class=muted>—</span></td></tr>
+<tr id="t-yow.trust.events.committed"><td><code>yow.trust.events.committed</code><div class="muted small"><code>TntTopics.TRUST_EVENTS_COMMITTED</code></div></td><td class="small"><span class=muted>—</span></td><td class="small"><span class="muted">—</span></td><td class="small"><code>TrustCommittedEventConsumer</code> <span class="muted">tnt-trust-core · groupe <code>tnt-trust-committed-listener</code></span></td><td class="small"><span class=muted>—</span></td></tr>
+</table></div>
+
+<h2 id="groupes">6. Groupes de consommateurs du Core</h2>
+<p class="muted small">Un groupe reçoit chaque enregistrement une fois ; deux groupes reçoivent tous les deux. Ne jamais
+réutiliser un de ces noms hors du Core.</p>
+<div class="table-wrap"><table><tr><th>Groupe</th><th>Listeners (classe ← topic)</th></tr><tr><td><code>#{&#x27;tnt-roles-cache-&#x27; + T(java.util.UUID).randomUUID()}</code></td><td class="small"><code>PermissionCacheInvalidationListener</code> ← <code>tnt.roles.permission-changed</code></td></tr><tr><td><code>(groupe de la fabrique)</code></td><td class="small"><code>BillingEventAccountingConsumer</code> ← <code>tnt.billing.compensation.paid</code><br><code>BillingEventAccountingConsumer</code> ← <code>tnt.billing.invoice.paid</code><br><code>BillingEventAccountingConsumer</code> ← <code>tnt.billing.wallet.commission.calculated</code><br><code>DisputeEventConsumer</code> ← <code>tnt.billing.compensation.paid</code><br><code>DisputeEventConsumer</code> ← <code>tnt.incident.events</code></td></tr><tr><td><code>...</code></td><td class="small"><code>ReactiveListenerSupport</code> ← <code>tnt.delivery.events</code></td></tr><tr><td><code>tiibntick-stream-group</code></td><td class="small"><code>MatchingNotificationConsumer</code> ← <code>gofp.matching.notifications</code></td></tr><tr><td><code>tnt-actor-freelancer-org-consumer</code></td><td class="small"><code>FreelancerOrgEventConsumer</code> ← <code>tnt.freelancer_org.created</code><br><code>FreelancerOrgEventConsumer</code> ← <code>tnt.freelancer_org.sub_deliverer.associated</code><br><code>FreelancerOrgEventConsumer</code> ← <code>tnt.freelancer_org.sub_deliverer.revoked</code><br><code>FreelancerOrgEventConsumer</code> ← <code>tnt.freelancer_org.verified</code></td></tr><tr><td><code>tnt-actor-incident-consumer</code></td><td class="small"><code>IncidentEventConsumer</code> ← <code>tnt.incident.events</code></td></tr><tr><td><code>tnt-agency-erp-actor-consumer</code></td><td class="small"><code>ActorKycConsumer</code> ← <code>tnt.actor.kyc.validated</code></td></tr><tr><td><code>tnt-agency-erp-billing-consumer</code></td><td class="small"><code>WalletPayoutConsumer</code> ← <code>tnt.billing.wallet.payment.confirmed</code></td></tr><tr><td><code>tnt-agency-erp-delivery-consumer</code></td><td class="small"><code>DeliveryStatusConsumer</code> ← <code>tnt.delivery.events</code></td></tr><tr><td><code>tnt-agency-erp-inventory-consumer</code></td><td class="small"><code>InventoryHubConsumer</code> ← <code>tnt.parcel.events</code></td></tr><tr><td><code>tnt-billing-invoice-group</code></td><td class="small"><code>InvoiceBillingEventConsumer</code> ← <code>${tnt.kafka.topics.payment-confirmed:</code><br><code>InvoiceBillingEventConsumer</code> ← <code>tnt.billing.wallet.payment.confirmed</code><br><code>InvoiceBillingEventConsumer</code> ← <code>tnt.delivery.events</code></td></tr><tr><td><code>tnt-billing-report-group</code></td><td class="small"><code>InvoiceEventReportConsumer</code> ← <code>tnt.billing.invoice.events</code></td></tr><tr><td><code>tnt-billing-wallet-commission</code></td><td class="small"><code>WalletBillingEventConsumer</code> ← <code>tnt.billing.wallet.commission.calculated</code></td></tr><tr><td><code>tnt-billing-wallet-delivery</code></td><td class="small"><code>WalletPaymentLifecycleConsumer</code> ← <code>tnt.delivery.events</code></td></tr><tr><td><code>tnt-billing-wallet-dispute</code></td><td class="small"><code>WalletPaymentLifecycleConsumer</code> ← <code>tnt.dispute.events</code></td></tr><tr><td><code>tnt-delivery-thresholds-cache-${random.uuid}</code></td><td class="small"><code>DeliveryThresholdsChangedConsumer</code> ← <code>tnt.administration.events</code></td></tr><tr><td><code>tnt-delivery-vehicle-consumer</code></td><td class="small"><code>FreelancerVehicleEventConsumer</code> ← <code>tnt.vehicle.assigned_to_mission</code><br><code>FreelancerVehicleEventConsumer</code> ← <code>tnt.vehicle.released_from_mission</code></td></tr><tr><td><code>tnt-delivery-watch</code></td><td class="small"><code>DeliveryWatchConsumer</code> ← <code>tnt.realtime.geofence.triggered</code><br><code>DeliveryWatchConsumer</code> ← <code>tnt.realtime.gps.position.updated</code></td></tr><tr><td><code>tnt-go-freelancer-core-group</code></td><td class="small"><code>MatchingUseCase</code> ← <code>tnt.announcement.events</code></td></tr><tr><td><code>tnt-go-freelancer-core-subscription-group</code></td><td class="small"><code>SubscriptionConfirmationConsumer</code> ← <code>gofp.subscription.attempts</code></td></tr><tr><td><code>tnt-gofp-delivery-alerts</code></td><td class="small"><code>CoreDeliveryAlertConsumer</code> ← <code>tnt.delivery.events</code></td></tr><tr><td><code>tnt-gofp-delivery-projection</code></td><td class="small"><code>CoreMissionStatusConsumer</code> ← <code>tnt.delivery.events</code></td></tr><tr><td><code>tnt-link-back-core</code></td><td class="small"><code>GpsPositionKafkaConsumer</code> ← <code>tnt.realtime.gps.position.updated</code></td></tr><tr><td><code>tnt-market-group</code></td><td class="small"><code>MarketKafkaConsumer</code> ← <code>tnt.billing.wallet.payment.confirmed</code><br><code>MarketKafkaConsumer</code> ← <code>tnt.delivery.events</code></td></tr><tr><td><code>tnt-notify-core</code></td><td class="small"><code>FreelancerOrgKafkaEventConsumer</code> ← <code>tnt.admin.freelancer_org.kyc_approved</code><br><code>FreelancerOrgKafkaEventConsumer</code> ← <code>tnt.admin.freelancer_org.kyc_rejected</code><br><code>FreelancerOrgKafkaEventConsumer</code> ← <code>tnt.admin.freelancer_org.suspended</code><br><code>FreelancerOrgKafkaEventConsumer</code> ← <code>tnt.admin.freelancer_org.unsuspended</code><br><code>FreelancerOrgKafkaEventConsumer</code> ← <code>tnt.billing.template.applied</code><br><code>FreelancerOrgKafkaEventConsumer</code> ← <code>tnt.delivery.events</code></td></tr><tr><td><code>tnt-realtime-core</code></td><td class="small"><code>MissionStatusEventConsumer</code> ← <code>tnt.delivery.events</code><br><code>MissionStatusEventConsumer</code> ← <code>tnt.parcel.events</code></td></tr><tr><td><code>tnt-sales-core-delivery</code></td><td class="small"><code>DeliveryEventSalesConsumer</code> ← <code>tnt.delivery.events</code></td></tr><tr><td><code>tnt-sync-core</code></td><td class="small"><code>EntityChangedEventConsumer</code> ← <code>tnt.actor.profile.updated</code><br><code>EntityChangedEventConsumer</code> ← <code>tnt.announcement.events</code><br><code>EntityChangedEventConsumer</code> ← <code>tnt.delivery.events</code><br><code>EntityChangedEventConsumer</code> ← <code>tnt.dispute.events</code><br><code>EntityChangedEventConsumer</code> ← <code>tnt.geo.alert.created</code><br><code>EntityChangedEventConsumer</code> ← <code>tnt.incident.events</code><br><code>EntityChangedEventConsumer</code> ← <code>tnt.market.listing.approved</code><br><code>EntityChangedEventConsumer</code> ← <code>tnt.market.listing.published</code><br><code>EntityChangedEventConsumer</code> ← <code>tnt.market.listing.rejected</code><br><code>EntityChangedEventConsumer</code> ← <code>tnt.market.merchant.contract.signed</code><br><code>EntityChangedEventConsumer</code> ← <code>tnt.market.order.completed</code><br><code>EntityChangedEventConsumer</code> ← <code>tnt.market.order.created</code><br><code>EntityChangedEventConsumer</code> ← <code>tnt.market.order.paid</code><br><code>EntityChangedEventConsumer</code> ← <code>tnt.market.provider.review.published</code><br><code>EntityChangedEventConsumer</code> ← <code>tnt.market.quote.request.created</code><br><code>EntityChangedEventConsumer</code> ← <code>tnt.market.quote.response.submitted</code><br><code>EntityChangedEventConsumer</code> ← <code>tnt.organization.hub.updated</code><br><code>EntityChangedEventConsumer</code> ← <code>tnt.parcel.events</code><br><code>EntityChangedEventConsumer</code> ← <code>tnt.realtime.geofence.triggered</code></td></tr><tr><td><code>tnt-tp-core-group</code></td><td class="small"><code>DeliveryEventConsumer</code> ← <code>tnt.delivery.events</code></td></tr><tr><td><code>tnt-trust-committed-listener</code></td><td class="small"><code>TrustCommittedEventConsumer</code> ← <code>yow.trust.events.committed</code></td></tr></table></div>
+
+<h2 id="externes">7. Plateformes externes : un groupe chacune, ACL lecture seule</h2>
+<p>Décision G.4 : BFF Mobile, Agency, Link, Market et Point Relais lisent directement le cluster partagé, chacune avec
+<strong>son propre groupe</strong> (préfixe conseillé <code>ext-&lt;plateforme&gt;-</code>) et un compte en <strong>lecture
+seule</strong> : lire les topics utiles et décrire/valider son groupe, jamais écrire. Exemple pour Agency :</p>
+<pre><code>kafka-acls.sh --bootstrap-server $KAFKA --add --allow-principal User:agency \
+  --operation Read --operation Describe --topic tnt.delivery.events --topic tnt.parcel.events \
+  --topic tnt.incident.events --topic tnt.dispute.events --topic tnt.billing.wallet.payment.confirmed
+kafka-acls.sh --bootstrap-server $KAFKA --add --allow-principal User:agency \
+  --operation Read --operation Describe --group ext-agency- --resource-pattern-type prefixed</code></pre>
+<p>La gestion de ces comptes et ACL est un besoin de la plateforme d'administration (spec §5.5).</p>
+
+<h2 id="pratiques">8. Bonnes pratiques</h2>
+<ul>
+<li><strong>Idempotence par <code>eventId</code></strong> : tout effet unique (paiement, notification, création) doit
+survivre à un rejeu.</li>
+<li><strong>Ordre par <code>aggregateVersion</code></strong> : ignorer une version déjà appliquée ou plus ancienne.</li>
+<li><strong>Ignorer les champs inconnus</strong> (<code>FAIL_ON_UNKNOWN_PROPERTIES=false</code>) et les types
+d'événements inconnus : de nouveaux s'ajoutent sans changer <code>schemaVersion</code>.</li>
+<li>Filtrer tôt sur l'en-tête <code>X-Yow-Event-Type</code> ; acquitter les événements qui ne concernent pas le lecteur.</li>
+<li>Dans le Core, attendre la fin du travail réactif dans le listener (<code>ReactiveListenerSupport.await</code>, 30 s
+au plus) : un échec est retenté 4 fois (1 s, ×2) puis envoyé dans <code>tnt.dlq</code> ; ne jamais avaler une erreur
+(<code>onErrorResume(e -&gt; Mono.empty())</code>).</li>
+<li>Ne pas passer de clé explicite à l'outbox : la clé est l'id de l'agrégat.</li>
+<li>Ne jamais publier de données personnelles en clair ; passer par <code>TntEventMasking</code>.</li>
+<li>Un topic nouveau = une constante <code>TntTopics</code> + un <code>NewTopic</code> (test <code>KafkaAsyncWiringTest.everyTopicConstantIsDeclared</code>) + une ligne de ce guide.</li>
+</ul>
+
+<h2 id="ancien-nouveau">9. Ancien → nouveau (spec §3.8)</h2>
+<p class="muted small">Les anciens topics ne sont plus produits ni lus depuis le lot L8 ; ils sont retirés de
+<code>TntTopics</code>.</p>
+<div class="table-wrap"><table><tr><th>Ancien topic</th><th>Nouveau</th><th>Type(s) d'événement</th><th>Lot</th></tr><tr><td class="small"><code>tnt.delivery.mission.created</code> (<code>DELIVERY_MISSION_CREATED</code>, l.46)</td><td class="small"><code>tnt.delivery.events</code></td><td class="small"><code>DeliveryCreated</code></td><td class="small">L8</td></tr><tr><td class="small"><code>tnt.delivery.mission.started</code> (l.54)</td><td class="small"><code>tnt.delivery.events</code></td><td class="small"><code>DeliveryPickedUp</code></td><td class="small">L8</td></tr><tr><td class="small"><code>tnt.delivery.mission.completed</code> (l.50)</td><td class="small"><code>tnt.delivery.events</code></td><td class="small"><code>DeliveryDelivered</code></td><td class="small">L8</td></tr><tr><td class="small"><code>tnt.delivery.mission.failed</code> (l.58)</td><td class="small"><code>tnt.delivery.events</code></td><td class="small"><code>DeliveryFailed</code></td><td class="small">L8</td></tr><tr><td class="small"><code>tnt.delivery.mission.status.changed</code> (l.39)</td><td class="small"><code>tnt.delivery.events</code></td><td class="small">tous les types de transition</td><td class="small">L8</td></tr><tr><td class="small"><code>tnt.delivery.freelancer_org.assigned</code> (l.42)</td><td class="small"><code>tnt.delivery.events</code></td><td class="small"><code>DeliveryFreelancerOrgAssigned</code></td><td class="small">L8</td></tr><tr><td class="small"><code>tnt.delivery.events</code> (l.36, ancien format)</td><td class="small"><code>tnt.delivery.events</code> (format §3.3)</td><td class="small">—</td><td class="small">L2 (format)</td></tr><tr><td class="small"><code>tnt.delivery.package.updated</code> (l.69)</td><td class="small"><code>tnt.parcel.events</code></td><td class="small">tous les types <code>Parcel*</code></td><td class="small">L8</td></tr><tr><td class="small"><code>tnt.delivery.package.delivered</code> (l.64)</td><td class="small"><code>tnt.parcel.events</code></td><td class="small"><code>ParcelDelivered</code></td><td class="small">L8</td></tr><tr><td class="small"><code>tnt.delivery.package.picked-up</code> (l.71, déclaré inutilisé)</td><td class="small"><code>tnt.parcel.events</code></td><td class="small"><code>ParcelPickedUp</code></td><td class="small">L8 (suppression)</td></tr><tr><td class="small"><code>tnt.delivery.hub-deposit.created</code> / <code>.picked-up</code> (l.73/75, inutilisés)</td><td class="small"><code>tnt.parcel.events</code></td><td class="small"><code>ParcelCustodyChanged</code></td><td class="small">L8 (suppression)</td></tr><tr><td class="small"><code>tnt.delivery.package.disputed</code> / <code>.dispute.released</code> (l.77/78)</td><td class="small"><code>tnt.parcel.events</code></td><td class="small"><code>ParcelUnderDispute</code> / <code>Parcel&lt;état rétabli&gt;</code></td><td class="small">L4 (producteur retiré) + L8</td></tr><tr><td class="small"><code>tnt.inventory.hub.package.deposited</code> / <code>.pickedup</code> (l.264/265)</td><td class="small"><code>tnt.parcel.events</code></td><td class="small"><code>ParcelAtRelayHub</code>, <code>ParcelCustodyChanged</code></td><td class="small">L8</td></tr><tr><td class="small"><code>tnt.delivery.announcement.published</code> (l.81)</td><td class="small"><code>tnt.announcement.events</code></td><td class="small"><code>AnnouncementPublished</code></td><td class="small">L8</td></tr><tr><td class="small"><code>gofp.announcement.published</code> (<code>GOFP_ANNOUNCEMENT_PUBLISHED</code>)</td><td class="small"><code>tnt.announcement.events</code></td><td class="small"><code>AnnouncementPublished</code> (corrige le double matching C5)</td><td class="small">L8</td></tr><tr><td class="small"><code>tnt.delivery.announcement.response.selected</code> (l.84)</td><td class="small"><code>tnt.announcement.events</code></td><td class="small"><code>AnnouncementAssigned</code></td><td class="small">L8</td></tr><tr><td class="small"><code>tnt.incident.created</code> / <code>.triaged</code> / <code>.escalated</code> / <code>.resolved</code> / <code>.closed</code> / <code>.cancelled</code> / <code>.status.changed</code> / <code>.driver.assigned</code> / <code>.handover.completed</code> / <code>.interagency.requested</code> / <code>.interagency.completed</code> (l.89-103 ; <code>IncidentKafkaEventPublisher.java:56-67</code>)</td><td class="small"><code>tnt.incident.events</code></td><td class="small">types §3.5 (<code>.driver.assigned</code> → <code>IncidentAwaitingHandover</code> ; <code>.handover.completed</code> → <code>IncidentResolved</code> trigger <code>HANDOVER_COMPLETED</code> ; <code>.interagency.*</code> → <code>IncidentWaitingInteragency</code>/<code>IncidentInteragencyInProgress</code>)</td><td class="small">L8</td></tr><tr><td class="small"><code>tnt.incident.escalated.to.dispute</code> (<code>INCIDENT_ESCALATED_TO_DISPUTE</code>)</td><td class="small"><code>tnt.incident.events</code></td><td class="small"><code>IncidentEscalatedToDispute</code></td><td class="small">L8</td></tr><tr><td class="small"><code>tnt.dispute.opened</code> / <code>.escalated</code> / <code>.ruled</code> / <code>.closed</code> / <code>.status.changed</code> / <code>.evidence.submitted</code> / <code>.compensation.processed</code> (l.151-164)</td><td class="small"><code>tnt.dispute.events</code></td><td class="small">types §3.5</td><td class="small">L8</td></tr><tr><td class="small"><code>tnt.dispute.resolved</code>, <code>.evidence-added</code>, <code>.compensation-paid</code>, <code>.refund-initiated</code> (déclarés inutilisés)</td><td class="small">—</td><td class="small">—</td><td class="small">L8 (suppression)</td></tr><tr><td class="small"><code>tnt.billing.compensation.initiated</code> (l.173)</td><td class="small"><strong>supprimé</strong> (appel synchrone <code>IDisputeCompensationPort</code>)</td><td class="small">—</td><td class="small">L5</td></tr><tr><td class="small"><code>tnt.billing.wallet.split_executed</code></td><td class="small"><strong>supprimé</strong> (aucun producteur possible : la répartition est faite par le Kernel)</td><td class="small">—</td><td class="small">L5</td></tr><tr><td class="small"><code>tnt.billing.compensation.paid</code> (l.178)</td><td class="small">conservé, producteur réel ajouté</td><td class="small"><code>CompensationPaid</code></td><td class="small">L5</td></tr><tr><td class="small"><code>tnt.delivery.mission.status.changed</code> comme source d&#x27;incident SLA (<code>incident/.../IncidentEventConsumer.java:34</code>)</td><td class="small"><code>tnt.delivery.events</code> <code>DeliveryAlertRaised</code> (pas d&#x27;incident)</td><td class="small">—</td><td class="small">L3</td></tr></table></div>
+
+<h2 id="dlq">10. Relancer un message de <code>tnt.dlq</code></h2>
+<p>Un listener du Core qui échoue encore après 4 tentatives publie l'enregistrement dans <code>tnt.dlq</code> avec sa
+clé, sa valeur, ses en-têtes et <code>kafka_dlt-original-topic</code>, <code>-partition</code>, <code>-offset</code>,
+<code>-original-consumer-group</code>, <code>-exception-fqcn</code>, <code>-exception-message</code>. Journal
+<code>KAFKA_RECORD_DEAD_LETTERED</code>, compteur <code>yow_event_consumer_dead_lettered_total{topic,group}</code>.</p>
+<ol>
+<li>Lire la file avec ses en-têtes :
+<pre><code>kafka-console-consumer.sh --bootstrap-server $KAFKA --topic tnt.dlq --from-beginning \
+  --property print.key=true --property print.headers=true --property print.timestamp=true</code></pre></li>
+<li>Comprendre la cause (<code>kafka_dlt-exception-message</code>), corriger (code, donnée, configuration).</li>
+<li>Republier l'enregistrement <strong>à l'identique</strong> (même clé, même valeur) sur
+<code>kafka_dlt-original-topic</code>, avec l'en-tête <code>X-Yow-Replay: true</code> : c'est le seul cas où l'anti-doublon
+<code>event_bus.processed_events</code> laisse repasser un <code>eventId</code> déjà traité.
+<pre><code>printf '%s\t%s\t%s\n' 'X-Yow-Replay:true' '&lt;clé&gt;' '&lt;valeur JSON sur une ligne&gt;' | \
+kafka-console-producer.sh --bootstrap-server $KAFKA --topic &lt;topic d'origine&gt; \
+  --property parse.headers=true --property parse.key=true --property key.separator=$'\t'</code></pre></li>
+<li>Noter la relance (qui, quoi, pourquoi) : elle relève du journal d'administration. Une route d'API de relance est à
+construire (spec d'administration §5.5) ; ce mode opératoire la remplace en attendant.</li>
+</ol>
+<p class="note">Attention : relancer un enregistrement dont l'effet a déjà été appliqué en partie peut le réappliquer
+(une notification peut repartir). Vérifier l'état avant.</p>
+
+<h2 id="exploitation">11. Exploitation : anciens topics d'un cluster existant</h2>
+<p>Spring Kafka crée les topics manquants mais n'en supprime aucun. Sur un cluster existant, tout topic <code>tnt.*</code>
+absent du <a href="#catalogue">catalogue</a> (hors <code>tnt.trust.*</code>) est un ancien topic : vider les lecteurs
+(offsets en fin), vérifier qu'aucune plateforme externe ne le lit, puis <code>kafka-topics.sh --delete --topic &lt;nom&gt;</code>.
+La liste complète (42 migrés, 22 morts) est dans le journal technique du chantier, lot L8. La rétention de
+<code>tnt.delivery.events</code> existant avant le lot L0 doit être réglée une fois
+(<code>kafka-configs.sh --alter --entity-type topics --entity-name tnt.delivery.events --add-config retention.ms=2592000000</code>).</p>
+</main>
+<script>
+(function () {
+  var q = document.getElementById('q'), rows = document.querySelectorAll('#cat tr[id]');
+  q.addEventListener('input', function () {
+    var v = q.value.toLowerCase();
+    rows.forEach(function (r) { r.style.display = r.textContent.toLowerCase().indexOf(v) >= 0 ? '' : 'none'; });
+  });
+})();
+</script>
+</body>
+</html>

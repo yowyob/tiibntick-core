@@ -9,4 +9,7 @@ public interface HubPackageEntryRepository {
     Mono<HubPackageEntry> findByTrackingCode(String trackingCode);
     Flux<HubPackageEntry> findActiveByHub(UUID hubId);
     Flux<HubPackageEntry> findAllByHub(UUID hubId);
+
+    /** Every entry (active or picked up) whose owner is the given actor. */
+    Flux<HubPackageEntry> findAllByOwner(UUID ownerActorId);
 }

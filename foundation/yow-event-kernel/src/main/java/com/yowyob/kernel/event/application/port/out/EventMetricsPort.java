@@ -61,4 +61,23 @@ public interface EventMetricsPort {
      * @param dlqSize the current number of WAITING DLQ entries
      */
     void updateDlqSize(long dlqSize);
+
+    /**
+     * Records the outcome of one outbox-relay attempt ({@code PUBLISHED}, {@code RETRY_SCHEDULED},
+     * {@code DEAD}, {@code CLAIM_LOST}). A {@code DEAD} outcome is what alerting should watch.
+     *
+     * @param envelope the envelope the relay handled
+     * @param outcome  the attempt outcome
+     */
+    default void recordRelayOutcome(DomainEventEnvelope envelope, String outcome) {
+    }
+
+    /**
+     * Records a consumer-side duplicate skipped by the idempotency filter.
+     *
+     * @param consumerGroup the consumer group that already processed the event
+     * @param topic         the topic of the duplicate record
+     */
+    default void recordDuplicateSkipped(String consumerGroup, String topic) {
+    }
 }

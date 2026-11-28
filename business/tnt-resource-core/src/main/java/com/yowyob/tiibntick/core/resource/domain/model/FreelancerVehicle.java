@@ -9,7 +9,13 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Domain entity representing a vehicle belonging to a {@code FreelancerOrganization}.
+ * Domain entity representing a vehicle belonging to a {@code FreelancerOrganization}, or the personal vehicle of
+ * an independent courier ({@code ownerActorId}, no organization). At least one owner is set.
+ *
+ * <p>The owning organization is optional since lot L3 (Go-Freelancer de-duplication): an independent courier
+ * declares his own vehicle. To be reviewed: the "freelancer organization" concept (three independents and a
+ * lead) may be withdrawn, which would leave the actor as the only owner. The maximum capacity stays mandatory
+ * ({@code > 0}) for every vehicle.
  *
  * <p><b>Kernel extension principle:</b> This entity does NOT extend any kernel Vehicle or
  * Actor class. It references {@code ownerOrgId} (the FreelancerOrganization UUID from
@@ -39,6 +45,12 @@ public final class FreelancerVehicle {
      * Pure integration key — no physical FK to tnt-organization-core (cross-module boundary).
      */
     private final UUID ownerOrgId;
+
+    /**
+     * Actor owning a personal vehicle (independent courier), or {@code null} for an organization vehicle.
+     * Pure integration key (actor-core actor id).
+     */
+    private final UUID ownerActorId;
 
     private final VehicleType type;
     private final String brand;
@@ -84,14 +96,18 @@ public final class FreelancerVehicle {
     // ── Max fleet size per FreelancerOrg ──────────────────────────────────
     public static final int MAX_VEHICLES_PER_ORG = 3;
 
-    private FreelancerVehicle(UUID vehicleId, UUID ownerOrgId, VehicleType type,
+    private FreelancerVehicle(UUID vehicleId, UUID ownerOrgId, UUID ownerActorId, VehicleType type,
             String brand, String model, String plateNumber, double maxCapacityKg,
             Double volumeM3, FuelType fuelType, Double fuelConsumptionLPer100km,
             String registrationDocRef, String insuranceDocRef, boolean active,
             LocalDate lastMaintenanceAt, String currentMissionId,
             Instant createdAt, Instant updatedAt) {
         this.vehicleId = Objects.requireNonNull(vehicleId, "vehicleId is required");
-        this.ownerOrgId = Objects.requireNonNull(ownerOrgId, "ownerOrgId is required");
+        if (ownerOrgId == null && ownerActorId == null) {
+            throw new IllegalArgumentException("ownerOrgId or ownerActorId is required");
+        }
+        this.ownerOrgId = ownerOrgId;
+        this.ownerActorId = ownerActorId;
         this.type = Objects.requireNonNull(type, "type is required");
         this.brand = brand;
         this.model = model;
@@ -138,13 +154,32 @@ public final class FreelancerVehicle {
             Double volumeM3, FuelType fuelType, Double fuelConsumptionLPer100km,
             String registrationDocRef, String insuranceDocRef) {
         Instant now = Instant.now();
-        return new FreelancerVehicle(UUID.randomUUID(), ownerOrgId, type, brand, model,
+        return new FreelancerVehicle(UUID.randomUUID(), ownerOrgId, null, type, brand, model,
                 plateNumber, maxCapacityKg, volumeM3, fuelType, fuelConsumptionLPer100km,
                 registrationDocRef, insuranceDocRef, true, null, null, now, now);
     }
 
     /**
-     * Rehydrates a {@code FreelancerVehicle} from persistence.
+     * Registers the personal vehicle of an independent courier (no organization). Same rules as
+     * {@link #register}: plate and a maximum capacity {@code > 0} are mandatory.
+     *
+     * @param vehicleId    id to give the vehicle, or {@code null} for a new random one (a migration may keep an id
+     *                     already referenced elsewhere)
+     * @param ownerActorId actor id of the courier owning the vehicle
+     */
+    public static FreelancerVehicle registerPersonal(UUID vehicleId, UUID ownerActorId, VehicleType type,
+            String brand, String model, String plateNumber, double maxCapacityKg,
+            Double volumeM3, FuelType fuelType, Double fuelConsumptionLPer100km,
+            String registrationDocRef, String insuranceDocRef) {
+        Instant now = Instant.now();
+        return new FreelancerVehicle(vehicleId != null ? vehicleId : UUID.randomUUID(), null,
+                Objects.requireNonNull(ownerActorId, "ownerActorId is required"), type, brand, model,
+                plateNumber, maxCapacityKg, volumeM3, fuelType, fuelConsumptionLPer100km,
+                registrationDocRef, insuranceDocRef, true, null, null, now, now);
+    }
+
+    /**
+     * Rehydrates an organization {@code FreelancerVehicle} from persistence.
      */
     public static FreelancerVehicle rehydrate(UUID vehicleId, UUID ownerOrgId, VehicleType type,
             String brand, String model, String plateNumber, double maxCapacityKg,
@@ -152,7 +187,21 @@ public final class FreelancerVehicle {
             String registrationDocRef, String insuranceDocRef, boolean active,
             LocalDate lastMaintenanceAt, String currentMissionId,
             Instant createdAt, Instant updatedAt) {
-        return new FreelancerVehicle(vehicleId, ownerOrgId, type, brand, model, plateNumber,
+        return rehydrate(vehicleId, ownerOrgId, null, type, brand, model, plateNumber, maxCapacityKg, volumeM3,
+                fuelType, fuelConsumptionLPer100km, registrationDocRef, insuranceDocRef, active,
+                lastMaintenanceAt, currentMissionId, createdAt, updatedAt);
+    }
+
+    /**
+     * Rehydrates a {@code FreelancerVehicle} (organization or personal) from persistence.
+     */
+    public static FreelancerVehicle rehydrate(UUID vehicleId, UUID ownerOrgId, UUID ownerActorId, VehicleType type,
+            String brand, String model, String plateNumber, double maxCapacityKg,
+            Double volumeM3, FuelType fuelType, Double fuelConsumptionLPer100km,
+            String registrationDocRef, String insuranceDocRef, boolean active,
+            LocalDate lastMaintenanceAt, String currentMissionId,
+            Instant createdAt, Instant updatedAt) {
+        return new FreelancerVehicle(vehicleId, ownerOrgId, ownerActorId, type, brand, model, plateNumber,
                 maxCapacityKg, volumeM3, fuelType, fuelConsumptionLPer100km,
                 registrationDocRef, insuranceDocRef, active, lastMaintenanceAt,
                 currentMissionId, createdAt, updatedAt);
@@ -173,7 +222,7 @@ public final class FreelancerVehicle {
             throw new IllegalStateException(
                     "Vehicle " + vehicleId + " is not available. currentMissionId=" + currentMissionId);
         }
-        return new FreelancerVehicle(vehicleId, ownerOrgId, type, brand, model, plateNumber,
+        return new FreelancerVehicle(vehicleId, ownerOrgId, ownerActorId, type, brand, model, plateNumber,
                 maxCapacityKg, volumeM3, fuelType, fuelConsumptionLPer100km,
                 registrationDocRef, insuranceDocRef, active, lastMaintenanceAt,
                 missionId, createdAt, Instant.now());
@@ -190,7 +239,7 @@ public final class FreelancerVehicle {
             throw new IllegalStateException(
                     "Vehicle " + vehicleId + " is not assigned to any mission");
         }
-        return new FreelancerVehicle(vehicleId, ownerOrgId, type, brand, model, plateNumber,
+        return new FreelancerVehicle(vehicleId, ownerOrgId, ownerActorId, type, brand, model, plateNumber,
                 maxCapacityKg, volumeM3, fuelType, fuelConsumptionLPer100km,
                 registrationDocRef, insuranceDocRef, active, lastMaintenanceAt,
                 null, createdAt, Instant.now());
@@ -208,7 +257,7 @@ public final class FreelancerVehicle {
             throw new IllegalStateException(
                     "Cannot deactivate vehicle " + vehicleId + " — currently on mission: " + currentMissionId);
         }
-        return new FreelancerVehicle(vehicleId, ownerOrgId, type, brand, model, plateNumber,
+        return new FreelancerVehicle(vehicleId, ownerOrgId, ownerActorId, type, brand, model, plateNumber,
                 maxCapacityKg, volumeM3, fuelType, fuelConsumptionLPer100km,
                 registrationDocRef, insuranceDocRef, false, lastMaintenanceAt,
                 null, createdAt, Instant.now());
@@ -222,9 +271,21 @@ public final class FreelancerVehicle {
      */
     public FreelancerVehicle recordMaintenance(LocalDate maintenanceDate) {
         Objects.requireNonNull(maintenanceDate, "maintenanceDate is required");
-        return new FreelancerVehicle(vehicleId, ownerOrgId, type, brand, model, plateNumber,
+        return new FreelancerVehicle(vehicleId, ownerOrgId, ownerActorId, type, brand, model, plateNumber,
                 maxCapacityKg, volumeM3, fuelType, fuelConsumptionLPer100km,
                 registrationDocRef, insuranceDocRef, active, maintenanceDate,
+                currentMissionId, createdAt, Instant.now());
+    }
+
+    /**
+     * Updates what the owner declares about the vehicle (lot L3): type, brand, model, plate, maximum capacity
+     * ({@code > 0}, mandatory), volume and fuel data. Owner, activity, mission and documents are kept.
+     */
+    public FreelancerVehicle update(VehicleType type, String brand, String model, String plateNumber,
+            double maxCapacityKg, Double volumeM3, FuelType fuelType, Double fuelConsumptionLPer100km) {
+        return new FreelancerVehicle(vehicleId, ownerOrgId, ownerActorId, type, brand, model, plateNumber,
+                maxCapacityKg, volumeM3, fuelType, fuelConsumptionLPer100km,
+                registrationDocRef, insuranceDocRef, active, lastMaintenanceAt,
                 currentMissionId, createdAt, Instant.now());
     }
 
@@ -232,7 +293,7 @@ public final class FreelancerVehicle {
      * Updates the document references (e.g., after KYC document upload).
      */
     public FreelancerVehicle updateDocs(String registrationDocRef, String insuranceDocRef) {
-        return new FreelancerVehicle(vehicleId, ownerOrgId, type, brand, model, plateNumber,
+        return new FreelancerVehicle(vehicleId, ownerOrgId, ownerActorId, type, brand, model, plateNumber,
                 maxCapacityKg, volumeM3, fuelType, fuelConsumptionLPer100km,
                 registrationDocRef, insuranceDocRef, active, lastMaintenanceAt,
                 currentMissionId, createdAt, Instant.now());
@@ -275,6 +336,7 @@ public final class FreelancerVehicle {
 
     public UUID vehicleId() { return vehicleId; }
     public UUID ownerOrgId() { return ownerOrgId; }
+    public UUID ownerActorId() { return ownerActorId; }
     public VehicleType type() { return type; }
     public String brand() { return brand; }
     public String model() { return model; }

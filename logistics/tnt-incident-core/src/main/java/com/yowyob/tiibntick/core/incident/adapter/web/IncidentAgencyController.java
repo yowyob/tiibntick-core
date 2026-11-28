@@ -32,7 +32,8 @@ public class IncidentAgencyController {
     @PostMapping("/handle")
     public Mono<IncidentResponse> startHandling(@CurrentUser TntUserIdentity identity,
                                                  @PathVariable UUID incidentId,
-                                                 @RequestParam UUID agencyId,
+                                                 // absent: the TiiBnTick support takes an incident without agency
+                                                 @RequestParam(required = false) UUID agencyId,
                                                  @RequestParam UUID initiatedByActorId,
                                                  @RequestParam(required = false) UUID assignedToActorId,
                                                  @RequestParam(required = false) String notes) {

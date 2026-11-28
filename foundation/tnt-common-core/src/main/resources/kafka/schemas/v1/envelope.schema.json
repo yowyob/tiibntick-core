@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:tnt:kafka:v1:envelope",
+  "title": "TiiBnTick aggregate event envelope, schemaVersion 1",
+  "description": "Body of every record of tnt.parcel.events, tnt.delivery.events, tnt.incident.events, tnt.dispute.events and tnt.announcement.events (cible-evenements-colis-livraison.md §3.3). Fields may be added; a breaking change increments schemaVersion.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["eventId", "eventType", "schemaVersion", "occurredAt", "aggregateType", "aggregateId",
+               "aggregateVersion", "tenantId", "trigger", "actor", "previousState", "payload", "details"],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"},
+    "eventType": {"type": "string", "pattern": "^[A-Z][A-Za-z]+$"},
+    "schemaVersion": {"type": "integer", "minimum": 1},
+    "occurredAt": {"type": "string", "format": "date-time"},
+    "aggregateType": {"enum": ["PARCEL", "DELIVERY", "INCIDENT", "DISPUTE", "ANNOUNCEMENT"]},
+    "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"type": "integer", "minimum": 0},
+    "tenantId": {"type": ["string", "null"], "format": "uuid"},
+    "correlationId": {"type": ["string", "null"]},
+    "causationId": {"type": ["string", "null"], "format": "uuid"},
+    "trigger": {"type": "string"},
+    "actor": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {"enum": ["COURIER", "SENDER", "RECIPIENT", "RELAY_OP", "AGENCY", "SUPPORT", "SYSTEM"]},
+        "id": {"type": ["string", "null"], "format": "uuid"}
+      }
+    },
+    "previousState": {"type": ["object", "null"], "properties": {"status": {"type": "string"}}},
+    "payload": {"type": "object"},
+    "details": {"type": "object"}
+  },
+  "$defs": {
+    "maskedAddress": {
+      "description": "Address published without street, landmark, postal code or exact position (decision G.3); coordinates rounded to tnt.kafka.masking.coordinate-decimals decimals (2, decision QO-17).",
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["district", "city", "country", "approxLatitude", "approxLongitude"],
+      "properties": {
+        "district": {"type": ["string", "null"]},
+        "city": {"type": ["string", "null"]},
+        "country": {"type": ["string", "null"]},
+        "approxLatitude": {"type": ["number", "null"], "minimum": -90, "maximum": 90},
+        "approxLongitude": {"type": ["number", "null"], "minimum": -180, "maximum": 180}
+      }
+    }
+  }
+}

@@ -16,8 +16,8 @@ import java.util.Map;
  *
  * <p>The former {@code incidentKafkaTemplate}/{@code incidentKafkaProducerFactory} producer
  * beans were removed with the Chantier C · Audit n°3 · P5 outbox migration:
- * {@code IncidentKafkaEventPublisher} now enqueues events through yow-event-kernel's
- * transactional outbox instead of sending via {@code KafkaTemplate}. Only the consumer side
+ * the incident events go through yow-event-kernel's outbox ({@code IncidentAggregateEventOutboxPublisher},
+ * {@code tnt.incident.events} only since lot L8). Only the consumer side
  * (inbound events from other modules) remains configured here.
  *
  * <p>Part of the tnt-incident-core module - TiiBnTick Logistics Layer.

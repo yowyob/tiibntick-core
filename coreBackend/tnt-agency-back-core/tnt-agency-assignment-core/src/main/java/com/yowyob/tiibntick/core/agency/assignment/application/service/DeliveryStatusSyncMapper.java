@@ -16,10 +16,13 @@ public final class DeliveryStatusSyncMapper {
             return MissionStatus.PENDING;
         }
         return switch (coreStatus.trim().toUpperCase()) {
-            case "CREATED" -> MissionStatus.PENDING;
+            // lot evt-l2: ASSIGNED (courier set, not collected) was CREATED before; same agency status
+            case "CREATED", "ASSIGNED" -> MissionStatus.PENDING;
             case "PICKED_UP" -> MissionStatus.ASSIGNED;
-            case "IN_TRANSIT", "PAUSED_BY_INCIDENT", "TIMED_OUT", "SLA_BREACHED" -> MissionStatus.IN_TRANSIT;
-            case "AT_RELAY_POINT" -> MissionStatus.AT_HUB;
+            case "IN_TRANSIT", "OUT_FOR_DELIVERY", "DELIVERY_ATTEMPT_FAILED", "INCIDENT_REPORTED", "PAUSED_BY_INCIDENT",
+                 "INCIDENT_HANDOVER" -> MissionStatus.IN_TRANSIT;
+            // AT_RELAY_POINT: name before lot evt-l2, still read from records already in the topics
+            case "AT_RELAY_HUB", "AT_RELAY_POINT" -> MissionStatus.AT_HUB;
             case "DELIVERED" -> MissionStatus.DELIVERED;
             case "FAILED" -> MissionStatus.FAILED;
             case "CANCELLED" -> MissionStatus.CANCELLED;

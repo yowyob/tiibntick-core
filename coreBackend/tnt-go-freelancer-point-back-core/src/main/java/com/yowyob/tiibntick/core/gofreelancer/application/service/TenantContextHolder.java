@@ -11,7 +11,7 @@ import java.util.UUID;
 /**
  * Helper that resolves the current tenant UUID from the reactive security context.
  *
- * <p>Replaces every hardcoded {@code UUID.fromString("00000000-0000-0000-0000-000000000001")}
+ * <p>Replaces every hardcoded system-tenant UUID
  * scattered across the module's application services. Falls back to the default system tenant
  * only for Kafka-listener-driven flows (no HTTP context, tenantId read from event payload).
  *
@@ -22,9 +22,12 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class TenantContextHolder {
 
-    /** System tenant — used only for background/Kafka flows without an HTTP security context. */
-    public static final UUID SYSTEM_TENANT =
-            UUID.fromString("00000000-0000-0000-0000-000000000001");
+    /**
+     * System tenant — used only for background/Kafka flows without an HTTP security context.
+     * It is THE TiiBnTick system tenant ({@code TNT_SYSTEM_TENANT_ID}), shared with the roles
+     * module — never a Go-Freelancer-specific value.
+     */
+    public static final UUID SYSTEM_TENANT = com.yowyob.tiibntick.common.tenant.SystemTenant.id();
 
     private final ResolveCurrentUserUseCase resolveCurrentUserUseCase;
 

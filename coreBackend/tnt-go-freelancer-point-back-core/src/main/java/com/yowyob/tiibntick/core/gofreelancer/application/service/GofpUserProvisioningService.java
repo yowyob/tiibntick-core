@@ -45,7 +45,7 @@ public class GofpUserProvisioningService {
         return userRepository.findByCoreUserId(coreUserId)
                 .switchIfEmpty(Mono.defer(() -> {
                     GofpUser user = GofpUser.builder()
-                            .id(UUID.randomUUID())
+                            .id(coreUserId) // one identity: the row id is the actor id (lot L3, C1)
                             .coreUserId(coreUserId)
                             .firstName("")
                             .lastName("")

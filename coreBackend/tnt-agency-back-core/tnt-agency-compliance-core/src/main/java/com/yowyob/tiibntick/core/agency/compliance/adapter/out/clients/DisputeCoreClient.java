@@ -36,7 +36,7 @@ public class DisputeCoreClient implements DisputeCorePort {
                 "CLIENT",
                 request.agencyId().toString(),
                 "AGENCY",
-                request.missionId() != null ? request.missionId().toString() : null,
+                request.deliveryId() != null ? request.deliveryId().toString() : null,
                 null,
                 null,
                 request.description(),
@@ -52,7 +52,7 @@ public class DisputeCoreClient implements DisputeCorePort {
                 .bodyToMono(CoreDisputeOpenedResponse.class)
                 .map(r -> new DisputeView(r.disputeId(), r.reference(), r.status()))
                 .doOnError(e -> log.warn("[DisputeCore] open failed mission={}: {}",
-                        request.missionId(), e.getMessage()));
+                        request.deliveryId(), e.getMessage()));
     }
 
     @Override

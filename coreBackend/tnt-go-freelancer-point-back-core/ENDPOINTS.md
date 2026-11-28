@@ -90,24 +90,9 @@ Retourne le profil de l'utilisateur connecté (JWT requis).
 
 ---
 
-### `POST /api/auth/setup-password`
-Finalise la configuration du mot de passe via un token signé (envoyé par email).
-
-**Corps de la requête**
-```json
-{ "token": "abc123...", "newPassword": "nouveauMotDePasse" }
-```
-
-**Réponse `200 OK`** — corps vide.
-
----
-
-### `POST /api/auth/request-password-reset`
-Demande un email de réinitialisation de mot de passe.
-
-**Query param** : `email=marie@example.com`
-
-**Réponse `202 Accepted`** — corps vide.
+### Mots de passe locaux — routes supprimées (clôture gdd-final, D-054 / D-154)
+`POST /api/auth/setup-password` et `POST /api/auth/request-password-reset` n'existent plus (404) : la définition
+et la réinitialisation du mot de passe passent par le Kernel.
 
 ---
 
@@ -1172,6 +1157,26 @@ Le client doit maintenir la connexion ouverte. Chaque événement est un `Matchi
 ```
 
 Types d'événements possibles : `NEW_ANNOUNCEMENT`, `ASSIGNMENT_CONFIRMED`, `DELIVERY_CANCELLED`…
+
+### Boîte de notifications in-app — `/api/v1/gofp/notifications` (lot C-36, décision D-157)
+
+Boîte de l'utilisateur du jeton (expéditeur, livreur, propriétaire de relais), **tenue par le Kernel** (canal
+`IN_APP`, application `tiibntick-go`) : le Core ne garde aucune copie. Aucun identifiant de destinataire dans les
+chemins.
+
+| Endpoint | Réponse |
+|----------|---------|
+| `GET /api/v1/gofp/notifications/mine?page=0&size=30` | `{items[], unread, page, size}` — non lus d'abord, puis plus récents ; `size` ≤ 100 |
+| `POST /api/v1/gofp/notifications/{id}/read` | la notification, `readAt` renseigné ; 404 si elle n'est pas à l'appelant |
+| `POST /api/v1/gofp/notifications/read-all` | `{updated}` — nombre marqué lu |
+| `DELETE /api/v1/gofp/notifications/{id}` | 204 — **marque lu** (le Kernel n'a pas de suppression, K17) ; 404 si elle n'est pas à l'appelant |
+
+Un élément : `id` (identifiant Kernel), `type` (`CANDIDATE_APPLIED`, `COURSE_OFFERED`, `COURSE_ACCEPTED`,
+`COURIER_SELECTED`, `INVITATION_DECLINED`, `INVITATION_EXPIRED`, `RELAY_PARCEL_INCOMING`, `PARCEL_PICKED_UP`,
+`PARCEL_AT_RELAY`, `RELAY_PARCEL_RECEIVED`, `PARCEL_HANDED_OVER`), `title`, `message` (français), `params` (objet JSON
+des valeurs à rendre dans la langue de l'utilisateur), `linkKind` (`SHIPMENT`, `COURSE`, `RELAY_PARCEL`), `linkId`,
+`createdAt`, `readAt`. Kernel indisponible : 503. Une notification par événement et par destinataire (trace
+d'idempotence partagée `event_bus.processed_events`, groupe `gofp-in-app`).
 
 ---
 

@@ -287,6 +287,36 @@ public class DomainEventEnvelope {
     }
 
     /**
+     * Claims this envelope for a relay attempt by the outbox relay: transitions any retryable
+     * status (PENDING left behind by a crash, FAILED, or a RETRYING claim whose owner died) to
+     * {@link EnvelopeStatus#RETRYING}. The version bump makes the persisted claim an optimistic
+     * lock: two relay instances can never both win it.
+     *
+     * @throws IllegalStateException if the envelope is PUBLISHED or DEAD
+     */
+    public void claimForRelay() {
+        if (!isRetryable()) {
+            throw new IllegalStateException("Cannot claim envelope for relay from status " + status);
+        }
+        this.status = EnvelopeStatus.RETRYING;
+        this.version++;
+    }
+
+    /**
+     * Returns a copy of this envelope, in the same persisted state, that applies
+     * {@code policy} to its next failures (the relay's configured max attempts / backoff, which
+     * are not persisted with the envelope).
+     *
+     * @param policy the retry policy to apply
+     * @return a restored copy carrying {@code policy}
+     */
+    public DomainEventEnvelope withRetryPolicy(final RetryPolicy policy) {
+        return restore(id, correlationId, causationId, eventType, aggregateId, aggregateType, tenantId,
+            solutionCode, payload, schemaVersion, kafkaTopic, kafkaPartitionKey, status, retryCount,
+            lastError, occurredAt, publishedAt, version, policy);
+    }
+
+    /**
      * Forces this envelope into the DLQ, bypassing remaining retry attempts.
      * Typically called by an administrator via the management API.
      *
@@ -335,6 +365,19 @@ public class DomainEventEnvelope {
     // ── Getters ──────────────────────────────────────────────────────────────
 
     public EnvelopeId getId()               { return id; }
+
+    /**
+     * Identifier of the event carried by this envelope, published in the {@code X-Yow-Event-Id} header
+     * (lot L0 of the aggregate-events workstream, {@code cible-evenements-colis-livraison.md} §3.2).
+     *
+     * <p>It <b>is</b> the envelope id: an aggregate event sets it with {@link Builder#eventId(String)} to the
+     * {@code eventId} of its JSON body, so that body, {@code X-Yow-Event-Id} and {@code X-Yow-Envelope-Id}
+     * agree. Being the persisted envelope id, it survives a relay re-publication and a replay without any
+     * extra column.
+     *
+     * @return the event id (never {@code null})
+     */
+    public String getEventId()              { return id.value(); }
     public String getCorrelationId()        { return correlationId; }
     public String getCausationId()          { return causationId; }
     public String getEventType()            { return eventType; }
@@ -382,6 +425,11 @@ public class DomainEventEnvelope {
         private Builder() {}
 
         public Builder id(final EnvelopeId id)                      { this.id = id; return this; }
+        /**
+         * Sets the event id published in {@code X-Yow-Event-Id}, which is also the envelope id
+         * (see {@link DomainEventEnvelope#getEventId()}). Optional: by default a random id is used.
+         */
+        public Builder eventId(final String eventId)                { this.id = EnvelopeId.of(eventId); return this; }
         public Builder correlationId(final String correlationId)     { this.correlationId = correlationId; return this; }
         public Builder causationId(final String causationId)         { this.causationId = causationId; return this; }
         public Builder eventType(final String eventType)             { this.eventType = eventType; return this; }

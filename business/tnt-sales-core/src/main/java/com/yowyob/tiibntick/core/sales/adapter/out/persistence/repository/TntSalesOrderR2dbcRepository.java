@@ -34,4 +34,7 @@ public interface TntSalesOrderR2dbcRepository extends ReactiveCrudRepository<Tnt
 
     @Query("SELECT * FROM sales.orders WHERE tenant_id = :tenantId AND status = :status ORDER BY priority DESC, created_at ASC")
     Flux<TntSalesOrderEntity> findByTenantIdAndStatus(UUID tenantId, String status);
+
+    @Query("SELECT * FROM sales.orders WHERE tenant_id = :tenantId AND mission_id = :missionId")
+    Flux<TntSalesOrderEntity> findByTenantIdAndMissionId(UUID tenantId, UUID missionId);
 }

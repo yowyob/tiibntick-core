@@ -66,4 +66,22 @@ public class FreelancerVehicleRepositoryAdapter implements FreelancerVehicleRepo
     public Mono<Void> deleteById(UUID vehicleId) {
         return r2dbcRepository.deleteById(vehicleId);
     }
+
+    @Override
+    public Flux<FreelancerVehicle> findByOwnerActorId(UUID ownerActorId) {
+        return r2dbcRepository.findByOwnerActorId(ownerActorId).map(FreelancerVehicleEntity::toDomain);
+    }
+
+    @Override
+    public Mono<Long> countByOwnerActorId(UUID ownerActorId) {
+        return r2dbcRepository.countByOwnerActorId(ownerActorId);
+    }
+
+    @Override
+    public Mono<Boolean> existsByPlateNumberOnAnotherVehicle(String plateNumber, UUID excludedVehicleId) {
+        // the domain stores plates upper-cased and trimmed
+        String plate = plateNumber == null ? "" : plateNumber.toUpperCase().trim();
+        return r2dbcRepository.existsByPlateNumberAndIdNot(plate,
+                excludedVehicleId != null ? excludedVehicleId : new UUID(0L, 0L));
+    }
 }

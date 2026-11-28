@@ -6,7 +6,7 @@ import com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepos
 import com.yowyob.tiibntick.core.gofreelancer.application.service.DeliveryProofService;
 import com.yowyob.tiibntick.core.gofreelancer.application.service.DeliveryStatusApplicationService;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryStatus;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryStatus;
 import com.yowyob.tiibntick.core.sync.application.port.out.IEntityVersionRepository;
 import com.yowyob.tiibntick.core.sync.application.port.out.IOfflineOperationRepository;
 import com.yowyob.tiibntick.core.sync.application.port.out.ISyncEventPublisher;
@@ -63,7 +63,7 @@ class GofpOfflineQueueReplayTest {
     void setUp() {
         row = new Delivery();
         row.setId(deliveryId);
-        row.setStatus(DeliveryStatus.CREATED);
+        com.yowyob.tiibntick.core.gofreelancer.TestDeliveries.status(row, DeliveryStatus.CREATED);
 
         DeliveryRepository deliveries = mock(DeliveryRepository.class);
         when(deliveries.findById(deliveryId)).thenAnswer(i -> Mono.just(row));
@@ -81,7 +81,7 @@ class GofpOfflineQueueReplayTest {
             if (dto.getStatus() == DeliveryStatus.PICKED_UP && !"123456".equals(dto.getConfirmationCode())) {
                 return Mono.error(new IllegalArgumentException("Invalid pickup code"));
             }
-            row.setStatus(dto.getStatus());
+            com.yowyob.tiibntick.core.gofreelancer.TestDeliveries.status(row, dto.getStatus());
             appliedTransitions.add(dto.getStatus());
             return Mono.just(row);
         });

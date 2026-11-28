@@ -31,7 +31,7 @@ import java.util.UUID;
 public class IncidentAutoEscalationScheduler {
     private final IIncidentRepository incidentRepository;
     private final IEscalateIncidentUseCase escalateUseCase;
-    private static final UUID SYSTEM_ACTOR = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private static final UUID SYSTEM_ACTOR = com.yowyob.tiibntick.common.tenant.SystemTenant.systemActorId();
 
     /**
      * Scheduled every 10 minutes. Finds incidents that have been stuck in
@@ -48,7 +48,7 @@ public class IncidentAutoEscalationScheduler {
                 List.of(IncidentStatus.AUTO_RESOLUTION_FAILED,
                         IncidentStatus.PENDING_AGENCY_ASSIGNMENT),
                 null
-        ).filter(inc -> inc.getDetectedAt() != null && inc.getDetectedAt().isBefore(threshold)
+        ).filter(inc -> inc.getReportedAt() != null && inc.getReportedAt().isBefore(threshold)
                 && inc.getSeverity().isAtLeast(IncidentSeverity.MEDIUM))
         .flatMap(incident -> escalateUseCase.execute(EscalateIncidentCommand.builder()
                 .incidentId(incident.getId())

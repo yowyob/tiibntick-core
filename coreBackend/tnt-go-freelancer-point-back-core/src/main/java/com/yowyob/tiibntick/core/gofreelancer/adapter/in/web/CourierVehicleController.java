@@ -22,7 +22,9 @@ import reactor.core.publisher.Mono;
  *
  * <ul>
  *   <li>{@code GET  /api/v1/gofp/freelancer-profiles/me/vehicle}</li>
- *   <li>{@code PUT  /api/v1/gofp/freelancer-profiles/me/vehicle} — {@code {vehicleType, plateNumber}}</li>
+ *   <li>{@code PUT  /api/v1/gofp/freelancer-profiles/me/vehicle} — {@code {vehicleType, plateNumber,
+ *       maxCapacityKg}} ({@code maxCapacityKg > 0} mandatory since lot L3, 400 otherwise; 409 when the plate is
+ *       registered on another vehicle)</li>
  *   <li>{@code POST /api/v1/gofp/freelancer-profiles/me/vehicle/photos?reset=} — multipart {@code file},
  *       JPEG/PNG, one photo per call, four at most</li>
  * </ul>
@@ -34,8 +36,11 @@ public class CourierVehicleController {
 
     private final CourierVehicleService vehicles;
 
-    /** Body of {@code PUT /me/vehicle}: the type in either vocabulary (moto… or MOTORBIKE…). */
-    public record VehicleBody(String vehicleType, String plateNumber) { }
+    /**
+     * Body of {@code PUT /me/vehicle}: the type in either vocabulary (moto… or MOTORBIKE…), the plate and the
+     * maximum capacity in kg (mandatory).
+     */
+    public record VehicleBody(String vehicleType, String plateNumber, Double maxCapacityKg) { }
 
     @GetMapping
     public Mono<VehicleView> myVehicle(@CurrentUser(required = false) TntSecurityContext ctx) {
@@ -46,7 +51,7 @@ public class CourierVehicleController {
     public Mono<VehicleView> saveMyVehicle(@RequestBody VehicleBody body,
                                            @CurrentUser(required = false) TntSecurityContext ctx) {
         return vehicles.saveMyVehicle(ctx, body == null ? null : body.vehicleType(),
-                body == null ? null : body.plateNumber());
+                body == null ? null : body.plateNumber(), body == null ? null : body.maxCapacityKg());
     }
 
     @PostMapping(value = "/photos", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

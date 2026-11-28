@@ -120,13 +120,13 @@ public class PresenceDomainService {
      *
      * @param userId     the actor's user identifier
      * @param tenantId   the tenant context
-     * @param missionId  the mission to assign
+     * @param deliveryId the delivery to assign
      * @return Mono completing after persistence and broadcast
      */
-    public Mono<Void> assignMission(String userId, String tenantId, String missionId) {
+    public Mono<Void> assignDelivery(String userId, String tenantId, String deliveryId) {
         return presenceRepository.findByUserAndTenant(userId, tenantId)
                 .flatMap(record -> {
-                    record.assignMission(missionId);
+                    record.assignMission(deliveryId);
                     return presenceRepository.save(record)
                             .then(broadcastPresenceChange(record));
                 })
@@ -141,7 +141,7 @@ public class PresenceDomainService {
      * @param tenantId the tenant context
      * @return Mono completing after persistence and broadcast
      */
-    public Mono<Void> clearMission(String userId, String tenantId) {
+    public Mono<Void> clearDelivery(String userId, String tenantId) {
         return presenceRepository.findByUserAndTenant(userId, tenantId)
                 .flatMap(record -> {
                     record.clearMission();

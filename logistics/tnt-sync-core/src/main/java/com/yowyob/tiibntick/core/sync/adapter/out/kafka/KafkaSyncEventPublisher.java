@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yowyob.kernel.event.application.port.in.PublishEventUseCase;
 import com.yowyob.kernel.event.domain.model.DomainEventEnvelope;
 import com.yowyob.tiibntick.core.sync.application.port.out.ISyncEventPublisher;
-import com.yowyob.tiibntick.core.sync.domain.event.EntityVersionChangedEvent;
 import com.yowyob.tiibntick.core.sync.domain.event.SyncCompletedEvent;
 import com.yowyob.tiibntick.core.sync.domain.event.SyncConflictDetectedEvent;
 import com.yowyob.tiibntick.core.sync.domain.event.SyncDomainEvent;
@@ -60,10 +59,6 @@ public class KafkaSyncEventPublisher implements ISyncEventPublisher {
         String aggregateId;
         String aggregateType;
         switch (event) {
-            case EntityVersionChangedEvent e -> {
-                aggregateId = e.getAggregateId();
-                aggregateType = e.getAggregateType();
-            }
             case SyncConflictDetectedEvent e -> {
                 aggregateId = e.getAggregateId();
                 aggregateType = e.getAggregateType();

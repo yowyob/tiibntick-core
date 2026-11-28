@@ -19,7 +19,7 @@ import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.Announcem
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.PublishAnnouncementPortCommand;
 import com.yowyob.tiibntick.core.gofreelancer.application.usecase.MatchingUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.DeliveryNeed;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.announcement.AnnouncementStatus;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.AnnouncementStatus;
 import com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext;
 import org.junit.jupiter.api.DisplayName;
 import org.springframework.core.MethodParameter;
@@ -28,9 +28,7 @@ import org.springframework.web.reactive.result.method.HandlerMethodArgumentResol
 import org.springframework.web.server.ServerWebExchange;
 import org.junit.jupiter.api.Test;
 import org.mockito.stubbing.Answer;
-import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.r2dbc.core.FetchSpec;
-import org.springframework.r2dbc.core.RowsFetchSpec;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -89,7 +87,7 @@ class GoNeedVisibilityProbeTest {
                 needs, mock(AdminRelayPointUseCase.class, REACTIVE_EMPTY), mock(PushNotificationPort.class, REACTIVE_EMPTY),
                 mock(MatchingUseCase.class, REACTIVE_EMPTY), addresses, users,
                 mock(GofpFreelancerRepository.class, REACTIVE_EMPTY), mock(FreelancerPriceQuoteUseCase.class, REACTIVE_EMPTY),
-                mock(FreelancerEligibilityUseCase.class, REACTIVE_EMPTY), legacyUserExists());
+                mock(FreelancerEligibilityUseCase.class, REACTIVE_EMPTY));
 
         IDeliveryAnnouncementPort port = mock(IDeliveryAnnouncementPort.class, REACTIVE_EMPTY);
         when(port.publish(any())).thenAnswer(inv -> {
@@ -104,7 +102,6 @@ class GoNeedVisibilityProbeTest {
         TenantContextHolder tenant = mock(TenantContextHolder.class, REACTIVE_EMPTY);
         when(tenant.currentTenantId()).thenReturn(Mono.just(tenantId));
         IAnnouncementRepository mirror = mock(IAnnouncementRepository.class, REACTIVE_EMPTY);
-        when(mirror.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
 
         wirePublicationIfPresent(service, port, tenant, mirror, needs);
 
@@ -160,21 +157,6 @@ class GoNeedVisibilityProbeTest {
         Method setter = DeliveryNeedApplicationService.class.getDeclaredMethod("setNeedAnnouncements", linkType);
         setter.setAccessible(true);
         setter.invoke(service, link);
-    }
-
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private static DatabaseClient legacyUserExists() {
-        DatabaseClient db = mock(DatabaseClient.class);
-        DatabaseClient.GenericExecuteSpec spec = mock(DatabaseClient.GenericExecuteSpec.class);
-        RowsFetchSpec rows = mock(RowsFetchSpec.class);
-        FetchSpec fetch = mock(FetchSpec.class);
-        when(db.sql(anyString())).thenReturn(spec);
-        when(spec.bind(anyString(), any())).thenReturn(spec);
-        when(spec.map(any(java.util.function.BiFunction.class))).thenReturn(rows);
-        when(rows.first()).thenReturn(Mono.just(1));
-        when(spec.fetch()).thenReturn(fetch);
-        when(fetch.rowsUpdated()).thenReturn(Mono.just(1L));
-        return db;
     }
 
     private static DeliveryNeedRequestDTO request() {

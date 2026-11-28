@@ -13,9 +13,7 @@ import com.yowyob.tiibntick.core.billing.pricing.domain.port.in.IBillingPolicyUs
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.FreelancerPricingDTO;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.FreelancerPriceQuoteUseCase.Quote;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.FreelancerPriceQuoteUseCase.QuoteInput;
-import com.yowyob.tiibntick.core.gofreelancer.application.port.out.FreelancerPricingRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpFreelancerRepository;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.FreelancerPricingPolicy;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpFreelancer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -50,8 +48,6 @@ class FreelancerBillingPricingTest {
     private static final UUID USER = UUID.randomUUID();
 
     private final Map<UUID, BillingPolicy> store = new ConcurrentHashMap<>();
-    private final Map<UUID, FreelancerPricingPolicy> legacyStore = new ConcurrentHashMap<>();
-    private FreelancerPricingRepository legacyRepo;
     private GofpFreelancerRepository freelancers;
     private IBillingPolicyUseCase billing;
     private FreelancerPricingPolicyApplicationService policyService;
@@ -82,15 +78,6 @@ class FreelancerBillingPricingTest {
             return Mono.just(p);
         });
 
-        legacyRepo = mock(FreelancerPricingRepository.class);
-        when(legacyRepo.findByDeliveryPersonId(any())).thenAnswer(inv ->
-                Mono.justOrEmpty(legacyStore.get((UUID) inv.getArgument(0))));
-        when(legacyRepo.save(any())).thenAnswer(inv -> {
-            FreelancerPricingPolicy row = inv.getArgument(0);
-            legacyStore.put(row.getDeliveryPersonId(), row);
-            return Mono.just(row);
-        });
-
         freelancers = mock(GofpFreelancerRepository.class);
         GofpFreelancer f = new GofpFreelancer();
         f.setCoreFreelancerId(DELIVERY_PERSON);
@@ -100,10 +87,10 @@ class FreelancerBillingPricingTest {
                 id -> id != null && !id.equals(DELIVERY_PERSON)))).thenReturn(Mono.empty());
         when(freelancers.findById(any(UUID.class))).thenReturn(Mono.empty());
 
-        policyService = new FreelancerPricingPolicyApplicationService(legacyRepo, billing, new FreelancerOwnershipGuard(freelancers));
+        policyService = new FreelancerPricingPolicyApplicationService(billing, new FreelancerOwnershipGuard(freelancers));
         PricingEngineService engine = new PricingEngineService(null,
                 new DslCompilerService(new DslLexer(), new DslParser()), new DslEvaluator());
-        quoteService = new FreelancerPriceQuoteService(billing, engine, legacyRepo);
+        quoteService = new FreelancerPriceQuoteService(billing, engine);
     }
 
     private static FreelancerPricingDTO grid() {
@@ -136,7 +123,6 @@ class FreelancerBillingPricingTest {
             assertThat(p.getTemplateCode()).isEqualTo(FreelancerGridPolicyMapper.GRID_TEMPLATE_CODE);
             assertThat(p.getSurchargeRules()).hasSize(2);
         });
-        assertThat(legacyStore.get(DELIVERY_PERSON).getBaseFee()).isEqualTo(500.0);
     }
 
     @Test
@@ -187,15 +173,16 @@ class FreelancerBillingPricingTest {
 
         Quote q = quote(new QuoteInput(0, 1, 0, true, true, null, null, null, null, null));
 
-        // 500 + 1×50 + 500 fragile + 300 perishable
-        assertThat(q.totalPrice()).isEqualTo(1350.0);
+        // 500 + 1×50 = 550 → 1000 minimum (inherited from the moto platform grid, D-058) + 500 fragile + 300 perishable
+        assertThat(q.totalPrice()).isEqualTo(1800.0);
         assertThat(q.breakdown()).contains("Supplément fragile").contains("Supplément périssable");
     }
 
     @org.junit.jupiter.params.ParameterizedTest(name = "fragile={0} perishable={1} → {2} XAF")
-    @org.junit.jupiter.params.provider.CsvSource({"false,false,550", "true,false,1050", "false,true,1050", "true,true,1550"})
+    @org.junit.jupiter.params.provider.CsvSource({"false,false,1000", "true,false,1500", "false,true,1500", "true,true,2000"})
     @DisplayName("C-56b — moto platform grid, 0 km, 1 kg: the 4 fragile × perishable combinations")
     void motoPlatformGridFourCombinations(boolean fragile, boolean perishable, double expected) {
+        // Moto grid of D-058: 600 + 1×75 = 675 → 1000 minimum, then +500 fragile and/or +500 perishable.
         // Liquid and insured have no input in QuoteInput: they cannot change the price (product rule, C-46).
         Quote q = quoteService.platformQuote("moto",
                 new QuoteInput(0, 1, 0, fragile, perishable, null, null, null, null, null)).block();
@@ -203,14 +190,14 @@ class FreelancerBillingPricingTest {
     }
 
     @Test
-    @DisplayName("C-56 — platform grid of each vehicle: fragile +500 AND perishable +500")
+    @DisplayName("C-56 — platform grid of each vehicle: fragile AND perishable surcharges both billed")
     void platformGridBillsBothSurcharges() {
         Quote moto = quoteService.platformQuote("moto", new QuoteInput(0, 1, 0, true, true, null, null, null, null, null)).block();
         Quote taxi = quoteService.platformQuote("taxi", new QuoteInput(0, 1, 0, true, true, null, null, null, null, null)).block();
 
-        // moto : 500 + 1×50 + 500 + 500 ; taxi : 1000 + 1×30 + 500 + 500
-        assertThat(moto.totalPrice()).isEqualTo(1550.0);
-        assertThat(taxi.totalPrice()).isEqualTo(2030.0);
+        // D-058 grids: moto 600 + 1×75 → 1000 minimum + 500 + 500; taxi 1000 + 1×25 → 2000 minimum + 750 + 750
+        assertThat(moto.totalPrice()).isEqualTo(2000.0);
+        assertThat(taxi.totalPrice()).isEqualTo(3500.0);
         assertThat(moto.breakdown()).contains("Supplément périssable");
     }
 
@@ -241,35 +228,12 @@ class FreelancerBillingPricingTest {
     }
 
     @Test
-    @DisplayName("a grid saved before the billing migration is still priced (legacy fallback)")
-    void legacyGridStillPriced() {
-        FreelancerPricingPolicy row = FreelancerPricingPolicy.builder().deliveryPersonId(DELIVERY_PERSON)
-                .baseFee(1000.0).pricePerKm(10.0).pricePerKg(0.0).pricePerCbm(0.0)
-                .fragileSurcharge(0.0).perishableSurcharge(0.0).currency("FCFA").build();
-        legacyStore.put(DELIVERY_PERSON, row);
-
-        Quote q = quote(QuoteInput.of(20, 1, 0, false, false));
-
-        assertThat(q.totalPrice()).isEqualTo(1200.0);
-        assertThat(q.source()).isEqualTo("LEGACY_GRID");
-        assertThat(policyService.getPolicy(DELIVERY_PERSON).block().getSource()).isEqualTo("LEGACY");
-
-        // the next update migrates it: a billing policy now exists and keeps the legacy values
-        FreelancerPricingDTO migrated = policyService.upsertPolicy(DELIVERY_PERSON,
-                FreelancerPricingDTO.builder().pricePerKm(15.0).build(), TENANT).block();
-        assertThat(migrated.getBaseFee()).isEqualTo(1000.0);
-        assertThat(migrated.getSource()).isEqualTo("POLICY");
-        assertThat(store).hasSize(1);
-        assertThat(quote(QuoteInput.of(20, 1, 0, false, false)).source()).isEqualTo("POLICY");
-    }
-
-    @Test
     @DisplayName("without any grid, the platform default barème is priced by the same engine")
     void platformDefaultWhenNothingPublished() {
         Quote q = quote(QuoteInput.of(10, 2, 0, true, false));
 
-        // 500 + 10×100 + 2×50 + 500 fragile
-        assertThat(q.totalPrice()).isEqualTo(2100.0);
+        // moto grid (D-058): 600 + 10×100 + 2×75 + 500 fragile
+        assertThat(q.totalPrice()).isEqualTo(2250.0);
         assertThat(q.source()).isEqualTo("PLATFORM_DEFAULT");
         assertThat(q.policyId()).isNull();
     }
@@ -290,7 +254,7 @@ class FreelancerBillingPricingTest {
         Quote q = quote(QuoteInput.of(5, 1, 0, false, false));
 
         assertThat(q.source()).isEqualTo("PLATFORM_DEFAULT");
-        assertThat(q.totalPrice()).isEqualTo(500 + 500 + 50);
+        assertThat(q.totalPrice()).isEqualTo(600 + 500 + 75);
     }
 
     @Test
@@ -301,6 +265,56 @@ class FreelancerBillingPricingTest {
         store.put(p.getId(), p.deactivate());
 
         assertThat(quote(QuoteInput.of(1, 1, 0, false, false)).source()).isEqualTo("PLATFORM_DEFAULT");
+    }
+
+    // ── D-058: platform grid as the starting proposal, minimum price ────────
+
+    @Test
+    @DisplayName("first PUT starts from the platform grid of the courier's vehicle: unsent fields keep the proposal")
+    void firstGridStartsFromThePlatformGridOfTheVehicle() {
+        var vehicles = mock(com.yowyob.tiibntick.core.gofreelancer.adapter.out.persistence.repository.FreelancerVehicleRepository.class);
+        var van = new com.yowyob.tiibntick.core.gofreelancer.domain.model.FreelancerVehicle();
+        van.setVehicleType("VAN");
+        when(vehicles.findByFreelancerId(DELIVERY_PERSON)).thenReturn(Mono.just(van));
+        policyService.setVehicleRepository(vehicles);
+
+        FreelancerPricingDTO after = policyService.upsertPolicy(DELIVERY_PERSON,
+                FreelancerPricingDTO.builder().pricePerKm(250.0).currency(null).build(), TENANT).block();
+
+        assertThat(after.getPricePerKm()).isEqualTo(250.0);
+        assertThat(after.getBaseFee()).isEqualTo(2500.0);
+        assertThat(after.getPricePerKg()).isEqualTo(10.0);
+        assertThat(after.getMinimumFee()).isEqualTo(5000.0);
+        assertThat(after.getWaitingFeePerMinute()).isEqualTo(75.0);
+        assertThat(after.getFragileSurcharge()).isEqualTo(1000.0);
+    }
+
+    @Test
+    @DisplayName("without a known vehicle the first PUT starts from the moto platform grid")
+    void firstGridWithoutVehicleStartsFromMoto() {
+        FreelancerPricingDTO after = policyService.upsertPolicy(DELIVERY_PERSON,
+                FreelancerPricingDTO.builder().pricePerKm(120.0).currency(null).build(), TENANT).block();
+
+        assertThat(after.getBaseFee()).isEqualTo(600.0);
+        assertThat(after.getPricePerKg()).isEqualTo(75.0);
+        assertThat(after.getMinimumFee()).isEqualTo(1000.0);
+    }
+
+    @Test
+    @DisplayName("the minimum price raises a short delivery; a courier may drop it with minimumFee = 0")
+    void minimumPriceRaisesShortDeliveries() {
+        // moto platform grid: 600 + 1 × 100 + 0 kg = 700 → raised to the 1000 minimum
+        assertThat(quote(QuoteInput.of(1, 0, 0, false, false)).totalPrice()).isEqualTo(1000.0);
+
+        FreelancerPricingDTO own = grid();
+        own.setMinimumFee(800.0);
+        policyService.upsertPolicy(DELIVERY_PERSON, own, TENANT).block();
+        // own grid: 500 + 1 × 100 = 600 → raised to the courier's own 800 minimum
+        assertThat(quote(QuoteInput.of(1, 0, 0, false, false)).totalPrice()).isEqualTo(800.0);
+
+        policyService.upsertPolicy(DELIVERY_PERSON,
+                FreelancerPricingDTO.builder().minimumFee(0.0).currency(null).build(), TENANT).block();
+        assertThat(quote(QuoteInput.of(1, 0, 0, false, false)).totalPrice()).isEqualTo(600.0);
     }
 
     // ── ownership guard on the facade ────────────────────────────────────────
@@ -323,13 +337,15 @@ class FreelancerBillingPricingTest {
     }
 
     @Test
-    @DisplayName("without a tenant the grid stays in the legacy table and no billing policy is invented")
-    void noTenantKeepsLegacyOnly() {
+    @DisplayName("without a tenant the grid policy is created in the system tenant (the legacy table is not written)")
+    void noTenantUsesSystemTenant() {
         FreelancerPricingDTO dto = policyService.upsertPolicy(DELIVERY_PERSON, grid(), null).block();
 
-        assertThat(dto.getSource()).isEqualTo("LEGACY");
-        assertThat(store).isEmpty();
-        assertThat(legacyStore.get(DELIVERY_PERSON).getBaseFee()).isEqualTo(500.0);
+        assertThat(dto.getSource()).isEqualTo("POLICY");
+        assertThat(store.values()).singleElement().satisfies(p -> {
+            assertThat(p.getTenantId()).isEqualTo(TenantContextHolder.SYSTEM_TENANT);
+            assertThat(p.getStatus()).isEqualTo(PolicyStatus.ACTIVE);
+        });
     }
 
     @Test

@@ -1,0 +1,27 @@
+databaseChangeLog:
+  # Lot L3 of the Go-Freelancer de-duplication (tnt-resource-core). Additive and idempotent.
+  - changeSet:
+      id: gdd-l3-330-personal-vehicle-owner
+      author: gdd-l3
+      labels: gdd-l3
+      comment: "Personal vehicle of an independent courier: owning organization optional, owning actor added (one of the two required); max_capacity_kg stays NOT NULL. Vehicle types are VARCHAR(50): SCOOTER and BUS need no DDL."
+      changes:
+        - sql:
+            splitStatements: false
+            sql: >
+              ALTER TABLE tnt_freelancer_vehicles ALTER COLUMN freelancer_org_id DROP NOT NULL;
+              ALTER TABLE tnt_freelancer_vehicles ADD COLUMN IF NOT EXISTS owner_actor_id UUID;
+              CREATE INDEX IF NOT EXISTS idx_tnt_fl_vehicles_owner_actor ON tnt_freelancer_vehicles (owner_actor_id);
+              DO $$
+              BEGIN
+                  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_tnt_fl_vehicles_owner') THEN
+                      ALTER TABLE tnt_freelancer_vehicles ADD CONSTRAINT ck_tnt_fl_vehicles_owner
+                          CHECK (freelancer_org_id IS NOT NULL OR owner_actor_id IS NOT NULL);
+                  END IF;
+              END $$;
+      rollback:
+        - sql:
+            sql: >
+              ALTER TABLE tnt_freelancer_vehicles DROP CONSTRAINT IF EXISTS ck_tnt_fl_vehicles_owner;
+              DROP INDEX IF EXISTS idx_tnt_fl_vehicles_owner_actor;
+              ALTER TABLE tnt_freelancer_vehicles DROP COLUMN IF EXISTS owner_actor_id;

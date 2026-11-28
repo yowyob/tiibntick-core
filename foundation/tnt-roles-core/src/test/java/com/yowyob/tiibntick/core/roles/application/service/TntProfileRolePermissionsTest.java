@@ -70,6 +70,47 @@ class TntProfileRolePermissionsTest {
         StepVerifier.create(check("CLIENT", resource, action)).expectNext(false).verifyComplete();
     }
 
+    // ── Ratings and loyalty (tnt-tp-core), called in-process by the Go-Freelancer evaluation/client services ──
+
+    @ParameterizedTest(name = "FREELANCER may {0}:{1} (ratings)")
+    @CsvSource({"rating,create", "rating,read"})
+    @DisplayName("a FREELANCER JWT alone may rate a mission and read ratings, without actor:write")
+    void freelancerCanRate(String resource, String action) {
+        StepVerifier.create(check("FREELANCER", resource, action)).expectNext(true).verifyComplete();
+        verifyNoInteractions(kernelResolver);
+    }
+
+    @ParameterizedTest(name = "CLIENT may {0}:{1} (ratings and loyalty)")
+    @CsvSource({"rating,create", "rating,read", "loyalty,read"})
+    @DisplayName("a CLIENT JWT alone may rate a mission, read ratings and read its own loyalty tier")
+    void clientCanRateAndReadLoyalty(String resource, String action) {
+        StepVerifier.create(check("CLIENT", resource, action)).expectNext(true).verifyComplete();
+        verifyNoInteractions(kernelResolver);
+    }
+
+    /** The generic grants stay minimal: no write on the loyalty account, no actor:write by the back door. */
+    @ParameterizedTest(name = "CLIENT may NOT {0}:{1} (ratings and loyalty)")
+    @CsvSource({"actor,write", "billing,write", "loyalty,write"})
+    void clientDoesNotGetTheBroaderGrants(String resource, String action) {
+        StepVerifier.create(check("CLIENT", resource, action)).expectNext(false).verifyComplete();
+    }
+
+    @ParameterizedTest(name = "FREELANCER may NOT {0}:{1} (ratings and loyalty)")
+    @CsvSource({"actor,write", "billing,write", "loyalty,read"})
+    void freelancerDoesNotGetTheBroaderGrants(String resource, String action) {
+        StepVerifier.create(check("FREELANCER", resource, action)).expectNext(false).verifyComplete();
+    }
+
+    /** Roles that could rate through actor:write or read a loyalty account through billing:read keep doing so. */
+    @ParameterizedTest(name = "{0} keeps {1}:{2}")
+    @CsvSource({
+            "ORG_ADMIN,rating,create", "ORG_ADMIN,loyalty,read", "AGENCY_MANAGER,rating,create",
+            "SUPPORT_AGENT,loyalty,read", "MEDIATOR,loyalty,read", "SUPPORT_AGENT,rating,read",
+    })
+    void formerHoldersKeepTheirAccess(String role, String resource, String action) {
+        StepVerifier.create(check(role, resource, action)).expectNext(true).verifyComplete();
+    }
+
     // ── Logistics layer: what the delivery / dispute / incident / media / geo screens actually call ──
 
     @ParameterizedTest(name = "FREELANCER may {0}:{1} (logistics)")

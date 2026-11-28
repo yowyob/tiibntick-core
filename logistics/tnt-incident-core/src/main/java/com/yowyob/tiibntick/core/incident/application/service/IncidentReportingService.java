@@ -6,10 +6,13 @@ import com.yowyob.tiibntick.core.incident.application.command.ReportIncidentComm
 import com.yowyob.tiibntick.core.incident.domain.enums.ActorRole;
 import com.yowyob.tiibntick.core.incident.domain.enums.IncidentStatus;
 import com.yowyob.tiibntick.core.incident.domain.enums.IncidentType;
-import com.yowyob.tiibntick.core.incident.domain.event.IncidentDomainEvents.*;
 import com.yowyob.tiibntick.core.incident.domain.model.Incident;
 import com.yowyob.tiibntick.core.incident.domain.model.IncidentEventLog;
+import com.yowyob.tiibntick.core.incident.domain.valueobject.IncidentGeoSnapshot;
+import com.yowyob.tiibntick.core.incident.domain.service.IncidentBlockingPolicy;
 import com.yowyob.tiibntick.core.incident.domain.service.IncidentTriageService;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import com.yowyob.tiibntick.core.incident.port.inbound.IReportDriverWithdrawalUseCase;
 import com.yowyob.tiibntick.core.incident.port.inbound.IReportIncidentUseCase;
 import com.yowyob.tiibntick.core.incident.port.outbound.*;
@@ -38,97 +41,94 @@ public class IncidentReportingService implements IReportIncidentUseCase, IReport
 
     private final IIncidentRepository incidentRepository;
     private final IIncidentEventLogRepository eventLogRepository;
-    private final IIncidentEventPublisher eventPublisher;
     private final INotificationPort notificationPort;
-    private final IMissionStatusPort missionStatusPort;
+    private final IDeliveryStatusPort deliveryStatusPort;
     private final IBlockchainAuditPort blockchainAuditPort;
     private final IncidentTriageService triageService;
+    private final IncidentBlockingPolicy blockingPolicy;
+    private final IncidentAutoResolutionService autoResolution;
 
-    /**
-     * Reports and acknowledges a new incident, pauses the mission and publishes the creation event.
-     *
-     * @param command the incident report command
-     * @return the acknowledged incident
-     */
-    /**
-     * Records a driver withdrawal as an incident, pauses the mission and notifies the agency.
-     *
-     * @param command the driver withdrawal command
-     * @return the created incident
-     */
     @Override
     @Transactional
     @RequirePermission(resource = "incident", action = "create")
     public Mono<Incident> execute(ReportIncidentCommand command) {
         IncidentType type = command.getType();
-        var category = triageService.deriveCategory(type);
-
         Incident incident = Incident.createWithFreelancerOrg(
                 command.getTenantId(), command.getAgencyId(), command.getPlatform(),
-                command.getMissionId(), category, type,
+                command.getMissionId(), triageService.deriveCategory(type), type,
                 command.getDescription(), command.getReportedByActorId(),
                 command.getReportedByRole(), command.getAffectedParcelIds(),
                 command.getResponsibleOrgId(), command.getResponsibleOrgType(),
-                command.getTrackingCode()
-        );
-
-        return incidentRepository.save(incident)
-                .flatMap(saved -> acknowledgeAndLog(saved, command.getReportedByActorId(), command.getReportedByRole()))
-                .flatMap(saved -> missionStatusPort.pauseMission(saved.getMissionId(), saved.getId()).thenReturn(saved))
-                .flatMap(saved -> publishCreated(saved))
-                .flatMap(saved -> notifyAgency(saved))
-                .flatMap(saved -> writeBlockchain(saved));
+                command.getTrackingCode());
+        if (command.isBlockingForced()) {
+            incident = incident.forceBlockingByCourier();
+        }
+        return declare(incident, command.getCurrentLat(), command.getCurrentLng());
     }
 
     @Override
     @Transactional
     @RequirePermission(resource = "incident", action = "create")
     public Mono<Incident> execute(ReportDriverWithdrawalCommand command) {
-        var category = triageService.deriveCategory(command.getWithdrawalType());
-
         Incident incident = Incident.create(
                 command.getTenantId(), command.getAgencyId(), command.getPlatform(),
-                command.getMissionId(), category, command.getWithdrawalType(),
+                command.getMissionId(), triageService.deriveCategory(command.getWithdrawalType()),
+                command.getWithdrawalType(),
                 "Driver withdrawal: " + command.getJustification(),
                 command.getDriverActorId(), command.getDriverRole(),
-                command.getAffectedParcelIds()
-        );
-
-        return incidentRepository.save(incident)
-                .flatMap(saved -> acknowledgeAndLog(saved, command.getDriverActorId(), command.getDriverRole()))
-                .flatMap(saved -> missionStatusPort.pauseMission(saved.getMissionId(), saved.getId()).thenReturn(saved))
-                .flatMap(saved -> publishCreated(saved))
-                .flatMap(saved -> notifyAgency(saved))
-                .flatMap(saved -> writeBlockchain(saved));
+                command.getAffectedParcelIds());
+        return declare(incident, command.getCurrentLat(), command.getCurrentLng());
     }
 
-    private Mono<Incident> acknowledgeAndLog(Incident incident, UUID actorId, ActorRole role) {
-        Incident acked = incident.acknowledge();
-        IncidentEventLog log = IncidentEventLog.of(acked.getId(), "INCIDENT_CREATED_AND_ACKNOWLEDGED",
-                actorId, role, "{\"status\":\"ACKNOWLEDGED\"}");
-        return incidentRepository.save(acked)
-                .flatMap(saved -> eventLogRepository.save(log).thenReturn(saved));
+    /**
+     * Rows I1 → I2 → I3, then D13, D15 (blocking) or D14 (not blocking), then I4/I5 for a blocking incident.
+     * Guards of I1: the type is declarable by a courier (QO-12) and the declarant is the delivery's assigned courier.
+     */
+    private Mono<Incident> declare(Incident reported, Double lat, Double lng) {
+        if (reported.getType() == null || !reported.getType().isDeclarableByCourier()) {
+            return Mono.error(new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Incident type " + reported.getType() + " cannot be declared by a courier"));
+        }
+        return deliveryStatusPort.isAssignedCourier(reported.getMissionId(), reported.getReportedByActorId())
+                .flatMap(assigned -> assigned ? incidentRepository.save(reported)
+                        : Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        "Only the courier assigned to the delivery may declare an incident on it")))
+                // D13 (the delivery adapter leaves a non-declarable state untouched: incident attached without move)
+                .flatMap(saved -> deliveryStatusPort.markIncidentReported(saved.getMissionId(), saved.getId())
+                        .thenReturn(saved))
+                .flatMap(saved -> incidentRepository.save(acknowledgeAndTriage(saved, lat, lng)))
+                .flatMap(this::log)
+                .flatMap(saved -> (saved.isBlocking()
+                        ? deliveryStatusPort.pauseDelivery(saved.getMissionId(), saved.getId())              // D15
+                        : deliveryStatusPort.resumeDelivery(saved.getMissionId(),                           // D14
+                        IDeliveryStatusPort.TRIGGER_INCIDENT_NOT_BLOCKING, null, null))
+                        .thenReturn(saved))
+                .flatMap(this::notifyAgency)
+                .flatMap(this::writeBlockchain)
+                .flatMap(saved -> saved.isBlocking() ? autoResolution.routeBlocking(saved) : Mono.just(saved));
     }
 
-    private Mono<Incident> publishCreated(Incident incident) {
-        var event = IncidentCreatedEvent.builder()
-                .eventId(UUID.randomUUID())
+    /** I2 then I3: severity, geo-snapshot at the declaration position, {@code blocking} (QO-2). */
+    private Incident acknowledgeAndTriage(Incident incident, Double lat, Double lng) {
+        var severity = triageService.determineSeverity(incident.getType(), incident.getCategory());
+        IncidentGeoSnapshot geo = lat == null || lng == null ? null : IncidentGeoSnapshot.builder()
                 .incidentId(incident.getId())
-                .referenceCode(incident.getReferenceCode())
-                .tenantId(incident.getTenantId())
-                .agencyId(incident.getAgencyId())
-                .missionId(incident.getMissionId())
-                .platform(incident.getSourcePlatform())
-                .category(incident.getCategory())
-                .type(incident.getType())
-                .description(incident.getDescription())
-                .reportedByActorId(incident.getReportedByActorId())
-                .reportedByRole(incident.getReportedByRole())
-                .affectedParcelIds(incident.getAffectedParcelIds())
-                .occurredAt(Instant.now())
+                .latitude(lat).longitude(lng)
+                .capturedAt(Instant.now())
+                .zoneRiskIndex(0.3)
                 .build();
-        return eventPublisher.publish(event).thenReturn(incident);
+        boolean blocking = blockingPolicy.isBlocking(incident.getType(), severity,
+                incident.isBlockingForcedByCourier());
+        return incident.acknowledge().triage(severity, geo, null, blocking);
     }
+
+    private Mono<Incident> log(Incident incident) {
+        IncidentEventLog log = IncidentEventLog.of(incident.getId(), "INCIDENT_CREATED_AND_ACKNOWLEDGED",
+                incident.getReportedByActorId(), incident.getReportedByRole(),
+                "{\"status\":\"" + incident.getStatus() + "\",\"blocking\":" + incident.isBlocking() + "}");
+        return eventLogRepository.save(log).thenReturn(incident);
+    }
+
 
     private Mono<Incident> notifyAgency(Incident incident) {
         if (incident.getAgencyId() == null) {

@@ -10,6 +10,7 @@ import com.yowyob.tiibntick.core.dispute.domain.enums.DisputeEventType;
 import com.yowyob.tiibntick.core.dispute.domain.enums.DisputeStatus;
 import com.yowyob.tiibntick.core.dispute.domain.model.*;
 import com.yowyob.tiibntick.core.dispute.infrastructure.adapter.out.persistence.entity.DisputeCommentEntity;
+import com.yowyob.tiibntick.core.dispute.infrastructure.adapter.out.persistence.entity.DisputeEntity;
 import com.yowyob.tiibntick.core.dispute.infrastructure.adapter.out.persistence.entity.DisputeEscalationEntity;
 import com.yowyob.tiibntick.core.dispute.infrastructure.adapter.out.persistence.entity.DisputeEventEntity;
 import com.yowyob.tiibntick.core.dispute.infrastructure.adapter.out.persistence.mapper.DisputePersistenceMapper;
@@ -54,9 +55,41 @@ public class DisputeRepositoryAdapter implements IDisputeRepository {
 
     @Override
     public Mono<Dispute> save(Dispute dispute) {
-        return disputeRepo.save(DisputePersistenceMapper.toEntity(dispute))
-                .flatMap(saved -> saveChildCollections(dispute))
+        // Lot L4: an existing dispute is updated (it was always INSERTed again, failing on its primary key), its new
+        // evidences, timeline entries and comments are written (they never were), then the pending changes go to
+        // tnt.dispute.events through the outbox, in the caller's transaction.
+        DisputeEntity entity = DisputePersistenceMapper.toEntity(dispute);
+        return disputeRepo.existsById(entity.getId())
+                .flatMap(exists -> {
+                    if (exists) {
+                        entity.markNotNew();
+                    }
+                    return disputeRepo.save(entity);
+                })
+                .then(saveChildCollections(dispute))
+                .then(aggregateEvents == null ? Mono.empty() : aggregateEvents.publish(dispute))
+                .then(Mono.fromRunnable(dispute::clearPendingTransitions))
                 .thenReturn(dispute);
+    }
+
+    /** {@code tnt.dispute.events} publisher (lot L4); optional so that the adapter works without the outbox. */
+    private com.yowyob.tiibntick.core.dispute.application.port.outbound.IDisputeAggregateEventPublisher aggregateEvents;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setAggregateEvents(
+            com.yowyob.tiibntick.core.dispute.application.port.outbound.IDisputeAggregateEventPublisher publisher) {
+        this.aggregateEvents = publisher;
+    }
+
+    /** Inserts {@code entity} when its id is unknown, else updates it. */
+    private <E extends com.yowyob.tiibntick.common.persistence.TntPersistableEntity> Mono<E> upsert(
+            org.springframework.data.repository.reactive.ReactiveCrudRepository<E, String> repo, String id, E entity) {
+        return repo.existsById(id).flatMap(exists -> {
+            if (exists) {
+                entity.markNotNew();
+            }
+            return repo.save(entity);
+        });
     }
 
     @Override
@@ -130,6 +163,13 @@ public class DisputeRepositoryAdapter implements IDisputeRepository {
         return disputeRepo.existsActiveDisputeForPackage(packageId, tenantId);
     }
 
+    @Override
+    public Mono<Dispute> findByIncidentId(String incidentId, String tenantId) {
+        return disputeRepo.findFirstByIncidentId(incidentId, tenantId)
+                .flatMap(entity -> loadFullDispute(entity.getId(), entity.getTenantId(),
+                        DisputePersistenceMapper.toDomain(entity, List.of())));
+    }
+
     // =========================================================================
     // PRIVATE HELPERS
     // =========================================================================
@@ -185,7 +225,9 @@ public class DisputeRepositoryAdapter implements IDisputeRepository {
                         base.getVersion(),
                         base.getRespondentOrgId(),
                         base.getImpliedSubDelivererId(),
-                        base.getSubDelivererInvolved()));
+                        base.getSubDelivererInvolved())
+                        .restoreLifecycle(base.getResponsibleParty(), base.getIncidentId(), base.getClosedAt(),
+                                base.getEventSequence()));
     }
 
     private Mono<Dispute> loadEvidencesOnly(String disputeId, String tenantId, Dispute base) {
@@ -221,7 +263,9 @@ public class DisputeRepositoryAdapter implements IDisputeRepository {
                         base.getVersion(),
                         base.getRespondentOrgId(),
                         base.getImpliedSubDelivererId(),
-                        base.getSubDelivererInvolved()));
+                        base.getSubDelivererInvolved())
+                        .restoreLifecycle(base.getResponsibleParty(), base.getIncidentId(), base.getClosedAt(),
+                                base.getEventSequence()));
     }
 
     private Mono<Void> saveChildCollections(Dispute dispute) {
@@ -231,9 +275,57 @@ public class DisputeRepositoryAdapter implements IDisputeRepository {
         Flux<DisputeEscalationEntity> escalationsFlux = Flux.fromIterable(dispute.getEscalationHistory())
                 .map(r -> toEscalationEntity(r, disputeId, tenantId));
 
-        return escalationRepo.deleteAll()
+        // Lot L4: only this dispute's escalations are replaced (it was deleteAll(): every dispute's history)
+        Mono<Void> escalations = escalationRepo.deleteByDisputeId(disputeId)
                 .thenMany(escalationRepo.saveAll(escalationsFlux))
                 .then();
+        Mono<Void> evidences = Flux.fromIterable(dispute.getEvidences())
+                .concatMap(ev -> upsert(evidenceRepo, ev.getId().getValue(),
+                        DisputePersistenceMapper.evidenceToEntity(ev, tenantId)))
+                .then();
+        Mono<Void> timeline = Flux.fromIterable(dispute.getTimeline())
+                .concatMap(ev -> eventRepo.existsById(ev.getId().getValue())
+                        .flatMap(exists -> exists ? Mono.<DisputeEventEntity>empty()
+                                : eventRepo.save(toEventEntity(ev, tenantId))))
+                .then();
+        Mono<Void> comments = Flux.fromIterable(dispute.getComments())
+                .concatMap(c -> commentRepo.existsById(c.getId())
+                        .flatMap(exists -> exists ? Mono.<DisputeCommentEntity>empty()
+                                : commentRepo.save(toCommentEntity(c, tenantId))))
+                .then();
+        return escalations.then(evidences).then(timeline).then(comments);
+    }
+
+    private DisputeEventEntity toEventEntity(DisputeEvent ev, String tenantId) {
+        DisputeEventEntity e = new DisputeEventEntity();
+        e.setId(ev.getId().getValue());
+        e.setDisputeId(ev.getDisputeId().getValue());
+        e.setTenantId(tenantId);
+        e.setType(ev.getType().name());
+        e.setDescription(ev.getDescription());
+        e.setPerformedBy(ev.getPerformedBy() != null ? ev.getPerformedBy() : "SYSTEM");
+        e.setPerformedByType(ev.getPerformedByType().name());
+        e.setOccurredAt(ev.getOccurredAt());
+        try {
+            e.setMetadataJson(ev.getMetadata() == null || ev.getMetadata().isEmpty() ? null
+                    : objectMapper.writeValueAsString(ev.getMetadata()));
+        } catch (Exception ignored) {
+            e.setMetadataJson(null);
+        }
+        return e;
+    }
+
+    private DisputeCommentEntity toCommentEntity(DisputeComment c, String tenantId) {
+        DisputeCommentEntity e = new DisputeCommentEntity();
+        e.setId(c.getId());
+        e.setDisputeId(c.getDisputeId().getValue());
+        e.setTenantId(tenantId);
+        e.setAuthorId(c.getAuthorId());
+        e.setAuthorType(c.getAuthorType().name());
+        e.setContent(c.getContent());
+        e.setInternal(c.isInternal());
+        e.setPostedAt(c.getPostedAt());
+        return e;
     }
 
     private DisputeEvent toDisputeEvent(DisputeEventEntity e) {

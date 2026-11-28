@@ -52,8 +52,20 @@ public class DeliveryNeed implements Persistable<UUID>, TntPersistableEntity {
     @Transient
     private TrackingCode trackingCode;
 
-    @Column("packet_id")
+    /**
+     * Id of the core {@code Parcel} of this need (lot L1: the goods are a core parcel). Stored in
+     * {@code parcel_id} (lot L2; the legacy {@code packet_id} column is no longer written and goes at
+     * closure). The Java name and the JSON field stay {@code packetId}.
+     */
+    @Column("parcel_id")
     private UUID packetId;
+
+    /**
+     * Announcement the core holds for this need (denormalised pointer; the authoritative link is the
+     * announcement's origin reference). Null while the need is not published.
+     */
+    @Column("announcement_id")
+    private UUID announcementId;
 
     /** Destination relay point chosen by the sender (gofp relay point id or its hub id), if any. */
     @Column("target_relay_point_id")
@@ -101,9 +113,20 @@ public class DeliveryNeed implements Persistable<UUID>, TntPersistableEntity {
     @Column("description")
     private String description;
 
-    @NotNull
-    @Column("status")
+    /**
+     * Derived, never stored: computed from the announcement and delivery the core holds for this
+     * need (see {@code DeliveryNeedStatusPolicy}); filled when the need is read. Null on a need that
+     * was not read through {@code IDeliveryNeedRepository}.
+     */
+    @Transient
     private DeliveryNeedStatus status;
+
+    /**
+     * QO-9: how a {@code COMPLETED} need ended — {@code DELIVERED} or {@code FAILED} (the delivery failed for good);
+     * {@code null} while the need is not completed. Derived like {@link #status}.
+     */
+    @Transient
+    private String outcome;
 
     @Column("duration")
     private Integer duration;
@@ -124,15 +147,12 @@ public class DeliveryNeed implements Persistable<UUID>, TntPersistableEntity {
     @Column("distance")
     private Double distance;
 
-    /** FK {@code deliveries(id)} — set once an actual delivery record exists. */
-    @Column("delivery_id")
+    /** Derived, never stored: the delivery the core created from this need's announcement. */
+    @Transient
     private UUID deliveryId;
 
-    /**
-     * Freelancer picked by the client. Distinct from {@link #deliveryId}, which FKs
-     * {@code deliveries(id)} and therefore cannot hold a freelancer identity.
-     */
-    @Column("assigned_freelancer_id")
+    /** Derived, never stored: the delivery person whose response the client selected. */
+    @Transient
     private UUID assignedFreelancerId;
 
     @Column("created_at")

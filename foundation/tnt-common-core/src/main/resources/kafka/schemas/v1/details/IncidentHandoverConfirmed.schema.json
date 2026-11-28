@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:tnt:kafka:v1:details:IncidentHandoverConfirmed",
+  "title": "details of IncidentHandoverConfirmed",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["side"],
+  "properties": {"side": {"enum": ["ORIGINAL", "REPLACEMENT"]}}
+}

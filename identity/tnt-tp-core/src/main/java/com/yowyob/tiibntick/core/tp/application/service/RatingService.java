@@ -5,7 +5,6 @@ import com.yowyob.tiibntick.core.tp.application.port.out.ThirdPartyRatingReposit
 import com.yowyob.tiibntick.core.tp.application.port.out.TntClientProfileRepository;
 import com.yowyob.tiibntick.core.tp.application.port.out.TntTpEventPublisher;
 import com.yowyob.tiibntick.core.tp.domain.event.TntTpDomainEvents.ThirdPartyRatedEvent;
-import com.yowyob.tiibntick.core.tp.domain.exception.TntThirdPartyNotFoundException;
 import com.yowyob.tiibntick.core.tp.domain.model.ThirdPartyRating;
 import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
 import org.springframework.stereotype.Service;
@@ -41,44 +40,46 @@ public class RatingService {
      * Records a new rating for a third party and updates the profile average.
      * Prevents duplicate ratings for the same mission by the same rater.
      */
-    @RequirePermission(resource = "actor", action = "write")
+    @RequirePermission(resource = "rating", action = "create")
     @Transactional
     public Mono<ThirdPartyRating> rate(RateThirdPartyCommand command) {
-        return ratingRepository.existsByMissionIdAndRaterActorId(
-                        command.missionId(), command.raterActorId())
+        // one rating per (mission, rater, kind of rated party): unique index uq_tnt_tp_rating_mission_rater_kind
+        return ratingRepository.existsByDeliveryIdAndRaterActorIdAndSubjectKind(
+                        command.deliveryId(), command.raterActorId(), command.subjectKind())
                 .flatMap(alreadyRated -> {
                     if (Boolean.TRUE.equals(alreadyRated)) {
                         return Mono.error(new IllegalStateException(
-                                "Actor " + command.raterActorId()
-                                        + " has already rated mission " + command.missionId()));
+                                "Actor " + command.raterActorId() + " has already rated the "
+                                        + (command.subjectKind() != null ? command.subjectKind() + " of " : "")
+                                        + "mission " + command.deliveryId()));
                     }
                     ThirdPartyRating rating = ThirdPartyRating.create(
                             command.tenantId(), command.ratedThirdPartyId(),
-                            command.raterActorId(), command.missionId(),
-                            command.score(), command.comment());
+                            command.raterActorId(), command.deliveryId(),
+                            command.score(), command.comment(),
+                            command.ratingContext(), command.subjectKind());
+                    // The tp-core client profile is optional: a rated party (delivery person, relay operator,
+                    // or a client known only by its actor profile) may have none. The rating is kept either way.
                     return ratingRepository.save(rating)
                             .flatMap(saved -> profileRepository
                                     .findByThirdPartyId(command.tenantId(), command.ratedThirdPartyId())
-                                    .switchIfEmpty(Mono.error(
-                                            new TntThirdPartyNotFoundException(command.ratedThirdPartyId())))
                                     .flatMap(profile -> {
                                         var updated = profile.applyRating(command.score());
                                         return profileRepository.save(updated).thenReturn(updated);
                                     })
-                                    .flatMap(updatedProfile -> {
+                                    .map(p -> p.getAverageRating() != null ? p.getAverageRating() : 0.0)
+                                    .defaultIfEmpty(0.0)
+                                    .flatMap(average -> {
                                         var event = new ThirdPartyRatedEvent(
                                                 saved.getId(), saved.getTenantId(),
                                                 saved.getRatedThirdPartyId(), saved.getMissionId(),
-                                                saved.getScore(),
-                                                updatedProfile.getAverageRating() != null
-                                                        ? updatedProfile.getAverageRating() : 0.0,
-                                                Instant.now());
+                                                saved.getScore(), average, Instant.now());
                                         return eventPublisher.publish(event).thenReturn(saved);
                                     }));
                 });
     }
 
-    @RequirePermission(resource = "actor", action = "read")
+    @RequirePermission(resource = "rating", action = "read")
     public Flux<ThirdPartyRating> listRatings(UUID tenantId, UUID thirdPartyId) {
         return ratingRepository.findByRatedThirdPartyId(tenantId, thirdPartyId);
     }

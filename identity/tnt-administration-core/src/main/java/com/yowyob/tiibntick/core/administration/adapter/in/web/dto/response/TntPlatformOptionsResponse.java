@@ -8,13 +8,16 @@ import java.util.UUID;
 
 /**
  * API response DTO for TiiBnTick platform options.
+ *
+ * <p>Lot L1: {@code relayPointMaxStorageHours} removed (never read; see the delivery thresholds).
+ *
  * Author: MANFOUO Braun
  */
 public record TntPlatformOptionsResponse(
         UUID id, UUID tenantId,
         boolean blockchainEnabled, boolean smartDisputeResolutionEnabled, String blockchainNetwork,
         boolean freelancerModeEnabled, boolean requireFreelancerApproval, int maxFreelancerConcurrentMissions,
-        boolean pointRelaisModeEnabled, int relayPointMaxStorageHours,
+        boolean pointRelaisModeEnabled,
         boolean announcementMarketplaceEnabled, int maxCourierAnnouncementResponses,
         BigDecimal tvaRate, String defaultCurrency,
         boolean disputeManagementEnabled, int disputeFilingWindowDays,
@@ -25,7 +28,7 @@ public record TntPlatformOptionsResponse(
                 o.getId(), o.getTenantId(),
                 o.isBlockchainEnabled(), o.isSmartDisputeResolutionEnabled(), o.getBlockchainNetwork(),
                 o.isFreelancerModeEnabled(), o.isRequireFreelancerApproval(), o.getMaxFreelancerConcurrentMissions(),
-                o.isPointRelaisModeEnabled(), o.getRelayPointMaxStorageHours(),
+                o.isPointRelaisModeEnabled(),
                 o.isAnnouncementMarketplaceEnabled(), o.getMaxCourierAnnouncementResponses(),
                 o.getTvaRate(), o.getDefaultCurrency(),
                 o.isDisputeManagementEnabled(), o.getDisputeFilingWindowDays(),

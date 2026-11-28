@@ -171,6 +171,14 @@ public class GofpRelayPoint implements Persistable<UUID>, TntPersistableEntity {
     @Column("storage_dimension_unit")
     private String storageDimensionUnit;
 
+    /**
+     * D-130 (lot evt-l2): storage duration in days chosen by this independent relay, within the platform bounds
+     * (3 to 30 by default, admin setting); {@code null} = the platform value (7 days). The storage of a deposit is
+     * min(requested by the sender, this value) (QO-30).
+     */
+    @Column("storage_days")
+    private Integer storageDays;
+
     // ── Double address ────────────────────────────────────────────────────
 
     /**

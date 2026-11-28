@@ -33,6 +33,7 @@ class ActorRatingServiceTest {
     @Mock private IFreelancerRepository freelancerRepository;
     @Mock private IRelayOperatorRepository relayOperatorRepository;
     @Mock private IActorEventPublisher eventPublisher;
+    @Mock private com.yowyob.tiibntick.core.actor.application.port.out.IClientProfileRepository clientRepository;
 
     private ActorRatingService service;
 
@@ -42,7 +43,7 @@ class ActorRatingServiceTest {
     @BeforeEach
     void setUp() {
         service = new ActorRatingService(delivererRepository, freelancerRepository,
-                relayOperatorRepository, eventPublisher);
+                relayOperatorRepository, eventPublisher, clientRepository);
         lenient().when(eventPublisher.publishProfileUpdated(any())).thenReturn(Mono.empty());
     }
 
@@ -86,8 +87,21 @@ class ActorRatingServiceTest {
     @Test
     void rateWithUnsupportedActorType_shouldError() {
         StepVerifier.create(service.rateActor(new RateActorCommand(TENANT_ID, ACTOR_ID,
-                ActorType.CLIENT, 3.0, UUID.randomUUID())))
+                ActorType.AGENCY_MANAGER, 3.0, UUID.randomUUID())))
                 .expectError(IllegalArgumentException.class)
                 .verify();
+    }
+
+    @Test
+    void rateClient_shouldUpdateTheClientProfileAverage() {
+        var profile = com.yowyob.tiibntick.core.actor.domain.model.ClientProfile.create(TENANT_ID, ACTOR_ID);
+        when(clientRepository.findByActorId(TENANT_ID, ACTOR_ID)).thenReturn(Mono.just(profile));
+        when(clientRepository.save(any())).thenAnswer(i -> Mono.just(i.getArgument(0)));
+
+        StepVerifier.create(service.rateActor(new RateActorCommand(TENANT_ID, ACTOR_ID,
+                ActorType.CLIENT, 4.0, UUID.randomUUID()))).verifyComplete();
+
+        org.mockito.Mockito.verify(clientRepository).save(org.mockito.ArgumentMatchers.argThat(
+                p -> p.rating().score() == 4.0 && p.rating().totalRatings() == 1));
     }
 }

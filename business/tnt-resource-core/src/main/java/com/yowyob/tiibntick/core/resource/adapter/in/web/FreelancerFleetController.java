@@ -35,6 +35,7 @@ public class FreelancerFleetController {
     private final ListFreelancerFleetUseCase listFleetUseCase;
     private final GetFreelancerVehicleUseCase getVehicleUseCase;
     private final DeactivateFreelancerVehicleUseCase deactivateVehicleUseCase;
+    private final UpdateFreelancerVehicleUseCase updateVehicleUseCase;
 
     // ── Vehicle endpoints ─────────────────────────────────────────────────────
 
@@ -89,7 +90,18 @@ public class FreelancerFleetController {
     public Mono<FreelancerVehicle> releaseFromMission(
             @PathVariable UUID vehicleId,
             @RequestParam String missionId) {
-        return releaseFromMissionUseCase.releaseFromMission(vehicleId, missionId);
+        return releaseFromMissionUseCase.releaseFromDelivery(vehicleId, missionId);
+    }
+
+    @Operation(summary = "Update what is declared about a vehicle (type, plate, mandatory maximum capacity, ...)")
+    @PutMapping("/vehicles/{vehicleId}")
+    @PreAuthorize("isAuthenticated()")
+    public Mono<FreelancerVehicle> updateVehicle(@PathVariable UUID vehicleId, @RequestBody UpdateVehicleRequest body) {
+        return updateVehicleUseCase.updateVehicle(new UpdateFreelancerVehicleCommand(vehicleId,
+                VehicleType.valueOf(body.type()), body.brand(), body.model(), body.plateNumber(),
+                body.maxCapacityKg(), body.volumeM3(),
+                body.fuelType() != null ? FuelType.valueOf(body.fuelType()) : null,
+                body.fuelConsumptionLPer100km()));
     }
 
     @Operation(summary = "Deactivate a vehicle (sold, scrapped, long-term storage)")
@@ -142,4 +154,8 @@ public class FreelancerFleetController {
             String type, String description, Double maxCapacityKg, String ownedOrRented) {}
 
     public record AssignMissionRequest(String missionId) {}
+
+    public record UpdateVehicleRequest(
+            String type, String brand, String model, String plateNumber,
+            double maxCapacityKg, Double volumeM3, String fuelType, Double fuelConsumptionLPer100km) {}
 }

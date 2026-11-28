@@ -71,13 +71,38 @@ class CourierCardRulesTest {
     @DisplayName("platform grids per vehicle (defaults = application.yml); unknown vehicle → moto")
     void grids() {
         GofpCourierPricingProperties p = new GofpCourierPricingProperties();
-        assertThat(p.gridFor(VehicleCategory.MOTO).getBaseFee()).isEqualTo(500.0);
+        // D-058, docs/architecture/chantiers/tarifs-par-vehicule.md §1
+        assertThat(p.gridFor(VehicleCategory.MOTO).getBaseFee()).isEqualTo(600.0);
+        assertThat(p.gridFor(VehicleCategory.MOTO).getMinimumFee()).isEqualTo(1000.0);
         assertThat(p.gridFor(VehicleCategory.TRICYCLE).getPricePerKm()).isEqualTo(150.0);
-        assertThat(p.gridFor(VehicleCategory.TAXI).getPricePerKg()).isEqualTo(30.0);
-        assertThat(p.gridFor(VehicleCategory.CAMION).getBaseFee()).isEqualTo(3000.0);
-        assertThat(p.gridFor(VehicleCategory.BUS).getPricePerKm()).isEqualTo(300.0);
-        assertThat(p.gridFor(null).getBaseFee()).isEqualTo(500.0);
+        assertThat(p.gridFor(VehicleCategory.TRICYCLE).getPricePerKg()).isEqualTo(15.0);
+        assertThat(p.gridFor(VehicleCategory.TAXI).getPricePerKg()).isEqualTo(25.0);
+        assertThat(p.gridFor(VehicleCategory.TAXI).getWaitingFeePerMinute()).isEqualTo(50.0);
+        assertThat(p.gridFor(VehicleCategory.CAMION).getBaseFee()).isEqualTo(5000.0);
+        assertThat(p.gridFor(VehicleCategory.BUS).getPricePerKm()).isEqualTo(10.0);
+        assertThat(p.gridFor(VehicleCategory.BUS).getPricePerKg()).isEqualTo(100.0);
+        assertThat(p.gridFor(null).getBaseFee()).isEqualTo(600.0);
         assertThat(p.gridFor(VehicleCategory.BUS).getPricePerCbm()).isEqualTo(2000.0);
-        assertThat(p.gridFor(VehicleCategory.BUS).getFragileSurcharge()).isEqualTo(500.0);
+        assertThat(p.gridFor(VehicleCategory.CAMION).getFragileSurcharge()).isEqualTo(2000.0);
+    }
+
+    @Test
+    @DisplayName("BIKE, SCOOTER and VAN have their own grid; the other types use their category's grid (D-058)")
+    void preciseTypeGrids() {
+        GofpCourierPricingProperties p = new GofpCourierPricingProperties();
+        assertThat(p.gridForVehicle("BIKE").getBaseFee()).isEqualTo(300.0);
+        assertThat(p.gridForVehicle("velo").getMinimumFee()).isEqualTo(500.0);
+        assertThat(p.gridForVehicle("SCOOTER").getPricePerKm()).isEqualTo(90.0);
+        assertThat(p.gridForVehicle("VAN").getPricePerKm()).isEqualTo(300.0);
+        assertThat(p.gridForVehicle("camionnette").getMinimumFee()).isEqualTo(5000.0);
+        assertThat(p.gridForVehicle("TRUCK").getPricePerKm()).isEqualTo(400.0);
+        assertThat(p.gridForVehicle("MOTORBIKE").getBaseFee()).isEqualTo(600.0);
+        assertThat(p.gridForVehicle("CAR").getMinimumFee()).isEqualTo(2000.0);
+        assertThat(p.gridForVehicle(null).getBaseFee()).isEqualTo(600.0);
+        assertThat(p.gridForVehicle("unknown").getBaseFee()).isEqualTo(600.0);
+
+        // a configuration without the precise key falls back to the category grid
+        p.getGrids().remove("scooter");
+        assertThat(p.gridForVehicle("SCOOTER").getPricePerKm()).isEqualTo(100.0);
     }
 }

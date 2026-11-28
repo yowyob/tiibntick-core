@@ -22,7 +22,7 @@ import java.util.UUID;
 interface GetInvoiceUseCase {
     Mono<Invoice> getById(UUID invoiceId);
     Mono<Invoice> getByNumber(String invoiceNumber);
-    Flux<Invoice> listByMissionId(String missionId);
+    Flux<Invoice> listByDeliveryId(String deliveryId);
     Flux<Invoice> listByClientId(UUID tenantId, String clientId);
 }
 

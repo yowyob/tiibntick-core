@@ -186,6 +186,16 @@
             <groupId>com.yowyob.tiibntick.core</groupId>
             <artifactId>tnt-incident-core</artifactId>
         </dependency>
+        <!-- Lot L5: implements the dispute module's IDisputeCompensationPort (Kernel compensation fund, spec §4.3) -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-dispute-core</artifactId>
+        </dependency>
+        <!-- Lot L5 (D-147, D-151, D-152): implements delivery-core's ReturnGuaranteePort on a Kernel escrow -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-delivery-core</artifactId>
+        </dependency>
 
         <!-- ── Spring AOP (required for @RequirePermission aspect) ── -->
         <dependency>

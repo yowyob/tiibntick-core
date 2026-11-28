@@ -1,0 +1,43 @@
+databaseChangeLog:
+  # Lot L3 of the Go-Freelancer de-duplication (tnt-tp-core). Additive, nullable, idempotent.
+  - changeSet:
+      id: gdd-l3-301-tp-rating-context-and-subject-kind
+      author: gdd-l3
+      labels: gdd-l3
+      comment: "Optional rating context (e.g. CLIENT_TO_DP) and rated-party kind (CLIENT, DELIVERY_PERSON, RELAY_OPERATOR) on tnt_tp_ratings"
+      changes:
+        - sql:
+            splitStatements: true
+            sql: >
+              ALTER TABLE tnt_tp_ratings ADD COLUMN IF NOT EXISTS rating_context VARCHAR(40);
+              ALTER TABLE tnt_tp_ratings ADD COLUMN IF NOT EXISTS subject_kind VARCHAR(20);
+  - changeSet:
+      id: gdd-l3-305-tp-rating-unique-per-subject-kind
+      author: gdd-l3
+      labels: gdd-l3
+      comment: "One rating per (mission, rater, kind of rated party) instead of (mission, rater): a client rates the courier and the relay operator of the same delivery"
+      changes:
+        - sql:
+            splitStatements: true
+            sql: >
+              ALTER TABLE tnt_tp_ratings DROP CONSTRAINT IF EXISTS uq_tnt_tp_rating_mission_rater;
+              CREATE UNIQUE INDEX IF NOT EXISTS uq_tnt_tp_rating_mission_rater_kind
+                  ON tnt_tp_ratings (mission_id, rater_actor_id, COALESCE(subject_kind, ''));
+      rollback:
+        - sql:
+            sql: DROP INDEX IF EXISTS uq_tnt_tp_rating_mission_rater_kind;
+  - changeSet:
+      id: gdd-l3-306-loyalty-transaction-unique-reference
+      author: gdd-l3
+      labels: gdd-l3
+      comment: "A points movement is recorded once per (account, type, external reference): a completed delivery (external_ref = mission id) is credited once"
+      changes:
+        - sql:
+            splitStatements: true
+            sql: >
+              CREATE UNIQUE INDEX IF NOT EXISTS uq_tnt_loyalty_tx_account_type_ref
+                  ON tnt_loyalty_transactions (loyalty_account_id, type, external_ref)
+                  WHERE external_ref IS NOT NULL;
+      rollback:
+        - sql:
+            sql: DROP INDEX IF EXISTS uq_tnt_loyalty_tx_account_type_ref;

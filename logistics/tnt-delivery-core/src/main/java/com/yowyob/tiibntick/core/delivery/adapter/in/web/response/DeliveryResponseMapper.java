@@ -41,7 +41,20 @@ public final class DeliveryResponseMapper {
                 d.getActualDeliveryTime(),
                 d.getNotes(),
                 d.getCreatedAt(),
-                d.getUpdatedAt());
+                d.getUpdatedAt(),
+                d.getKind() != null ? d.getKind().name() : null,
+                d.getParentDeliveryId(),
+                d.getParcel() != null && d.getParcel().getStatus() != null ? d.getParcel().getStatus().name() : null,
+                d.getAttemptCount(),
+                d.getMaxAttempts(),
+                d.getFailureReason() != null ? d.getFailureReason().name() : null,
+                d.getLastAttemptReason() != null ? d.getLastAttemptReason().name() : null,
+                d.getRelayHubId(),
+                d.getRelayStorageDays(),
+                d.getRelayStorageExpiresAt(),
+                d.isLate(),
+                d.getReturnGuaranteeStatus() == null ? null : d.getReturnGuaranteeStatus().name(),
+                d.getReturnGuaranteeReason());
     }
 
     public static EtaResponse toEtaResponse(EtaEstimate eta) {

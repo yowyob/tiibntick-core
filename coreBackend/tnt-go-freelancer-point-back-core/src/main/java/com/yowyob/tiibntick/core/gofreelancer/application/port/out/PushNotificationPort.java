@@ -19,4 +19,15 @@ public interface PushNotificationPort {
     default Mono<Void> sendPushNotification(UUID tenantId, UUID userId, String title, String message) {
         return sendPushNotification(userId, title, message);
     }
+
+    /**
+     * A message written once per language in the catalog and rendered with {@code params} in the language of
+     * the recipient's account (never a literal built by the caller). Nothing is sent when the key is unknown to
+     * the catalog beyond the generic fallback the notification module applies.
+     */
+    Mono<Void> sendLocalized(UUID tenantId, UUID userId, String templateKey, java.util.Map<String, Object> params);
+
+    default Mono<Void> sendLocalized(UUID userId, String templateKey, java.util.Map<String, Object> params) {
+        return sendLocalized(null, userId, templateKey, params);
+    }
 }

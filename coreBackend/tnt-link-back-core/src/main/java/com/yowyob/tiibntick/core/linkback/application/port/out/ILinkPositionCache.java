@@ -21,5 +21,5 @@ public interface ILinkPositionCache {
      */
     Mono<Void> saveIfNewer(UUID tenantId, LinkPosition position);
 
-    Mono<LinkPosition> findLatest(UUID tenantId, String missionId);
+    Mono<LinkPosition> findLatest(UUID tenantId, String deliveryId);
 }

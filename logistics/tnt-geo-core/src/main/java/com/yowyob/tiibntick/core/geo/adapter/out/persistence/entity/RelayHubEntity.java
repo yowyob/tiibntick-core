@@ -46,11 +46,23 @@ public class RelayHubEntity implements Persistable<UUID> {
     @Column("status")
     private String status;
 
+    @Column("approval_status")
+    private String approvalStatus;
+
     @Column("created_at")
     private Instant createdAt;
 
     @Column("updated_at")
     private Instant updatedAt;
+
+    @Column("revocation_reason")
+    private String revocationReason;
+
+    @Column("revoked_at")
+    private Instant revokedAt;
+
+    @Column("revoked_by_actor_id")
+    private UUID revokedByActorId;
 
     public RelayHubEntity() {}
 
@@ -64,8 +76,12 @@ public class RelayHubEntity implements Persistable<UUID> {
         e.currentOccupancy = hub.currentOccupancy();
         e.operatorActorId = hub.operatorActorId();
         e.status = hub.status().name();
+        e.approvalStatus = hub.approvalStatus().name();
         e.createdAt = hub.createdAt();
         e.updatedAt = hub.updatedAt();
+        e.revocationReason = hub.revocationReason();
+        e.revokedAt = hub.revokedAt();
+        e.revokedByActorId = hub.revokedByActorId();
         return e;
     }
 
@@ -76,7 +92,9 @@ public class RelayHubEntity implements Persistable<UUID> {
                 capacitySlots, currentOccupancy,
                 operatorActorId,
                 HubStatus.valueOf(status),
-                createdAt, updatedAt
+                approvalStatus != null ? HubApprovalStatus.valueOf(approvalStatus) : HubApprovalStatus.PENDING,
+                createdAt, updatedAt,
+                revocationReason, revokedAt, revokedByActorId
         );
     }
 
@@ -97,10 +115,18 @@ public class RelayHubEntity implements Persistable<UUID> {
     public void setCurrentOccupancy(int o)  { this.currentOccupancy = o; }
     public String getOperatorActorId()      { return operatorActorId; }
     public void setOperatorActorId(String o){ this.operatorActorId = o; }
+    public String getApprovalStatus()       { return approvalStatus; }
+    public void setApprovalStatus(String a) { this.approvalStatus = a; }
     public String getStatus()               { return status; }
     public void setStatus(String s)         { this.status = s; }
     public Instant getCreatedAt()           { return createdAt; }
     public void setCreatedAt(Instant t)     { this.createdAt = t; }
     public Instant getUpdatedAt()           { return updatedAt; }
     public void setUpdatedAt(Instant t)     { this.updatedAt = t; }
+    public String getRevocationReason()     { return revocationReason; }
+    public void setRevocationReason(String r) { this.revocationReason = r; }
+    public Instant getRevokedAt()           { return revokedAt; }
+    public void setRevokedAt(Instant t)     { this.revokedAt = t; }
+    public UUID getRevokedByActorId()       { return revokedByActorId; }
+    public void setRevokedByActorId(UUID a) { this.revokedByActorId = a; }
 }

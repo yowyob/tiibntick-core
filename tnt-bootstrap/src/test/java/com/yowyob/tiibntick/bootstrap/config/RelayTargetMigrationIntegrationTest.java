@@ -63,9 +63,7 @@ class RelayTargetMigrationIntegrationTest {
     private static Liquibase liquibase(Connection conn) throws Exception {
         Database database = DatabaseFactory.getInstance()
                 .findCorrectDatabaseImplementation(new JdbcConnection(conn));
-        ResourceAccessor accessor = new CompositeResourceAccessor(
-                new DirectoryResourceAccessor(Path.of("src/main/resources")),
-                new ClassLoaderResourceAccessor());
+        ResourceAccessor accessor = com.yowyob.tiibntick.bootstrap.config.BootstrapChangelogs.accessor();
         return new Liquibase(MASTER, accessor, database);
     }
 
@@ -116,9 +114,9 @@ class RelayTargetMigrationIntegrationTest {
         try (Connection conn = DriverManager.getConnection(createDatabase(), POSTGRES.getUsername(), POSTGRES.getPassword())) {
             // 1. the production database as the previous version left it
             Liquibase previous = liquibase(conn);
-            previous.update(new Contexts(), new LabelExpression("!" + NEW_CHANGESET_LABEL));
+            previous.update(new Contexts(), new LabelExpression("!" + NEW_CHANGESET_LABEL + " and !gdd-final"));
             assertThat(newColumns(conn)).as("previous version: no relay point column").isZero();
-            assertThat(previous.listUnrunChangeSets(new Contexts(), new LabelExpression())).hasSize(1);
+            assertThat(previous.listUnrunChangeSets(new Contexts(), new LabelExpression("!gdd-final"))).hasSize(1);
             conn.setAutoCommit(true);
             insertNeed(conn, UUID.randomUUID(), null, null);
             insertNeed(conn, UUID.randomUUID(), null, null);
@@ -128,10 +126,10 @@ class RelayTargetMigrationIntegrationTest {
             // 2. the application restarts on the new version
             Liquibase upgrade = liquibase(conn);
             upgrade.validate();
-            upgrade.update(new Contexts(), new LabelExpression());
+            upgrade.update(new Contexts(), new LabelExpression("!gdd-final"));
             conn.setAutoCommit(true);
 
-            assertThat(upgrade.listUnrunChangeSets(new Contexts(), new LabelExpression())).isEmpty();
+            assertThat(upgrade.listUnrunChangeSets(new Contexts(), new LabelExpression("!gdd-final"))).isEmpty();
             assertThat(count(conn, "SELECT count(*) FROM databasechangelog")).isEqualTo(appliedBefore + 1);
             assertThat(newColumns(conn)).isEqualTo(2);
             assertThat(count(conn, "SELECT count(*) FROM delivery_needs")).as("existing rows kept").isEqualTo(before);
@@ -149,7 +147,7 @@ class RelayTargetMigrationIntegrationTest {
             // 4. a further restart applies nothing
             Liquibase again = liquibase(conn);
             again.validate();
-            again.update(new Contexts(), new LabelExpression());
+            again.update(new Contexts(), new LabelExpression("!gdd-final"));
             assertThat(count(conn, "SELECT count(*) FROM databasechangelog")).isEqualTo(appliedBefore + 1);
         }
     }

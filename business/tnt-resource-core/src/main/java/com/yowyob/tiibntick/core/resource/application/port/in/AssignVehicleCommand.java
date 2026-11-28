@@ -11,5 +11,5 @@ public record AssignVehicleCommand(
         @NotNull UUID tenantId,
         @NotNull UUID vehicleId,
         @NotNull UUID delivererId,
-        UUID missionId
+        UUID deliveryId
 ) {}

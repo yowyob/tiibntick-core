@@ -1,14 +1,15 @@
 package com.yowyob.tiibntick.core.gofreelancer.domain.model;
 
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryStatus;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryUrgency;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryStatus;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import jakarta.validation.constraints.NotNull;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
+import lombok.AccessLevel;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.Transient;
 import org.springframework.data.domain.Persistable;
@@ -17,8 +18,15 @@ import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
 /**
- * Represents a delivery execution.
- * Time windows are defined using minimum and maximum bounds.
+ * The Go-Freelancer extension of a delivery: what the product adds to the delivery that
+ * {@code tnt-delivery-core} owns under the same id (OTP hashes, handover codes, receive code, notes,
+ * the links to the announcement and the delivery need).
+ *
+ * <p>The delivery's own facts are <em>not</em> stored here: status, assigned delivery person, real
+ * pickup / delivery instants, agreed price and pickup / hand-over windows belong to the core. They are
+ * exposed by the read-only accessors below, filled from the core whenever the row is loaded by
+ * {@code GofpDeliveryRepositoryAdapter}; they have no setter and are never written to this table. They
+ * are {@code null} for a row the core does not know.
  *
  * @author Kengfack Lagrange
  * @date 17/12/2025
@@ -45,36 +53,11 @@ public class Delivery implements Persistable<UUID>, TntPersistableEntity {
     @Column("announcement_id")
     private UUID announcementId;
 
-    @Column("freelancer_id")
-    private UUID freelancerId;
-
-    @Column("status")
-    private DeliveryStatus status;
-
     @Column("delivery_need_id")
     private UUID deliveryNeedId;
 
-    @Column("tarif")
-    private Double tarif;
-
     @Column("note_livreur")
     private Double noteLivreur;
-
-    @NotNull
-    @Column("pickup_min_time")
-    private Instant pickupMinTime;
-
-    @NotNull
-    @Column("pickup_max_time")
-    private Instant pickupMaxTime;
-
-    @NotNull
-    @Column("delivery_min_time")
-    private Instant deliveryMinTime;
-
-    @NotNull
-    @Column("delivery_max_time")
-    private Instant deliveryMaxTime;
 
     @Column("delivery_note")
     private Double deliveryNote;
@@ -103,33 +86,73 @@ public class Delivery implements Persistable<UUID>, TntPersistableEntity {
     @Column("delivery_code_enc")
     private String deliveryCodeEnc;
 
-    /** Timestamp when the delivery person physically collected the parcel (PICKED_UP confirmed). */
-    @Column("actual_pickup_time")
-    private Instant actualPickupTime;
+    // ── Kernel escrow payment (lot L5) ───────────────────────────────────────
 
-    /** Timestamp when the recipient confirmed receipt of the parcel (DELIVERED confirmed). */
-    @Column("actual_delivery_time")
-    private Instant actualDeliveryTime;
-
-    // ── Kernel wallet payment (receive code of the delivery person) ─────────
-
-    /** JWT subject of the delivery person who generated {@link #receiveCode}. */
+    /** Actor (Kernel user) of the courier paid by the escrow; printed on the invoice. */
     @Column("driver_user_id")
     @com.fasterxml.jackson.annotation.JsonIgnore
     private UUID driverUserId;
 
-    /** Short-lived Kernel receive code the client's transfer is addressed to. Never serialised. */
-    @Column("receive_code")
-    @com.fasterxml.jackson.annotation.JsonIgnore
-    private String receiveCode;
+    // ── Read-through from tnt-delivery-core (never persisted here) ───────────
 
-    @Column("receive_code_expires_at")
-    @com.fasterxml.jackson.annotation.JsonIgnore
-    private Instant receiveCodeExpiresAt;
+    /** Lifecycle status owned by the core. */
+    @Transient
+    @Setter(AccessLevel.NONE)
+    private DeliveryStatus status;
 
-    /** True when a non-expired receive code is stored. */
-    public boolean hasValidReceiveCode() {
-        return receiveCode != null && !receiveCode.isBlank()
-                && (receiveCodeExpiresAt == null || receiveCodeExpiresAt.isAfter(Instant.now()));
+    /** The delivery person the core assigned (the id the selected response carried). */
+    @Transient
+    @Setter(AccessLevel.NONE)
+    private UUID freelancerId;
+
+    /** Agreed price (core {@code agreedAmount}). */
+    @Transient
+    @Setter(AccessLevel.NONE)
+    private Double tarif;
+
+    @Transient
+    @Setter(AccessLevel.NONE)
+    private Instant pickupMinTime;
+
+    @Transient
+    @Setter(AccessLevel.NONE)
+    private Instant pickupMaxTime;
+
+    @Transient
+    @Setter(AccessLevel.NONE)
+    private Instant deliveryMinTime;
+
+    @Transient
+    @Setter(AccessLevel.NONE)
+    private Instant deliveryMaxTime;
+
+    /** When the delivery person physically collected the parcel (PICKED_UP confirmed in the core). */
+    @Transient
+    @Setter(AccessLevel.NONE)
+    private Instant actualPickupTime;
+
+    /** When the recipient received the parcel (DELIVERED confirmed in the core). */
+    @Transient
+    @Setter(AccessLevel.NONE)
+    private Instant actualDeliveryTime;
+
+    /**
+     * Fills the read-through facts with what the core says. Called by the repository adapter and by the
+     * services that just drove a transition; it changes nothing that is persisted.
+     */
+    public Delivery readThrough(DeliveryStatus status, UUID deliveryPersonId, BigDecimal agreedAmount,
+                                Instant pickupWindowStart, Instant pickupWindowEnd,
+                                Instant deliveryWindowStart, Instant deliveryWindowEnd,
+                                Instant actualPickupTime, Instant actualDeliveryTime) {
+        this.status = status;
+        this.freelancerId = deliveryPersonId;
+        this.tarif = agreedAmount != null ? agreedAmount.doubleValue() : null;
+        this.pickupMinTime = pickupWindowStart;
+        this.pickupMaxTime = pickupWindowEnd;
+        this.deliveryMinTime = deliveryWindowStart;
+        this.deliveryMaxTime = deliveryWindowEnd;
+        this.actualPickupTime = actualPickupTime;
+        this.actualDeliveryTime = actualDeliveryTime;
+        return this;
     }
 }

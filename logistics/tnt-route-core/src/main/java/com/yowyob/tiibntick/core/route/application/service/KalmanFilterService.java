@@ -40,7 +40,7 @@ public class KalmanFilterService implements IUpdateEtaUseCase {
 
     @Override
     public Mono<EtaResult> updateEta(String missionId, String trackingCode, GPSMeasurement measurement) {
-        return stateRepository.findByMissionId(missionId)
+        return stateRepository.findByDeliveryId(missionId)
                 .switchIfEmpty(Mono.error(new IllegalStateException(
                         "No Kalman state for mission: " + missionId)))
                 .flatMap(state -> {

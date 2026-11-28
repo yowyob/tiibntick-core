@@ -26,9 +26,27 @@ public interface DeliveryQueryUseCase {
     }
 
     /**
+     * Finds a delivery by its UUID whatever its tenant — for callers that hold the id of a delivery
+     * created elsewhere and have no tenant context (background consumers). Empty when the delivery
+     * does not exist (unlike {@link #findDeliveryById}, which fails).
+     */
+    Mono<Delivery> findDeliveryByIdAnyTenant(UUID deliveryId);
+
+    /**
+     * The deliveries that carry this parcel, whatever their tenant, most recent first (empty when none).
+     * <p><b>Reserved</b> for the retrieval of a parcel deposited at a relay point (a deposit is keyed on the
+     * parcel id and has no tenant context). It crosses tenants: do not call it from anywhere else
+     * ({@code ParcelLookupCallersArchitectureTest} fails the build otherwise).
+     */
+    Flux<Delivery> findDeliveriesByParcelIdAnyTenant(UUID parcelId);
+
+    /**
      * Finds a delivery by its tracking code.
      */
     Mono<Delivery> findByTrackingCode(String trackingCode);
+
+    /** D-136: every delivery of the parcel carrying the code, oldest first (empty when unknown). */
+    reactor.core.publisher.Flux<Delivery> findHistoryByTrackingCode(String trackingCode);
 
     /**
      * Lists all deliveries for a sender.
@@ -51,6 +69,12 @@ public interface DeliveryQueryUseCase {
      * terminal status ({@link DeliveryStatus#isTerminal()}), without loading them.
      */
     Mono<Long> countNonTerminalDeliveriesByDeliveryPerson(UUID tenantId, UUID deliveryPersonId);
+
+    /**
+     * Counts deliveries of a delivery person that are in the given status, without loading them
+     * (e.g. how many a courier has delivered).
+     */
+    Mono<Long> countDeliveriesByDeliveryPersonAndStatus(UUID tenantId, UUID deliveryPersonId, DeliveryStatus status);
 
     /**
      * Lists deliveries by status for a given tenant.

@@ -23,7 +23,10 @@ import org.springframework.test.web.reactive.server.WebTestClient;
  *
  * @author MANFOUO Braun
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+// The API documentation is closed in the default document since d453f4b0 (NoProfileHardeningTest) and open in
+// staging only: it is opened here as staging does, so that the published-endpoint check below keeps its meaning.
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = {"springdoc.api-docs.enabled=true"})
 @AutoConfigureWebTestClient(timeout = "PT30S")
 @ActiveProfiles({"test", "r2dbc"})
 class PublicPathsSecurityIntegrationTest {

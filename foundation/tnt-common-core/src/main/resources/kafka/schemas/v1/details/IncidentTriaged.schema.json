@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:tnt:kafka:v1:details:IncidentTriaged",
+  "title": "details of IncidentTriaged",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["severity", "blocking"],
+  "properties": {"severity": {"type": ["string", "null"]}, "blocking": {"type": "boolean"}}
+}

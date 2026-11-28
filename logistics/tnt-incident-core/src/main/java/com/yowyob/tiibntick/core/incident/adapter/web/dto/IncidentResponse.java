@@ -43,4 +43,12 @@ public class IncidentResponse {
     String responsibleOrgId;
     String responsibleOrgType;
     String trackingCode;
+    /** Lot L3: blocks the delivery (QO-2). */
+    boolean blocking;
+    /** Lot L3: what the resolution does (or proposes) to the delivery. */
+    com.yowyob.tiibntick.core.incident.domain.enums.IncidentDeliveryOutcome deliveryOutcome;
+    com.yowyob.tiibntick.core.incident.domain.enums.IncidentResponsibleParty responsibleParty;
+    String resolutionNote;
+    /** Lot L3 (QO-14): when the resolution was proposed; confirmed automatically after the configured delay. */
+    Instant resolutionProposedAt;
 }

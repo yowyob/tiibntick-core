@@ -4,7 +4,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yowyob.tiibntick.common.kafka.TntTopics;
 import com.yowyob.tiibntick.core.billing.invoice.application.port.in.command.GenerateInvoiceCommand;
 import com.yowyob.tiibntick.core.billing.invoice.application.port.in.command.MarkInvoicePaidCommand;
-import com.yowyob.tiibntick.core.billing.invoice.application.service.InvoiceService;
+import com.yowyob.tiibntick.core.billing.invoice.application.port.in.SystemInvoicingUseCase;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.yowyob.tiibntick.common.kafka.ReactiveListenerSupport;
+import com.yowyob.tiibntick.common.kafka.TntAggregateEvent;
 import com.yowyob.tiibntick.core.billing.invoice.domain.model.InvoiceLine;
 import com.yowyob.tiibntick.core.billing.invoice.domain.model.Money;
 import com.yowyob.tiibntick.core.billing.invoice.domain.model.enums.LineItemType;
@@ -26,10 +29,11 @@ import java.util.UUID;
  *
  * <p>Listens to:
  * <ul>
- *   <li>{@code tnt.delivery.mission.completed} → generate invoice</li>
+ *   <li>{@code DeliveryDelivered} of {@code tnt.delivery.events} (lot L8, was {@code tnt.delivery.mission.completed})
+ *       → the delivery's invoice, once (none when the payment flow already issued it);</li>
  *   <li>{@code tnt.billing.wallet.payment.confirmed} → mark invoice paid</li>
  * </ul>
- * </p>
+ * Both await their work (lot L7 rule): a failure is retried, then dead-lettered to {@code tnt.dlq}.
  *
  * @author MANFOUO Braun
  */
@@ -37,62 +41,69 @@ import java.util.UUID;
 public class InvoiceBillingEventConsumer {
 
     private static final Logger log = LoggerFactory.getLogger(InvoiceBillingEventConsumer.class);
+    static final String DELIVERED = "DeliveryDelivered";
+    private static final java.time.Duration TIMEOUT = java.time.Duration.ofSeconds(30);
 
-    private final InvoiceService invoiceService;
+    private final SystemInvoicingUseCase invoiceService;
     private final ObjectMapper objectMapper;
 
-    public InvoiceBillingEventConsumer(InvoiceService invoiceService,
+    public InvoiceBillingEventConsumer(SystemInvoicingUseCase invoiceService,
             @Qualifier("invoiceObjectMapper") ObjectMapper objectMapper) {
         this.invoiceService = invoiceService;
         this.objectMapper = objectMapper;
     }
 
     /**
-     * Handles DeliveryCompleted events from tnt-delivery-core.
-     * Generates an invoice for the completed mission.
+     * {@code DeliveryDelivered}: invoice of the delivered delivery at its agreed price, the sender being the client;
+     * issuer = the agency or the freelancer organisation of the delivery when there is one. Skipped (logged) without
+     * agreed price or sender.
      */
     @KafkaListener(
-            topics = "${tnt.kafka.topics.delivery-mission-completed:" + TntTopics.DELIVERY_MISSION_COMPLETED + "}",
+            topics = TntTopics.DELIVERY_EVENTS,
             groupId = "${tnt.kafka.consumer.groups.billing-invoice:tnt-billing-invoice-group}",
             containerFactory = "invoiceKafkaListenerContainerFactory"
     )
-    public void onDeliveryCompleted(ConsumerRecord<String, String> record) {
-        log.info("InvoiceBillingEventConsumer received DeliveryCompleted, offset={}", record.offset());
-        try {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> payload = (Map<String, Object>) objectMapper.readValue(record.value(), Map.class);
-
-            UUID tenantId    = UUID.fromString((String) payload.get("tenantId"));
-            String tenantCode = (String) payload.getOrDefault("tenantCode", "DEFAULT");
-            String countryCode = (String) payload.getOrDefault("countryCode", "CM");
-            String missionId  = (String) payload.get("missionId");
-            String clientId   = (String) payload.get("senderThirdPartyId");
-            String currency   = (String) payload.getOrDefault("currency", "XAF");
-            Number sellingPriceRaw = (Number) payload.get("sellingPrice");
-
-            if (missionId == null || clientId == null || sellingPriceRaw == null) {
-                log.warn("Missing required fields in DeliveryCompleted event, skipping");
-                return;
-            }
-
-            Money unitPrice = Money.of(sellingPriceRaw.doubleValue(), currency);
-            InvoiceLine line = InvoiceLine.of(1, "Delivery Mission " + missionId,
-                    1.0, unitPrice, BigDecimal.ZERO, LineItemType.DELIVERY_FEE);
-
-            GenerateInvoiceCommand command = GenerateInvoiceCommand.simple(
-                    tenantId, tenantCode, countryCode,
-                    missionId, null, clientId,
-                    List.of(line), List.of(), currency,
-                    LocalDateTime.now().plusDays(7));
-
-            invoiceService.generateAsSystem(command)
-                    .doOnSuccess(inv -> log.info("Invoice generated from DeliveryCompleted: {}", inv.getNumber()))
-                    .doOnError(e -> log.error("Failed to generate invoice for mission={}: {}", missionId, e.getMessage()))
-                    .subscribe();
-
-        } catch (Exception e) {
-            log.error("Failed processing DeliveryCompleted event at offset={}: {}", record.offset(), e.getMessage(), e);
+    public void onDeliveryEvent(ConsumerRecord<String, String> record) throws Exception {
+        JsonNode event = objectMapper.readTree(record.value());
+        if (!TntAggregateEvent.isAggregateEvent(event) || !DELIVERED.equals(event.path("eventType").asText())) {
+            return;
         }
+        GenerateInvoiceCommand command = deliveryInvoice(event);
+        if (command == null) {
+            log.warn("INVOICE_NOT_GENERATED delivery={} — no agreed price, sender or tenant",
+                    event.path("aggregateId").asText());
+            return;
+        }
+        var invoice = ReactiveListenerSupport.awaitBounded(invoiceService.generateOnceAsSystem(command), TIMEOUT);
+        log.info("Invoice {} for delivered delivery {}", invoice != null ? invoice.getNumber() : null,
+                command.deliveryId());
+    }
+
+    static GenerateInvoiceCommand deliveryInvoice(JsonNode event) {
+        JsonNode p = event.path("payload");
+        String deliveryId = event.path("aggregateId").asText(null);
+        String tenant = event.path("tenantId").asText(null);
+        String sender = p.path("senderId").asText(null);
+        String amount = p.path("agreedAmount").asText(null);
+        if (deliveryId == null || tenant == null || sender == null || amount == null || p.path("agreedAmount").isNull()
+                || new BigDecimal(amount).signum() <= 0) {
+            return null;
+        }
+        String currency = p.hasNonNull("currency") ? p.path("currency").asText() : "XAF";
+        InvoiceLine line = InvoiceLine.of(1, "Livraison " + deliveryId, 1.0,
+                Money.of(new BigDecimal(amount).doubleValue(), currency), BigDecimal.ZERO, LineItemType.DELIVERY_FEE);
+        String issuerType = null;
+        String issuerId = null;
+        if (p.hasNonNull("agencyId")) {
+            issuerType = "AGENCY";
+            issuerId = p.path("agencyId").asText();
+        } else if (p.hasNonNull("freelancerOrgId")) {
+            issuerType = "FREELANCER_ORG";
+            issuerId = p.path("freelancerOrgId").asText();
+        }
+        return new GenerateInvoiceCommand(UUID.fromString(tenant), "DEFAULT", "CM", deliveryId, null, sender,
+                List.of(line), List.of(), currency, LocalDateTime.now().plusDays(7), issuerType, issuerId, null,
+                null, List.of(), null, null);
     }
 
     /**
@@ -103,28 +114,24 @@ public class InvoiceBillingEventConsumer {
             groupId = "${tnt.kafka.consumer.groups.billing-invoice:tnt-billing-invoice-group}",
             containerFactory = "invoiceKafkaListenerContainerFactory"
     )
-    public void onPaymentConfirmed(ConsumerRecord<String, String> record) {
-        log.info("InvoiceBillingEventConsumer received PaymentConfirmed, offset={}", record.offset());
-        try {
-            Map<?, ?> payload = objectMapper.readValue(record.value(), Map.class);
-
-            UUID tenantId   = UUID.fromString((String) payload.get("tenantId"));
-            UUID invoiceId  = UUID.fromString((String) payload.get("invoiceId"));
-            String paymentRef = (String) payload.get("paymentRef");
-
-            if (paymentRef == null) {
-                log.warn("Missing paymentRef in PaymentConfirmed event, skipping");
-                return;
-            }
-
-            MarkInvoicePaidCommand command = new MarkInvoicePaidCommand(tenantId, invoiceId, paymentRef);
-            invoiceService.markPaidAsSystem(command)
-                    .doOnSuccess(inv -> log.info("Invoice marked paid: {}", inv.getNumber()))
-                    .doOnError(e -> log.error("Failed to mark invoice paid={}: {}", invoiceId, e.getMessage()))
-                    .subscribe();
-
-        } catch (Exception e) {
-            log.error("Failed processing PaymentConfirmed event at offset={}: {}", record.offset(), e.getMessage(), e);
+    public void onPaymentConfirmed(ConsumerRecord<String, String> record) throws Exception {
+        Map<?, ?> payload = objectMapper.readValue(record.value(), Map.class);
+        if (payload.get("invoiceId") == null) {
+            // Settlement-level confirmations (Core SettlementService, R1 2026-11-26) carry no invoice:
+            // their caller issues the invoice already paid. Nothing to mark here.
+            log.debug("PaymentConfirmed without invoiceId (settlement={}), nothing to mark paid",
+                    payload.get("settlementId"));
+            return;
         }
+        String paymentRef = (String) payload.get("paymentRef");
+        if (paymentRef == null) {
+            log.warn("Missing paymentRef in PaymentConfirmed event, skipping");
+            return;
+        }
+        UUID tenantId = UUID.fromString((String) payload.get("tenantId"));
+        UUID invoiceId = UUID.fromString((String) payload.get("invoiceId"));
+        var invoice = ReactiveListenerSupport.awaitBounded(
+                invoiceService.markPaidAsSystem(new MarkInvoicePaidCommand(tenantId, invoiceId, paymentRef)), TIMEOUT);
+        log.info("Invoice marked paid: {}", invoice != null ? invoice.getNumber() : invoiceId);
     }
 }

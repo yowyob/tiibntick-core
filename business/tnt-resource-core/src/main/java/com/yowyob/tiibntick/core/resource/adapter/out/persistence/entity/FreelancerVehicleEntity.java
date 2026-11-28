@@ -26,6 +26,7 @@ public class FreelancerVehicleEntity implements Persistable<UUID> {
     @Transient
     private boolean isNew;
     @Column("freelancer_org_id")          private UUID freelancerOrgId;
+    @Column("owner_actor_id")             private UUID ownerActorId;
     @Column("vehicle_type")               private String vehicleType;
     @Column("brand")                      private String brand;
     @Column("model")                      private String model;
@@ -46,6 +47,7 @@ public class FreelancerVehicleEntity implements Persistable<UUID> {
         FreelancerVehicleEntity e = new FreelancerVehicleEntity();
         e.id = v.vehicleId();
         e.freelancerOrgId = v.ownerOrgId();
+        e.ownerActorId = v.ownerActorId();
         e.vehicleType = v.type().name();
         e.brand = v.brand();
         e.model = v.model();
@@ -66,7 +68,7 @@ public class FreelancerVehicleEntity implements Persistable<UUID> {
 
     public FreelancerVehicle toDomain() {
         return FreelancerVehicle.rehydrate(
-                id, freelancerOrgId, VehicleType.valueOf(vehicleType),
+                id, freelancerOrgId, ownerActorId, VehicleType.valueOf(vehicleType),
                 brand, model, plateNumber, maxCapacityKg, volumeM3,
                 fuelType != null ? FuelType.valueOf(fuelType) : null,
                 fuelConsumptionLPer100km, registrationDocRef, insuranceDocRef,
@@ -79,6 +81,8 @@ public class FreelancerVehicleEntity implements Persistable<UUID> {
     @Override public boolean isNew() { return isNew; }
     public void setNew(boolean isNew) { this.isNew = isNew; }
     public UUID getFreelancerOrgId() { return freelancerOrgId; }
+    public UUID getOwnerActorId() { return ownerActorId; }
+    public void setOwnerActorId(UUID ownerActorId) { this.ownerActorId = ownerActorId; }
     public void setFreelancerOrgId(UUID freelancerOrgId) { this.freelancerOrgId = freelancerOrgId; }
     public String getVehicleType() { return vehicleType; }
     public void setVehicleType(String vehicleType) { this.vehicleType = vehicleType; }

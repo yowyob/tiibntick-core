@@ -47,7 +47,7 @@ class TntJwtSelfServiceRolesTest {
                 .build();
         TntSecurityConfig config = new TntSecurityConfig();
         org.springframework.test.util.ReflectionTestUtils.setField(config, "systemTenantId",
-                "00000000-0000-0000-0000-000000000001");
+                com.yowyob.tiibntick.common.tenant.SystemTenant.id().toString());
         ReactiveJwtAuthenticationConverter converter = config.tntJwtAuthenticationConverter();
 
         Set<String> authorities = converter.convert(jwt).block().getAuthorities().stream()

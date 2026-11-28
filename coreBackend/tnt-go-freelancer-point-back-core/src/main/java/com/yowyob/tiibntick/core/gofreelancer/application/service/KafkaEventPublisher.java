@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yowyob.kernel.event.application.port.in.PublishEventUseCase;
 import com.yowyob.kernel.event.domain.model.DomainEventEnvelope;
 import com.yowyob.tiibntick.common.kafka.TntTopics;
-import com.yowyob.tiibntick.core.gofreelancer.adapter.out.kafka.event.AnnouncementPublishedEvent;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.kafka.event.FreelancerCreatedEvent;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.kafka.event.FreelancerValidatedEvent;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.kafka.event.MatchingNotificationEvent;
@@ -56,14 +55,6 @@ public class KafkaEventPublisher implements EventPublisher {
         enqueue(TntTopics.ACTOR_KYC_VALIDATED, event,
                 event.getFreelancerId().toString(),
                 AGGREGATE_TYPE_FREELANCER,
-                SOLUTION_CODE);
-    }
-
-    @Override
-    public void publishAnnouncementPublished(AnnouncementPublishedEvent event) {
-        enqueue(TntTopics.GOFP_ANNOUNCEMENT_PUBLISHED, event,
-                event.getAnnouncement().getId().toString(),
-                AGGREGATE_TYPE_ANNOUNCEMENT,
                 SOLUTION_CODE);
     }
 

@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="
+           http://www.liquibase.org/xml/ns/dbchangelog
+           http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.23.xsd">
+
+    <!--
+        Closure of the Go-Freelancer deduplication (spec gofp-dedup §4.6, maintainer decision D-154 of 2026-11-27:
+        "Oui, avec garde-fous"). Destructive changes, decided by the maintainer: the legacy tables and columns
+        whose data now lives in the core are dropped. The Go code that still read them was removed first.
+
+        Guard rails: every drop is preceded by a precondition on the census of gdd-final-901 (legacy rows
+        without a core counterpart = 0) with onFail = HALT. A database holding such rows stops the migration
+        before anything is dropped; diagnostic: SELECT * FROM public.gdd_final_uncovered() WHERE uncovered > 0.
+
+        Kept on purpose (data or code still live): gofreelancer_vehicles (photos, colour, trunk: no core
+        field), announcement_subscriptions (Kafka subscription consumer), the courier counters and position of
+        gofp_freelancers (no core quota use case yet), deliveries.duration (not part of H7).
+    -->
+
+    <changeSet id="gdd-final-901-closure-census" author="gdd-final" labels="gdd-final">
+        <comment>Census functions: legacy rows without a core counterpart, per closure item.</comment>
+        <sqlFile path="db/changelog/20261127_gdd_final_901_closure_census.sql" relativeToChangelogFile="false"
+                 splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="gdd-final-902-closure-gate-and-foreign-keys" author="gdd-final" labels="gdd-final">
+        <preConditions onFail="HALT" onError="HALT"
+                       onFailMessage="gdd-final: legacy rows without a core counterpart; nothing dropped. Run SELECT * FROM public.gdd_final_uncovered() WHERE uncovered &gt; 0">
+            <sqlCheck expectedResult="0">SELECT COALESCE(sum(uncovered), 0) FROM public.gdd_final_uncovered()</sqlCheck>
+        </preConditions>
+        <comment>Whole census at zero, then every foreign key pointing at a table the closure drops is removed
+            (whatever its name), so that the drops below depend on no constraint left by an older changelog.</comment>
+        <sql splitStatements="false" stripComments="true">
+            DO $$
+            DECLARE
+                fk RECORD;
+            BEGIN
+                FOR fk IN
+                    SELECT c.conname, c.conrelid::regclass AS owner
+                      FROM pg_constraint c
+                     WHERE c.contype = 'f'
+                       AND c.confrelid IN (
+                           SELECT to_regclass('public.' || t)
+                             FROM unnest(ARRAY['announcements', 'responses', 'packets', 'evaluations', 'payments',
+                                               'relay_deposits', 'person_addresses', 'addresses', 'notifications',
+                                               'notification_annonces', 'notification_livraisons', 'password_tokens',
+                                               'delivery_person_pricing', 'users', 'persons', 'clients',
+                                               'delivery_persons', 'logistics']) AS t
+                            WHERE to_regclass('public.' || t) IS NOT NULL)
+                LOOP
+                    EXECUTE format('ALTER TABLE %s DROP CONSTRAINT IF EXISTS %I', fk.owner, fk.conname);
+                END LOOP;
+            END
+            $$;
+        </sql>
+    </changeSet>
+
+    <changeSet id="gdd-final-903-drop-tables-copied-to-core" author="gdd-final" labels="gdd-final">
+        <preConditions onFail="HALT" onError="HALT"
+                       onFailMessage="gdd-final-903: legacy rows not copied to the core; nothing dropped. Run SELECT * FROM public.gdd_final_uncovered() WHERE uncovered &gt; 0">
+            <sqlCheck expectedResult="0">
+                SELECT COALESCE(sum(uncovered), 0) FROM public.gdd_final_uncovered()
+                 WHERE item IN ('announcements', 'responses', 'packets', 'evaluations', 'payments', 'relay_deposits',
+                                'addresses', 'person_addresses')
+            </sqlCheck>
+        </preConditions>
+        <comment>Tables whose rows were copied to the core with the same ids (lots L1-L4): announcements →
+            tnt_delivery_announcements, responses → tnt_announcement_responses, packets → tnt_parcels,
+            evaluations → tnt_tp_ratings, payments (PAID) → billing.wallet_settlements, relay_deposits →
+            tnt_hub_package_entries, addresses / person_addresses → tnt_geography.</comment>
+        <sql splitStatements="true" stripComments="true">
+            DROP TABLE IF EXISTS responses;
+            DROP TABLE IF EXISTS announcements;
+            DROP TABLE IF EXISTS evaluations;
+            DROP TABLE IF EXISTS payments;
+            DROP TABLE IF EXISTS relay_deposits;
+            DROP TABLE IF EXISTS packets;
+            DROP TABLE IF EXISTS person_addresses;
+            DROP TABLE IF EXISTS addresses;
+        </sql>
+    </changeSet>
+
+    <changeSet id="gdd-final-904-drop-deliveries-legacy-columns" author="gdd-final" labels="gdd-final">
+        <preConditions onFail="HALT" onError="HALT"
+                       onFailMessage="gdd-final-904: gofp deliveries without a core delivery; nothing dropped. Run SELECT * FROM public.gdd_final_uncovered() WHERE uncovered &gt; 0">
+            <sqlCheck expectedResult="0">
+                SELECT COALESCE(sum(uncovered), 0) FROM public.gdd_final_uncovered()
+                 WHERE item = 'deliveries.legacy_columns'
+            </sqlCheck>
+        </preConditions>
+        <comment>H7: status, assignment, agreed price, windows and actual times are read from the core delivery
+            (gdd-l1-107 copied the agreed terms).</comment>
+        <sql splitStatements="true" stripComments="true">
+            ALTER TABLE deliveries DROP COLUMN IF EXISTS status;
+            ALTER TABLE deliveries DROP COLUMN IF EXISTS freelancer_id;
+            ALTER TABLE deliveries DROP COLUMN IF EXISTS tarif;
+            ALTER TABLE deliveries DROP COLUMN IF EXISTS pickup_min_time;
+            ALTER TABLE deliveries DROP COLUMN IF EXISTS pickup_max_time;
+            ALTER TABLE deliveries DROP COLUMN IF EXISTS delivery_min_time;
+            ALTER TABLE deliveries DROP COLUMN IF EXISTS delivery_max_time;
+            ALTER TABLE deliveries DROP COLUMN IF EXISTS actual_pickup_time;
+            ALTER TABLE deliveries DROP COLUMN IF EXISTS actual_delivery_time;
+        </sql>
+    </changeSet>
+
+    <changeSet id="gdd-final-905-drop-delivery-needs-legacy-columns" author="gdd-final" labels="gdd-final">
+        <preConditions onFail="HALT" onError="HALT"
+                       onFailMessage="gdd-final-905: needs whose packet or assignment has no core counterpart; nothing dropped. Run SELECT * FROM public.gdd_final_uncovered() WHERE uncovered &gt; 0">
+            <sqlCheck expectedResult="0">
+                SELECT COALESCE(sum(uncovered), 0) FROM public.gdd_final_uncovered()
+                 WHERE item IN ('delivery_needs.packet_id', 'delivery_needs.legacy_state')
+            </sqlCheck>
+        </preConditions>
+        <comment>Lot L2: the packet is the core parcel (parcel_id), the status, delivery and courier are derived
+            from the core announcement and delivery; the read fallback on the stored columns is removed.</comment>
+        <sql splitStatements="true" stripComments="true">
+            ALTER TABLE delivery_needs DROP COLUMN IF EXISTS packet_id;
+            ALTER TABLE delivery_needs DROP COLUMN IF EXISTS status;
+            ALTER TABLE delivery_needs DROP COLUMN IF EXISTS delivery_id;
+            ALTER TABLE delivery_needs DROP COLUMN IF EXISTS assigned_freelancer_id;
+        </sql>
+    </changeSet>
+
+    <changeSet id="gdd-final-906-drop-gofp-profile-legacy-columns" author="gdd-final" labels="gdd-final">
+        <preConditions onFail="HALT" onError="HALT"
+                       onFailMessage="gdd-final-906: loyalty or rating migration (gdd-l3-303/304) not applied; nothing dropped.">
+            <sqlCheck expectedResult="0">
+                SELECT COALESCE(sum(uncovered), 0) FROM public.gdd_final_uncovered()
+                 WHERE item = 'gofp_profiles.aggregates'
+            </sqlCheck>
+        </preConditions>
+        <comment>Loyalty, order count and ratings are read from the core (lot L3); local password hashes are
+            gone with the local password routes (D-054: authentication and reset belong to the Kernel).</comment>
+        <sql splitStatements="true" stripComments="true">
+            ALTER TABLE gofp_users DROP COLUMN IF EXISTS password_hash;
+            ALTER TABLE gofp_clients DROP COLUMN IF EXISTS loyalty_status;
+            ALTER TABLE gofp_clients DROP COLUMN IF EXISTS total_orders;
+            ALTER TABLE gofp_clients DROP COLUMN IF EXISTS rating;
+            ALTER TABLE gofp_freelancers DROP COLUMN IF EXISTS rating;
+        </sql>
+    </changeSet>
+
+    <changeSet id="gdd-final-907-drop-tables-without-reader" author="gdd-final" labels="gdd-final">
+        <preConditions onFail="HALT" onError="HALT"
+                       onFailMessage="gdd-final-907: legacy price grids without a FREELANCER-GRID policy; nothing dropped. Run SELECT * FROM public.gdd_final_uncovered() WHERE uncovered &gt; 0">
+            <sqlCheck expectedResult="0">
+                SELECT COALESCE(sum(uncovered), 0) FROM public.gdd_final_uncovered()
+                 WHERE item = 'delivery_person_pricing'
+            </sqlCheck>
+        </preConditions>
+        <comment>Local notification feed (no reader, lot L4-2), password tokens (D-054), legacy price grids
+            (each owner has its FREELANCER-GRID billing policy, lot L4 backfill).</comment>
+        <sql splitStatements="true" stripComments="true">
+            DROP TABLE IF EXISTS notification_annonces;
+            DROP TABLE IF EXISTS notification_livraisons;
+            DROP TABLE IF EXISTS notifications;
+            DROP TABLE IF EXISTS password_tokens;
+            DROP TABLE IF EXISTS delivery_person_pricing;
+        </sql>
+    </changeSet>
+
+    <changeSet id="gdd-final-908-drop-legacy-identity-tables" author="gdd-final" labels="gdd-final">
+        <preConditions onFail="HALT" onError="HALT"
+                       onFailMessage="gdd-final-908: legacy persons, couriers, vehicles or users unknown to the new model; nothing dropped. Run SELECT * FROM public.gdd_final_uncovered() WHERE uncovered &gt; 0">
+            <sqlCheck expectedResult="0">
+                SELECT COALESCE(sum(uncovered), 0) FROM public.gdd_final_uncovered()
+                 WHERE item IN ('users', 'persons', 'clients', 'delivery_persons', 'logistics',
+                                'live_refs.delivery_persons', 'live_refs.logistics', 'live_refs.persons',
+                                'live_refs.users')
+            </sqlCheck>
+        </preConditions>
+        <comment>Identity tables from before the gofp_* projection: only demo fixtures and rows of known actors
+            remain.</comment>
+        <sql splitStatements="true" stripComments="true">
+            DROP TABLE IF EXISTS logistics;
+            DROP TABLE IF EXISTS clients;
+            DROP TABLE IF EXISTS delivery_persons;
+            DROP TABLE IF EXISTS persons;
+            DROP TABLE IF EXISTS users;
+        </sql>
+    </changeSet>
+
+    <changeSet id="gdd-final-909-drop-closure-census" author="gdd-final" labels="gdd-final">
+        <comment>The census is no longer needed once the closure is applied.</comment>
+        <sql splitStatements="true" stripComments="true">
+            DROP FUNCTION IF EXISTS public.gdd_final_uncovered();
+            DROP FUNCTION IF EXISTS public.gdd_final_logistics_covered(UUID);
+            DROP FUNCTION IF EXISTS public.gdd_final_person_covered(UUID);
+            DROP FUNCTION IF EXISTS public.gdd_final_known_actor(UUID);
+            DROP FUNCTION IF EXISTS public.gdd_final_fixture(UUID);
+        </sql>
+    </changeSet>
+</databaseChangeLog>

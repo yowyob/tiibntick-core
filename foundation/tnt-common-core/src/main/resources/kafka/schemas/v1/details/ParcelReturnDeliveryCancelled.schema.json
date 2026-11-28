@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:tnt:kafka:v1:details:ParcelReturnDeliveryCancelled",
+  "title": "details of ParcelReturnDeliveryCancelled (D-148: return cancelled before pickup, the parcel stays RETURN_REQUESTED)",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["returnCause", "returnCostPayer", "failedReturnCount"],
+  "properties": {
+    "returnCause": {"enum": ["RETURN_DELIVERY_CANCELLED"]},
+    "returnCostPayer": {"enum": ["SENDER", "RECIPIENT", "COURIER", "PLATFORM", "RELAY", "AGENCY", "NONE", null]},
+    "failedReturnCount": {"type": "integer", "minimum": 1}
+  }
+}

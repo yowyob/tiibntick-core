@@ -22,4 +22,9 @@ public interface AddressUseCase {
     Mono<Void> deleteAddress(UUID id);
 
     Flux<AddressDTO> searchAddresses(String query);
+
+    /** Same search, narrowed to a city (the form already knows it): geocoding is biased to it and the fallback address carries it. */
+    default Flux<AddressDTO> searchAddresses(String query, String city) {
+        return searchAddresses(query);
+    }
 }

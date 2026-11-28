@@ -8,7 +8,6 @@ import com.yowyob.tiibntick.core.billing.pricing.domain.model.enums.PolicyOwnerT
 import com.yowyob.tiibntick.core.billing.pricing.domain.model.enums.PolicyStatus;
 import com.yowyob.tiibntick.core.billing.pricing.domain.model.enums.SurchargeType;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.FreelancerPricingDTO;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.FreelancerPricingPolicy;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -60,16 +59,6 @@ public final class FreelancerGridPolicyMapper {
         }
     }
 
-    /** Legacy {@code delivery_person_pricing} row → grid DTO. */
-    public static FreelancerPricingDTO toGrid(FreelancerPricingPolicy legacy) {
-        return FreelancerPricingDTO.builder()
-                .pricePerKg(legacy.getPricePerKg()).pricePerCbm(legacy.getPricePerCbm())
-                .pricePerKm(legacy.getPricePerKm()).fragileSurcharge(legacy.getFragileSurcharge())
-                .perishableSurcharge(legacy.getPerishableSurcharge()).baseFee(legacy.getBaseFee())
-                .waitingFeePerMinute(0.0)
-                .currency(normalizeCurrency(legacy.getCurrency())).source("LEGACY").build();
-    }
-
     /**
      * Billing policy → grid DTO (best effort for policies not authored as a grid: the first rule by
      * priority is projected; conditions and extra rules are not representable in a flat grid).
@@ -83,6 +72,7 @@ public final class FreelancerGridPolicyMapper {
                 .pricePerKg(amount(rule == null ? null : rule.getPerKgRate()))
                 .pricePerCbm(amount(rule == null ? null : rule.getPerCbmRate()))
                 .waitingFeePerMinute(amount(rule == null ? null : rule.getWaitingFeePerMinute()))
+                .minimumFee(amount(rule == null ? null : rule.getMinimumPrice()))
                 .fragileSurcharge(surcharge(policy, "FRAGILE"))
                 .perishableSurcharge(surcharge(policy, "PERISHABLE"))
                 .currency(currency)
@@ -100,6 +90,7 @@ public final class FreelancerGridPolicyMapper {
                 .pricePerKg(pick(overrides.getPricePerKg(), base.getPricePerKg()))
                 .pricePerCbm(pick(overrides.getPricePerCbm(), base.getPricePerCbm()))
                 .waitingFeePerMinute(pick(overrides.getWaitingFeePerMinute(), base.getWaitingFeePerMinute()))
+                .minimumFee(pick(overrides.getMinimumFee(), base.getMinimumFee()))
                 .fragileSurcharge(pick(overrides.getFragileSurcharge(), base.getFragileSurcharge()))
                 .perishableSurcharge(pick(overrides.getPerishableSurcharge(), base.getPerishableSurcharge()))
                 .currency(normalizeCurrency(overrides.getCurrency() != null ? overrides.getCurrency()
@@ -118,6 +109,7 @@ public final class FreelancerGridPolicyMapper {
                 .perKgRate(money(grid.getPricePerKg(), cur, false))
                 .perCbmRate(money(grid.getPricePerCbm(), cur, false))
                 .waitingFeePerMinute(money(grid.getWaitingFeePerMinute(), cur, false))
+                .minimumPrice(money(grid.getMinimumFee(), cur, false))
                 .build();
         List<SurchargeRule> surcharges = new ArrayList<>();
         addSurcharge(surcharges, "Supplément fragile", FRAGILE_CONDITION, grid.getFragileSurcharge());

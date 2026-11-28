@@ -33,7 +33,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class LocalReactivePermissionResolverTest {
 
-    private static final UUID SYSTEM_TENANT = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private static final UUID SYSTEM_TENANT = com.yowyob.tiibntick.common.tenant.SystemTenant.id();
     private static final UUID USER_TENANT   = UUID.fromString("dbae6615-8f7e-4ef5-9e58-23a6179acf22");
     private static final UUID USER          = UUID.randomUUID();
 
@@ -61,6 +61,41 @@ class LocalReactivePermissionResolverTest {
 
         StepVerifier.create(resolver.resolvePermissions(USER_TENANT, USER))
                 .assertNext(perms -> assertThat(perms).contains("announcement:respond", "announcement:elect"))
+                .verifyComplete();
+    }
+
+    @Test
+    void aFormerPerTenantTntAdminAssignmentGrantsNothing() {
+        // D-169: TNT_ADMIN lives in the platform-admin registry only; the old rows are not migrated and give nothing.
+        Role admin = new Role(UUID.randomUUID(), SYSTEM_TENANT, "TNT_ADMIN", "Admin", RoleScopeType.SYSTEM,
+                Set.of("*"), false);
+        UserRoleAssignment assignment = UserRoleAssignment.assign(
+                SYSTEM_TENANT, USER, admin.id(), RoleScopeType.SYSTEM, SYSTEM_TENANT);
+        when(assignmentRepository.findByTenantIdAndUserId(SYSTEM_TENANT, USER)).thenReturn(Flux.just(assignment));
+        when(roleRepository.findById(SYSTEM_TENANT, admin.id())).thenReturn(Mono.just(admin));
+
+        StepVerifier.create(resolver.resolvePermissions(SYSTEM_TENANT, USER))
+                .assertNext(perms -> assertThat(perms).isEmpty())
+                .verifyComplete();
+    }
+
+    @Test
+    void scopedRoleEntriesProveOnlyAgencyAndOrganisationAssignments() {
+        // D-176: what the Core assigned is the proof for the agency/organisation roles of a token
+        UUID agency = UUID.randomUUID();
+        Role manager = new Role(UUID.randomUUID(), SYSTEM_TENANT, "AGENCY_MANAGER", "Manager", RoleScopeType.AGENCY,
+                Set.of(), false);
+        Role freelancer = new Role(UUID.randomUUID(), SYSTEM_TENANT, "FREELANCER", "Freelancer", RoleScopeType.TENANT,
+                Set.of(), false);
+        when(assignmentRepository.findByTenantIdAndUserId(USER_TENANT, USER)).thenReturn(Flux.just(
+                UserRoleAssignment.assign(USER_TENANT, USER, manager.id(), RoleScopeType.AGENCY, agency),
+                UserRoleAssignment.assign(USER_TENANT, USER, freelancer.id(), RoleScopeType.TENANT, USER_TENANT)));
+        when(roleRepository.findById(USER_TENANT, manager.id())).thenReturn(Mono.empty());
+        when(roleRepository.findById(SYSTEM_TENANT, manager.id())).thenReturn(Mono.just(manager));
+
+        StepVerifier.create(resolver.scopedRoleEntries(USER_TENANT, USER).collectList())
+                .assertNext(entries -> assertThat(entries)
+                        .containsExactlyInAnyOrder("AGENCY_MANAGER", "AGENCY_MANAGER#AGENCY:" + agency))
                 .verifyComplete();
     }
 

@@ -1,5 +1,6 @@
 package com.yowyob.tiibntick.core.notify.infrastructure.messaging;
 
+import com.yowyob.tiibntick.core.notify.domain.model.FreelancerOrgNotificationTemplates;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yowyob.kernel.i18n.domain.enums.SupportedLanguage;
@@ -9,6 +10,7 @@ import com.yowyob.tiibntick.core.notify.domain.enums.NotificationChannel;
 import com.yowyob.tiibntick.core.notify.domain.enums.NotificationPriority;
 import com.yowyob.tiibntick.core.notify.domain.enums.NotificationType;
 import com.yowyob.tiibntick.core.notify.domain.vo.NotificationModel;
+import com.yowyob.tiibntick.common.kafka.ReactiveListenerSupport;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,7 +18,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import java.util.Map;
 
@@ -39,15 +40,14 @@ import java.util.Map;
  * <li>{@code tnt.admin.freelancer_org.suspended} — FreelancerOrg suspended</li>
  * <li>{@code tnt.admin.freelancer_org.unsuspended} — FreelancerOrg
  * unsuspended</li>
- * <li>{@code tnt.delivery.freelancer_org.assigned} — FreelancerOrg assigned to
- * delivery</li>
+ * <li>{@code DeliveryFreelancerOrgAssigned} of {@code tnt.delivery.events} (lot L8, was
+ * {@code tnt.delivery.freelancer_org.assigned}) — FreelancerOrg assigned to delivery</li>
  * <li>{@code tnt.billing.template.applied} — Billing template applied</li>
  * </ul>
  *
  * <p>
- * All operations are non-blocking (reactive). Errors are logged but not
- * re-thrown
- * to avoid consumer group rebalances for transient notification failures.
+ * Each listener awaits its notification work (lot L7); a failure is retried, then dead-lettered to
+ * {@code tnt.dlq}.
  *
  * @author MANFOUO Braun
  */
@@ -59,13 +59,16 @@ public class FreelancerOrgKafkaEventConsumer {
     private final ISendNotificationUseCase notificationUseCase;
     private final ObjectMapper objectMapper;
     private final NotifyProperties properties;
+    private final ReactiveListenerSupport listenerSupport;
 
     public FreelancerOrgKafkaEventConsumer(ISendNotificationUseCase notificationUseCase,
             @Qualifier("tntObjectMapper") ObjectMapper objectMapper,
-            NotifyProperties properties) {
+            NotifyProperties properties,
+            ReactiveListenerSupport listenerSupport) {
         this.notificationUseCase = notificationUseCase;
         this.objectMapper = objectMapper;
         this.properties = properties;
+        this.listenerSupport = listenerSupport;
     }
 
     // ── KYC Approved (FreelancerOrg verified or level upgraded) ──────────────
@@ -76,7 +79,7 @@ public class FreelancerOrgKafkaEventConsumer {
      * If the KYC_LEVEL is FULL, sends KYC_LEVEL_UPGRADED; otherwise
      * FREELANCER_ORG_VERIFIED.
      */
-    @KafkaListener(topics = "tnt.admin.freelancer_org.kyc_approved", groupId = "${spring.kafka.consumer.group-id:tnt-notify-core}", containerFactory = "notifyKafkaListenerContainerFactory")
+    @KafkaListener(topics = com.yowyob.tiibntick.common.kafka.TntTopics.ADMIN_FREELANCER_ORG_KYC_APPROVED, groupId = "${tnt.kafka.consumer.groups.notify:tnt-notify-core}", containerFactory = "notifyKafkaListenerContainerFactory")
     public void handleKycApproved(ConsumerRecord<String, String> record) {
         log.info("Received tnt.admin.freelancer_org.kyc_approved key={}", record.key());
         parseAndDispatch(record.value(), (json) -> {
@@ -110,7 +113,7 @@ public class FreelancerOrgKafkaEventConsumer {
 
     // ── KYC Rejected ─────────────────────────────────────────────────────────
 
-    @KafkaListener(topics = "tnt.admin.freelancer_org.kyc_rejected", groupId = "${spring.kafka.consumer.group-id:tnt-notify-core}", containerFactory = "notifyKafkaListenerContainerFactory")
+    @KafkaListener(topics = com.yowyob.tiibntick.common.kafka.TntTopics.ADMIN_FREELANCER_ORG_KYC_REJECTED, groupId = "${tnt.kafka.consumer.groups.notify:tnt-notify-core}", containerFactory = "notifyKafkaListenerContainerFactory")
     public void handleKycRejected(ConsumerRecord<String, String> record) {
         log.info("Received tnt.admin.freelancer_org.kyc_rejected key={}", record.key());
         parseAndDispatch(record.value(), (json) -> {
@@ -130,7 +133,7 @@ public class FreelancerOrgKafkaEventConsumer {
 
     // ── FreelancerOrg Suspended ───────────────────────────────────────────────
 
-    @KafkaListener(topics = "tnt.admin.freelancer_org.suspended", groupId = "${spring.kafka.consumer.group-id:tnt-notify-core}", containerFactory = "notifyKafkaListenerContainerFactory")
+    @KafkaListener(topics = com.yowyob.tiibntick.common.kafka.TntTopics.ADMIN_FREELANCER_ORG_SUSPENDED, groupId = "${tnt.kafka.consumer.groups.notify:tnt-notify-core}", containerFactory = "notifyKafkaListenerContainerFactory")
     public void handleOrgSuspended(ConsumerRecord<String, String> record) {
         log.info("Received tnt.admin.freelancer_org.suspended key={}", record.key());
         parseAndDispatch(record.value(), (json) -> {
@@ -150,7 +153,7 @@ public class FreelancerOrgKafkaEventConsumer {
 
     // ── FreelancerOrg Unsuspended ─────────────────────────────────────────────
 
-    @KafkaListener(topics = "tnt.admin.freelancer_org.unsuspended", groupId = "${spring.kafka.consumer.group-id:tnt-notify-core}", containerFactory = "notifyKafkaListenerContainerFactory")
+    @KafkaListener(topics = com.yowyob.tiibntick.common.kafka.TntTopics.ADMIN_FREELANCER_ORG_UNSUSPENDED, groupId = "${tnt.kafka.consumer.groups.notify:tnt-notify-core}", containerFactory = "notifyKafkaListenerContainerFactory")
     public void handleOrgUnsuspended(ConsumerRecord<String, String> record) {
         log.info("Received tnt.admin.freelancer_org.unsuspended key={}", record.key());
         parseAndDispatch(record.value(), (json) -> {
@@ -168,61 +171,67 @@ public class FreelancerOrgKafkaEventConsumer {
 
     // ── FreelancerOrg Assigned to Delivery ───────────────────────────────────
 
+    static final String FREELANCER_ORG_ASSIGNED = "DeliveryFreelancerOrgAssigned";
+
     /**
-     * Handles FreelancerOrg assignment to a delivery.
-     * Sends SUB_DELIVERER_MISSION_ASSIGNED to the sub-deliverer if applicable.
+     * Handles FreelancerOrg assignment to a delivery ({@code DeliveryFreelancerOrgAssigned}; other event types and
+     * legacy records are ignored). Notifies the org; when the role is SUB_DELIVERER and the delivery has a courier,
+     * the sub-deliverer too.
      */
-    @KafkaListener(topics = "tnt.delivery.freelancer_org.assigned", groupId = "${spring.kafka.consumer.group-id:tnt-notify-core}", containerFactory = "notifyKafkaListenerContainerFactory")
-    public void handleFreelancerOrgAssigned(ConsumerRecord<String, String> record) {
-        log.info("Received tnt.delivery.freelancer_org.assigned key={}", record.key());
-        parseAndDispatch(record.value(), (json) -> {
-            String tenantId = resolveTenantId(json);
-            String organizationId = resolveOrganizationId(json);
-            String deliveryId = jsonText(json, "deliveryId");
-            String freelancerOrgId = jsonText(json, "freelancerOrgId");
-            String freelancerRole = jsonText(json, "freelancerRole");
+    @KafkaListener(topics = com.yowyob.tiibntick.common.kafka.TntTopics.DELIVERY_EVENTS, groupId = "${tnt.kafka.consumer.groups.notify:tnt-notify-core}", containerFactory = "notifyKafkaListenerContainerFactory")
+    public void handleFreelancerOrgAssigned(ConsumerRecord<String, String> record) throws Exception {
+        JsonNode event = objectMapper.readTree(record.value());
+        if (!com.yowyob.tiibntick.common.kafka.TntAggregateEvent.isAggregateEvent(event)
+                || !FREELANCER_ORG_ASSIGNED.equals(event.path("eventType").asText())) {
+            return;
+        }
+        log.info("Received DeliveryFreelancerOrgAssigned key={}", record.key());
+        JsonNode delivery = event.path("payload");
+        String tenantId = resolveTenantId(event);
+        String organizationId = resolveOrganizationId(event);
+        String deliveryId = event.path("aggregateId").asText();
+        String freelancerOrgId = jsonText(delivery, "freelancerOrgId");
+        String freelancerRole = jsonText(event.path("details"), "role");
 
-            // Notify the org about mission assignment
-            NotificationModel modelOrg = new NotificationModel(
-                    "notify.freelancer_org.mission_assigned", SupportedLanguage.FR_CM.getTag(),
+        // Notify the org about the delivery assignment
+        NotificationModel modelOrg = new NotificationModel(
+                FreelancerOrgNotificationTemplates.FREELANCER_ORG_DELIVERY_ASSIGNED, SupportedLanguage.FR_CM.getTag(),
+                Map.of("deliveryId", nullSafe(deliveryId),
+                        "freelancerOrgId", nullSafe(freelancerOrgId)),
+                NotificationPriority.HIGH);
+        Mono<?> orgNotif = notificationUseCase.send(
+                tenantId, organizationId, freelancerOrgId, freelancerOrgId, modelOrg, NotificationChannel.PUSH_FCM);
+
+        // If SUB_DELIVERER is assigned, notify them specifically
+        String subDelivererId = jsonText(delivery, "courierId");
+        if ("SUB_DELIVERER".equals(freelancerRole) && subDelivererId != null && !subDelivererId.isBlank()) {
+            NotificationModel modelSub = new NotificationModel(
+                    FreelancerOrgNotificationTemplates.SUB_DELIVERER_DELIVERY_ASSIGNED, SupportedLanguage.FR_CM.getTag(),
                     Map.of("deliveryId", nullSafe(deliveryId),
-                            "freelancerOrgId", nullSafe(freelancerOrgId)),
+                            "orgId", nullSafe(freelancerOrgId)),
                     NotificationPriority.HIGH);
-
-            Mono<?> orgNotif = notificationUseCase.send(
-                    tenantId, organizationId, freelancerOrgId, freelancerOrgId, modelOrg, NotificationChannel.PUSH_FCM);
-
-            // If SUB_DELIVERER is assigned, notify them specifically
-            if ("SUB_DELIVERER".equals(freelancerRole)) {
-                String subDelivererId = jsonText(json, "deliveryPersonId");
-                if (subDelivererId != null && !subDelivererId.isBlank()) {
-                    NotificationModel modelSub = new NotificationModel(
-                            "notify.sub_deliverer.mission_assigned", SupportedLanguage.FR_CM.getTag(),
-                            Map.of("deliveryId", nullSafe(deliveryId),
-                                    "orgId", nullSafe(freelancerOrgId)),
-                            NotificationPriority.HIGH);
-                    return orgNotif
-                            .then(notificationUseCase.send(
-                                    tenantId, organizationId, subDelivererId, subDelivererId, modelSub, NotificationChannel.PUSH_FCM))
-                            .then(notificationUseCase.send(
-                                    tenantId, organizationId, subDelivererId, subDelivererId, modelSub, NotificationChannel.SMS_LOCAL));
-                }
-            }
-            return orgNotif;
-        });
+            orgNotif = orgNotif
+                    .then(notificationUseCase.send(
+                            tenantId, organizationId, subDelivererId, subDelivererId, modelSub, NotificationChannel.PUSH_FCM))
+                    .then(notificationUseCase.send(
+                            tenantId, organizationId, subDelivererId, subDelivererId, modelSub, NotificationChannel.SMS_LOCAL));
+        }
+        listenerSupport.await(orgNotif.then());
     }
 
     // ── Billing Template Applied ──────────────────────────────────────────────
 
-    @KafkaListener(topics = "tnt.billing.template.applied", groupId = "${spring.kafka.consumer.group-id:tnt-notify-core}", containerFactory = "notifyKafkaListenerContainerFactory")
+    @KafkaListener(topics = com.yowyob.tiibntick.common.kafka.TntTopics.BILLING_TEMPLATE_APPLIED, groupId = "${tnt.kafka.consumer.groups.notify:tnt-notify-core}", containerFactory = "notifyKafkaListenerContainerFactory")
     public void handleBillingTemplateApplied(ConsumerRecord<String, String> record) {
         log.info("Received tnt.billing.template.applied key={}", record.key());
         parseAndDispatch(record.value(), (json) -> {
             String tenantId = resolveTenantId(json);
             String organizationId = resolveOrganizationId(json);
-            String actorId = jsonText(json, "actorId");
+            // TemplateAppliedEvent (tnt-billing-templates, via the outbox) names them ownerActorId /
+            // createdPolicyId; actorId / policyId are kept for any producer using the short names.
+            String actorId = firstNonNull(jsonText(json, "actorId"), jsonText(json, "ownerActorId"));
             String templateCode = jsonText(json, "templateCode");
-            String policyId = jsonText(json, "policyId");
+            String policyId = firstNonNull(jsonText(json, "policyId"), jsonText(json, "createdPolicyId"));
             NotificationModel model = new NotificationModel(
                     "notify.billing.template_applied", SupportedLanguage.FR_CM.getTag(),
                     Map.of("actorId", nullSafe(actorId),
@@ -240,22 +249,21 @@ public class FreelancerOrgKafkaEventConsumer {
         Mono<?> supply(JsonNode json) throws Exception;
     }
 
+    /**
+     * Lot L7 (spec §3.10): the notification work is awaited on the container thread; an unreadable record or a
+     * failed send reaches the container (retries, then {@code tnt.dlq}) instead of being logged and lost.
+     * Delivery is at least once: a retry after a partial failure may resend a channel that had succeeded.
+     */
     private void parseAndDispatch(String payload, NotifSupplier supplier) {
-        Mono.fromCallable(() -> objectMapper.readTree(payload))
-                .flatMap(json -> {
+        listenerSupport.await(Mono.fromCallable(
+                        () -> com.yowyob.tiibntick.common.kafka.EventPayloads.parse(objectMapper, payload))
+                .flatMap(json -> Mono.defer(() -> {
                     try {
                         return supplier.supply(json);
                     } catch (Exception e) {
-                        log.warn("Error dispatching FreelancerOrg notification: {}", e.getMessage());
-                        return Mono.empty();
+                        return Mono.error(e);
                     }
-                })
-                .onErrorResume(e -> {
-                    log.error("Failed to process FreelancerOrg notification event: {}", e.getMessage());
-                    return Mono.empty();
-                })
-                .subscribeOn(Schedulers.boundedElastic())
-                .subscribe();
+                })));
     }
 
     private String jsonText(JsonNode json, String field) {
@@ -277,6 +285,10 @@ public class FreelancerOrgKafkaEventConsumer {
     private String resolveOrganizationId(JsonNode json) {
         String organizationId = jsonText(json, "organizationId");
         return organizationId != null ? organizationId : properties.getKernel().getDefaultOrganizationId();
+    }
+
+    private static String firstNonNull(String first, String second) {
+        return first != null ? first : second;
     }
 
     private String nullSafe(String val) {

@@ -44,13 +44,13 @@ public class R2dbcKalmanStateRepository implements IKalmanStateRepository {
     }
 
     @Override
-    public Mono<KalmanState> findByMissionId(String missionId) {
+    public Mono<KalmanState> findByDeliveryId(String deliveryId) {
         String sql = """
                 SELECT mission_id, state_s, state_v, state_b,
                        cov_matrix_json, total_distance_km, last_updated_at
                 FROM tnt_route.kalman_states WHERE mission_id = :mid
                 """;
-        return db.sql(sql).bind("mid", missionId)
+        return db.sql(sql).bind("mid", deliveryId)
                 .map(row -> {
                     KalmanStateEntity e = new KalmanStateEntity();
                     e.setMissionId(row.get("mission_id", String.class));
@@ -65,9 +65,9 @@ public class R2dbcKalmanStateRepository implements IKalmanStateRepository {
     }
 
     @Override
-    public Mono<Void> deleteByMissionId(String missionId) {
+    public Mono<Void> deleteByDeliveryId(String deliveryId) {
         return db.sql("DELETE FROM tnt_route.kalman_states WHERE mission_id = :mid")
-                .bind("mid", missionId)
+                .bind("mid", deliveryId)
                 .fetch().rowsUpdated().then();
     }
 }

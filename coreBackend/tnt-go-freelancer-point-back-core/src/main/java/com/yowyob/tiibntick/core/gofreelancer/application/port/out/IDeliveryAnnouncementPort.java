@@ -3,10 +3,12 @@ package com.yowyob.tiibntick.core.gofreelancer.application.port.out;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.AnnouncementSnapshot;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.PublishAnnouncementPortCommand;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.RespondToAnnouncementPortCommand;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.UpdateAnnouncementPortCommand;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.UUID;
 
 /**
@@ -46,6 +48,15 @@ public interface IDeliveryAnnouncementPort {
     Mono<AnnouncementSnapshot> selectResponse(UUID tenantId, UUID announcementId, UUID clientId, UUID responseId);
 
     /**
+     * Same, creating the delivery with the given id (lot L5: the escrow held at selection names it before it
+     * exists); {@code null} → a random id.
+     */
+    default Mono<AnnouncementSnapshot> selectResponse(UUID tenantId, UUID announcementId, UUID clientId,
+                                                      UUID responseId, UUID deliveryId) {
+        return selectResponse(tenantId, announcementId, clientId, responseId);
+    }
+
+    /**
      * Resolves the escrow amount for a candidate response — {@code offeredAmount} for
      * FIXED_PRICE, the response's own {@code proposedPrice} for QUOTE_REQUEST. Delegates to
      * {@code DeliveryAnnouncement.resolveEscrowAmount} so the rule stays defined once, in
@@ -77,6 +88,21 @@ public interface IDeliveryAnnouncementPort {
      * additional filtering is needed.
      */
     Mono<Boolean> hasResponse(UUID announcementId, UUID freelancerId);
+
+    /**
+     * Amends the amount/currency (while the announcement is open to responses) and the optional
+     * complements of an announcement; only its client may do so.
+     */
+    Mono<AnnouncementSnapshot> update(UpdateAnnouncementPortCommand command);
+
+    /** The announcement published for the given origin (e.g. {@code DELIVERY_NEED}), or empty. */
+    Mono<AnnouncementSnapshot> findByOrigin(UUID tenantId, String originType, UUID originId);
+
+    /** Batch variant of {@link #findByOrigin}: one query for all the origins. */
+    Flux<AnnouncementSnapshot> findByOrigins(UUID tenantId, String originType, Collection<UUID> originIds);
+
+    /** Announcements on which one of these delivery persons (any of their ids) has a response. */
+    Flux<AnnouncementSnapshot> findRespondedBy(UUID tenantId, Collection<UUID> deliveryPersonIds);
 
     /** Lot C-56 — tenant the announcement was published in, or empty if unknown. */
     default Mono<UUID> tenantOf(UUID announcementId) {

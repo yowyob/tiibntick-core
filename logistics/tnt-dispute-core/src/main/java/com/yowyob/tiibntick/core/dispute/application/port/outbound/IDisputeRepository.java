@@ -25,6 +25,11 @@ public interface IDisputeRepository {
      */
     Mono<Dispute> save(Dispute dispute);
 
+    /** Lot L4: the dispute an incident was escalated into, if any. */
+    default Mono<Dispute> findByIncidentId(String incidentId, String tenantId) {
+        return Mono.empty();
+    }
+
     /**
      * Finds a dispute by its unique identifier within a tenant context.
      *

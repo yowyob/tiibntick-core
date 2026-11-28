@@ -20,4 +20,8 @@ public class ResolveIncidentCommand {
     @NotNull UUID resolvedByActorId;
     @NotNull ResolutionMode resolutionMode;
     String resolutionNotes;
+    /** Lot L3: mandatory for a blocking incident; RESUMED by default for a non-blocking one. */
+    com.yowyob.tiibntick.core.incident.domain.enums.IncidentDeliveryOutcome deliveryOutcome;
+    /** Lot L3: payer of a return [B.6]; may be null. */
+    com.yowyob.tiibntick.core.incident.domain.enums.IncidentResponsibleParty responsibleParty;
 }

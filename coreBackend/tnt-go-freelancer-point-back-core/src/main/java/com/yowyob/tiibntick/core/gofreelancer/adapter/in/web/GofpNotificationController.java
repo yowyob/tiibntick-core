@@ -3,7 +3,7 @@ package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web;
 import com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser;
 import com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext;
 import com.yowyob.tiibntick.core.gofreelancer.application.service.InAppNotificationService;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.Notification;
+import com.yowyob.tiibntick.core.gofreelancer.domain.model.InAppNotification;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -14,7 +14,8 @@ import reactor.core.publisher.Mono;
 
 /**
  * Lot C-36 — the caller's in-app notifications (sender, courier or relay owner alike). The recipient
- * is always the token's user: there is no recipient id in any path.
+ * is always the token's user: there is no recipient id in any path. The inbox is held by the Kernel
+ * (decision D-157); DELETE marks the notification read, the Kernel having no deletion.
  */
 @RestController
 @RequestMapping("/api/v1/gofp/notifications")
@@ -60,9 +61,8 @@ public class GofpNotificationController {
         return Mono.defer(() -> inbox.delete(id, callerId(ctx)));
     }
 
-    static NotificationView view(Notification n) {
-        return new NotificationView(n.getId(), n.getNotificationType() != null ? n.getNotificationType().name() : null,
-                n.getTitle(), n.getMessage(), n.getParams(), n.getLinkKind(), n.getLinkId(), n.getCreatedAt(),
-                n.getReadAt());
+    static NotificationView view(InAppNotification n) {
+        return new NotificationView(n.id(), n.type() != null ? n.type().name() : null, n.title(), n.message(),
+                n.params(), n.linkKind(), n.linkId(), n.createdAt(), n.readAt());
     }
 }

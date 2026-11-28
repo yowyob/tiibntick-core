@@ -11,3 +11,6 @@ databaseChangeLog:
   - include:
       file: db/changelog/migrations/V4__add_blockchain_did_to_actor_profiles.sql
       relativeToChangelogFile: false
+  - include:
+      file: db/changelog/gdd-l3-actor.yaml
+      relativeToChangelogFile: false

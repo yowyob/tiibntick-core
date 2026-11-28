@@ -305,7 +305,7 @@ class InvoiceAccessControlTest {
         @Override public Mono<Invoice> findByNumber(String n) {
             return Flux.fromIterable(store.values()).filter(i -> i.getNumber().value().equals(n)).next();
         }
-        @Override public Flux<Invoice> findByMissionId(String m) {
+        @Override public Flux<Invoice> findByDeliveryId(String m) {
             return Flux.fromIterable(store.values()).filter(i -> m.equals(i.getMissionId()));
         }
         @Override public Flux<Invoice> findByClientId(UUID t, String c) {
@@ -318,8 +318,8 @@ class InvoiceAccessControlTest {
             return Flux.fromIterable(store.values()).filter(i -> t.equals(i.getTenantId()) && o.equals(i.getIssuerOrgId()));
         }
         @Override public Flux<Invoice> findOverdue(LocalDateTime now) { return Flux.empty(); }
-        @Override public Mono<Boolean> existsByMissionId(String m) {
-            return findByMissionId(m).hasElements();
+        @Override public Mono<Boolean> existsByDeliveryId(String m) {
+            return findByDeliveryId(m).hasElements();
         }
     }
 }

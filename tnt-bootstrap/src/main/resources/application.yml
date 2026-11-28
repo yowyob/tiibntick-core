@@ -234,7 +234,10 @@ resilience4j:
       kernelOrganizationWebClient: *kernelCircuitBreaker
       kernelTpWebClient: *kernelCircuitBreaker
       kernelPaymentWebClient: *kernelCircuitBreaker
+      kernelUserWebClient: *kernelCircuitBreaker
+      kernelFileWebClient: *kernelCircuitBreaker
       kernelServiceAccountWebClient: *kernelCircuitBreaker
+      kernelSettlementWebClient: *kernelCircuitBreaker
   timelimiter:
     instances:
       trustEventGatewayRead:
@@ -244,10 +247,17 @@ resilience4j:
       kernelOrganizationWebClient: *kernelTimeLimiter
       kernelTpWebClient: *kernelTimeLimiter
       kernelPaymentWebClient: *kernelTimeLimiter
+      kernelUserWebClient: *kernelTimeLimiter
+      # File transfers: the Kernel scans/types the file before answering (see tnt.kernel.file-response-timeout-ms).
+      kernelFileWebClient:
+        timeout-duration: 35s
       # Plus large que les autres, et ce n'est pas un confort : cet appel peut inclure
       # l'ouverture de session du compte de service. Sans declaration, Resilience4j
       # appliquait son defaut de 1 s -- trop court, tout echouait en TimeoutException.
       kernelServiceAccountWebClient:
+        timeout-duration: 10s
+      # Lot L5: escrow, cash collections and compensation fund, with the service account (session opening included).
+      kernelSettlementWebClient:
         timeout-duration: 10s
   retry:
     instances:
@@ -261,6 +271,12 @@ resilience4j:
           - io.github.resilience4j.circuitbreaker.CallNotPermittedException
       kernelOrganizationWebClient: *kernelRetry
       kernelTpWebClient: *kernelRetry
+      kernelUserWebClient: *kernelRetry
+      # A multipart body streamed from the incoming request cannot be replayed: no transport retry.
+      kernelFileWebClient:
+        max-attempts: 1
+        ignore-exceptions:
+          - io.github.resilience4j.circuitbreaker.CallNotPermittedException
       # Money-moving calls (transfers, withdrawals, recharge, order initiation) must NEVER be
       # replayed by the transport layer: a timed-out POST may already have been applied by the
       # Kernel. max-attempts: 1 = no retry; the order poller retries on its own schedule.
@@ -271,6 +287,12 @@ resilience4j:
       # Rejouer est sans danger ici : declarer un role est idempotent cote noyau, et la file
       # d'attente garde la trace de ce qui reste a faire.
       kernelServiceAccountWebClient: *kernelRetry
+      # Lot L5: platform money operations (escrow release/refund/freeze, compensation from the fund, cash
+      # collections) move money: never replayed by the transport layer (a timed-out POST may have been applied).
+      kernelSettlementWebClient:
+        max-attempts: 1
+        ignore-exceptions:
+          - io.github.resilience4j.circuitbreaker.CallNotPermittedException
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TNT — Module-level properties
@@ -319,6 +341,21 @@ tnt:
       success-ttl: ${TNT_WALLET_AUTO_PROVISION_SUCCESS_TTL:PT1H}   # no new Kernel check for a user within this delay
       failure-ttl: ${TNT_WALLET_AUTO_PROVISION_FAILURE_TTL:PT5M}   # retry delay after a Kernel failure
 
+  # ── Delivery escrow (tnt-billing-wallet, lot L5) ──────────────────────────
+  # Kernel wallet that receives the PLATFORM share of every escrowed delivery price and of
+  # every cash remittance. Empty → paying a delivery answers 503 PLATFORM_WALLET_NOT_CONFIGURED
+  # (nothing is held). Set by the administrator (admin spec §5.2, platform wallet).
+  payments:
+    platform-wallet-id: ${TNT_PAYMENTS_PLATFORM_WALLET_ID:}
+
+  # Lot L6: the platform's books are kept in the Kernel accounting service, in this organisation
+  # (X-Organization-Id). Empty → platform facts (commissions, indemnities, returns paid by the fund)
+  # are kept FAILED PLATFORM_ORGANIZATION_NOT_CONFIGURED and replayed by the administrator once set
+  # (admin spec §5.6).
+  accounting:
+    kernel:
+      platform-organization-id: ${TNT_ACCOUNTING_PLATFORM_ORGANIZATION_ID:}
+
   # ── FreelancerOrganization configuration () ─────────────────────────────
   freelancer-org:
     max-sub-deliverers: 5
@@ -344,7 +381,7 @@ tnt:
   roles:
     # Stable UUID for the TiiBnTick system tenant — used to seed global role definitions.
     # MUST be identical across all environments and deployments.
-    system-tenant-id: ${TNT_SYSTEM_TENANT_ID:00000000-0000-0000-0000-000000000001}
+    system-tenant-id: ${TNT_SYSTEM_TENANT_ID}
     # Provision the 9 canonical TntRole definitions in Kernel DB at startup (idempotent).
     provision-on-startup: ${TNT_ROLES_PROVISION_ON_STARTUP:true}
     # TTL for the local in-process permission cache (seconds).
@@ -413,6 +450,19 @@ tnt:
   kafka:
     partitions: ${KAFKA_PARTITIONS:3}
     replication-factor: ${KAFKA_REPLICATION:1}
+    # Aggregate topics tnt.{parcel,delivery,incident,dispute,announcement}.events (lot L0, decision G.1):
+    # retention 30 days so that the external platforms can catch up.
+    aggregate-retention-ms: ${TNT_KAFKA_AGGREGATE_RETENTION_MS:2592000000}
+    retry:
+      # Total attempts of a record whose listener fails (exponential backoff 1 s x2), then tnt.dlq
+      # (TntKafkaErrorHandlingPostProcessor, yow-event-kernel; decision G.8).
+      max-attempts: ${TNT_KAFKA_RETRY_MAX_ATTEMPTS:4}
+    listener:
+      # Maximum duration of a listener's reactive work (ReactiveListenerSupport); exceeded = failure.
+      timeout: ${TNT_KAFKA_LISTENER_TIMEOUT:30s}
+    masking:
+      # Decimals of the coordinates published in the aggregate events (decision QO-17: 2, about 1.1 km).
+      coordinate-decimals: ${TNT_KAFKA_MASKING_COORDINATE_DECIMALS:2}
     # ── Idle poll cost of the consumers ────────────────────────────────────────
     # These three CANNOT be expressed under spring.kafka.consumer.*: all 22 modules
     # that own consumers build their own configuration map and never read
@@ -433,11 +483,7 @@ tnt:
       concurrency: ${TNT_KAFKA_CONSUMER_CONCURRENCY:0}
     topics:
       consumed:
-        core-mission-created: tnt.delivery.mission.created
-        core-mission-status: tnt.delivery.mission.status.changed
-        core-package-delivered: tnt.delivery.package.delivered
-        core-inventory-deposited: tnt.inventory.hub.package.deposited
-        core-inventory-pickedup: tnt.inventory.hub.package.pickedup
+        # Lot L8: the agency reads deliveries and relay-hub parcels from tnt.delivery.events / tnt.parcel.events.
         core-actor-kyc: tnt.actor.kyc.validated
         core-wallet: tnt.billing.wallet.payment.confirmed
       produced:
@@ -476,12 +522,17 @@ tnt:
     # A courier whose vehicle is unknown is priced on the moto grid. Same defaults in
     # GofpCourierPricingProperties: nothing here is mandatory.
     courier:
+      # Platform grid by vehicle, XAF (D-058, docs/architecture/chantiers/tarifs-par-vehicule.md §1). A proposal only:
+      # each courier redefines his own prices. velo/scooter/camionnette = BIKE/SCOOTER/VAN on their own grid.
       grids:
-        moto:     { base-fee: 500,  price-per-km: 100, price-per-kg: 50 }
-        tricycle: { base-fee: 800,  price-per-km: 150, price-per-kg: 40 }
-        taxi:     { base-fee: 1000, price-per-km: 200, price-per-kg: 30 }
-        camion:   { base-fee: 3000, price-per-km: 400, price-per-kg: 20 }
-        bus:      { base-fee: 2000, price-per-km: 300, price-per-kg: 30 }
+        velo:        { base-fee: 300,  price-per-km: 75,  price-per-kg: 50,  minimum-fee: 500,   price-per-cbm: 2000, fragile-surcharge: 300,  perishable-surcharge: 300,  waiting-fee-per-minute: 15 }
+        moto:        { base-fee: 600,  price-per-km: 100, price-per-kg: 75,  minimum-fee: 1000,  price-per-cbm: 2000, fragile-surcharge: 500,  perishable-surcharge: 500,  waiting-fee-per-minute: 25 }
+        scooter:     { base-fee: 500,  price-per-km: 90,  price-per-kg: 75,  minimum-fee: 900,   price-per-cbm: 2000, fragile-surcharge: 500,  perishable-surcharge: 500,  waiting-fee-per-minute: 25 }
+        tricycle:    { base-fee: 1000, price-per-km: 150, price-per-kg: 15,  minimum-fee: 1500,  price-per-cbm: 1000, fragile-surcharge: 500,  perishable-surcharge: 500,  waiting-fee-per-minute: 25 }
+        taxi:        { base-fee: 1000, price-per-km: 200, price-per-kg: 25,  minimum-fee: 2000,  price-per-cbm: 1500, fragile-surcharge: 750,  perishable-surcharge: 750,  waiting-fee-per-minute: 50 }
+        camionnette: { base-fee: 2500, price-per-km: 300, price-per-kg: 10,  minimum-fee: 5000,  price-per-cbm: 1000, fragile-surcharge: 1000, perishable-surcharge: 1000, waiting-fee-per-minute: 75 }
+        camion:      { base-fee: 5000, price-per-km: 400, price-per-kg: 5,   minimum-fee: 10000, price-per-cbm: 500,  fragile-surcharge: 2000, perishable-surcharge: 2000, waiting-fee-per-minute: 100 }
+        bus:         { base-fee: 1000, price-per-km: 10,  price-per-kg: 100, minimum-fee: 1500,  price-per-cbm: 2000, fragile-surcharge: 500,  perishable-surcharge: 500,  waiting-fee-per-minute: 0 }
       # Badge: NEW below 5 delivered, CONFIRMED from 5, LOYAL from 50 and 6 months of profile.
       loyalty:
         new-below-deliveries: 5
@@ -498,11 +549,8 @@ tnt:
     kafka:
       consumers:
         enabled: ${TNT_AGENCY_KAFKA_CONSUMERS_ENABLED:true}
-    hub:
-      expiry-job:
-        enabled: ${TNT_AGENCY_HUB_EXPIRY_JOB_ENABLED:true}
-        cron: ${TNT_AGENCY_HUB_EXPIRY_JOB_CRON:0 0 * * * *}
-        tenant-id: ${TNT_AGENCY_HUB_EXPIRY_JOB_TENANT_ID:}
+    # Lot L8: no agency hub expiry job any more — a parcel not collected at the end of its (common) storage is marked
+    # EXPIRED when the core reports it (tnt.parcel.events, returnCause NOT_COLLECTED_AT_RELAY).
     platform:
       base-url: ${TNT_AGENCY_PLATFORM_BASE_URL:${tnt.core.base-url:http://localhost:8080}}
       api-key: ${TNT_AGENCY_PLATFORM_API_KEY:${tnt.core.api-key:}}
@@ -533,6 +581,35 @@ iwm:
       issuer: ${JWT_ISSUER_URI:http://localhost:9000}
       # Access token time-to-live
       access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:PT15M}
+
+# ── yow-event-kernel: outbox relay + consumer idempotency (2026-11-26) ──────
+# See docs/audits/remediation/kafka-async-wiring.md §8. Values below are the defaults,
+# repeated here so that operations can see and override them per environment.
+yow:
+  event:
+    outbox:
+      relay:
+        # Re-publishes FAILED envelopes (exponential backoff), PENDING ones older than
+        # pending-grace (crash) and expired RETRYING claims; one instance at a time (ShedLock
+        # "yow-event-outbox-relay"). After max-attempts (initial publish included) the envelope
+        # is DEAD: dead_letter_entries row, ERROR "OUTBOX_ENVELOPE_DEAD", metric
+        # yow_event_outbox_dead_total. Manual replay: ProcessDeadLetterUseCase / ReplayEventUseCase.
+        enabled: ${YOW_EVENT_RELAY_ENABLED:true}
+        poll-interval-ms: ${YOW_EVENT_RELAY_POLL_INTERVAL_MS:5000}
+        batch-size: ${YOW_EVENT_RELAY_BATCH_SIZE:50}
+        max-attempts: ${YOW_EVENT_RELAY_MAX_ATTEMPTS:10}
+        initial-delay: ${YOW_EVENT_RELAY_INITIAL_DELAY:10s}
+        multiplier: ${YOW_EVENT_RELAY_MULTIPLIER:2.0}
+        max-delay: ${YOW_EVENT_RELAY_MAX_DELAY:10m}
+        pending-grace: ${YOW_EVENT_RELAY_PENDING_GRACE:60s}
+        claim-timeout: ${YOW_EVENT_RELAY_CLAIM_TIMEOUT:2m}
+    consumer-idempotency:
+      # Duplicate filter on every @KafkaListener (event_bus.processed_events). Retention must stay
+      # well above the longest plausible redelivery delay.
+      enabled: ${YOW_EVENT_IDEMPOTENCY_ENABLED:true}
+      retention: ${YOW_EVENT_IDEMPOTENCY_RETENTION:14d}
+      purge-cron: "${YOW_EVENT_IDEMPOTENCY_PURGE_CRON:0 40 3 * * *}"
+      lookup-timeout: ${YOW_EVENT_IDEMPOTENCY_LOOKUP_TIMEOUT:5s}
 
 # ── Logging ────────────────────────────────────────────────────────────────
 logging:
@@ -587,7 +664,8 @@ tnt:
     actor-resolution-enabled: false
     allow-anonymous-context: true
   roles:
-    system-tenant-id: 00000000-0000-0000-0000-000000000001
+    # Same single system tenant as every other profile (never a literal: SystemTenantConsistencyCheck refuses a mismatch)
+    system-tenant-id: ${TNT_SYSTEM_TENANT_ID}
     # Skip DB seeding during unit/integration tests (avoids Kernel DB dependency)
     provision-on-startup: false
     # Disable AOP permission enforcement in test slices — use @MockBean for TntPermissionEvaluator
@@ -781,6 +859,8 @@ tnt:
     # Chantier D · Audit n°6 · S4 — no Kernel call may block indefinitely.
     connect-timeout-ms: ${TNT_KERNEL_CONNECT_TIMEOUT_MS:2000}
     response-timeout-ms: ${TNT_KERNEL_RESPONSE_TIMEOUT_MS:5000}
+    # File transfers (profile photo…): the Kernel scans the file before answering.
+    file-response-timeout-ms: ${TNT_KERNEL_FILE_RESPONSE_TIMEOUT_MS:30000}
 
   # ── Solution ───────────────────────────────────────────────────────────────
   solution:

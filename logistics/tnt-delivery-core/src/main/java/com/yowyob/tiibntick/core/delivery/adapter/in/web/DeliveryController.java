@@ -1,5 +1,10 @@
 package com.yowyob.tiibntick.core.delivery.adapter.in.web;
 
+import com.yowyob.tiibntick.core.delivery.adapter.in.web.response.PublicTrackingResponse;
+import com.yowyob.tiibntick.core.delivery.application.tracking.PublicTrackingRateLimiter;
+import com.yowyob.tiibntick.core.delivery.domain.exception.DeliveryNotFoundException;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryFailureReason;
+
 import com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser;
 import com.yowyob.tiibntick.core.auth.domain.model.TntUserIdentity;
 import com.yowyob.tiibntick.core.delivery.adapter.in.web.request.CreateDirectDeliveryRequest;
@@ -51,6 +56,7 @@ public class DeliveryController {
     private final DeliveryLifecycleUseCase lifecycleUseCase;
     private final DeliveryQueryUseCase queryUseCase;
     private final CreateDirectDeliveryUseCase createDirectDeliveryUseCase;
+    private final PublicTrackingRateLimiter trackingRateLimiter;
 
     @Operation(summary = "Create a delivery directly, bypassing the announcement/marketplace flow",
                description = "For callers that already know sender/recipient/parcel and don't need a "
@@ -74,11 +80,26 @@ public class DeliveryController {
                 .map(DeliveryResponseMapper::toDetail);
     }
 
-    @Operation(summary = "Track delivery by tracking code (public endpoint)")
+    /**
+     * Public tracking by the parcel code (D-136: the code is the parcel's and shows all its deliveries; D-137: masked
+     * view — states, cities, times — and a rate limit per client IP). Codes printed before D-136 still resolve.
+     */
+    @Operation(summary = "Track a parcel by its tracking code (public, masked, rate-limited per IP)")
     @GetMapping("/track/{trackingCode}")
-    public Mono<DeliveryDetailResponse> track(@PathVariable String trackingCode) {
-        return queryUseCase.findByTrackingCode(trackingCode)
-                .map(DeliveryResponseMapper::toDetail);
+    public Mono<PublicTrackingResponse> track(@PathVariable String trackingCode,
+                                              org.springframework.http.server.reactive.ServerHttpRequest request) {
+        String ip = PublicTrackingRateLimiter.clientIp(request.getHeaders().getFirst("X-Forwarded-For"),
+                request.getRemoteAddress() != null && request.getRemoteAddress().getAddress() != null
+                        ? request.getRemoteAddress().getAddress().getHostAddress() : null);
+        if (!trackingRateLimiter.tryAcquire(ip)) {
+            return Mono.error(new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.TOO_MANY_REQUESTS, "Too many tracking lookups, retry in a minute"));
+        }
+        return queryUseCase.findHistoryByTrackingCode(trackingCode)
+                .collectList()
+                .filter(list -> !list.isEmpty())
+                .switchIfEmpty(Mono.error(new DeliveryNotFoundException(trackingCode)))
+                .map(list -> PublicTrackingResponse.of(trackingCode, list));
     }
 
     @Operation(summary = "List deliveries by sender")
@@ -139,17 +160,20 @@ public class DeliveryController {
                 .map(DeliveryResponseMapper::toDetail);
     }
 
-    @Operation(summary = "Deposit parcel at relay point")
+    @Operation(summary = "Deposit parcel at a relay hub (row D7)")
     @PostMapping("/{deliveryId}/relay/{relayPointId}/deposit")
     @PreAuthorize("hasAnyRole('PERMANENT_DELIVERER','FREELANCER','RELAY_OPERATOR')")
     public Mono<DeliveryDetailResponse> depositAtRelay(
             @PathVariable UUID tenantId,
             @PathVariable UUID deliveryId,
             @PathVariable UUID relayPointId,
+            @RequestParam(required = false) UUID hubPackageEntryId,
+            @RequestParam(required = false) Integer requestedStorageDays,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
         UUID deliveryPersonId = currentUser.actorId() != null ? currentUser.actorId() : currentUser.userId();
-        return lifecycleUseCase.depositAtRelayPoint(
-                        new DepositAtRelayPointCommand(tenantId, deliveryId, deliveryPersonId, relayPointId))
+        return lifecycleUseCase.depositAtRelayHub(
+                        new DepositAtRelayHubCommand(tenantId, deliveryId, deliveryPersonId, relayPointId,
+                                hubPackageEntryId, requestedStorageDays))
                 .map(DeliveryResponseMapper::toDetail);
     }
 
@@ -161,8 +185,20 @@ public class DeliveryController {
             @PathVariable UUID deliveryId,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
         UUID deliveryPersonId = currentUser.actorId() != null ? currentUser.actorId() : currentUser.userId();
-        return lifecycleUseCase.resumeFromRelayPoint(
-                        new ResumeFromRelayPointCommand(tenantId, deliveryId, deliveryPersonId))
+        return lifecycleUseCase.resumeFromRelayHub(
+                        new ResumeFromRelayHubCommand(tenantId, deliveryId, deliveryPersonId))
+                .map(DeliveryResponseMapper::toDetail);
+    }
+
+    @Operation(summary = "Start the last leg towards the recipient (row D8)")
+    @PostMapping("/{deliveryId}/out-for-delivery")
+    @PreAuthorize("hasAnyRole('PERMANENT_DELIVERER','FREELANCER')")
+    public Mono<DeliveryDetailResponse> outForDelivery(
+            @PathVariable UUID tenantId,
+            @PathVariable UUID deliveryId,
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser) {
+        UUID deliveryPersonId = currentUser.actorId() != null ? currentUser.actorId() : currentUser.userId();
+        return lifecycleUseCase.startFinalLeg(new StartFinalLegCommand(tenantId, deliveryId, deliveryPersonId))
                 .map(DeliveryResponseMapper::toDetail);
     }
 
@@ -200,17 +236,22 @@ public class DeliveryController {
                 .map(DeliveryResponseMapper::toDetail);
     }
 
-    @Operation(summary = "Mark delivery as failed")
-    @PostMapping("/{deliveryId}/fail")
+    /**
+     * Rows D9/D10: a failed hand-over attempt. {@code reason} is a {@code DeliveryFailureReason} attempt reason
+     * ({@code CLIENT_*}); the delivery fails at once on {@code CLIENT_REFUSED_RECEPTION} or when the maximum is
+     * reached. {@code POST /{id}/fail} is kept as an alias of the same operation.
+     */
+    @Operation(summary = "Record a failed hand-over attempt (rows D9/D10)")
+    @PostMapping({"/{deliveryId}/attempts/failed", "/{deliveryId}/fail"})
     @PreAuthorize("hasAnyRole('PERMANENT_DELIVERER','FREELANCER','AGENCY_MANAGER')")
     public Mono<DeliveryDetailResponse> fail(
             @PathVariable UUID tenantId,
             @PathVariable UUID deliveryId,
             @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
-            @RequestParam String reason) {
+            @RequestParam DeliveryFailureReason reason) {
         UUID deliveryPersonId = currentUser.actorId() != null ? currentUser.actorId() : currentUser.userId();
-        return lifecycleUseCase.failDelivery(
-                        new FailDeliveryCommand(tenantId, deliveryId, deliveryPersonId, reason))
+        return lifecycleUseCase.recordFailedAttempt(
+                        new RecordFailedAttemptCommand(tenantId, deliveryId, deliveryPersonId, reason))
                 .map(DeliveryResponseMapper::toDetail);
     }
 

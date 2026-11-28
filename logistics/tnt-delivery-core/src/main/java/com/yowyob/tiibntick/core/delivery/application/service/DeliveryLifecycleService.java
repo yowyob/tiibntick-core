@@ -10,11 +10,14 @@ import com.yowyob.tiibntick.core.delivery.domain.exception.DeliveryDomainExcepti
 import com.yowyob.tiibntick.core.delivery.domain.exception.DeliveryNotFoundException;
 import com.yowyob.tiibntick.core.delivery.domain.model.aggregate.Delivery;
 import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.EtaEstimate;
+import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.RelayDeposit;
 import com.yowyob.tiibntick.core.delivery.domain.policy.DeliveryCostPolicy;
+import com.yowyob.tiibntick.core.geo.application.port.in.ICheckHubAcceptsDepositsUseCase;
 import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
 import com.yowyob.tiibntick.core.route.application.port.in.IUpdateEtaUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Mono;
@@ -42,9 +45,22 @@ public class DeliveryLifecycleService implements DeliveryLifecycleUseCase {
     private final DeliveryRepository deliveryRepository;
     private final DeliveryPersonRepository deliveryPersonRepository;
     private final EtaComputationPort etaComputationPort;
-    private final DeliveryEventPublisher eventPublisher;
     private final DeliveryProofAnchorPort deliveryProofAnchorPort;
     private final IUpdateEtaUseCase updateEtaUseCase;
+    private final DeliveryThresholdsPort thresholds;
+    private final DeliveryTransitionExecutor transitionExecutor;
+
+    /**
+     * Approval of the hub in geo-core (D-140): a hub that is not APPROVED refuses every new deposit, checked
+     * <b>before</b> row D7 so that a refused deposit changes nothing. Optional: a hub unknown to geo-core (Agency hub,
+     * D-143) is not governed, and the service still builds without geo-core in tests.
+     */
+    private ICheckHubAcceptsDepositsUseCase hubDepositGuard;
+
+    @Autowired(required = false)
+    public void setHubDepositGuard(ICheckHubAcceptsDepositsUseCase hubDepositGuard) {
+        this.hubDepositGuard = hubDepositGuard;
+    }
 
     @Override
     @Transactional
@@ -100,23 +116,43 @@ public class DeliveryLifecycleService implements DeliveryLifecycleUseCase {
                 });
     }
 
+    /**
+     * Row D7. The storage deadline is computed from the thresholds (relay owner / independent relay / platform) and
+     * the client request (QO-30: effective = min(request, relay storage)).
+     */
     @Override
     @Transactional
-    public Mono<Delivery> depositAtRelayPoint(DepositAtRelayPointCommand cmd) {
-        log.info("Depositing delivery={} at relay={}", cmd.deliveryId(), cmd.relayPointId());
-        return loadDelivery(cmd.tenantId(), cmd.deliveryId())
+    public Mono<Delivery> depositAtRelayHub(DepositAtRelayHubCommand cmd) {
+        log.info("Depositing delivery={} at relay hub={}", cmd.deliveryId(), cmd.relayHubId());
+        Instant depositedAt = Instant.now();
+        Mono<Void> approved = hubDepositGuard == null ? Mono.empty()
+                : hubDepositGuard.requireAcceptsDeposits(cmd.relayHubId());
+        return approved.then(Mono.defer(() -> loadDelivery(cmd.tenantId(), cmd.deliveryId())))
                 .flatMap(delivery -> resolveDeliveryPersonId(cmd.tenantId(), cmd.deliveryPersonId())
                         .flatMap(dpId -> {
                             validateDeliveryPerson(delivery, dpId);
-                            delivery.depositAtRelayPoint(cmd.relayPointId());
-                            return saveAndPublish(delivery);
+                            boolean destination = delivery.getDestinationHubId() == null
+                                    || delivery.getDestinationHubId().equals(cmd.relayHubId());
+                            Mono<RelayDeposit> deposit = destination
+                                    ? thresholds.relayStorageDeadline(cmd.relayHubId(), depositedAt,
+                                                    cmd.requestedStorageDays())
+                                            .map(d -> new RelayDeposit(cmd.relayHubId(), cmd.hubPackageEntryId(),
+                                                    depositedAt, true, cmd.requestedStorageDays(),
+                                                    d.effectiveStorageDays(), d.expiresAt(), d.reminderAt()))
+                                    : Mono.just(new RelayDeposit(cmd.relayHubId(), cmd.hubPackageEntryId(),
+                                            depositedAt, false, cmd.requestedStorageDays(), null, null, null));
+                            return deposit.flatMap(d -> {
+                                delivery.depositAtRelayHub(d);
+                                return saveAndPublish(delivery);
+                            });
                         }));
     }
 
+    /** Row D6. */
     @Override
     @Transactional
-    public Mono<Delivery> resumeFromRelayPoint(ResumeFromRelayPointCommand cmd) {
-        log.info("Resuming delivery={} from relay point", cmd.deliveryId());
+    public Mono<Delivery> resumeFromRelayHub(ResumeFromRelayHubCommand cmd) {
+        log.info("Resuming delivery={} from relay hub", cmd.deliveryId());
         return loadDelivery(cmd.tenantId(), cmd.deliveryId())
                 .flatMap(delivery -> resolveDeliveryPersonId(cmd.tenantId(), cmd.deliveryPersonId())
                         .flatMap(dpId -> {
@@ -124,12 +160,28 @@ public class DeliveryLifecycleService implements DeliveryLifecycleUseCase {
                             var dest = delivery.getDeliveryAddress().coordinates();
                             var origin = delivery.getPickupAddress().coordinates();
                             double distKm = origin.haversineDistanceTo(dest);
-
                             return etaComputationPort.computeInitial(origin, dest, distKm)
                                     .flatMap(eta -> {
-                                        delivery.resumeFromRelayPoint(eta);
+                                        delivery.resumeFromRelayHub(eta);
                                         return saveAndPublish(delivery);
                                     });
+                        }));
+    }
+
+    /** Row D8: the attempt maximum is read from the thresholds at the time of the transition. */
+    @Override
+    @Transactional
+    @RequirePermission(resource = "mission", action = "start")
+    public Mono<Delivery> startFinalLeg(StartFinalLegCommand cmd) {
+        log.info("Starting final leg delivery={}", cmd.deliveryId());
+        return loadDelivery(cmd.tenantId(), cmd.deliveryId())
+                .flatMap(delivery -> resolveDeliveryPersonId(cmd.tenantId(), cmd.deliveryPersonId())
+                        .flatMap(dpId -> {
+                            validateDeliveryPerson(delivery, dpId);
+                            return maxAttempts(delivery).flatMap(max -> {
+                                delivery.startFinalLeg(delivery.getCurrentEta(), max);
+                                return saveAndPublish(delivery);
+                            });
                         }));
     }
 
@@ -158,7 +210,7 @@ public class DeliveryLifecycleService implements DeliveryLifecycleUseCase {
                                             dp.updateLocation(cmd.currentPosition());
                                             return deliveryPersonRepository.save(dp);
                                         })
-                                        .then(deliveryRepository.save(delivery))
+                                        .then(saveAndPublish(delivery))
                                         .thenReturn(eta);
                             });
                         }));
@@ -213,25 +265,38 @@ public class DeliveryLifecycleService implements DeliveryLifecycleUseCase {
                 });
     }
 
+    /**
+     * Rows D9/D10: a failed hand-over attempt. The delivery fails at once on a refusal by the recipient, or when the
+     * maximum (read now from the thresholds) is reached; the parcel then goes back (QO-4: return draft).
+     */
     @Override
     @Transactional
     @RequirePermission(resource = "mission", action = "complete")
-    public Mono<Delivery> failDelivery(FailDeliveryCommand cmd) {
-        log.warn("Failing delivery={} reason={}", cmd.deliveryId(), cmd.reason());
+    public Mono<Delivery> recordFailedAttempt(RecordFailedAttemptCommand cmd) {
+        log.warn("Failed attempt delivery={} reason={}", cmd.deliveryId(), cmd.reason());
         return loadDelivery(cmd.tenantId(), cmd.deliveryId())
                 .flatMap(delivery -> resolveDeliveryPersonId(cmd.tenantId(), cmd.deliveryPersonId())
                         .flatMap(dpId -> {
                             validateDeliveryPerson(delivery, dpId);
-                            delivery.fail(cmd.reason());
-                            return saveAndPublish(delivery)
-                                    .flatMap(saved -> deliveryPersonRepository
-                                            .findById(cmd.tenantId(), dpId)
-                                            .flatMap(dp -> {
-                                                dp.recordDeliveryFailed();
-                                                return deliveryPersonRepository.save(dp);
-                                            })
-                                            .thenReturn(saved));
+                            return maxAttempts(delivery).flatMap(max -> {
+                                delivery.recordFailedAttempt(cmd.reason(), max);
+                                boolean failed = delivery.getStatus().isTerminal();
+                                return saveAndPublish(delivery)
+                                        .flatMap(saved -> !failed ? Mono.just(saved) : deliveryPersonRepository
+                                                .findById(cmd.tenantId(), dpId)
+                                                .flatMap(dp -> {
+                                                    dp.recordDeliveryFailed();
+                                                    return deliveryPersonRepository.save(dp);
+                                                })
+                                                .thenReturn(saved));
+                            });
                         }));
+    }
+
+    private Mono<Integer> maxAttempts(Delivery delivery) {
+        return thresholds.forAgency(delivery.getAgencyId())
+                .map(DeliveryThresholdsPort.Thresholds::maxDeliveryAttempts)
+                .defaultIfEmpty(delivery.getMaxAttempts());
     }
 
     @Override
@@ -243,6 +308,20 @@ public class DeliveryLifecycleService implements DeliveryLifecycleUseCase {
                 .flatMap(delivery -> {
                     delivery.cancel(cmd.reason());
                     return saveAndPublish(delivery);
+                });
+    }
+
+    @Override
+    @Transactional
+    public Mono<Delivery> recordAgreedTerms(RecordAgreedTermsCommand cmd) {
+        log.info("Recording agreed terms on delivery={} tenant={}", cmd.deliveryId(), cmd.tenantId());
+        return loadDelivery(cmd.tenantId(), cmd.deliveryId())
+                .flatMap(delivery -> {
+                    delivery.recordAgreedTerms(cmd.amount(), cmd.currency(),
+                            cmd.pickupWindowStart(), cmd.pickupWindowEnd(),
+                            cmd.deliveryWindowStart(), cmd.deliveryWindowEnd());
+                    // D-147, D-151: the delivery to a relay is now priced -> its return guarantee is frozen
+                    return transitionExecutor.holdReturnGuarantee(delivery).flatMap(deliveryRepository::save);
                 });
     }
 
@@ -269,7 +348,7 @@ public class DeliveryLifecycleService implements DeliveryLifecycleUseCase {
                 .switchIfEmpty(Mono.error(new com.yowyob.tiibntick.core.delivery.domain.exception.DeliveryNotFoundException(deliveryId)))
                 .flatMap(delivery -> {
                     delivery.recordFreelancerVehicleAssigned(vehicleId, equipmentIds);
-                    return deliveryRepository.save(delivery);
+                    return saveAndPublish(delivery);
                 });
     }
 
@@ -296,9 +375,6 @@ public class DeliveryLifecycleService implements DeliveryLifecycleUseCase {
     }
 
     private Mono<Delivery> saveAndPublish(Delivery delivery) {
-        return deliveryRepository.save(delivery)
-                .flatMap(saved -> eventPublisher.publishAll(saved.getDomainEvents())
-                        .doOnSuccess(v -> saved.clearDomainEvents())
-                        .thenReturn(saved));
+        return transitionExecutor.saveAndPublish(delivery);
     }
 }

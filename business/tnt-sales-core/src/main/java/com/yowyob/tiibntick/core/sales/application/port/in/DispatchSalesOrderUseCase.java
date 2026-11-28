@@ -12,5 +12,5 @@ import java.util.UUID;
  * @author MANFOUO Braun
  */
 public interface DispatchSalesOrderUseCase {
-    Mono<TntSalesOrder> dispatch(UUID tenantId, UUID orderId, UUID missionId);
+    Mono<TntSalesOrder> dispatch(UUID tenantId, UUID orderId, UUID deliveryId);
 }

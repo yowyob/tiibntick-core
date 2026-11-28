@@ -28,7 +28,6 @@ public class ClientApplicationService implements ClientUseCase {
     private final ICreateClientProfileUseCase createClientProfileUseCase;
     private final IFindClientUseCase findClientUseCase;
     private final TenantContextHolder tenantContextHolder;
-    private final PasswordHasherService passwordHasherService;
 
     private static final UUID DEFAULT_TENANT = TenantContextHolder.SYSTEM_TENANT;
 

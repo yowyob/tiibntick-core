@@ -3,7 +3,6 @@ package com.yowyob.tiibntick.delivery.application.service;
 import com.yowyob.tiibntick.core.delivery.application.port.in.command.RespondToAnnouncementCommand;
 import com.yowyob.tiibntick.core.delivery.application.port.out.DeliveryAnnouncementRepository;
 import com.yowyob.tiibntick.core.delivery.application.port.out.DeliveryCostComputationPort;
-import com.yowyob.tiibntick.core.delivery.application.port.out.DeliveryEventPublisher;
 import com.yowyob.tiibntick.core.delivery.application.port.out.DeliveryPersonRepository;
 import com.yowyob.tiibntick.core.delivery.application.port.out.DeliveryRepository;
 import com.yowyob.tiibntick.core.delivery.application.port.out.EtaComputationPort;
@@ -44,9 +43,13 @@ class DeliveryAnnouncementCrossTenantCourierTest {
 
     @BeforeEach
     void setUp() {
+        // The response is published through the transition executor (aggregate event of the announcement).
+        com.yowyob.tiibntick.core.delivery.application.service.DeliveryTransitionExecutor executor =
+                mock(com.yowyob.tiibntick.core.delivery.application.service.DeliveryTransitionExecutor.class);
+        when(executor.publish(any())).thenReturn(Mono.empty());
         service = new DeliveryAnnouncementService(announcements, mock(DeliveryRepository.class), persons,
-                mock(DeliveryCostComputationPort.class), mock(EtaComputationPort.class),
-                mock(DeliveryEventPublisher.class));
+                mock(DeliveryCostComputationPort.class), mock(EtaComputationPort.class), executor,
+                mock(com.yowyob.tiibntick.core.delivery.application.port.out.DeliveryThresholdsPort.class));
     }
 
     private RespondToAnnouncementCommand respond() {

@@ -43,7 +43,8 @@ public enum TntRole {
                     DELIVERY_READ, DELIVERY_TRACK, DELIVERY_RETURN, DELIVERY_CANCEL, DELIVERY_CREATE_DIRECT,
                     AGENCY_READ, AGENCY_WRITE, AGENCY_MANAGE,
                     BRANCH_READ, BRANCH_WRITE, BRANCH_MANAGE,
-                    ACTOR_READ, ACTOR_WRITE, ACTOR_APPROVE, ACTOR_SUSPEND,
+                    ACTOR_READ, RATING_READ, ACTOR_WRITE, ACTOR_APPROVE, ACTOR_SUSPEND,
+                    RATING_CREATE, LOYALTY_READ,
                     BILLING_READ, BILLING_WRITE, BILLING_POST,
                     INVOICE_READ, INVOICE_ISSUE,
                     WALLET_READ,
@@ -59,7 +60,8 @@ public enum TntRole {
                     SETTINGS_READ, SETTINGS_WRITE,
                     ROUTE_READ, ROUTE_COMPUTE,
                     GEO_READ,
-                    ADMIN_ROLES, ADMIN_USERS, ADMIN_AUDIT
+                    ADMIN_ROLES, ADMIN_USERS, ADMIN_AUDIT,
+                    ORGANIZATION_DELIVERY_SETTINGS_READ, ORGANIZATION_DELIVERY_SETTINGS_WRITE
             )
     ),
 
@@ -77,7 +79,8 @@ public enum TntRole {
                     DELIVERY_READ, DELIVERY_TRACK, DELIVERY_CANCEL, DELIVERY_CREATE_DIRECT,
                     AGENCY_READ,
                     BRANCH_READ, BRANCH_WRITE, BRANCH_MANAGE,
-                    ACTOR_READ, ACTOR_WRITE,
+                    ACTOR_READ, RATING_READ, ACTOR_WRITE,
+                    RATING_CREATE, LOYALTY_READ,
                     BILLING_READ,
                     INVOICE_READ,
                     REPORT_READ,
@@ -87,7 +90,8 @@ public enum TntRole {
                     TRUST_READ,
                     MEDIA_READ, MEDIA_UPLOAD,
                     RESOURCE_READ,
-                    GEO_READ
+                    GEO_READ,
+                    ORGANIZATION_DELIVERY_SETTINGS_READ
             )
     ),
 
@@ -104,13 +108,14 @@ public enum TntRole {
             Set.of(
                     MISSION_READ, MISSION_START, MISSION_COMPLETE,
                     DELIVERY_READ, DELIVERY_TRACK, DELIVERY_CONFIRM, DELIVERY_PROOF,
-                    ACTOR_READ,
+                    ACTOR_READ, RATING_READ,
                     WALLET_READ,
                     TRUST_READ, TRUST_VERIFY,
                     MEDIA_READ, MEDIA_UPLOAD,
                     GEO_READ, ROUTE_READ,
                     DISPUTE_CREATE,
-                    INCIDENT_CREATE, INCIDENT_READ
+                    INCIDENT_CREATE, INCIDENT_READ,
+                    ORGANIZATION_DELIVERY_SETTINGS_READ
             )
     ),
 
@@ -128,7 +133,7 @@ public enum TntRole {
                     MISSION_READ, MISSION_START, MISSION_COMPLETE,
                     DELIVERY_READ, DELIVERY_TRACK, DELIVERY_CONFIRM, DELIVERY_PROOF, DELIVERY_CANCEL,
                     ANNOUNCEMENT_READ, ANNOUNCEMENT_RESPOND, ANNOUNCEMENT_ELECT,
-                    ACTOR_READ,
+                    ACTOR_READ, RATING_READ, RATING_CREATE,
                     FREELANCER_READ,
                     INVOICE_READ, REPORT_OWN,
                     WALLET_READ, WALLET_WRITE,
@@ -158,7 +163,8 @@ public enum TntRole {
                     MEDIA_READ, MEDIA_UPLOAD,
                     GEO_READ,
                     DISPUTE_CREATE,
-                    INCIDENT_CREATE, INCIDENT_READ
+                    INCIDENT_CREATE, INCIDENT_READ,
+                    ORGANIZATION_DELIVERY_SETTINGS_READ
             )
     ),
 
@@ -180,7 +186,8 @@ public enum TntRole {
                     GEO_READ,
                     DISPUTE_CREATE,
                     INCIDENT_CREATE, INCIDENT_READ,
-                    ACTOR_READ
+                    ACTOR_READ, RATING_READ,
+                    ORGANIZATION_DELIVERY_SETTINGS_READ
             )
     ),
 
@@ -197,6 +204,7 @@ public enum TntRole {
                     ANNOUNCEMENT_CREATE, ANNOUNCEMENT_READ, ANNOUNCEMENT_UPDATE,
                     ANNOUNCEMENT_DELETE, ANNOUNCEMENT_ELECT,
                     DELIVERY_READ, DELIVERY_TRACK, DELIVERY_CANCEL,
+                    RATING_CREATE, RATING_READ, LOYALTY_READ,
                     BILLING_READ,
                     INVOICE_READ,
                     WALLET_READ, WALLET_WRITE,
@@ -221,8 +229,9 @@ public enum TntRole {
             Set.of(
                     MISSION_READ,
                     DELIVERY_READ, DELIVERY_TRACK,
-                    ACTOR_READ,
+                    ACTOR_READ, RATING_READ,
                     AGENCY_READ,
+                    LOYALTY_READ,
                     BILLING_READ,
                     INVOICE_READ,
                     REPORT_READ,
@@ -249,7 +258,8 @@ public enum TntRole {
             Set.of(
                     MISSION_READ,
                     DELIVERY_READ, DELIVERY_TRACK,
-                    ACTOR_READ,
+                    ACTOR_READ, RATING_READ,
+                    LOYALTY_READ,
                     BILLING_READ,
                     INVOICE_READ,
                     TRUST_READ, TRUST_VERIFY,
@@ -273,7 +283,8 @@ public enum TntRole {
                     DELIVERY_READ, DELIVERY_TRACK,
                     AGENCY_READ, AGENCY_WRITE, AGENCY_MANAGE,
                     BRANCH_READ,
-                    ACTOR_READ, ACTOR_WRITE, ACTOR_APPROVE, ACTOR_SUSPEND,
+                    ACTOR_READ, RATING_READ, ACTOR_WRITE, ACTOR_APPROVE, ACTOR_SUSPEND,
+                    RATING_CREATE, LOYALTY_READ,
                     BILLING_READ, BILLING_WRITE,
                     INVOICE_READ,
                     REPORT_READ, REPORT_EXPORT,
@@ -285,7 +296,8 @@ public enum TntRole {
                     RESOURCE_READ, RESOURCE_WRITE,
                     SETTINGS_READ, SETTINGS_WRITE,
                     ADMIN_ROLES, ADMIN_USERS, ADMIN_AUDIT, ADMIN_SETTINGS, ADMIN_GOVERN,
-                    ORG_ADMIN_PERM
+                    ORG_ADMIN_PERM,
+                    ORGANIZATION_DELIVERY_SETTINGS_READ, ORGANIZATION_DELIVERY_SETTINGS_WRITE
             )
     ),
 

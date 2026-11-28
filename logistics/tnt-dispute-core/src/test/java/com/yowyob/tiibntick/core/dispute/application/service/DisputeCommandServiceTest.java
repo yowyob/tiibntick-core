@@ -19,6 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
@@ -35,10 +37,9 @@ import static org.mockito.Mockito.*;
 class DisputeCommandServiceTest {
 
     @Mock private IDisputeRepository repository;
-    @Mock private IDisputeEventPublisher eventPublisher;
     @Mock private IDisputeNotificationPort notificationPort;
-    @Mock private IDeliveryStatusPort deliveryStatusPort;
-    @Mock private IBillingCompensationPort billingCompensationPort;
+    @Mock private IDisputeParcelPort parcelPort;
+    @Mock private IDisputeCompensationPort compensationPort;
     @Mock private IBlockchainProofPort blockchainProofPort;
     @Mock private IDisputeReferenceGenerator referenceGenerator;
 
@@ -47,11 +48,16 @@ class DisputeCommandServiceTest {
     @BeforeEach
     void setUp() {
         service = new DisputeCommandService(
-                repository, eventPublisher, notificationPort,
-                deliveryStatusPort, billingCompensationPort, blockchainProofPort,
+                repository, notificationPort,
+                parcelPort, compensationPort, blockchainProofPort,
                 referenceGenerator);
         when(referenceGenerator.nextReference())
                 .thenReturn(Mono.just(DisputeReference.forSequence(1)));
+        // "pkg-001" is the core parcel; anything else is not a core parcel
+        when(parcelPort.resolveParcel(anyString(), any(), any())).thenAnswer(inv ->
+                "pkg-001".equals(inv.getArgument(1)) ? Mono.just("pkg-001") : Mono.empty());
+        when(parcelPort.openDispute(anyString(), anyString(), anyString(), anyBoolean(), any()))
+                .thenReturn(Mono.empty());
     }
 
     // =========================================================================
@@ -67,10 +73,7 @@ class DisputeCommandServiceTest {
         when(repository.existsActiveDisputeForPackage(anyString(), anyString()))
                 .thenReturn(Mono.just(false));
         when(repository.save(any(Dispute.class))).thenReturn(Mono.just(saved));
-        when(eventPublisher.publishAll(any())).thenReturn(Mono.empty());
         when(notificationPort.notifyDisputeOpened(any())).thenReturn(Mono.empty());
-        when(deliveryStatusPort.markPackageAsDisputed(anyString(), anyString(), anyString()))
-                .thenReturn(Mono.empty());
 
         StepVerifier.create(service.openDispute(cmd))
                 .assertNext(dispute -> {
@@ -80,9 +83,9 @@ class DisputeCommandServiceTest {
                 .verifyComplete();
 
         verify(repository).save(any());
-        verify(eventPublisher).publishAll(any());
         verify(notificationPort).notifyDisputeOpened(any());
-        verify(deliveryStatusPort).markPackageAsDisputed(anyString(), anyString(), anyString());
+        // P12 in the same transaction, the delivery frozen (cause PACKAGE_DAMAGED, QO-7)
+        verify(parcelPort).openDispute(eq("tenant-01"), eq("pkg-001"), anyString(), eq(true), any());
     }
 
     @Test
@@ -97,7 +100,6 @@ class DisputeCommandServiceTest {
                 .verify();
 
         verify(repository, never()).save(any());
-        verify(eventPublisher, never()).publishAll(any());
     }
 
     @Test
@@ -115,14 +117,13 @@ class DisputeCommandServiceTest {
         when(repository.existsActiveDisputeForPackage(isNull(), anyString()))
                 .thenReturn(Mono.just(false));
         when(repository.save(any())).thenReturn(Mono.just(saved));
-        when(eventPublisher.publishAll(any())).thenReturn(Mono.empty());
         when(notificationPort.notifyDisputeOpened(any())).thenReturn(Mono.empty());
 
         StepVerifier.create(service.openDispute(cmd))
                 .assertNext(d -> assertThat(d.getPackageId()).isNull())
                 .verifyComplete();
 
-        verify(deliveryStatusPort, never()).markPackageAsDisputed(any(), any(), any());
+        verify(parcelPort, never()).openDispute(any(), any(), any(), anyBoolean(), any());
     }
 
     // =========================================================================

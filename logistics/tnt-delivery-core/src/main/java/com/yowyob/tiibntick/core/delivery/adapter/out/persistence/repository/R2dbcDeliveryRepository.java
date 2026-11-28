@@ -7,6 +7,8 @@ import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.time.Instant;
+import java.util.Collection;
 import java.util.UUID;
 
 /**
@@ -34,21 +36,26 @@ public interface R2dbcDeliveryRepository extends ReactiveCrudRepository<Delivery
             SELECT * FROM tnt_deliveries
             WHERE tenant_id = :tenantId
               AND delivery_person_id = :dpId
-              AND status IN ('PICKED_UP','IN_TRANSIT','AT_RELAY_POINT')
+              AND status IN (:activeStatuses)
             ORDER BY created_at DESC
             """)
-    Flux<DeliveryEntity> findActiveByTenantIdAndDeliveryPersonId(UUID tenantId, UUID dpId);
+    Flux<DeliveryEntity> findActiveByTenantIdAndDeliveryPersonId(UUID tenantId, UUID dpId,
+                                                                 Collection<String> activeStatuses);
 
     @Query("SELECT COUNT(*) FROM tnt_deliveries WHERE tenant_id = :tenantId AND delivery_person_id = :dpId")
     Mono<Long> countByTenantIdAndDeliveryPersonId(UUID tenantId, UUID dpId);
+
+    @Query("SELECT COUNT(*) FROM tnt_deliveries WHERE tenant_id = :tenantId AND delivery_person_id = :dpId AND status = :status")
+    Mono<Long> countByTenantIdAndDeliveryPersonIdAndStatus(UUID tenantId, UUID dpId, String status);
 
     @Query("""
             SELECT COUNT(*) FROM tnt_deliveries
             WHERE tenant_id = :tenantId
               AND delivery_person_id = :dpId
-              AND status NOT IN ('DELIVERED','FAILED','CANCELLED')
+              AND status NOT IN (:terminalStatuses)
             """)
-    Mono<Long> countNonTerminalByTenantIdAndDeliveryPersonId(UUID tenantId, UUID dpId);
+    Mono<Long> countNonTerminalByTenantIdAndDeliveryPersonId(UUID tenantId, UUID dpId,
+                                                            Collection<String> terminalStatuses);
 
     /**
      * Finds a delivery by ID without tenant scoping (for cross-module calls from tnt-incident-core).
@@ -63,36 +70,9 @@ public interface R2dbcDeliveryRepository extends ReactiveCrudRepository<Delivery
     @Query("SELECT * FROM tnt_deliveries WHERE paused_by_incident_id = :incidentId")
     Flux<DeliveryEntity> findByPausedByIncidentId(UUID incidentId);
 
-    /**
-     * Atomically updates the delivery for incident pause operation.
-     */
-    @Modifying
-    @Query("""
-            UPDATE tnt_deliveries
-            SET status = 'PAUSED_BY_INCIDENT',
-                previous_status_before_pause = status,
-                paused_by_incident_id = :incidentId,
-                updated_at = NOW()
-            WHERE id = :deliveryId
-              AND status NOT IN ('DELIVERED','CANCELLED','FAILED')
-            """)
-    Mono<Void> pauseByIncident(UUID deliveryId, UUID incidentId);
+    // pauseByIncident / resumeFromIncident (raw SQL bypassing the state machine) removed by lot evt-l2:
+    // every incident transition goes through Delivery (rows D13–D20) and emits its event.
 
-    /**
-     * Atomically resumes a delivery from incident pause with optional new driver.
-     */
-    @Modifying
-    @Query("""
-            UPDATE tnt_deliveries
-            SET status = previous_status_before_pause,
-                delivery_person_id = COALESCE(:newDriverId, delivery_person_id),
-                paused_by_incident_id = NULL,
-                previous_status_before_pause = NULL,
-                updated_at = NOW()
-            WHERE id = :deliveryId
-              AND status = 'PAUSED_BY_INCIDENT'
-            """)
-    Mono<Void> resumeFromIncident(UUID deliveryId, UUID newDriverId);
 
     /**
      * Finds all deliveries assigned to a specific FreelancerOrg ().
@@ -106,4 +86,57 @@ public interface R2dbcDeliveryRepository extends ReactiveCrudRepository<Delivery
      */
     @Query("SELECT * FROM tnt_deliveries WHERE id = :deliveryId LIMIT 1")
     Mono<DeliveryEntity> findByIdNoTenant(UUID deliveryId);
+
+    /**
+     * Deliveries carrying this parcel, whatever their tenant, most recent first.
+     * <p><b>Reserved</b> for the retrieval of a parcel deposited at a relay point (a deposit is keyed on the
+     * parcel id and has no tenant context). It crosses tenants: do not call it from anywhere else
+     * ({@code ParcelLookupCallersArchitectureTest} fails the build otherwise).
+     */
+    @Query("SELECT * FROM tnt_deliveries WHERE parcel_id = :parcelId ORDER BY created_at DESC, id")
+    Flux<DeliveryEntity> findByParcelIdNoTenant(UUID parcelId);
+
+    /** Deliveries waiting at their destination relay whose storage ended (row D12, spec §5.2). */
+    @Query("""
+            SELECT * FROM tnt_deliveries
+            WHERE status = 'AT_RELAY_HUB'
+              AND relay_storage_expires_at IS NOT NULL
+              AND relay_storage_expires_at <= :now
+            ORDER BY relay_storage_expires_at
+            LIMIT :limit
+            """)
+    Flux<DeliveryEntity> findRelayStorageExpired(Instant now, int limit);
+
+    /**
+     * Deliveries the alert watch evaluates (lot L3): a courier is responsible and the parcel is not at a relay. Oldest
+     * update first, so that a large backlog is covered over successive runs.
+     */
+    @Query("""
+            SELECT * FROM tnt_deliveries
+            WHERE status IN ('ASSIGNED', 'PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERY_ATTEMPT_FAILED',
+                             'INCIDENT_REPORTED', 'PAUSED_BY_INCIDENT', 'INCIDENT_HANDOVER')
+            ORDER BY updated_at
+            LIMIT :limit
+            """)
+    Flux<DeliveryEntity> findWatchCandidates(int limit);
+
+    /** Deliveries at their destination relay whose reminder is due and not sent yet (spec §5.2). */
+    @Query("""
+            SELECT * FROM tnt_deliveries
+            WHERE status = 'AT_RELAY_HUB'
+              AND storage_reminder_at IS NOT NULL
+              AND storage_reminder_at <= :now
+              AND storage_reminder_sent_at IS NULL
+            ORDER BY storage_reminder_at
+            LIMIT :limit
+            """)
+    Flux<DeliveryEntity> findRelayStorageReminderDue(Instant now, int limit);
+
+    /** Non-terminal deliveries at a relay hub (custody of a revoked relay, D-129). */
+    @Query("""
+            SELECT * FROM tnt_deliveries
+            WHERE status = 'AT_RELAY_HUB' AND relay_hub_id = :hubId
+            ORDER BY created_at
+            """)
+    Flux<DeliveryEntity> findAtRelayHub(UUID hubId);
 }

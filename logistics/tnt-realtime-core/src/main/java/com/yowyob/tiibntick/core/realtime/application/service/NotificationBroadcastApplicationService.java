@@ -1,9 +1,11 @@
 package com.yowyob.tiibntick.core.realtime.application.service;
 
 import com.yowyob.tiibntick.core.realtime.application.port.in.IBroadcastNotificationUseCase;
+import com.yowyob.tiibntick.core.realtime.application.port.in.IStreamUserNotificationsUseCase;
 import com.yowyob.tiibntick.core.realtime.application.port.out.IWebSocketBroadcaster;
 import com.yowyob.tiibntick.core.realtime.domain.model.BroadcastTopic;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
@@ -14,7 +16,7 @@ import reactor.core.publisher.Mono;
  * @author MANFOUO Braun
  */
 @Service
-public class NotificationBroadcastApplicationService implements IBroadcastNotificationUseCase {
+public class NotificationBroadcastApplicationService implements IBroadcastNotificationUseCase, IStreamUserNotificationsUseCase {
 
     private final IWebSocketBroadcaster broadcaster;
 
@@ -30,5 +32,10 @@ public class NotificationBroadcastApplicationService implements IBroadcastNotifi
     @Override
     public Mono<Void> broadcastToUser(String userId, Object payload) {
         return broadcaster.broadcast(BroadcastTopic.forUser(userId), payload);
+    }
+
+    @Override
+    public Flux<String> streamNotificationsOf(String userId) {
+        return broadcaster.subscribeToTopic(BroadcastTopic.forUser(userId).path()).map(String::valueOf);
     }
 }

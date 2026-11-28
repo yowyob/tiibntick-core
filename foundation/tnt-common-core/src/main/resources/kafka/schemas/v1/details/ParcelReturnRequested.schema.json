@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:tnt:kafka:v1:details:ParcelReturnRequested",
+  "title": "details of ParcelReturnRequested",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "returnCause",
+    "returnCostPayer"
+  ],
+  "properties": {
+    "returnCause": {
+      "enum": [
+        "MAX_ATTEMPTS_REACHED",
+        "CLIENT_REFUSED_RECEPTION",
+        "NOT_COLLECTED_AT_RELAY",
+        "INCIDENT_UNRESOLVED",
+        "SENDER_CANCELLED_AFTER_PICKUP",
+        "DISPUTE_RETURN_TO_SENDER_ORDERED",
+        "RETURN_DELIVERY_CANCELLED",
+        "RETURN_DELIVERY_FAILED",
+        "RELAY_REVOKED"
+      ]
+    },
+    "returnCostPayer": {
+      "enum": [
+        "SENDER",
+        "RECIPIENT",
+        "COURIER",
+        "PLATFORM",
+        "RELAY",
+        "AGENCY",
+        "NONE",
+        null
+      ]
+    }
+  }
+}

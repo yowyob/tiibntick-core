@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:tnt:kafka:v1:details:DeliveryFailed",
+  "title": "details of DeliveryFailed",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "reason",
+    "responsibleParty"
+  ],
+  "properties": {
+    "reason": {
+      "enum": [
+        "CLIENT_ABSENT_AT_DELIVERY",
+        "CLIENT_PHONE_UNREACHABLE",
+        "CLIENT_REFUSED_RECEPTION",
+        "CLIENT_REFUSED_OTP_VALIDATION",
+        "CLIENT_WRONG_ADDRESS",
+        "CLIENT_INCOMPLETE_ADDRESS",
+        "CLIENT_BUILDING_ACCESS_BLOCKED",
+        "MAX_ATTEMPTS_REACHED",
+        "NOT_COLLECTED_AT_RELAY",
+        "INCIDENT_UNRESOLVED",
+        "PARCEL_LOST",
+        "PARCEL_DAMAGED"
+      ]
+    },
+    "responsibleParty": {
+      "enum": [
+        "SENDER",
+        "RECIPIENT",
+        "COURIER",
+        "PLATFORM",
+        "RELAY",
+        "AGENCY",
+        "NONE",
+        null
+      ]
+    }
+  }
+}

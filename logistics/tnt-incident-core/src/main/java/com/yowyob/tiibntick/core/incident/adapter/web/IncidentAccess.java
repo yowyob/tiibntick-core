@@ -34,6 +34,13 @@ final class IncidentAccess {
     }
 
     /** A non-manager can only name themselves as the acting actor. */
+    /** Lot L3: courier actions (confirm / contest a resolution, accept a replacement, close own non-blocking). */
+    static void requireCreate(TntUserIdentity identity) {
+        if (!identity.hasPermission("incident", "create") && !canManage(identity)) {
+            throw TntRoleException.forbidden("incident", "create");
+        }
+    }
+
     static void requireSelfUnlessManager(TntUserIdentity identity, UUID actorIdInPayload) {
         if (!canManage(identity) && (actorIdInPayload == null || !actorIdInPayload.equals(identity.actorId()))) {
             throw TntRoleException.forbidden("incident", "manage");

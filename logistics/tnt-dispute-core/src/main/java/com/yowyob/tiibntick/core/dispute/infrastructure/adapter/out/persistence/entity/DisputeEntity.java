@@ -145,8 +145,8 @@ public class DisputeEntity implements Persistable<String>, TntPersistableEntity 
     @Column("updated_at")
     private LocalDateTime updatedAt;
 
-    @Version
     // : FreelancerOrg respondent context
+    // (lot L4: the @Version that stood here applied to respondentOrgId, a String — removed; no optimistic locking)
     @Column("respondent_org_id")
     private String respondentOrgId;
     @Column("implied_sub_deliverer_id")
@@ -156,6 +156,25 @@ public class DisputeEntity implements Persistable<String>, TntPersistableEntity 
 
     @Column("version")
     private Integer version;
+
+    // Lot L4: lifecycle published on tnt.dispute.events
+    @Column("responsible_party")
+    private String responsibleParty;
+    @Column("incident_id")
+    private String incidentId;
+    @Column("closed_at")
+    private LocalDateTime closedAt;
+    @Column("event_sequence")
+    private Long eventSequence;
+
+    public String getResponsibleParty() { return responsibleParty; }
+    public void setResponsibleParty(String v) { this.responsibleParty = v; }
+    public String getIncidentId() { return incidentId; }
+    public void setIncidentId(String v) { this.incidentId = v; }
+    public LocalDateTime getClosedAt() { return closedAt; }
+    public void setClosedAt(LocalDateTime v) { this.closedAt = v; }
+    public Long getEventSequence() { return eventSequence; }
+    public void setEventSequence(Long v) { this.eventSequence = v; }
 
     public DisputeEntity() {}
 

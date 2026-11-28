@@ -1,0 +1,37 @@
+databaseChangeLog:
+  - changeSet:
+      id: evt-l5-004-wallet-debts
+      author: evt-l5
+      labels: evt-l5
+      comment: >
+        Lot L5 (decisions QO-22 / D-115 and QO-26 / D-120 of 2026-11-26, maintainer): what the compensation fund paid
+        because of a third party becomes a debt of that party (courier, relay, agency), recovered like unpaid cash
+        through a Kernel cash collection opened on the debtor's wallet, remitted by the debtor with his code. One row
+        per Kernel fund reference (DISPUTE:<id>, RETURN:<deliveryId>). Balances stay in the Kernel (decision H).
+      changes:
+        - createTable:
+            schemaName: billing
+            tableName: wallet_debts
+            columns:
+              - column: { name: id, type: UUID, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: tenant_id, type: UUID, constraints: { nullable: false } }
+              - column: { name: debtor_type, type: VARCHAR(16), constraints: { nullable: false }, remarks: "COURIER | RELAY | AGENCY" }
+              - column: { name: debtor_id, type: UUID, remarks: "actor (courier) or organisation; null until the administrator names it" }
+              - column: { name: reason, type: VARCHAR(32), constraints: { nullable: false }, remarks: "DISPUTE_COMPENSATION | RETURN_COST" }
+              - column: { name: reference, type: VARCHAR(64), constraints: { nullable: false, unique: true, uniqueConstraintName: uq_wallet_debt_reference } }
+              - column: { name: delivery_id, type: UUID }
+              - column: { name: amount, type: "NUMERIC(19,4)", constraints: { nullable: false } }
+              - column: { name: currency, type: VARCHAR(3), constraints: { nullable: false } }
+              - column: { name: status, type: VARCHAR(16), constraints: { nullable: false }, remarks: "PENDING | OPEN | REPAID | CANCELLED" }
+              - column: { name: debtor_wallet_id, type: UUID }
+              - column: { name: kernel_collection_id, type: UUID }
+              - column: { name: note, type: VARCHAR(255) }
+              - column: { name: created_at, type: TIMESTAMP, defaultValueComputed: NOW(), constraints: { nullable: false } }
+              - column: { name: updated_at, type: TIMESTAMP, defaultValueComputed: NOW(), constraints: { nullable: false } }
+        - createIndex:
+            schemaName: billing
+            tableName: wallet_debts
+            indexName: idx_wallet_debts_debtor_status
+            columns:
+              - column: { name: debtor_id }
+              - column: { name: status }

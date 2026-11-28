@@ -4,8 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yowyob.kernel.event.application.port.in.PublishEventUseCase;
 import com.yowyob.kernel.event.domain.model.DomainEventEnvelope;
 import com.yowyob.tiibntick.core.inventory.application.port.out.InventoryEventPublisherPort;
-import com.yowyob.tiibntick.core.inventory.domain.event.PackageDepositedEvent;
-import com.yowyob.tiibntick.core.inventory.domain.event.PackagePickedUpEvent;
 import com.yowyob.tiibntick.core.inventory.domain.event.StockLowEvent;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
@@ -32,8 +30,11 @@ import java.util.UUID;
  * <p>The Kafka wire format is unchanged: the payload is still simply
  * {@code objectMapper.writeValueAsString(event)} — the raw event record serialized
  * directly, with no extra wrapper envelope — and the message keys are preserved
- * (productId for stock-low, trackingCode for hub package events, via an explicit
- * {@code kafkaPartitionKey}), so existing consumers require no change.
+ * (productId for stock-low, via an explicit {@code kafkaPartitionKey}), so existing consumers require no change.
+ *
+ * <p>Lot L8: the hub package topics ({@code tnt.inventory.hub.package.deposited / pickedup}) are gone — a parcel
+ * entering or leaving a relay hub is {@code ParcelAtRelayHub} / the next parcel transition on
+ * {@code tnt.parcel.events}.
  *
  * @author MANFOUO Braun
  */
@@ -41,11 +42,8 @@ import java.util.UUID;
 public class InventoryKafkaEventPublisher implements InventoryEventPublisherPort {
 
     static final String STOCK_LOW_TOPIC = "tnt.inventory.stock.low";
-    static final String PKG_DEPOSITED_TOPIC = "tnt.inventory.hub.package.deposited";
-    static final String PKG_PICKEDUP_TOPIC = "tnt.inventory.hub.package.pickedup";
 
     private static final String AGGREGATE_TYPE_STOCK_ENTRY = "StockEntry";
-    private static final String AGGREGATE_TYPE_HUB_PACKAGE_ENTRY = "HubPackageEntry";
     private static final String SOLUTION_CODE = "TNT";
 
     private final PublishEventUseCase publishEventUseCase;
@@ -62,20 +60,6 @@ public class InventoryKafkaEventPublisher implements InventoryEventPublisherPort
         return enqueue(STOCK_LOW_TOPIC, event,
                 event.productId().toString(), AGGREGATE_TYPE_STOCK_ENTRY,
                 event.productId().toString(), event.tenantId(), event.occurredAt());
-    }
-
-    @Override
-    public Mono<Void> publishPackageDeposited(PackageDepositedEvent event) {
-        return enqueue(PKG_DEPOSITED_TOPIC, event,
-                event.hubPackageEntryId().toString(), AGGREGATE_TYPE_HUB_PACKAGE_ENTRY,
-                event.trackingCode(), event.tenantId(), event.occurredAt());
-    }
-
-    @Override
-    public Mono<Void> publishPackagePickedUp(PackagePickedUpEvent event) {
-        return enqueue(PKG_PICKEDUP_TOPIC, event,
-                event.hubPackageEntryId().toString(), AGGREGATE_TYPE_HUB_PACKAGE_ENTRY,
-                event.trackingCode(), event.tenantId(), event.occurredAt());
     }
 
     private Mono<Void> enqueue(String topic, Object event, String aggregateId, String aggregateType,

@@ -4,52 +4,46 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.annotation.Transient;
-import org.springframework.data.domain.Persistable;
-import com.yowyob.tiibntick.common.persistence.TntPersistableEntity;
-import org.springframework.data.relational.core.mapping.Column;
-import org.springframework.data.relational.core.mapping.Table;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * Evaluation as exposed by {@code /api/v1/evaluations}.
+ *
+ * <p>Lot L3 de-duplication: no longer a persisted entity. An evaluation is a tp-core third-party rating
+ * ({@code tnt_tp_ratings}): {@code id} is the rating id, {@code deliveryId} its mission, {@code evaluatorId} and
+ * {@code evaluatedId} are actor ids (core ids), {@code type} its rating context. The legacy {@code evaluations}
+ * table is only read by the migration and dropped at closure.
+ */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Table("evaluations")
-public class Evaluation implements Persistable<UUID>, TntPersistableEntity {
-    @Transient @Builder.Default private boolean isNew = true;
+public class Evaluation {
 
-    @Override
-    public boolean isNew() { return isNew; }
-
-    @Override
-    public void markNotNew() { this.isNew = false; }
-
-
-    @Id
     private UUID id;
 
-    @Column("delivery_id")
     private UUID deliveryId;
 
-    @Column("evaluator_id")
+    /** Actor id of the rater. */
     private UUID evaluatorId;
 
-    @Column("evaluated_id")
+    /** Actor id of the rated party. */
     private UUID evaluatedId;
 
-    @Column("rating")
+    /** Score rounded to a whole star (1-5), as before. */
     private Integer rating;
 
-    @Column("comment")
+    /** Exact score held by the core (1.0-5.0). Addition, optional. */
+    private Double score;
+
     private String comment;
 
-    @Column("type")
     private String type;
 
-    @Column("created_at")
+    /** Kind of the rated party: CLIENT, DELIVERY_PERSON or RELAY_OPERATOR. Addition, optional. */
+    private String subjectKind;
+
     private LocalDateTime createdAt;
 }

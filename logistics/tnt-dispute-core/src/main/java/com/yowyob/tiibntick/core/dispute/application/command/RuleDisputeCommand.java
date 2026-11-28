@@ -18,8 +18,15 @@ public record RuleDisputeCommand(
         ResolutionType resolutionType,
         boolean compensationRequired,
         CompensationDetails compensation,
-        String summary
+        String summary,
+        /** Party found at fault (pays the return / the new delivery, [B.6]); {@code null} = not decided (lot L4). */
+        com.yowyob.tiibntick.core.dispute.domain.enums.DisputeResponsibleParty responsibleParty
 ) {
+    public RuleDisputeCommand(DisputeId disputeId, String tenantId, String ruledBy, ResolutionType resolutionType,
+                              boolean compensationRequired, CompensationDetails compensation, String summary) {
+        this(disputeId, tenantId, ruledBy, resolutionType, compensationRequired, compensation, summary, null);
+    }
+
     public RuleDisputeCommand {
         Objects.requireNonNull(disputeId, "disputeId is required");
         Objects.requireNonNull(tenantId, "tenantId is required");

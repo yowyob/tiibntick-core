@@ -167,6 +167,10 @@ public class TntPermissionEvaluator implements CheckPermissionUseCase {
             String code = authority.substring(5); // remove "ROLE_"
             int hashIdx = code.indexOf('#');
             if (hashIdx >= 0) code = code.substring(0, hashIdx);
+            // Decision D-162: TNT_ADMIN is only trusted as the exact authority the Core's JWT converter adds from
+            // the owner rule or the registry; a scoped "ROLE_TNT_ADMIN#…" can only come from a Kernel claim.
+            if (hashIdx >= 0 && com.yowyob.tiibntick.core.roles.domain.model.PlatformRoleGrant.TNT_ADMIN
+                    .equalsIgnoreCase(code)) continue;
             registry.findByCode(code).ifPresent(def ->
                     expanded.addAll(def.defaultPermissions()));
         }

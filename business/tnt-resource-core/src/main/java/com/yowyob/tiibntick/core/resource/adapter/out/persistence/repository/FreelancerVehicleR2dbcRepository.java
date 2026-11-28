@@ -26,4 +26,13 @@ public interface FreelancerVehicleR2dbcRepository
 
     @Query("SELECT EXISTS(SELECT 1 FROM tnt_freelancer_vehicles WHERE freelancer_org_id = :orgId AND plate_number = :plateNumber)")
     Mono<Boolean> existsByFreelancerOrgIdAndPlateNumber(UUID orgId, String plateNumber);
+
+    @Query("SELECT * FROM tnt_freelancer_vehicles WHERE owner_actor_id = :actorId ORDER BY created_at ASC")
+    Flux<FreelancerVehicleEntity> findByOwnerActorId(UUID actorId);
+
+    @Query("SELECT COUNT(*) FROM tnt_freelancer_vehicles WHERE owner_actor_id = :actorId")
+    Mono<Long> countByOwnerActorId(UUID actorId);
+
+    @Query("SELECT EXISTS(SELECT 1 FROM tnt_freelancer_vehicles WHERE plate_number = :plateNumber AND id <> :excludedId)")
+    Mono<Boolean> existsByPlateNumberAndIdNot(String plateNumber, UUID excludedId);
 }

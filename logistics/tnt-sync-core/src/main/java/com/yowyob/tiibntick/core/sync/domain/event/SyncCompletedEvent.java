@@ -2,7 +2,7 @@ package com.yowyob.tiibntick.core.sync.domain.event;
 
 public class SyncCompletedEvent extends SyncDomainEvent {
 
-    private static final String TOPIC = "tnt.sync.completed";
+    private static final String TOPIC = com.yowyob.tiibntick.common.kafka.TntTopics.SYNC_COMPLETED;
 
     private final String sessionId;
     private final String userId;

@@ -193,7 +193,9 @@ public class TntAdministrationController {
                             req.blockchainEnabled(), req.smartDisputeResolutionEnabled(),
                             req.blockchainNetwork(), req.freelancerModeEnabled(),
                             req.requireFreelancerApproval(), req.maxFreelancerConcurrentMissions(),
-                            req.pointRelaisModeEnabled(), req.relayPointMaxStorageHours(),
+                            req.pointRelaisModeEnabled(),
+                            // removed from the API (lot L1): the stored value is kept as is
+                            existing.getRelayPointMaxStorageHours(),
                             req.announcementMarketplaceEnabled(), req.maxCourierAnnouncementResponses(),
                             req.tvaRate(), req.defaultCurrency(),
                             req.disputeManagementEnabled(), req.disputeFilingWindowDays(),

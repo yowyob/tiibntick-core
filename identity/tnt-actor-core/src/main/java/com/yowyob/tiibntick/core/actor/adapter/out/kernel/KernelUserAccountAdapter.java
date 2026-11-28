@@ -32,9 +32,13 @@ public class KernelUserAccountAdapter implements IKernelUserAccountPort {
     private static final Logger log = LoggerFactory.getLogger(KernelUserAccountAdapter.class);
 
     private final WebClient kernel;
+    /** Same credentials and bearer, with a transfer-sized timeout and no retry (see KernelBridgeConfig). */
+    private final WebClient files;
 
-    public KernelUserAccountAdapter(@Qualifier("kernelUserWebClient") WebClient kernelUserWebClient) {
+    public KernelUserAccountAdapter(@Qualifier("kernelUserWebClient") WebClient kernelUserWebClient,
+                                    @Qualifier("kernelFileWebClient") WebClient kernelFileWebClient) {
         this.kernel = kernelUserWebClient;
+        this.files = kernelFileWebClient;
     }
 
     @Override
@@ -49,7 +53,7 @@ public class KernelUserAccountAdapter implements IKernelUserAccountPort {
                 ? file.headers().getContentType() : MediaType.APPLICATION_OCTET_STREAM;
         MultipartBodyBuilder builder = new MultipartBodyBuilder();
         builder.asyncPart("file", file.content(), DataBuffer.class).contentType(type).filename(file.filename());
-        var response = kernel.post()
+        var response = files.post()
                 .uri(u -> u.path("/api/files")
                         .queryParamIfPresent("documentType", Optional.ofNullable(documentType))
                         .queryParam("public", publicFile)

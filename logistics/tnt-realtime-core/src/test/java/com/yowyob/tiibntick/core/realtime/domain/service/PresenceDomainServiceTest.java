@@ -107,7 +107,7 @@ class PresenceDomainServiceTest {
         when(presenceRepository.save(any())).thenReturn(Mono.empty());
         when(broadcaster.broadcast(any(), any())).thenReturn(Mono.empty());
 
-        StepVerifier.create(presenceService.assignMission(USER_ID, TENANT_ID, "MISSION-001"))
+        StepVerifier.create(presenceService.assignDelivery(USER_ID, TENANT_ID, "MISSION-001"))
                 .verifyComplete();
 
         assertThat(existing.getStatus()).isEqualTo(PresenceStatus.ONLINE_ON_MISSION);
@@ -123,7 +123,7 @@ class PresenceDomainServiceTest {
         when(presenceRepository.save(any())).thenReturn(Mono.empty());
         when(broadcaster.broadcast(any(), any())).thenReturn(Mono.empty());
 
-        StepVerifier.create(presenceService.clearMission(USER_ID, TENANT_ID))
+        StepVerifier.create(presenceService.clearDelivery(USER_ID, TENANT_ID))
                 .verifyComplete();
 
         assertThat(existing.getStatus()).isEqualTo(PresenceStatus.ONLINE_AVAILABLE);

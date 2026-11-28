@@ -77,4 +77,29 @@ public class GofpNotifyPushAdapter implements PushNotificationPort {
                 ? configured
                 : TenantContextHolder.SYSTEM_TENANT.toString();
     }
+
+    @Override
+    public Mono<Void> sendLocalized(UUID tenant, UUID userId, String templateKey, Map<String, Object> params) {
+        String recipientId = userId.toString();
+        String tenantId = tenant != null ? tenant.toString() : defaultTenantId();
+        Map<String, Object> safe = params != null ? params : Map.of();
+        NotificationModel inApp = new NotificationModel(templateKey, FR, safe, NotificationPriority.NORMAL);
+        NotificationModel push = new NotificationModel(templateKey, FR, safe, NotificationPriority.HIGH);
+
+        Mono<Void> inAppSend = sendNotificationUseCase
+                .send(tenantId, null, recipientId, recipientId, inApp, NotificationChannel.IN_APP_WEBSOCKET)
+                .onErrorResume(e -> {
+                    log.warn("In-app notification {} failed for {}: {}", templateKey, userId, e.getMessage());
+                    return Mono.empty();
+                })
+                .then();
+        Mono<Void> pushSend = sendNotificationUseCase
+                .send(tenantId, null, recipientId, recipientId, push, NotificationChannel.PUSH_FCM)
+                .onErrorResume(e -> {
+                    log.warn("Push notification {} failed for {}: {}", templateKey, userId, e.getMessage());
+                    return Mono.empty();
+                })
+                .then();
+        return Mono.when(inAppSend, pushSend);
+    }
 }

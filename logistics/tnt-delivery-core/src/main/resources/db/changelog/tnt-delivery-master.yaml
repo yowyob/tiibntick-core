@@ -26,3 +26,18 @@ databaseChangeLog:
   - include:
       file: db/changelog/009-add-response-dedup-index.yaml
       relativeToChangelogFile: false
+  - include:
+      file: db/changelog/gdd-l1-delivery.yaml
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/gdd-l2-delivery.yaml
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/evt-l2-delivery.yaml
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/evt-l3-delivery.yaml
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/evt-qo11-delivery.yaml
+      relativeToChangelogFile: false

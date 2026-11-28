@@ -9,7 +9,7 @@ import java.util.UUID;
  * Use case — Return a sales order (DISPATCHED | IN_DELIVERY → RETURNED).
  *
  * <p>Records the return reason (e.g. RECIPIENT_ABSENT, DAMAGED_GOODS) and a note.
- * Typically triggered by the Kafka event {@code tnt.delivery.mission.failed}.</p>
+ * Typically triggered by {@code DeliveryFailed} of {@code tnt.delivery.events} (lot L8).</p>
  *
  * @author MANFOUO Braun
  */

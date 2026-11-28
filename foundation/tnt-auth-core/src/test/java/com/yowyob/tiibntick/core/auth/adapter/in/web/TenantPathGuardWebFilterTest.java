@@ -31,6 +31,11 @@ class TenantPathGuardWebFilterTest {
             return Mono.just("deliveries-of-" + tenantId);
         }
 
+        @org.springframework.web.bind.annotation.PostMapping("/api/v1/tenants/{tenantId}/deliveries")
+        Mono<String> create(@PathVariable UUID tenantId) {
+            return Mono.just("created-in-" + tenantId);
+        }
+
         @GetMapping("/api/v1/other")
         Mono<String> other() {
             return Mono.just("other");
@@ -46,6 +51,12 @@ class TenantPathGuardWebFilterTest {
         return WebTestClient.bindToController(new TenantScopedController())
                 .webFilter(new TenantPathGuardWebFilter(resolver))
                 .build();
+    }
+
+    private static TntSecurityContext admin(UUID tenant) {
+        return TntSecurityContext.builder()
+                .userId(UUID.randomUUID()).tenantId(tenant).authenticated(true)
+                .roles(Set.of("ROLE_TNT_ADMIN")).permissions(Set.of("tnt:platform:admin", "system:admin")).build();
     }
 
     private static TntSecurityContext user(UUID tenant, Set<String> permissions) {
@@ -78,6 +89,34 @@ class TenantPathGuardWebFilterTest {
         clientFor(user(MY_TENANT, Set.of("*")))
                 .get().uri("/api/v1/tenants/{t}/deliveries", OTHER_TENANT)
                 .exchange().expectStatus().isOk();
+    }
+
+    @Test
+    @DisplayName("D-178: a platform administrator reads another tenant")
+    void platformAdministratorReadsAnyTenant() {
+        clientFor(admin(MY_TENANT))
+                .get().uri("/api/v1/tenants/{t}/deliveries", OTHER_TENANT)
+                .exchange().expectStatus().isOk()
+                .expectBody(String.class).isEqualTo("deliveries-of-" + OTHER_TENANT);
+    }
+
+    @Test
+    @DisplayName("D-178: a platform administrator does not write in another tenant, only in its own")
+    void platformAdministratorWritesOnlyItsOwnTenant() {
+        clientFor(admin(MY_TENANT))
+                .post().uri("/api/v1/tenants/{t}/deliveries", OTHER_TENANT)
+                .exchange().expectStatus().isEqualTo(HttpStatus.FORBIDDEN);
+        clientFor(admin(MY_TENANT))
+                .post().uri("/api/v1/tenants/{t}/deliveries", MY_TENANT)
+                .exchange().expectStatus().isOk();
+    }
+
+    @Test
+    @DisplayName("a forged admin permission without the role does not open the read")
+    void permissionsAloneDoNotMakeAnAdministrator() {
+        clientFor(user(MY_TENANT, Set.of("tnt:platform:admin", "system:admin")))
+                .get().uri("/api/v1/tenants/{t}/deliveries", OTHER_TENANT)
+                .exchange().expectStatus().isEqualTo(HttpStatus.FORBIDDEN);
     }
 
     @Test

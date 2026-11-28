@@ -34,20 +34,75 @@ public class TntKafkaTopicsConfig {
     @Value("${tnt.kafka.partitions:3}")
     private int partitions;
 
-    // ── Delivery Topics ────────────────────────────────────────────────────────
-    @Bean public NewTopic tntMissionCreated()       { return topic(TntTopics.DELIVERY_MISSION_CREATED); }
-    @Bean public NewTopic tntMissionStatusChanged() { return topic(TntTopics.DELIVERY_MISSION_STATUS_CHANGED); }
-    @Bean public NewTopic tntMissionStarted()       { return topic(TntTopics.DELIVERY_MISSION_STARTED); }
-    @Bean public NewTopic tntMissionCompleted()     { return topic(TntTopics.DELIVERY_MISSION_COMPLETED); }
-    @Bean public NewTopic tntMissionFailed()        { return topic(TntTopics.DELIVERY_MISSION_FAILED); }
-    @Bean public NewTopic tntPackagePickedUp()      { return topic(TntTopics.DELIVERY_PACKAGE_PICKED_UP); }
-    @Bean public NewTopic tntPackageDelivered()     { return topic(TntTopics.DELIVERY_PACKAGE_DELIVERED); }
-    @Bean public NewTopic tntPackageUpdated()       { return topic(TntTopics.DELIVERY_PACKAGE_UPDATED); }
-    @Bean public NewTopic tntHubDepositCreated()    { return topic(TntTopics.DELIVERY_HUB_DEPOSIT_CREATED); }
-    @Bean public NewTopic tntHubDepositPickedUp()   { return topic(TntTopics.DELIVERY_HUB_DEPOSIT_PICKED_UP); }
+    /** Retention of the aggregate topics: 30 days, so that external platforms can catch up (spec §3.1). */
+    @Value("${tnt.kafka.aggregate-retention-ms:2592000000}")
+    private long aggregateRetentionMs;
+
+    // ── Aggregate topics (decision [G.1] of 2026-11-26, lot L0) ──────────────────────────────
+    // One topic per aggregate, key = aggregate id, body = TntAggregateEvent (cible-evenements-colis-
+    // livraison.md §3.1/§3.3); read directly by the external platforms (one group each, read-only ACL).
+    @Bean public NewTopic tntParcelEvents()       { return aggregateTopic(TntTopics.PARCEL_EVENTS); }
+    @Bean public NewTopic tntDeliveryEvents()     { return aggregateTopic(TntTopics.DELIVERY_EVENTS); }
+    @Bean public NewTopic tntIncidentEvents()     { return aggregateTopic(TntTopics.INCIDENT_EVENTS); }
+    @Bean public NewTopic tntDisputeEvents()      { return aggregateTopic(TntTopics.DISPUTE_EVENTS); }
+    @Bean public NewTopic tntAnnouncementEvents() { return aggregateTopic(TntTopics.ANNOUNCEMENT_EVENTS); }
+
+    // ── Topics produced/consumed by modules but previously never declared (audit kafka-async-wiring) ──
+    @Bean public NewTopic tntGofpAnnouncementCandidatesRanked() { return topic(TntTopics.GOFP_ANNOUNCEMENT_CANDIDATES_RANKED); }
+    @Bean public NewTopic tntGofpFreelancerCreated() { return topic(TntTopics.GOFP_FREELANCER_CREATED); }
+    @Bean public NewTopic tntGofpMatchingNotifications() { return topic(TntTopics.GOFP_MATCHING_NOTIFICATIONS); }
+    @Bean public NewTopic tntGofpSubscriptionAttempts() { return topic(TntTopics.GOFP_SUBSCRIPTION_ATTEMPTS); }
+    @Bean public NewTopic tntAccountingJournalEntryPosted() { return topic(TntTopics.ACCOUNTING_JOURNAL_ENTRY_POSTED); }
+    @Bean public NewTopic tntAccountingPeriodClosed() { return topic(TntTopics.ACCOUNTING_PERIOD_CLOSED); }
+    @Bean public NewTopic tntActorBadgeEarned() { return topic(TntTopics.ACTOR_BADGE_EARNED); }
+    @Bean public NewTopic tntActorKycValidated() { return topic(TntTopics.ACTOR_KYC_VALIDATED); }
+    @Bean public NewTopic tntActorLocationUpdated() { return topic(TntTopics.ACTOR_LOCATION_UPDATED); }
+    @Bean public NewTopic tntActorMissionAssigned() { return topic(TntTopics.ACTOR_MISSION_ASSIGNED); }
+    @Bean public NewTopic tntActorStatusChanged() { return topic(TntTopics.ACTOR_STATUS_CHANGED); }
+    @Bean public NewTopic tntAdministrationEvents() { return topic(TntTopics.ADMINISTRATION_EVENTS); }
+    @Bean public NewTopic tntAgencyContractEvents() { return topic(TntTopics.AGENCY_CONTRACT_EVENTS); }
+    @Bean public NewTopic tntAgencyEvents() { return topic(TntTopics.AGENCY_EVENTS); }
+    @Bean public NewTopic tntAgencyMissionRequest() { return topic(TntTopics.AGENCY_MISSION_REQUEST); }
+    @Bean public NewTopic tntAgencyStaffEvents() { return topic(TntTopics.AGENCY_STAFF_EVENTS); }
+    @Bean public NewTopic tntBillingWalletCommissionCalculated() { return topic(TntTopics.BILLING_WALLET_COMMISSION_CALCULATED); }
+    @Bean public NewTopic tntFreelancerOrgCreated() { return topic(TntTopics.FREELANCER_ORG_CREATED); }
+    @Bean public NewTopic tntFreelancerOrgSubDelivererAssociated() { return topic(TntTopics.FREELANCER_ORG_SUB_DELIVERER_ASSOCIATED); }
+    @Bean public NewTopic tntFreelancerOrgSubDelivererRevoked() { return topic(TntTopics.FREELANCER_ORG_SUB_DELIVERER_REVOKED); }
+    @Bean public NewTopic tntFreelancerOrgVerified() { return topic(TntTopics.FREELANCER_ORG_VERIFIED); }
+    @Bean public NewTopic tntGeoNodeEvents() { return topic(TntTopics.GEO_NODE_EVENTS); }
+    @Bean public NewTopic tntGeoTrafficEvents() { return topic(TntTopics.GEO_TRAFFIC_EVENTS); }
+    @Bean public NewTopic tntGeoZoneEvents() { return topic(TntTopics.GEO_ZONE_EVENTS); }
+    @Bean public NewTopic tntInventoryStockLow() { return topic(TntTopics.INVENTORY_STOCK_LOW); }
+    @Bean public NewTopic tntMarketListingApproved() { return topic(TntTopics.MARKET_LISTING_APPROVED); }
+    @Bean public NewTopic tntMarketListingPublished() { return topic(TntTopics.MARKET_LISTING_PUBLISHED); }
+    @Bean public NewTopic tntMarketListingRejected() { return topic(TntTopics.MARKET_LISTING_REJECTED); }
+    @Bean public NewTopic tntMarketMerchantContractSigned() { return topic(TntTopics.MARKET_MERCHANT_CONTRACT_SIGNED); }
+    @Bean public NewTopic tntMarketOrderCompleted() { return topic(TntTopics.MARKET_ORDER_COMPLETED); }
+    @Bean public NewTopic tntMarketOrderCreated() { return topic(TntTopics.MARKET_ORDER_CREATED); }
+    @Bean public NewTopic tntMarketOrderPaid() { return topic(TntTopics.MARKET_ORDER_PAID); }
+    @Bean public NewTopic tntMarketProviderReviewPublished() { return topic(TntTopics.MARKET_PROVIDER_REVIEW_PUBLISHED); }
+    @Bean public NewTopic tntMarketQuoteRequestCreated() { return topic(TntTopics.MARKET_QUOTE_REQUEST_CREATED); }
+    @Bean public NewTopic tntMarketQuoteResponseSubmitted() { return topic(TntTopics.MARKET_QUOTE_RESPONSE_SUBMITTED); }
+    @Bean public NewTopic tntProductCreated() { return topic(TntTopics.PRODUCT_CREATED); }
+    @Bean public NewTopic tntProductOfferPublished() { return topic(TntTopics.PRODUCT_OFFER_PUBLISHED); }
+    @Bean public NewTopic tntRouteEtaUpdated() { return topic(TntTopics.ROUTE_ETA_UPDATED); }
+    @Bean public NewTopic tntRouteRerouteEvents() { return topic(TntTopics.ROUTE_REROUTE_EVENTS); }
+    @Bean public NewTopic tntRouteTourEvents() { return topic(TntTopics.ROUTE_TOUR_EVENTS); }
+    @Bean public NewTopic tntRouteVrpEvents() { return topic(TntTopics.ROUTE_VRP_EVENTS); }
+    @Bean public NewTopic tntSalesOrderCancelled() { return topic(TntTopics.SALES_ORDER_CANCELLED); }
+    @Bean public NewTopic tntSalesOrderConfirmed() { return topic(TntTopics.SALES_ORDER_CONFIRMED); }
+    @Bean public NewTopic tntSalesOrderDelivered() { return topic(TntTopics.SALES_ORDER_DELIVERED); }
+    @Bean public NewTopic tntSalesOrderDispatched() { return topic(TntTopics.SALES_ORDER_DISPATCHED); }
+    @Bean public NewTopic tntTpClientProfileEvents() { return topic(TntTopics.TP_CLIENT_PROFILE_EVENTS); }
+    @Bean public NewTopic tntTpKycEvents() { return topic(TntTopics.TP_KYC_EVENTS); }
+    @Bean public NewTopic tntTpLoyaltyEvents() { return topic(TntTopics.TP_LOYALTY_EVENTS); }
+    @Bean public NewTopic tntTpPhoneAliasEvents() { return topic(TntTopics.TP_PHONE_ALIAS_EVENTS); }
+    @Bean public NewTopic tntTpRatingEvents() { return topic(TntTopics.TP_RATING_EVENTS); }
+    @Bean public NewTopic tntTpUnknownEvents() { return topic(TntTopics.TP_UNKNOWN_EVENTS); }
+    @Bean public NewTopic tntTrustEvents() { return topic(TntTopics.TRUST_EVENTS); }
+    @Bean public NewTopic tntTrustEventsCommitted() { return topic(TntTopics.TRUST_EVENTS_COMMITTED); }
 
     // ── Geo Topics ────────────────────────────────────────────────────────────
-    @Bean public NewTopic tntGpsPositionUpdated()   { return topic(TntTopics.GEO_GPS_POSITION_UPDATED); }
     @Bean public NewTopic tntGeoAlertCreated()      { return topic(TntTopics.GEO_ALERT_CREATED); }
 
     // ── Organization Topics ───────────────────────────────────────────────────
@@ -55,90 +110,26 @@ public class TntKafkaTopicsConfig {
 
     // ── Realtime Topics ───────────────────────────────────────────────────────
     // tnt.realtime.gps.position.updated — enriched GPS events with anomaly flags
-    // consumed by tnt-incident-core (IncidentEventConsumer) to auto-detect incidents.
+    // consumed by tnt-delivery-core (DeliveryWatchConsumer) to raise delivery alerts (lot L3, decision D.2).
     @Bean public NewTopic tntRealtimeGpsPositionUpdated() { return topic(TntTopics.REALTIME_GPS_POSITION_UPDATED); }
     // tnt.realtime.geofence.triggered — geofence breach events with zoneType field
-    // consumed by tnt-incident-core to auto-create geographic incidents.
+    // consumed by tnt-delivery-core (DeliveryWatchConsumer): DANGER / RESTRICTED zones raise a delivery alert.
     @Bean public NewTopic tntRealtimeGeofenceTriggered()  { return topic(TntTopics.REALTIME_GEOFENCE_TRIGGERED); }
     @Bean public NewTopic tntLiveEtaUpdated()             { return topic(TntTopics.REALTIME_ETA_UPDATED); }
-    @Bean public NewTopic tntPresenceChanged()            { return topic(TntTopics.REALTIME_PRESENCE_CHANGED); }
 
     // ── Notify Topics ─────────────────────────────────────────────────────────
-    @Bean public NewTopic tntNotificationRequested() { return topic(TntTopics.NOTIFY_NOTIFICATION_REQUESTED); }
-    @Bean public NewTopic tntNotificationDelivered() { return topic(TntTopics.NOTIFY_NOTIFICATION_DELIVERED); }
-    @Bean public NewTopic tntNotificationFailed()    { return topic(TntTopics.NOTIFY_NOTIFICATION_FAILED); }
 
     // ── Media Topics ──────────────────────────────────────────────────────────
-    @Bean public NewTopic tntMediaUploaded()  { return topic(TntTopics.MEDIA_FILE_UPLOADED); }
-    @Bean public NewTopic tntMediaDeleted()   { return topic(TntTopics.MEDIA_FILE_DELETED); }
 
     // ── Billing Topics ────────────────────────────────────────────────────────
     @Bean public NewTopic tntInvoiceEvents()     { return topic(TntTopics.BILLING_INVOICE_EVENTS); }
     @Bean public NewTopic tntInvoicePaid()       { return topic(TntTopics.BILLING_INVOICE_PAID); }
-    @Bean public NewTopic tntInvoiceCreated()    { return topic(TntTopics.BILLING_INVOICE_CREATED); }
-    @Bean public NewTopic tntPaymentConfirmed()  { return topic(TntTopics.BILLING_WALLET_PAYMENT_CONFIRMED); }
-    @Bean public NewTopic tntPaymentFailed()     { return topic(TntTopics.BILLING_PAYMENT_FAILED); }
-    @Bean public NewTopic tntWalletCredited()    { return topic(TntTopics.BILLING_WALLET_CREDITED_PROVISIONING_BEAN); }
-    @Bean public NewTopic tntWalletDebited()     { return topic(TntTopics.BILLING_WALLET_DEBITED_PROVISIONING_BEAN); }
+    @Bean public NewTopic tntPaymentConfirmed()  { return topic(TntTopics.BILLING_WALLET_PAYMENT_CONFIRMED); }  
 
     // ── Dispute Topics ────────────────────────────────────────────────────────
-    @Bean public NewTopic tntDisputeOpened()          { return topic(TntTopics.DISPUTE_OPENED); }
-    @Bean public NewTopic tntDisputeResolved()         { return topic(TntTopics.DISPUTE_RESOLVED); }
-    @Bean public NewTopic tntDisputeEscalated()        { return topic(TntTopics.DISPUTE_ESCALATED); }
-    @Bean public NewTopic tntDisputeEvidenceAdded()    { return topic(TntTopics.DISPUTE_EVIDENCE_ADDED); }
-    @Bean public NewTopic tntDisputeRefundInitiated()  { return topic(TntTopics.DISPUTE_REFUND_INITIATED); }
-    @Bean public NewTopic tntDisputeCompensationPaid() { return topic(TntTopics.DISPUTE_COMPENSATION_PAID); }
-    @Bean public NewTopic tntDisputeClosed()           { return topic(TntTopics.DISPUTE_CLOSED); }
-    @Bean public NewTopic tntBillingCompensationInitiated() { return topic(TntTopics.BILLING_COMPENSATION_INITIATED); }
     @Bean public NewTopic tntBillingCompensationPaid()       { return topic(TntTopics.BILLING_COMPENSATION_PAID); }
 
-    // ── Incident Topics (tnt-incident-core L3) ────────────────────────────────
-    // Published by tnt-incident-core IncidentKafkaEventPublisher
-
-    /** Incident reported — initial detection event. */
-    @Bean public NewTopic tntIncidentCreated()    { return topic(TntTopics.INCIDENT_CREATED); }
-
-    /** Any incident state machine transition. */
-    @Bean public NewTopic tntIncidentStatusChanged() { return topic(TntTopics.INCIDENT_STATUS_CHANGED); }
-
-    /** Incident triage completed — severity and risk score computed. */
-    @Bean public NewTopic tntIncidentTriaged()    { return topic(TntTopics.INCIDENT_TRIAGED); }
-
-    /** Replacement driver assigned by auto-resolution engine. */
-    @Bean public NewTopic tntIncidentDriverAssigned() { return topic(TntTopics.INCIDENT_DRIVER_ASSIGNED); }
-
-    /** Double-confirmed parcel handover between original and replacement driver. */
-    @Bean public NewTopic tntIncidentHandoverCompleted() { return topic(TntTopics.INCIDENT_HANDOVER_COMPLETED); }
-
-    /** Incident resolved — SLA impact and compensation computed. */
-    @Bean public NewTopic tntIncidentResolved()   { return topic(TntTopics.INCIDENT_RESOLVED); }
-
-    /** Incident definitively closed — blockchain chain finalized. */
-    @Bean public NewTopic tntIncidentClosed()     { return topic(TntTopics.INCIDENT_CLOSED); }
-
-    /** Incident cancelled before resolution. */
-    @Bean public NewTopic tntIncidentCancelled()  { return topic(TntTopics.INCIDENT_CANCELLED); }
-
-    /** Incident escalated up the management hierarchy. */
-    @Bean public NewTopic tntIncidentEscalated()  { return topic(TntTopics.INCIDENT_ESCALATED); }
-
-    /**
-     * Incident crossed the fraud/damage threshold and converted to a formal dispute.
-     * Consumed by {@code tnt-dispute-core} to auto-create a {@code Dispute}.
-     */
-    @Bean public NewTopic tntIncidentEscalatedToDispute() {
-        return topic(TntTopics.INCIDENT_ESCALATED_TO_DISPUTE);
-    }
-
-    /** Inter-agency cooperation requested to resolve the incident. */
-    @Bean public NewTopic tntIncidentInteragencyRequested() {
-        return topic(TntTopics.INCIDENT_INTERAGENCY_REQUESTED);
-    }
-
-    /** Inter-agency cooperation completed. */
-    @Bean public NewTopic tntIncidentInteragencyCompleted() {
-        return topic(TntTopics.INCIDENT_INTERAGENCY_COMPLETED);
-    }
+    // Lot L8 (G.5): the per-event delivery, incident, dispute and hub topics are gone — see the aggregate topics above.
 
     // ── FreelancerOrg Topics () ──────────────────────────────────────────────
 
@@ -168,14 +159,6 @@ public class TntKafkaTopicsConfig {
                 .partitions(6)
                 .replicas(replicationFactor)
                 .build();
-    }
-
-    /**
-     * FreelancerOrg assigned to a delivery.
-     * Consumed by: tnt-accounting-core, tnt-notify-core, tnt-billing-wallet.
-     */
-    @Bean public NewTopic tntDeliveryFreelancerOrgAssigned() {
-        return topic(TntTopics.DELIVERY_FREELANCER_ORG_ASSIGNED);
     }
 
     /**
@@ -221,11 +204,6 @@ public class TntKafkaTopicsConfig {
         return topic(TntTopics.ADMIN_FREELANCER_ORG_BLACKLISTED);
     }
 
-    /** Wallet payment split executed (platform + org + sub-deliverer distribution). */
-    @Bean public NewTopic tntBillingWalletSplitExecuted() {
-        return topic(TntTopics.BILLING_WALLET_SPLIT_EXECUTED);
-    }
-
     // ── Link Topics (tnt-link-back-core, coreBackend) ─────────────────────────
 
     /**
@@ -245,30 +223,51 @@ public class TntKafkaTopicsConfig {
     }
 
     // ── Sync Topics ───────────────────────────────────────────────────────────
-    @Bean public NewTopic tntSyncDeltaRequested()    { return topic(TntTopics.SYNC_DELTA_REQUESTED); }
     @Bean public NewTopic tntSyncConflictDetected()  { return topic(TntTopics.SYNC_CONFLICT_DETECTED); }
-    @Bean public NewTopic tntSyncEntityChangedDlq()  { return topic(TntTopics.SYNC_ENTITY_CHANGED_DLQ); }
 
     // ── Actor / Identity Topics ───────────────────────────────────────────────
     @Bean public NewTopic tntActorProfileUpdated()    { return topic(TntTopics.ACTOR_PROFILE_UPDATED); }
-    @Bean public NewTopic tntActorReputationChanged() { return topic(TntTopics.ACTOR_REPUTATION_CHANGED); }
 
     // ── Roles Topics ──────────────────────────────────────────────────────────
     @Bean public NewTopic tntRolesPermissionChanged() { return topic(TntTopics.ROLES_PERMISSION_CHANGED); }
+    @Bean public NewTopic tntRolesPlatformAdminChanged() { return topic(TntTopics.ROLES_PLATFORM_ADMIN_CHANGED); }
 
     // ── Event Outbox (Dead Letter Queue) ──────────────────────────────────────
     @Bean public NewTopic tntDlq() { return topic(TntTopics.DLQ); }
 
-    @Bean
-    public NewTopic tntOutboxEvents() {
-        // Single-partition outbox for transactional ordering guarantee
-        return TopicBuilder.name(TntTopics.OUTBOX_EVENTS)
-                .partitions(1)
-                .replicas(replicationFactor)
-                .build();
-    }
+    // ── Lot L8 (spec annex 9.1): topics produced under a literal name, now TntTopics constants ──
+    @Bean public NewTopic tntNotificationsSent() { return topic(TntTopics.NOTIFY_NOTIFICATIONS_SENT); }
+    @Bean public NewTopic tntNotificationsFailed() { return topic(TntTopics.NOTIFY_NOTIFICATIONS_FAILED); }
+    @Bean public NewTopic tntFreelancerOrgSuspended() { return topic(TntTopics.FREELANCER_ORG_SUSPENDED); }
+    @Bean public NewTopic tntFreelancerOrgKycUpgraded() { return topic(TntTopics.FREELANCER_ORG_KYC_UPGRADED); }
+    @Bean public NewTopic tntActorFreelancerAssociated() { return topic(TntTopics.ACTOR_FREELANCER_ASSOCIATED); }
+    @Bean public NewTopic tntActorFreelancerDissociated() { return topic(TntTopics.ACTOR_FREELANCER_DISSOCIATED); }
+    @Bean public NewTopic tntActorFreelancerOrgLinked() { return topic(TntTopics.ACTOR_FREELANCER_ORG_LINKED); }
+    @Bean public NewTopic tntActorFreelancerOrgUnlinked() { return topic(TntTopics.ACTOR_FREELANCER_ORG_UNLINKED); }
+    @Bean public NewTopic tntResourceVehicleRegistered() { return topic(TntTopics.RESOURCE_VEHICLE_REGISTERED); }
+    @Bean public NewTopic tntResourceVehicleAssigned() { return topic(TntTopics.RESOURCE_VEHICLE_ASSIGNED); }
+    @Bean public NewTopic tntResourceVehicleUnassigned() { return topic(TntTopics.RESOURCE_VEHICLE_UNASSIGNED); }
+    @Bean public NewTopic tntResourceVehicleMaintenance() { return topic(TntTopics.RESOURCE_VEHICLE_MAINTENANCE); }
+    @Bean public NewTopic tntResourceVehicleRetired() { return topic(TntTopics.RESOURCE_VEHICLE_RETIRED); }
+    @Bean public NewTopic tntResourceVehicleLocation() { return topic(TntTopics.RESOURCE_VEHICLE_LOCATION); }
+    @Bean public NewTopic tntResourceMaintenanceAlert() { return topic(TntTopics.RESOURCE_MAINTENANCE_ALERT); }
+    @Bean public NewTopic tntResourceEquipmentAssigned() { return topic(TntTopics.RESOURCE_EQUIPMENT_ASSIGNED); }
+    // produced although annex 9.1 listed them as unused ("SUPPRIMÉ"): kept, now declared (session, sync batch)
+    @Bean public NewTopic tntRealtimeActorConnected() { return topic(TntTopics.REALTIME_ACTOR_CONNECTED); }
+    @Bean public NewTopic tntRealtimeActorDisconnected() { return topic(TntTopics.REALTIME_ACTOR_DISCONNECTED); }
+    @Bean public NewTopic tntSyncCompleted() { return topic(TntTopics.SYNC_COMPLETED); }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /** Aggregate topic: delete policy (never compacted — every change is an event), long retention. */
+    private NewTopic aggregateTopic(String name) {
+        return TopicBuilder.name(name)
+                .partitions(partitions)
+                .replicas(replicationFactor)
+                .config(TopicConfig.CLEANUP_POLICY_CONFIG, TopicConfig.CLEANUP_POLICY_DELETE)
+                .config(TopicConfig.RETENTION_MS_CONFIG, Long.toString(aggregateRetentionMs))
+                .build();
+    }
 
     private NewTopic topic(String name) {
         return TopicBuilder.name(name)

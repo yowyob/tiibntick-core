@@ -57,7 +57,7 @@ public class InvoiceRepositoryAdapter implements InvoiceRepository {
     }
 
     @Override
-    public Flux<Invoice> findByMissionId(String missionId) {
+    public Flux<Invoice> findByDeliveryId(String missionId) {
         return r2dbcRepo.findByMissionId(missionId).map(mapper::toDomain);
     }
 
@@ -82,7 +82,7 @@ public class InvoiceRepositoryAdapter implements InvoiceRepository {
     }
 
     @Override
-    public Mono<Boolean> existsByMissionId(String missionId) {
+    public Mono<Boolean> existsByDeliveryId(String missionId) {
         return r2dbcRepo.existsByMissionId(missionId);
     }
 }

@@ -1,0 +1,18 @@
+databaseChangeLog:
+  - changeSet:
+      id: evt-l3-001-delivery-alerts
+      author: evt-l3
+      labels: evt-l3
+      comment: >
+        Lot L3 (spec §3.5): detections on a delivery are alerts, not incidents. active_alerts = comma-separated
+        DeliveryAlertType names currently raised (dedup of DeliveryAlertRaised / DeliveryAlertCleared);
+        last_position_at = last GPS position of the courier (GPS_SIGNAL_LOST). Partial index for the watch job, which
+        scans the non-terminal deliveries only. Additive and idempotent.
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS active_alerts    VARCHAR(255);
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS last_position_at TIMESTAMPTZ;
+              CREATE INDEX IF NOT EXISTS idx_tnt_deliveries_watch
+                  ON tnt_deliveries (status, updated_at)
+                  WHERE status NOT IN ('DELIVERED', 'FAILED', 'CANCELLED');

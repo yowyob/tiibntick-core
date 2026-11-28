@@ -17,5 +17,35 @@ public enum ResponseStatus {
     REJECTED,
 
     /** Delivery person withdrew their offer before client decision. */
-    CANCELLED
+    CANCELLED;
+
+    /** The wire value of this status (its name), as exposed to API clients. */
+    /** @return whether this state has no exit in {@code AnnouncementStateMachine.RESPONSE_TABLE} */
+    public boolean isTerminal() {
+        return com.yowyob.tiibntick.core.delivery.domain.statemachine.AnnouncementStateMachine.RESPONSE_TABLE
+                .terminalStates().contains(this);
+    }
+
+    /** @return whether the response can still be selected, rejected or withdrawn */
+    public boolean isActive() {
+        return !isTerminal();
+    }
+
+    public String getValue() {
+        return name();
+    }
+
+    /**
+     * Reads a status from its wire value, ignoring case.
+     *
+     * @throws IllegalArgumentException when the value names no status
+     */
+    public static ResponseStatus fromValue(String value) {
+        for (ResponseStatus status : values()) {
+            if (status.name().equalsIgnoreCase(value)) {
+                return status;
+            }
+        }
+        throw new IllegalArgumentException("Unknown response status: " + value);
+    }
 }

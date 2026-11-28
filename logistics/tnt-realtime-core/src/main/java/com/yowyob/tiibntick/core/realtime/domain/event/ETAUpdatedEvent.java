@@ -10,7 +10,7 @@ import com.yowyob.tiibntick.core.realtime.domain.model.LiveETAUpdate;
  */
 public class ETAUpdatedEvent extends RealtimeDomainEvent {
 
-    private static final String TOPIC = "tnt.realtime.eta.updated";
+    private static final String TOPIC = com.yowyob.tiibntick.common.kafka.TntTopics.REALTIME_ETA_UPDATED;
 
     private final LiveETAUpdate etaUpdate;
 

@@ -18,4 +18,7 @@ public interface TntSalesOrderRepository {
     Flux<TntSalesOrder> findByClientThirdPartyId(UUID tenantId, UUID clientThirdPartyId);
     Flux<TntSalesOrder> findByAgencyAndPeriod(UUID tenantId, UUID agencyId, int year, int month);
     Flux<TntSalesOrder> findByStatus(UUID tenantId, SalesOrderStatus status);
+
+    /** Lot L8: the orders dispatched with this delivery ({@code mission_id}). */
+    Flux<TntSalesOrder> findByDeliveryId(UUID tenantId, UUID deliveryId);
 }

@@ -76,8 +76,8 @@ public class ClaimsKafkaPublisher implements ClaimEventPublisherPort {
         payload.put("claimRef", claimRef);
         payload.put("tenantId", submission.tenantId().toString());
         payload.put("agencyId", submission.agencyId().toString());
-        payload.put("missionId", submission.missionId() != null
-                ? submission.missionId().toString() : null);
+        payload.put("missionId", submission.deliveryId() != null
+                ? submission.deliveryId().toString() : null);
         payload.put("claimType", submission.claimType());
         payload.put("description", submission.description());
         payload.put("contactEmail", submission.contactEmail());

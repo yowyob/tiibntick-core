@@ -63,9 +63,7 @@ class RelayOpeningHoursMigrationIntegrationTest {
     private static Liquibase liquibase(Connection conn) throws Exception {
         Database database = DatabaseFactory.getInstance()
                 .findCorrectDatabaseImplementation(new JdbcConnection(conn));
-        ResourceAccessor accessor = new CompositeResourceAccessor(
-                new DirectoryResourceAccessor(Path.of("src/main/resources")),
-                new ClassLoaderResourceAccessor());
+        ResourceAccessor accessor = com.yowyob.tiibntick.bootstrap.config.BootstrapChangelogs.accessor();
         return new Liquibase(MASTER, accessor, database);
     }
 
@@ -85,8 +83,8 @@ class RelayOpeningHoursMigrationIntegrationTest {
     /** Liquibase of the previous version, then the new one; returns the changelog rows before the upgrade. */
     private static long previousVersion(Connection conn) throws Exception {
         Liquibase previous = liquibase(conn);
-        previous.update(new Contexts(), new LabelExpression("!" + NEW_CHANGESET_LABEL));
-        assertThat(previous.listUnrunChangeSets(new Contexts(), new LabelExpression())).hasSize(1);
+        previous.update(new Contexts(), new LabelExpression("!" + NEW_CHANGESET_LABEL + " and !gdd-final"));
+        assertThat(previous.listUnrunChangeSets(new Contexts(), new LabelExpression("!gdd-final"))).hasSize(1);
         conn.setAutoCommit(true);
         return count(conn, "SELECT count(*) FROM databasechangelog");
     }
@@ -94,13 +92,13 @@ class RelayOpeningHoursMigrationIntegrationTest {
     private static void upgradeTwice(Connection conn, long appliedBefore) throws Exception {
         Liquibase upgrade = liquibase(conn);
         upgrade.validate();
-        upgrade.update(new Contexts(), new LabelExpression());
+        upgrade.update(new Contexts(), new LabelExpression("!gdd-final"));
         conn.setAutoCommit(true);
-        assertThat(upgrade.listUnrunChangeSets(new Contexts(), new LabelExpression())).isEmpty();
+        assertThat(upgrade.listUnrunChangeSets(new Contexts(), new LabelExpression("!gdd-final"))).isEmpty();
         assertThat(count(conn, "SELECT count(*) FROM databasechangelog")).isEqualTo(appliedBefore + 1);
         Liquibase again = liquibase(conn);
         again.validate();
-        again.update(new Contexts(), new LabelExpression());
+        again.update(new Contexts(), new LabelExpression("!gdd-final"));
         conn.setAutoCommit(true);
         assertThat(count(conn, "SELECT count(*) FROM databasechangelog")).isEqualTo(appliedBefore + 1);
     }

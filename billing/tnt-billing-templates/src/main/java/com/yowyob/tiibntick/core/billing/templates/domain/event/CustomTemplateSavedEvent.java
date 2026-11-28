@@ -27,7 +27,7 @@ public class CustomTemplateSavedEvent {
     UUID eventId = UUID.randomUUID();
 
     /** Kafka topic name for this event. */
-    public static final String TOPIC = "tnt.billing.custom_template.saved";
+    public static final String TOPIC = com.yowyob.tiibntick.common.kafka.TntTopics.BILLING_CUSTOM_TEMPLATE_SAVED;
 
     /** Event type discriminator. */
     @Builder.Default

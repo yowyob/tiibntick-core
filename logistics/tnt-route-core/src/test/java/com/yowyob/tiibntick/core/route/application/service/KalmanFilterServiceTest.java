@@ -75,7 +75,7 @@ class KalmanFilterServiceTest {
     @Test
     void updateEta_withGPSMeasurement_returnsUpdatedEta() {
         KalmanState initialState = KalmanState.initialize("M1", 10.0);
-        when(stateRepo.findByMissionId("M1")).thenReturn(Mono.just(initialState));
+        when(stateRepo.findByDeliveryId("M1")).thenReturn(Mono.just(initialState));
         when(stateRepo.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
         when(eventPublisher.publishEtaUpdated(any())).thenReturn(Mono.empty());
 

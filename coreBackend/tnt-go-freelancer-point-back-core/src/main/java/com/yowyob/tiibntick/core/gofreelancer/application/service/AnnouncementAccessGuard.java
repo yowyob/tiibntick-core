@@ -35,7 +35,8 @@ public class AnnouncementAccessGuard {
     private final GofpFreelancerRepository gofpFreelancerRepository;
 
     /**
-     * Lot C-54b — local announcement mirror (link announcement → delivery need) and delivery needs, to let
+     * Lot C-54b — read view of the core announcement (its origin reference links it to a delivery need,
+     * lot L2; there is no local mirror any more) and delivery needs, to let
      * the owner of the linked need read the applications. Optional (setter): absent, only the
      * announcement's client and staff can.
      */

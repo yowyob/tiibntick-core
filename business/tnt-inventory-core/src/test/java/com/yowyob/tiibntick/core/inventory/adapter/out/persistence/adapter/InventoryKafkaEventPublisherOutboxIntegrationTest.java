@@ -7,7 +7,6 @@ import com.yowyob.kernel.event.application.port.in.PublishEventUseCase;
 import com.yowyob.kernel.event.application.port.out.EventEnvelopeRepository;
 import com.yowyob.kernel.event.config.YowEventKernelAutoConfiguration;
 import com.yowyob.kernel.event.domain.enums.EnvelopeStatus;
-import com.yowyob.tiibntick.core.inventory.domain.event.PackageDepositedEvent;
 import com.yowyob.tiibntick.core.inventory.domain.event.StockLowEvent;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -86,14 +85,11 @@ import static org.springframework.kafka.test.utils.KafkaTestUtils.getSingleRecor
  */
 @SpringBootTest(classes = InventoryKafkaEventPublisherOutboxIntegrationTest.TestConfig.class)
 @Testcontainers
-@EmbeddedKafka(partitions = 1, topics = {
-        InventoryKafkaEventPublisherOutboxIntegrationTest.STOCK_LOW_TOPIC,
-        InventoryKafkaEventPublisherOutboxIntegrationTest.PKG_DEPOSITED_TOPIC})
+@EmbeddedKafka(partitions = 1, topics = InventoryKafkaEventPublisherOutboxIntegrationTest.STOCK_LOW_TOPIC)
 @Tag("integration")
 class InventoryKafkaEventPublisherOutboxIntegrationTest {
 
     static final String STOCK_LOW_TOPIC = "tnt.inventory.stock.low";
-    static final String PKG_DEPOSITED_TOPIC = "tnt.inventory.hub.package.deposited";
 
     @Container
     @SuppressWarnings("resource")
@@ -188,61 +184,6 @@ class InventoryKafkaEventPublisherOutboxIntegrationTest {
         // 3. Once relayed, the envelope transitions to PUBLISHED.
         StepVerifier.create(envelopeRepository.findByAggregateId(
                         productId.toString(), "StockEntry", tenantId.toString()))
-                .assertNext(envelope -> assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED))
-                .verifyComplete();
-    }
-
-    @Test
-    @DisplayName("publishPackageDeposited() publishes straight to Kafka (envelope PUBLISHED); the record is delivered "
-            + "keyed by trackingCode (preserved from the old adapter) with the same payload")
-    void publishPackageDepositedPreservesTrackingCodeKey() throws Exception {
-        ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
-
-        UUID entryId = UUID.randomUUID();
-        UUID hubId = UUID.randomUUID();
-        UUID packageId = UUID.randomUUID();
-        UUID tenantId = UUID.randomUUID();
-        String trackingCode = "TNT-TRK-0042";
-        PackageDepositedEvent event = new PackageDepositedEvent(
-                entryId, hubId, packageId, trackingCode, tenantId, Instant.now());
-
-        publisher.publishPackageDeposited(event).block(Duration.ofSeconds(10));
-
-        StepVerifier.create(envelopeRepository.findByAggregateId(
-                        entryId.toString(), "HubPackageEntry", tenantId.toString()))
-                .assertNext(envelope -> {
-                    assertThat(envelope.getKafkaTopic()).isEqualTo(PKG_DEPOSITED_TOPIC);
-                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED);
-                    assertThat(envelope.getKafkaPartitionKey()).isEqualTo(trackingCode);
-                })
-                .verifyComplete();
-
-        Map<String, Object> consumerProps = new HashMap<>(
-                KafkaTestUtils.consumerProps(embeddedKafka, "inventory-outbox-deposited-it", true));
-        consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-
-        try (Consumer<String, String> rawConsumer = new KafkaConsumer<>(consumerProps)) {
-            embeddedKafka.consumeFromAnEmbeddedTopic(rawConsumer, PKG_DEPOSITED_TOPIC);
-
-            ConsumerRecord<String, String> received =
-                    getSingleRecord(rawConsumer, PKG_DEPOSITED_TOPIC, Duration.ofSeconds(15));
-
-            assertThat(received.topic()).isEqualTo(PKG_DEPOSITED_TOPIC);
-            // Key preserved: the old adapter keyed hub package events by trackingCode.
-            assertThat(received.key()).isEqualTo(trackingCode);
-
-            JsonNode wire = objectMapper.readTree(received.value());
-            assertThat(wire.get("hubPackageEntryId").asText()).isEqualTo(entryId.toString());
-            assertThat(wire.get("hubId").asText()).isEqualTo(hubId.toString());
-            assertThat(wire.get("packageId").asText()).isEqualTo(packageId.toString());
-            assertThat(wire.get("trackingCode").asText()).isEqualTo(trackingCode);
-            assertThat(wire.get("tenantId").asText()).isEqualTo(tenantId.toString());
-        }
-
-        StepVerifier.create(envelopeRepository.findByAggregateId(
-                        entryId.toString(), "HubPackageEntry", tenantId.toString()))
                 .assertNext(envelope -> assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED))
                 .verifyComplete();
     }

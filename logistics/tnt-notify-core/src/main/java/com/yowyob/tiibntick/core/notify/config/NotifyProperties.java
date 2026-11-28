@@ -13,9 +13,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "tnt.notify")
 public class NotifyProperties {
 
-    private String kafkaTopicSent = "tnt.notifications.sent";
+    private String kafkaTopicSent = com.yowyob.tiibntick.common.kafka.TntTopics.NOTIFY_NOTIFICATIONS_SENT;
 
-    private String kafkaTopicFailed = "tnt.notifications.failed";
+    private String kafkaTopicFailed = com.yowyob.tiibntick.common.kafka.TntTopics.NOTIFY_NOTIFICATIONS_FAILED;
 
     private Kernel kernel = new Kernel();
 

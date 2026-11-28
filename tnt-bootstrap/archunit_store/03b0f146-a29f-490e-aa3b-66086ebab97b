@@ -1,0 +1,1 @@
+com.yowyob.tiibntick.core.trust.adapter.in.kafka.TrustCommittedEventConsumer.onCommitted(java.lang.String, java.lang.String, org.springframework.kafka.support.Acknowledgment) does not await its work: it calls Mono.subscribe() in updateLocalCache (TrustCommittedEventConsumer.java:174)

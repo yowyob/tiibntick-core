@@ -55,7 +55,7 @@ class NotificationFreelancerOrgTest {
                     .containsKey(FreelancerOrgNotificationTemplates.FREELANCER_ORG_SUSPENDED)
                     .containsKey(FreelancerOrgNotificationTemplates.SUB_DELIVERER_INVITED)
                     .containsKey(FreelancerOrgNotificationTemplates.SUB_DELIVERER_INVITATION_ACCEPTED)
-                    .containsKey(FreelancerOrgNotificationTemplates.SUB_DELIVERER_MISSION_ASSIGNED)
+                    .containsKey(FreelancerOrgNotificationTemplates.SUB_DELIVERER_DELIVERY_ASSIGNED)
                     .containsKey(FreelancerOrgNotificationTemplates.FREELANCER_ORG_KYC_LEVEL_UPGRADED)
                     .containsKey(FreelancerOrgNotificationTemplates.BILLING_TEMPLATE_APPLIED)
                     .containsKey(FreelancerOrgNotificationTemplates.SURCHARGE_TRIGGERED);

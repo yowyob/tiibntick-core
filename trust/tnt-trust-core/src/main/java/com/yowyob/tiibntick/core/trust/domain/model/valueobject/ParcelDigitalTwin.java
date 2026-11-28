@@ -1,6 +1,6 @@
 package com.yowyob.tiibntick.core.trust.domain.model.valueobject;
 
-import com.yowyob.tiibntick.core.trust.domain.model.enums.ParcelLifecycleState;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.ParcelStatus;
 
 import java.time.LocalDateTime;
 
@@ -9,7 +9,8 @@ import java.time.LocalDateTime;
  *
  * <p>Represents the composite real-time view of a parcel, combining:
  * <ul>
- *   <li>Current lifecycle state (inferred from Chain of Custody)</li>
+ *   <li>Current state of the parcel: {@link ParcelStatus} of delivery-core, the single parcel state machine
+ *       (lot evt-l2); inferred from the Chain of Custody only for a parcel delivery-core does not know</li>
  *   <li>Chain of Custody status (from blockchain)</li>
  *   <li>Last known delivery proof (from blockchain, if available)</li>
  *   <li>Blockchain anchoring status</li>
@@ -30,8 +31,8 @@ public record ParcelDigitalTwin(
         String trackingCode,
         String tenantId,
 
-        /** Current lifecycle state inferred from the custody chain. */
-        ParcelLifecycleState currentState,
+        /** Current state of the parcel (delivery-core {@link ParcelStatus}). */
+        ParcelStatus currentState,
 
         /** Complete Chain of Custody from blockchain. */
         ParcelCustodyChain custodyChain,

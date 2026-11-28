@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:tnt:kafka:v1:details:DeliveryEtaUpdated",
+  "title": "details of DeliveryEtaUpdated",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "previousEta",
+    "eta"
+  ],
+  "properties": {
+    "previousEta": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "eta": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    }
+  }
+}

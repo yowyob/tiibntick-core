@@ -8,6 +8,8 @@ import com.yowyob.tiibntick.core.resource.application.port.out.ResourceEventPubl
 import com.yowyob.tiibntick.core.resource.application.service.FreelancerFleetApplicationService;
 import com.yowyob.tiibntick.core.resource.domain.exception.FreelancerFleetCapacityExceededException;
 import com.yowyob.tiibntick.core.resource.domain.exception.FreelancerVehicleNotFoundException;
+import com.yowyob.tiibntick.core.resource.application.port.in.AddPersonalVehicleCommand;
+import com.yowyob.tiibntick.core.resource.application.port.in.UpdateFreelancerVehicleCommand;
 import com.yowyob.tiibntick.core.resource.domain.model.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -172,6 +174,79 @@ class FreelancerFleetApplicationServiceTest {
             StepVerifier.create(service.getAvailableVehicles(orgId))
                     .expectNext(sampleMoto)
                     .verifyComplete();
+        }
+    }
+
+    /** Lot L3: personal vehicles (owner = actor) and vehicle update. */
+    @Nested
+    @DisplayName("personal vehicles and update")
+    class PersonalVehiclesAndUpdate {
+
+        private AddPersonalVehicleCommand personal(UUID actor, String plate) {
+            return new AddPersonalVehicleCommand(null, actor, VehicleType.MOTORCYCLE, null, null, plate, 40.0,
+                    null, null, null, null, null);
+        }
+
+        @Test
+        void addsAPersonalVehicle() {
+            UUID actor = UUID.randomUUID();
+            when(vehicleRepository.countByOwnerActorId(actor)).thenReturn(Mono.just(0L));
+            when(vehicleRepository.existsByPlateNumberOnAnotherVehicle("LT-1", null)).thenReturn(Mono.just(false));
+            when(vehicleRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+            when(eventPublisher.publish(any(
+                    com.yowyob.tiibntick.core.resource.domain.event.FreelancerVehicleRegisteredEvent.class)))
+                    .thenReturn(Mono.empty());
+
+            StepVerifier.create(service.addPersonalVehicle(personal(actor, "LT-1")))
+                    .expectNextMatches(v -> actor.equals(v.ownerActorId()) && v.ownerOrgId() == null
+                            && v.maxCapacityKg() == 40.0)
+                    .verifyComplete();
+        }
+
+        @Test
+        void refusesAPlateAlreadyRegistered() {
+            UUID actor = UUID.randomUUID();
+            when(vehicleRepository.countByOwnerActorId(actor)).thenReturn(Mono.just(0L));
+            when(vehicleRepository.existsByPlateNumberOnAnotherVehicle("LT-1", null)).thenReturn(Mono.just(true));
+
+            StepVerifier.create(service.addPersonalVehicle(personal(actor, "LT-1")))
+                    .expectError(IllegalStateException.class).verify();
+            verify(vehicleRepository, never()).save(any());
+        }
+
+        @Test
+        void refusesAFourthPersonalVehicle() {
+            UUID actor = UUID.randomUUID();
+            when(vehicleRepository.countByOwnerActorId(actor)).thenReturn(Mono.just(3L));
+            when(vehicleRepository.existsByPlateNumberOnAnotherVehicle(any(), any())).thenReturn(Mono.just(false));
+
+            StepVerifier.create(service.addPersonalVehicle(personal(actor, "LT-4")))
+                    .expectError(IllegalStateException.class).verify();
+            verify(vehicleRepository, never()).save(any());
+        }
+
+        @Test
+        void updatesADeclaredVehicle() {
+            when(vehicleRepository.findById(sampleMoto.vehicleId())).thenReturn(Mono.just(sampleMoto));
+            when(vehicleRepository.existsByPlateNumberOnAnotherVehicle("CMR-009", sampleMoto.vehicleId()))
+                    .thenReturn(Mono.just(false));
+            when(vehicleRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+
+            StepVerifier.create(service.updateVehicle(new UpdateFreelancerVehicleCommand(sampleMoto.vehicleId(),
+                            VehicleType.SCOOTER, null, null, "CMR-009", 30.0, null, null, null)))
+                    .expectNextMatches(v -> v.type() == VehicleType.SCOOTER && v.plateNumber().equals("CMR-009")
+                            && v.maxCapacityKg() == 30.0 && orgId.equals(v.ownerOrgId()))
+                    .verifyComplete();
+        }
+
+        @Test
+        void updateOfAnUnknownVehicleFails() {
+            UUID unknown = UUID.randomUUID();
+            when(vehicleRepository.findById(unknown)).thenReturn(Mono.empty());
+            StepVerifier.create(service.updateVehicle(new UpdateFreelancerVehicleCommand(unknown,
+                            VehicleType.CAR, null, null, "X-1", 100.0, null, null, null)))
+                    .expectError(com.yowyob.tiibntick.core.resource.domain.exception.FreelancerVehicleNotFoundException.class)
+                    .verify();
         }
     }
 }

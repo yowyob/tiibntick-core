@@ -17,7 +17,7 @@ import java.util.UUID;
  * <ul>
  *   <li>{@link #incidentHistoryCount} — counter incremented each time an incident involving
  *       this deliverer is closed. Maintained by {@code ActorReputationPortAdapter} and the
- *       {@code IncidentEventConsumer} (Kafka consumer on {@code tnt.incident.closed}).</li>
+ *       {@code IncidentEventConsumer} ({@code IncidentClosed} of {@code tnt.incident.events}).</li>
  *   <li>{@link #fraudFlaggedByIncidentId} — nullable UUID set when the deliverer is flagged
  *       for fraud by {@code IActorReputationPort.flagForFraud()}. Also triggers
  *       {@link KycStatus#FLAGGED} on the profile.</li>
@@ -210,7 +210,7 @@ public final class DelivererProfile extends TntActorProfile {
 
     /**
      * Returns a new profile with the incident history counter incremented by 1.
-     * Called by {@code IncidentEventConsumer} when {@code tnt.incident.closed}
+     * Called by {@code IncidentEventConsumer} when {@code IncidentClosed}
      * is received and this deliverer was involved.
      *
      * @return new profile with incremented incident count

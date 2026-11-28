@@ -51,6 +51,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 class LiquibaseMasterChangelogIntegrationTest {
 
     private static final String MASTER = "db/changelog/tnt-core-master.yaml";
+    private static final String GUEST_RELOCATION_CHANGESET = "075-relocate-guest-person";
+    /** The legacy fixed guest id, matched by pattern so the literal is not written in the project. */
+    private static final String LEGACY_GUEST_ID_PATTERN = "'^0{8}-0{4}-0{4}-0{4}-0{11}1$'";
     private static final String FIRST_WALLET_MIGRATION_CHANGESET = "004-create-wallet-settlements-and-holds";
 
     @Container
@@ -78,12 +81,18 @@ class LiquibaseMasterChangelogIntegrationTest {
     private static Liquibase liquibase(Connection conn) throws Exception {
         Database database = DatabaseFactory.getInstance()
                 .findCorrectDatabaseImplementation(new JdbcConnection(conn));
-        // failsafe runs after `package`, when tnt-bootstrap's own resources sit inside the Spring Boot
-        // fat jar (BOOT-INF/classes) and are invisible to the classloader: read the master and the
-        // bootstrap-owned changes from src/main/resources, the module changelogs from their JARs.
-        ResourceAccessor accessor = new CompositeResourceAccessor(
-                new DirectoryResourceAccessor(Path.of("src/main/resources")),
-                new ClassLoaderResourceAccessor());
+        // When failsafe runs against the Spring Boot fat jar, tnt-bootstrap's own resources sit in
+        // BOOT-INF/classes and are invisible to the classloader: read the master and the bootstrap-owned
+        // changes from src/main/resources, the module changelogs from their JARs. When it runs against
+        // target/classes (integration-tests profile), the classloader already sees them: adding the
+        // source directory would make Liquibase find every bootstrap changelog twice.
+        boolean bootstrapResourcesOnClasspath =
+                LiquibaseMasterChangelogIntegrationTest.class.getClassLoader().getResource(MASTER) != null;
+        ResourceAccessor accessor = bootstrapResourcesOnClasspath
+                ? new ClassLoaderResourceAccessor()
+                : new CompositeResourceAccessor(
+                        new DirectoryResourceAccessor(Path.of("src/main/resources")),
+                        new ClassLoaderResourceAccessor());
         return new Liquibase(MASTER, accessor, database);
     }
 
@@ -124,10 +133,16 @@ class LiquibaseMasterChangelogIntegrationTest {
             again.update(new Contexts(), new LabelExpression());
             assertThat(count(conn, "SELECT count(*) FROM databasechangelog")).isEqualTo(applied);
 
+            // lot L5: the legacy intents table (005) is replaced by the escrow intents of the same name, the local
+            // holds are dropped (decision H.1)
             assertThat(tables(conn, "billing"))
-                    .contains("wallet_settlements", "wallet_holds")
-                    .doesNotContain("wallet_wallets", "wallet_transactions", "wallet_payment_intents",
+                    .contains("wallet_settlements", "wallet_compensations", "wallet_payment_intents",
+                            "wallet_escrows", "wallet_cash_collections", "wallet_debts")
+                    .doesNotContain("wallet_wallets", "wallet_transactions", "wallet_holds",
                             "wallet_payment_splits", "wallet_reconciliations");
+            // lot L6: correspondences with the Kernel books; the local journal stays (read-only, QO-21)
+            assertThat(tables(conn, "accounting"))
+                    .contains("kernel_account_links", "kernel_journal_links", "kernel_entry_links", "journal_entries");
         }
     }
 
@@ -162,12 +177,65 @@ class LiquibaseMasterChangelogIntegrationTest {
             upgrade.update(new Contexts(), new LabelExpression());
 
             assertThat(upgrade.listUnrunChangeSets(new Contexts(), new LabelExpression())).isEmpty();
-            assertThat(tables(conn, "billing")).contains("wallet_settlements", "wallet_holds")
-                    .doesNotContain("wallet_wallets", "wallet_transactions", "wallet_payment_intents",
+            assertThat(tables(conn, "billing"))
+                    .contains("wallet_settlements", "wallet_compensations", "wallet_payment_intents",
+                            "wallet_escrows", "wallet_cash_collections", "wallet_debts")
+                    .doesNotContain("wallet_wallets", "wallet_transactions", "wallet_holds",
                             "wallet_payment_splits", "wallet_reconciliations");
             assertThat(count(conn, "SELECT count(*) FROM information_schema.columns "
                     + "WHERE column_name = 'receive_code' AND table_name = 'deliveries'"))
-                    .as("delivery receive-code columns added by changeset 071").isEqualTo(1);
+                    .as("receive-code columns added by changeset 071, dropped by evt-l5-001 (lot L5, H.1)")
+                    .isZero();
+        }
+    }
+
+    @Test
+    @DisplayName("corrective migration: the Guest person leaves its legacy fixed id and every reference follows")
+    void guestPersonIsRelocated() throws Exception {
+        try (Connection conn = open(createDatabase())) {
+            Liquibase lb = liquibase(conn);
+            List<ChangeSet> all = lb.getDatabaseChangeLog().getChangeSets();
+            int cut = -1;
+            for (int i = 0; i < all.size(); i++) {
+                if (GUEST_RELOCATION_CHANGESET.equals(all.get(i).getId())) {
+                    cut = i;
+                    break;
+                }
+            }
+            assertThat(cut).as("guest relocation changeset present in the master").isPositive();
+
+            // 1. production as it is today: the guest person sits under the legacy id
+            lb.update(cut, "");
+            assertThat(count(conn, "SELECT count(*) FROM persons WHERE id::text ~ " + LEGACY_GUEST_ID_PATTERN))
+                    .as("guest person under the legacy id before the migration").isEqualTo(1);
+            long fksBefore = count(conn, "SELECT count(*) FROM pg_constraint "
+                    + "WHERE contype = 'f' AND confrelid = 'persons'::regclass");
+            // changeset c36-in-app-notifications (lot C-36 of main) drops this one on purpose during the upgrade
+            long droppedByC36 = count(conn, "SELECT count(*) FROM pg_constraint "
+                    + "WHERE contype = 'f' AND confrelid = 'persons'::regclass AND conname = 'fk_notification_person'");
+            assertThat(count(conn, "SELECT count(*) FROM clients c JOIN persons p ON p.id = c.person_id "
+                    + "WHERE p.email = 'guest@tiibntick.com'")).isEqualTo(1);
+
+            // 2. the application restarts on the new version (closure gdd-final excluded: it drops persons, and is
+            //    covered by GddFinalClosureMigrationIntegrationTest)
+            Liquibase upgrade = liquibase(conn);
+            upgrade.validate();
+            upgrade.update(new Contexts(), new LabelExpression("!gdd-final"));
+            assertThat(upgrade.listUnrunChangeSets(new Contexts(), new LabelExpression("!gdd-final"))).isEmpty();
+
+            assertThat(count(conn, "SELECT count(*) FROM persons WHERE id::text ~ " + LEGACY_GUEST_ID_PATTERN))
+                    .as("no person left under the legacy id").isZero();
+            assertThat(count(conn, "SELECT count(*) FROM persons WHERE email = 'guest@tiibntick.com'"))
+                    .as("the guest person still exists, once").isEqualTo(1);
+            assertThat(count(conn, "SELECT count(*) FROM clients c JOIN persons p ON p.id = c.person_id "
+                    + "WHERE p.email = 'guest@tiibntick.com'"))
+                    .as("the guest client follows its person").isEqualTo(1);
+            assertThat(count(conn, "SELECT count(*) FROM pg_constraint "
+                    + "WHERE contype = 'f' AND confrelid = 'persons'::regclass"))
+                    .as("foreign keys on persons(id) re-created").isEqualTo(fksBefore - droppedByC36);
+            assertThat(count(conn, "SELECT count(*) FROM pg_constraint "
+                    + "WHERE contype = 'f' AND confrelid = 'persons'::regclass AND NOT convalidated"))
+                    .isZero();
         }
     }
 }

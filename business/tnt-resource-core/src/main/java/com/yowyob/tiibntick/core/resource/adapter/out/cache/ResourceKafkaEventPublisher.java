@@ -47,14 +47,14 @@ import java.util.UUID;
 public class ResourceKafkaEventPublisher implements ResourceEventPublisherPort {
 
     // ── Agency vehicle topics ─────────────────────────────────────────────
-    static final String TOPIC_VEHICLE_REGISTERED    = "tnt.resource.vehicle.registered";
-    static final String TOPIC_VEHICLE_ASSIGNED      = "tnt.resource.vehicle.assigned";
-    static final String TOPIC_VEHICLE_UNASSIGNED    = "tnt.resource.vehicle.unassigned";
-    static final String TOPIC_VEHICLE_MAINTENANCE   = "tnt.resource.vehicle.maintenance";
-    static final String TOPIC_VEHICLE_RETIRED       = "tnt.resource.vehicle.retired";
-    static final String TOPIC_VEHICLE_LOCATION      = "tnt.resource.vehicle.location";
-    static final String TOPIC_MAINTENANCE_ALERT     = "tnt.resource.maintenance.alert";
-    static final String TOPIC_EQUIPMENT_ASSIGNED    = "tnt.resource.equipment.assigned";
+    static final String TOPIC_VEHICLE_REGISTERED    = com.yowyob.tiibntick.common.kafka.TntTopics.RESOURCE_VEHICLE_REGISTERED;
+    static final String TOPIC_VEHICLE_ASSIGNED      = com.yowyob.tiibntick.common.kafka.TntTopics.RESOURCE_VEHICLE_ASSIGNED;
+    static final String TOPIC_VEHICLE_UNASSIGNED    = com.yowyob.tiibntick.common.kafka.TntTopics.RESOURCE_VEHICLE_UNASSIGNED;
+    static final String TOPIC_VEHICLE_MAINTENANCE   = com.yowyob.tiibntick.common.kafka.TntTopics.RESOURCE_VEHICLE_MAINTENANCE;
+    static final String TOPIC_VEHICLE_RETIRED       = com.yowyob.tiibntick.common.kafka.TntTopics.RESOURCE_VEHICLE_RETIRED;
+    static final String TOPIC_VEHICLE_LOCATION      = com.yowyob.tiibntick.common.kafka.TntTopics.RESOURCE_VEHICLE_LOCATION;
+    static final String TOPIC_MAINTENANCE_ALERT     = com.yowyob.tiibntick.common.kafka.TntTopics.RESOURCE_MAINTENANCE_ALERT;
+    static final String TOPIC_EQUIPMENT_ASSIGNED    = com.yowyob.tiibntick.common.kafka.TntTopics.RESOURCE_EQUIPMENT_ASSIGNED;
 
     // ── FreelancerVehicle topics ──────────────────────────────────────────
     static final String TOPIC_FL_VEHICLE_REGISTERED     = "tnt.resource.freelancer.vehicle.registered";

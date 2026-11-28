@@ -1,7 +1,6 @@
 package com.yowyob.tiibntick.core.incident.application.service;
 
 import com.yowyob.tiibntick.core.incident.application.command.TriageIncidentCommand;
-import com.yowyob.tiibntick.core.incident.domain.event.IncidentDomainEvents.*;
 import com.yowyob.tiibntick.core.incident.domain.model.Incident;
 import com.yowyob.tiibntick.core.incident.domain.model.IncidentEventLog;
 import com.yowyob.tiibntick.core.incident.domain.service.IncidentRiskScoringService;
@@ -37,7 +36,6 @@ public class IncidentClassificationService implements ITriageIncidentUseCase {
 
     private final IIncidentRepository incidentRepository;
     private final IIncidentEventLogRepository eventLogRepository;
-    private final IIncidentEventPublisher eventPublisher;
     private final IRouteOptimizerPort routeOptimizerPort;
     private final IBlockchainAuditPort blockchainAuditPort;
     private final IncidentTriageService triageService;
@@ -59,16 +57,23 @@ public class IncidentClassificationService implements ITriageIncidentUseCase {
                 .flatMap(incident -> performTriage(incident, command));
     }
 
+    /**
+     * Lot L3: the triage itself (row I3: severity, geo-snapshot, {@code blocking}) runs at the declaration
+     * ({@link IncidentReportingService}); this support endpoint refines the risk score and the SLA impact of an
+     * active, already triaged incident, without transition.
+     */
     private Mono<Incident> performTriage(Incident incident, TriageIncidentCommand command) {
-        var severity = triageService.determineSeverity(incident.getType(), incident.getCategory());
-
+        if (incident.getStatus().isTerminal() || incident.getTriagedAt() == null) {
+            return Mono.error(new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Incident " + incident.getId() + " is " + incident.getStatus() + ": nothing to refine"));
+        }
         IncidentSlaImpact slaImpact = command.getSlaDeadlineEpochSeconds() != null
                 ? IncidentSlaImpact.compute(incident.getId(),
                 Instant.ofEpochSecond(command.getSlaDeadlineEpochSeconds()), 0L)
-                : null;
+                : incident.getSlaImpact();
 
         return resolveGeoSnapshot(incident)
-                .map(geo -> incident.triage(severity, geo, slaImpact))
+                .map(geo -> incident.toBuilder().geoSnapshot(geo).slaImpact(slaImpact).build())
                 .map(triaged -> {
                     var score = riskScoringService.compute(triaged,
                             command.getDriverReputationScore(),
@@ -81,7 +86,7 @@ public class IncidentClassificationService implements ITriageIncidentUseCase {
                     return triaged.withRiskScore(score);
                 })
                 .flatMap(incidentRepository::save)
-                .flatMap(saved -> logAndPublish(saved, command.getTriggeredByActorId()))
+                .flatMap(saved -> logTriage(saved, command.getTriggeredByActorId()))
                 .flatMap(saved -> initBlockchainChainIfMultiParcel(saved));
     }
 
@@ -97,26 +102,11 @@ public class IncidentClassificationService implements ITriageIncidentUseCase {
                 .build());
     }
 
-    private Mono<Incident> logAndPublish(Incident incident, UUID triggeredBy) {
+    private Mono<Incident> logTriage(Incident incident, UUID triggeredBy) {
         IncidentEventLog log = IncidentEventLog.of(incident.getId(), "INCIDENT_TRIAGED",
                 triggeredBy, null, "{\"severity\":\"" + incident.getSeverity() + "\"}");
 
-        var event = IncidentTriagedEvent.builder()
-                .eventId(UUID.randomUUID())
-                .incidentId(incident.getId())
-                .tenantId(incident.getTenantId())
-                .missionId(incident.getMissionId())
-                .severity(incident.getSeverity())
-                .category(incident.getCategory())
-                .riskScore(incident.getRiskScore() != null ? incident.getRiskScore().getGlobalScore() : 0.0)
-                .autoResolutionRecommended(incident.getRiskScore() != null
-                        && incident.getRiskScore().isAutoResolutionRecommended())
-                .occurredAt(Instant.now())
-                .build();
-
-        return eventLogRepository.save(log)
-                .then(eventPublisher.publish(event))
-                .thenReturn(incident);
+        return eventLogRepository.save(log).thenReturn(incident);
     }
 
     private Mono<Incident> initBlockchainChainIfMultiParcel(Incident incident) {

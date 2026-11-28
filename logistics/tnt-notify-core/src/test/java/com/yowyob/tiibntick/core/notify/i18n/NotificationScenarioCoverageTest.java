@@ -29,7 +29,8 @@ class NotificationScenarioCoverageTest {
 
     private static Set<String> seeded() throws IOException {
         Set<String> rows = new HashSet<>();
-        for (String file : List.of("i18n-002-seed-existing-messages.sql", "i18n-003-seed-notification-scenarios.sql", "i18n-004-seed-profile-welcome.sql")) {
+        for (String file : List.of("i18n-002-seed-existing-messages.sql", "i18n-003-seed-notification-scenarios.sql", "i18n-004-seed-profile-welcome.sql",
+                "i18n-006-rename-delivery-vocabulary-keys.sql")) {
             try (InputStream in = NotificationScenarioCoverageTest.class.getClassLoader()
                     .getResourceAsStream("db/changelog/changes/" + file)) {
                 assertThat(in).as(file).isNotNull();

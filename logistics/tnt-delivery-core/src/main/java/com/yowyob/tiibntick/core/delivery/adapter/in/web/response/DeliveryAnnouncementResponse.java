@@ -34,7 +34,22 @@ public record DeliveryAnnouncementResponse(
         UUID selectedResponseId,
         UUID createdDeliveryId,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        // Optional complements (null when not specified)
+        String recipientEmail,
+        String senderName,
+        String senderPhone,
+        String senderEmail,
+        String requiredVehicleType,
+        String paymentMethod,
+        String transportMethod,
+        BigDecimal distanceKm,
+        Integer estimatedDurationMin,
+        UUID destinationHubId,
+        String handoverSignatureRef,
+        BigDecimal serviceFee,
+        String originRefType,
+        UUID originRefId
 ) {
     public record ResponseSummary(
             UUID id,

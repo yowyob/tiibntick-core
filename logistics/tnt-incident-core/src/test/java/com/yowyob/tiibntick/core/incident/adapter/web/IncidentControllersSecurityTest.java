@@ -48,6 +48,9 @@ class IncidentControllersSecurityTest {
     private final IConfirmHandoverUseCase confirm = mock(IConfirmHandoverUseCase.class);
     private final IStartAgencyHandlingUseCase handling = mock(IStartAgencyHandlingUseCase.class);
     private final IInterAgencyCooperationUseCase cooperation = mock(IInterAgencyCooperationUseCase.class);
+    private final IResolutionConfirmationUseCase confirmation = mock(IResolutionConfirmationUseCase.class);
+    private final com.yowyob.tiibntick.core.incident.application.service.IncidentAutoResolutionService autoResolution =
+            mock(com.yowyob.tiibntick.core.incident.application.service.IncidentAutoResolutionService.class);
 
     private IncidentController incidents;
     private IncidentHandoverController handover;
@@ -62,8 +65,8 @@ class IncidentControllersSecurityTest {
     @BeforeEach
     void setUp() {
         incidents = new IncidentController(report, withdrawal, triage, autoResolve, resolve, close, cancel,
-                escalate, evidence, query, mapper);
-        handover = new IncidentHandoverController(assign, confirm, query);
+                escalate, evidence, query, confirmation, mapper);
+        handover = new IncidentHandoverController(assign, confirm, query, autoResolution);
         agency = new IncidentAgencyController(handling, query, mapper);
         coop = new IncidentCooperationController(cooperation, query);
         // the incident is visible to whoever asks — we are testing the action guards, not visibility
@@ -79,10 +82,33 @@ class IncidentControllersSecurityTest {
     void reporterCannotRunTheCase() {
         forbidden(() -> incidents.triage(driver, INCIDENT, TriageRequest.builder().triggeredByActorId(DRIVER).build()));
         forbidden(() -> incidents.startAutoResolution(driver, INCIDENT));
-        forbidden(() -> incidents.resolve(driver, INCIDENT, ResolveRequest.builder().resolvedByActorId(DRIVER).build()));
+        // lot L3 (I6): a courier may only close his own non-blocking incident, never as somebody else
+        forbidden(() -> incidents.resolve(driver, INCIDENT, ResolveRequest.builder().resolvedByActorId(UUID.randomUUID()).build()));
         forbidden(() -> incidents.close(driver, INCIDENT, DRIVER));
         forbidden(() -> incidents.getKpi(driver, UUID.randomUUID(), TENANT));
-        verifyNoInteractions(triage, autoResolve, resolve, close);
+        verifyNoInteractions(triage, autoResolve, resolve, close, confirmation);
+    }
+
+    @Test
+    @DisplayName("lot L3: a courier resolving goes to his own non-blocking closing (I6), never to the manager use case")
+    void courierResolveIsTheOwnNonBlockingClosing() {
+        when(confirmation.resolveOwnNonBlocking(INCIDENT, DRIVER, "done")).thenReturn(Mono.empty());
+        incidents.resolve(driver, INCIDENT, ResolveRequest.builder().resolvedByActorId(DRIVER).resolutionNotes("done").build())
+                .block();
+        org.mockito.Mockito.verify(confirmation).resolveOwnNonBlocking(INCIDENT, DRIVER, "done");
+        verifyNoInteractions(resolve);
+    }
+
+    @Test
+    @DisplayName("lot L3: only a manager proposes a resolution; confirm/contest go to the use case with the caller's actor")
+    void resolutionConfirmationGuards() {
+        forbidden(() -> incidents.proposeResolution(driver, INCIDENT, ProposeResolutionRequest.builder().build()));
+        when(confirmation.confirm(INCIDENT, DRIVER)).thenReturn(Mono.empty());
+        when(confirmation.contest(INCIDENT, DRIVER, "not fixed")).thenReturn(Mono.empty());
+        incidents.confirmResolution(driver, INCIDENT).block();
+        incidents.contestResolution(driver, INCIDENT, "not fixed").block();
+        org.mockito.Mockito.verify(confirmation).confirm(INCIDENT, DRIVER);
+        org.mockito.Mockito.verify(confirmation).contest(INCIDENT, DRIVER, "not fixed");
     }
 
     @Test
@@ -109,6 +135,8 @@ class IncidentControllersSecurityTest {
         // as themselves they pass the guard and reach the visibility lookup (which here is empty)
         assertThat(incidents.escalate(driver, INCIDENT, EscalateRequest.builder().escalatedByActorId(DRIVER).reason("x").build())).isNotNull();
         assertThat(incidents.cancel(driver, INCIDENT, DRIVER, "x")).isNotNull();
+        // lot L3: the confirmation reaches the use case, which checks the caller is that side's courier
+        when(confirm.execute(any())).thenReturn(Mono.empty());
         assertThat(handover.confirm(driver, INCIDENT, DRIVER, true)).isNotNull();
     }
 
@@ -117,7 +145,8 @@ class IncidentControllersSecurityTest {
     void managerPasses() {
         assertThat(incidents.triage(manager, INCIDENT, TriageRequest.builder().triggeredByActorId(MANAGER).build())).isNotNull();
         assertThat(incidents.startAutoResolution(manager, INCIDENT)).isNotNull();
-        assertThat(incidents.resolve(manager, INCIDENT, ResolveRequest.builder().resolvedByActorId(MANAGER).build())).isNotNull();
+        assertThat(incidents.resolve(manager, INCIDENT, ResolveRequest.builder().resolvedByActorId(MANAGER)
+                .resolutionMode(com.yowyob.tiibntick.core.incident.domain.enums.ResolutionMode.MANUAL_AGENCY).build())).isNotNull();
         assertThat(incidents.close(manager, INCIDENT, MANAGER)).isNotNull();
         assertThat(handover.assignDriver(manager, INCIDENT, AssignDriverRequest.builder().assignedByActorId(MANAGER).build())).isNotNull();
         assertThat(agency.startHandling(manager, INCIDENT, UUID.randomUUID(), MANAGER, null, null)).isNotNull();

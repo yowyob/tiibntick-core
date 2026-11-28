@@ -136,6 +136,12 @@
             <artifactId>spring-kafka-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- lot L3: tnt.incident.events records checked against the JSON Schemas of spec §3.6 -->
+        <dependency>
+            <groupId>com.networknt</groupId>
+            <artifactId>json-schema-validator</artifactId>
+            <scope>test</scope>
+        </dependency>
         <!-- @SchedulerLock annotation (Chantier D · Audit n°6 · S2) — distributed lock around
              this module's @Scheduled job(s); LockProvider bean lives centrally in
              tnt-bootstrap's TntSchedulerLockConfig. -->

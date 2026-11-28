@@ -16,6 +16,11 @@ import java.util.UUID;
 @Data @Builder @AllArgsConstructor @NoArgsConstructor
 public class ResolveRequest {
     @NotNull UUID resolvedByActorId;
-    @NotNull ResolutionMode resolutionMode;
+    /** Required for a manager; ignored when the declaring courier closes his own non-blocking incident (I6). */
+    ResolutionMode resolutionMode;
     String resolutionNotes;
+    /** Lot L3: RESUMED or FAILED, mandatory for a blocking incident (RESUMED by default otherwise). */
+    com.yowyob.tiibntick.core.incident.domain.enums.IncidentDeliveryOutcome deliveryOutcome;
+    /** Lot L3: payer of a return [B.6], optional. */
+    com.yowyob.tiibntick.core.incident.domain.enums.IncidentResponsibleParty responsibleParty;
 }

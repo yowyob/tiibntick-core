@@ -169,7 +169,9 @@ class TemplateKeyI18nRegressionTest {
         String normalized = path.toString().replace('\\', '/');
         return normalized.contains("/src/main/java/")
                 && !normalized.contains("/target/")
-                && !normalized.contains("/.git/");
+                && !normalized.contains("/.git/")
+                // local agent worktrees (.claude/worktrees/*) are copies of other branches, not part of this build
+                && !normalized.contains("/.claude/");
     }
 
     // ── Repo-root resolution ─────────────────────────────────────────────────────────────────

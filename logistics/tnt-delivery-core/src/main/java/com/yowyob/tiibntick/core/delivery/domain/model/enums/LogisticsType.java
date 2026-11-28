@@ -12,5 +12,11 @@ public enum LogisticsType {
     MOTORBIKE,
     CAR,
     VAN,
-    TRUCK
+    TRUCK,
+    /** Light two-wheeler (kick or motor scooter). */
+    SCOOTER,
+    /** Three-wheeler (motor tricycle, cargo tricycle). */
+    TRICYCLE,
+    /** Passenger bus or minibus carrying parcels. */
+    BUS
 }

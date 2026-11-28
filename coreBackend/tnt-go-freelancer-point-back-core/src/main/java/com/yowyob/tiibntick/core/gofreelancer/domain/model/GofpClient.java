@@ -3,7 +3,7 @@ package com.yowyob.tiibntick.core.gofreelancer.domain.model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.client.ClientStatus;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.user.LoyaltyStatus;
+import com.yowyob.tiibntick.core.tp.domain.model.enums.LoyaltyTier;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -77,18 +77,22 @@ public class GofpClient implements Persistable<UUID>, TntPersistableEntity {
     @Builder.Default
     private ClientStatus status = ClientStatus.ACTIVE;
 
-    @NotNull
-    @Column("loyalty_status")
-    @Builder.Default
-    private LoyaltyStatus loyaltyStatus = LoyaltyStatus.BRONZE;
+    /**
+     * Loyalty tier, read from the tp-core loyalty account of the client's actor (lot L3, H3: core thresholds).
+     * Not persisted here: the {@code loyalty_status} column is no longer read nor written (dropped at closure).
+     */
+    @Transient
+    private LoyaltyTier loyaltyStatus;
 
-    /** Total number of completed orders — used for loyalty tier calculation. */
-    @Column("total_orders")
-    @Builder.Default
-    private Integer totalOrders = 0;
+    /**
+     * Completed orders, derived from the tp-core loyalty account: lifetime points / points per delivery
+     * (each completed delivery credits {@code LoyaltyAccount.POINTS_PER_DELIVERY}). Not persisted here.
+     */
+    @Transient
+    private Integer totalOrders;
 
-    /** Average rating given by delivery persons. */
-    @Column("rating")
+    /** Average rating of the client, read from the actor-core client profile ({@code ActorRating}). Not persisted. */
+    @Transient
     private Double rating;
 
     // ── Address ───────────────────────────────────────────────────────────

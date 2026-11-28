@@ -44,6 +44,7 @@ class DeliveryAnnouncementPortAdapterTest {
 
     @Mock private DeliveryAnnouncementUseCase deliveryAnnouncementUseCase;
     @Mock private DeliveryQueryUseCase deliveryQueryUseCase;
+    @Mock private com.yowyob.tiibntick.core.delivery.application.port.in.AnnouncementLookupUseCase announcementLookupUseCase;
 
     private DeliveryAnnouncementPortAdapter adapter;
 
@@ -52,7 +53,7 @@ class DeliveryAnnouncementPortAdapterTest {
 
     @BeforeEach
     void setUp() {
-        adapter = new DeliveryAnnouncementPortAdapter(deliveryAnnouncementUseCase, deliveryQueryUseCase);
+        adapter = new DeliveryAnnouncementPortAdapter(deliveryAnnouncementUseCase, deliveryQueryUseCase, announcementLookupUseCase);
     }
 
     @Test

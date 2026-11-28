@@ -27,9 +27,9 @@ notify.freelancer_org.kyc_level_upgraded
 notify.freelancer_org.suspended
 notify.freelancer_org.unsuspended
 notify.freelancer_org.kyc_rejected
-notify.freelancer_org.mission_assigned
+notify.freelancer_org.delivery_assigned
 notify.sub_deliverer.invited
 notify.sub_deliverer.invitation_accepted
-notify.sub_deliverer.mission_assigned
+notify.sub_deliverer.delivery_assigned
 notify.billing.template_applied
 notify.billing.surcharge_triggered

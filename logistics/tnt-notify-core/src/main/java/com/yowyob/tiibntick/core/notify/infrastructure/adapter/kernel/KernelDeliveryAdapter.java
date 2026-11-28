@@ -25,6 +25,8 @@ public class KernelDeliveryAdapter implements INotificationDeliveryPort {
 
     private static final Logger log = LoggerFactory.getLogger(KernelDeliveryAdapter.class);
 
+    private static final String DEFAULT_EMAIL_SUBJECT = "TiiBnTick";
+
     private final KernelNotificationClient client;
     private final KernelTemplateRegistrar templates;
     private final boolean templatesEnabled;
@@ -59,10 +61,22 @@ public class KernelDeliveryAdapter implements INotificationDeliveryPort {
                 address,
                 kernelChannel,
                 useTemplate ? m.templateCode() : null,
-                m.subject(),
+                subjectOf(m),
                 m.body(),
                 useTemplate ? m.variables() : null,
                 m.priority() != null ? Map.of("priority", m.priority().name()) : null);
+    }
+
+    /**
+     * An e-mail needs a subject: a message with none is delivered with an empty subject line, which mail
+     * providers readily file as spam. When the catalog has no written subject for the key, the brand name
+     * is used, as for the templates registered in the Kernel.
+     */
+    private static String subjectOf(OutboundMessage m) {
+        if (m.subject() != null && !m.subject().isBlank()) {
+            return m.subject();
+        }
+        return m.channel() == NotificationChannel.EMAIL ? DEFAULT_EMAIL_SUBJECT : null;
     }
 
     private static boolean userAddressedChannel(NotificationChannel channel) {

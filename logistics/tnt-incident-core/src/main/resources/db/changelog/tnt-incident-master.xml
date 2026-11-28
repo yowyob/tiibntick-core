@@ -16,4 +16,6 @@
 
     <include file="db/changelog/005-incident-agency-id-nullable.xml" relativeToChangelogFile="false"/>
 
+    <include file="db/changelog/evt-l3-incident.xml" relativeToChangelogFile="false"/>
+
 </databaseChangeLog>

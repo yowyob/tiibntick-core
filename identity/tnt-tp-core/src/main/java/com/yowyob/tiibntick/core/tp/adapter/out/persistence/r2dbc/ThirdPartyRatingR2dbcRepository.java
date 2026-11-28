@@ -21,4 +21,9 @@ public interface ThirdPartyRatingR2dbcRepository
 
     @Query("SELECT COUNT(*) > 0 FROM tnt_tp_ratings WHERE mission_id = :missionId AND rater_actor_id = :raterActorId")
     Mono<Boolean> existsByMissionIdAndRaterActorId(String missionId, UUID raterActorId);
+
+    @Query("SELECT COUNT(*) > 0 FROM tnt_tp_ratings WHERE mission_id = :missionId AND rater_actor_id = :raterActorId"
+            + " AND COALESCE(subject_kind, '') = :subjectKind")
+    Mono<Boolean> existsByMissionIdAndRaterActorIdAndSubjectKind(String missionId, UUID raterActorId,
+                                                                 String subjectKind);
 }

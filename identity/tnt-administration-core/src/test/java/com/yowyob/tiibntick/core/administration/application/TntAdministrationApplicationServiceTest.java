@@ -32,7 +32,8 @@ class TntAdministrationApplicationServiceTest {
 
     private TntAdministrationApplicationService service;
 
-    private static final int EXPECTED_PERMISSION_COUNT = 90;
+    // 90 + organization:delivery-settings:read/write (lot L1, delivery thresholds)
+    private static final int EXPECTED_PERMISSION_COUNT = 92;
 
     @BeforeEach
     void setUp() {

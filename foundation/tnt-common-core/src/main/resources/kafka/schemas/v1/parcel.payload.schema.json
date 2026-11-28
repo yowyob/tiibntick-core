@@ -1,0 +1,243 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:tnt:kafka:v1:parcel.payload",
+  "title": "Payload of tnt.parcel.events (spec §3.6), full parcel state after the event",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "parcelId",
+    "trackingCode",
+    "status",
+    "previousStatusBeforeDispute",
+    "openDisputeId",
+    "currentDeliveryId",
+    "deliveryIds",
+    "custody",
+    "specification",
+    "hasPhoto",
+    "returnCause",
+    "returnCostPayer",
+    "closedReason",
+    "failedReturnCount",
+    "createdAt",
+    "updatedAt",
+    "statusChangedAt"
+  ],
+  "properties": {
+    "parcelId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "trackingCode": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^TNT-[0-9]{8}-[A-Z0-9]{8}$"
+    },
+    "status": {
+      "enum": [
+        "CREATED",
+        "ASSIGNED",
+        "PICKED_UP",
+        "IN_TRANSIT",
+        "AT_RELAY_HUB",
+        "OUT_FOR_DELIVERY",
+        "DELIVERED",
+        "DELIVERY_FAILED",
+        "UNDER_DISPUTE",
+        "RETURNED",
+        "RETURN_REQUESTED",
+        "RETURN_IN_TRANSIT",
+        "LOST",
+        "DAMAGED"
+      ]
+    },
+    "previousStatusBeforeDispute": {
+      "enum": [
+        "CREATED",
+        "ASSIGNED",
+        "PICKED_UP",
+        "IN_TRANSIT",
+        "AT_RELAY_HUB",
+        "OUT_FOR_DELIVERY",
+        "DELIVERED",
+        "DELIVERY_FAILED",
+        "UNDER_DISPUTE",
+        "RETURNED",
+        "RETURN_REQUESTED",
+        "RETURN_IN_TRANSIT",
+        "LOST",
+        "DAMAGED",
+        null
+      ]
+    },
+    "openDisputeId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "currentDeliveryId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "deliveryIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      }
+    },
+    "custody": {
+      "$ref": "#/$defs/custody"
+    },
+    "specification": {
+      "type": "object",
+      "required": [
+        "weightKg",
+        "dimensionsCm",
+        "category",
+        "fragile",
+        "declaredValue"
+      ],
+      "properties": {
+        "weightKg": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "dimensionsCm": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "category": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fragile": {
+          "type": "boolean"
+        },
+        "declaredValue": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "hasPhoto": {
+      "type": "boolean"
+    },
+    "returnCause": {
+      "enum": [
+        "MAX_ATTEMPTS_REACHED",
+        "CLIENT_REFUSED_RECEPTION",
+        "NOT_COLLECTED_AT_RELAY",
+        "INCIDENT_UNRESOLVED",
+        "SENDER_CANCELLED_AFTER_PICKUP",
+        "DISPUTE_RETURN_TO_SENDER_ORDERED",
+        "RETURN_DELIVERY_CANCELLED",
+        "RETURN_DELIVERY_FAILED",
+        "RELAY_REVOKED",
+        null
+      ]
+    },
+    "returnCostPayer": {
+      "enum": [
+        "SENDER",
+        "RECIPIENT",
+        "COURIER",
+        "PLATFORM",
+        "RELAY",
+        "AGENCY",
+        "NONE",
+        null
+      ]
+    },
+    "closedReason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "failedReturnCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "createdAt": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "statusChangedAt": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    }
+  },
+  "$defs": {
+    "custody": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "holderType",
+        "holderId",
+        "hubId",
+        "hubPackageEntryId"
+      ],
+      "properties": {
+        "holderType": {
+          "enum": [
+            "SENDER",
+            "COURIER",
+            "RELAY",
+            "RECIPIENT",
+            "NONE"
+          ]
+        },
+        "holderId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid"
+        },
+        "hubId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid"
+        },
+        "hubPackageEntryId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid"
+        }
+      }
+    }
+  }
+}

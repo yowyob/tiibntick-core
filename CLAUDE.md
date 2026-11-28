@@ -137,6 +137,13 @@ A second, parallel principal type exists for platform *backends* (not human user
 - Prefer idempotent DDL (`IF NOT EXISTS` / preConditions) for additive changes; destructive changes (`dropTable`, `dropColumn`) need an explicit maintainer decision recorded in the changeset comment.
 - `tnt-bootstrap/src/test/.../LiquibaseMasterChangelogIntegrationTest` is the production gate: it applies the real `tnt-core-master.yaml` (all module JARs) on PostGIS, checks `validate`, idempotent re-run, and an upgrade of a populated database. Run it after any changelog change: `mvn -o verify -Pintegration-tests -pl tnt-bootstrap -am -Dtest=NoSuchTest -Dsurefire.failIfNoSpecifiedTests=false -Dit.test=LiquibaseMasterChangelogIntegrationTest -Dfailsafe.failIfNoSpecifiedTests=false` (**`-am` is required**, otherwise stale module JARs from `~/.m2` are used).
 
+## Decision log and admin-platform spec (mandatory, maintainer rule of 2026-11-26)
+
+- **Every question asked to the maintainer is logged** in `docs/decisions/registre-decisions.md` (versioned, French): the question, every option exactly as it was shown (label + detail, recommended marker included), and the answer exactly as selected or typed (free text verbatim). Append only, in chronological order, `D-NNN` numbering continued; never rewrite a past entry — a reversed decision is a new entry citing the old one. Directives the maintainer gives as free text (not via options) go, quoted verbatim, in section 1 of the same file. Commit the log update with the work it drives (or right after). This applies to every workstream, every agent, every session.
+- **Anything that needs an administrator** (approval/rejection, suspension, platform or organisation setting, arbitration, monitoring, manual replay, manual decision on money) is added **automatically** to `docs/plateforme-administration/specifications.md` (the spec of the future TiiBnTick administration platform), in the same commit as the code or decision that creates it.
+- **After every answer, update the affected documents right away** (not at the end of the workstream): the decision log, the workstream decision/design documents, the admin-platform spec, and the contract-impact docs (Mobile+BFF, Agency, technical journal) the answer touches — committed together.
+- Workstream decision/design documents live versioned under `docs/architecture/chantiers/` (e.g. `decisions-evenements-colis-livraison.md`, `cible-evenements-colis-livraison.md`, `tarifs-par-vehicule.md`, `gofp-dedup-architecture-cible.md`) — never only outside the repo.
+
 ## Git workflow rules (mandatory)
 
 - **Dedicated branch per workstream**: never commit directly to `main`; create a branch named after the work (e.g. `feat/wallet-hardening-and-kernel-migration`).

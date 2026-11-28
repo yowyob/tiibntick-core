@@ -32,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -199,19 +200,12 @@ class TntRoleAssignmentServiceTest {
     }
 
     @Test
-    void assignRole_systemScopedRole_shouldOverrideScopeIdAndTenantIdWithSystemTenant() {
-        Role localRole = canonicalRole("TNT_ADMIN", RoleScopeType.SYSTEM);
-        when(roleRepository.findByTenantId(SYSTEM_TENANT_ID)).thenReturn(Flux.just(localRole));
-        when(assignmentRepository.save(any())).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
-        when(outboxRepository.save(any())).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
-
-        // caller supplies an unrelated tenantId/scopeId — both must be overridden by systemTenantId
+    void assignRole_tntAdmin_isNeverAPerTenantAssignmentAnyMore() {
+        // D-169/D-171: TNT_ADMIN goes to the platform-admin registry (TntAdminThroughRolesApiTest); without it the
+        // service refuses rather than writing the former per-tenant row, which grants nothing any more.
         StepVerifier.create(service.assignRole(TENANT_ID, TARGET_USER_ID, "TNT_ADMIN", SCOPE_ID))
-                .assertNext(result -> {
-                    TntRoleAssignmentResult r = result;
-                    assertThat(r.scopeType()).isEqualTo("SYSTEM");
-                    assertThat(r.scopeId()).isEqualTo(SYSTEM_TENANT_ID);
-                })
-                .verifyComplete();
+                .expectError(IllegalStateException.class)
+                .verify();
+        verifyNoInteractions(assignmentRepository, outboxRepository);
     }
 }

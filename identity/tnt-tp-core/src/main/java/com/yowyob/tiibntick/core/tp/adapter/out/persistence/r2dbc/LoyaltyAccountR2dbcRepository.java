@@ -20,4 +20,9 @@ public interface LoyaltyAccountR2dbcRepository
 
     @Query("SELECT COUNT(*) > 0 FROM tnt_loyalty_accounts WHERE tenant_id = :tenantId AND third_party_id = :thirdPartyId")
     Mono<Boolean> existsByTenantIdAndThirdPartyId(UUID tenantId, UUID thirdPartyId);
+
+    @org.springframework.data.r2dbc.repository.Modifying
+    @Query("INSERT INTO tnt_loyalty_transactions (loyalty_account_id, points_delta, type, external_ref) "
+            + "VALUES (:accountId, :pointsDelta, :type, :externalRef) ON CONFLICT DO NOTHING")
+    Mono<Integer> insertTransactionOnce(UUID accountId, int pointsDelta, String type, String externalRef);
 }

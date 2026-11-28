@@ -25,10 +25,10 @@ public interface IUpdatePresenceUseCase {
      *
      * @param userId    the actor's user identifier
      * @param tenantId  the tenant context
-     * @param missionId the mission to assign
+     * @param deliveryId the delivery to assign
      * @return Mono completing after update
      */
-    Mono<Void> assignMission(String userId, String tenantId, String missionId);
+    Mono<Void> assignDelivery(String userId, String tenantId, String deliveryId);
 
     /**
      * Clears the active mission from an actor's presence.
@@ -37,5 +37,5 @@ public interface IUpdatePresenceUseCase {
      * @param tenantId the tenant context
      * @return Mono completing after update
      */
-    Mono<Void> clearMission(String userId, String tenantId);
+    Mono<Void> clearDelivery(String userId, String tenantId);
 }

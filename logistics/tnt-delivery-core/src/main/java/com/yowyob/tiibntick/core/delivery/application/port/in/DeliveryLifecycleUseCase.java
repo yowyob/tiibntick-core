@@ -23,10 +23,13 @@ public interface DeliveryLifecycleUseCase {
     Mono<Delivery> startTransit(StartTransitCommand command);
 
     /** Deposits at relay point. Transitions: IN_TRANSIT → AT_RELAY_POINT */
-    Mono<Delivery> depositAtRelayPoint(DepositAtRelayPointCommand command);
+    Mono<Delivery> depositAtRelayHub(DepositAtRelayHubCommand command);
 
     /** Resumes from relay point. Transitions: AT_RELAY_POINT → IN_TRANSIT */
-    Mono<Delivery> resumeFromRelayPoint(ResumeFromRelayPointCommand command);
+    Mono<Delivery> resumeFromRelayHub(ResumeFromRelayHubCommand command);
+
+    /** Row D8: last leg towards the recipient. */
+    Mono<Delivery> startFinalLeg(StartFinalLegCommand command);
 
     /** Updates real-time GPS and refines ETA. No status change. */
     Mono<EtaEstimate> updateLocation(UpdateDeliveryLocationCommand command);
@@ -35,10 +38,17 @@ public interface DeliveryLifecycleUseCase {
     Mono<Delivery> completeDelivery(CompleteDeliveryCommand command);
 
     /** Marks delivery as failed. Transitions: IN_TRANSIT | PICKED_UP → FAILED */
-    Mono<Delivery> failDelivery(FailDeliveryCommand command);
+    Mono<Delivery> recordFailedAttempt(RecordFailedAttemptCommand command);
 
     /** Cancels the delivery. Transitions: CREATED | PICKED_UP → CANCELLED */
     Mono<Delivery> cancelDelivery(CancelDeliveryCommand command);
+
+    /**
+     * Records the terms agreed for the mission (price, pickup and hand-over windows). No status
+     * change. Called once the sender has selected a response, by the caller that owns the product
+     * rules for those terms.
+     */
+    Mono<Delivery> recordAgreedTerms(RecordAgreedTermsCommand command);
 
     // ── : FreelancerOrg integration ────────────────────────────────────
 

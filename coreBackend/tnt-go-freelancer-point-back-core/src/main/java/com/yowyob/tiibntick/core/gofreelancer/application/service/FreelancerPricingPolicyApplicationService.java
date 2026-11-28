@@ -1,12 +1,13 @@
 package com.yowyob.tiibntick.core.gofreelancer.application.service;
 
+import com.yowyob.tiibntick.core.gofreelancer.adapter.out.persistence.repository.FreelancerVehicleRepository;
+import com.yowyob.tiibntick.core.gofreelancer.config.GofpCourierPricingProperties;
+import com.yowyob.tiibntick.core.gofreelancer.domain.model.FreelancerVehicle;
 import com.yowyob.tiibntick.core.billing.pricing.domain.model.BillingPolicy;
 import com.yowyob.tiibntick.core.billing.pricing.domain.model.enums.PolicyStatus;
 import com.yowyob.tiibntick.core.billing.pricing.domain.port.in.IBillingPolicyUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.FreelancerPricingDTO;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.FreelancerPricingPolicyUseCase;
-import com.yowyob.tiibntick.core.gofreelancer.application.port.out.FreelancerPricingRepository;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.FreelancerPricingPolicy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,10 +21,10 @@ import java.util.UUID;
  *
  * <p><strong>Source of truth.</strong> The grid is a {@link BillingPolicy} (template code
  * {@value FreelancerGridPolicyMapper#GRID_TEMPLATE_CODE}) owned by the delivery person and
- * ACTIVE; the pricing engine bills with it. The legacy {@code delivery_person_pricing} row is kept
- * as a mirror (written on every update) and as the fallback for grids saved before the billing
- * migration: reading such a grid transparently serves the legacy row, and the next update creates
- * the billing policy from it (lazy migration, no batch job).
+ * ACTIVE; the pricing engine bills with it. The legacy {@code delivery_person_pricing} table is no
+ * longer read nor written: its grids were copied into billing policies once, in the system tenant
+ * (legacy pricing backfill, lot L4; table dropped by gdd-final). A grid created without a tenant in the caller's
+ * context goes to the system tenant too (the module's rule, see {@link TenantContextHolder}).
  *
  * @author MANFOUO BRAUN
  */
@@ -32,16 +33,27 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class FreelancerPricingPolicyApplicationService implements FreelancerPricingPolicyUseCase {
 
-    private final FreelancerPricingRepository freelancerPricingRepository;
     private final IBillingPolicyUseCase billingPolicyUseCase;
     private final FreelancerOwnershipGuard ownershipGuard;
+
+    /** Platform grids, the starting point of a courier's first grid (D-058). Optional for slim test contexts. */
+    private GofpCourierPricingProperties courierPricing = new GofpCourierPricingProperties();
+    private FreelancerVehicleRepository vehicleRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setCourierPricing(GofpCourierPricingProperties courierPricing) {
+        if (courierPricing != null) this.courierPricing = courierPricing;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setVehicleRepository(FreelancerVehicleRepository vehicleRepository) {
+        this.vehicleRepository = vehicleRepository;
+    }
 
     @Override
     public Mono<FreelancerPricingDTO> getPolicy(UUID freelancerId) {
         return findGridPolicy(freelancerId)
-                .map(FreelancerGridPolicyMapper::toGrid)
-                .switchIfEmpty(Mono.defer(() -> freelancerPricingRepository.findByDeliveryPersonId(freelancerId)
-                        .map(FreelancerGridPolicyMapper::toGrid)));
+                .map(FreelancerGridPolicyMapper::toGrid);
     }
 
     @Override
@@ -50,10 +62,9 @@ public class FreelancerPricingPolicyApplicationService implements FreelancerPric
                 .map(Optional::of)
                 .defaultIfEmpty(Optional.empty())
                 .flatMap(existing -> currentGrid(freelancerId, existing.orElse(null))
-                        .map(current -> FreelancerGridPolicyMapper.merge(current, request))
-                        .flatMap(merged -> saveLegacyMirror(freelancerId, merged)
-                                .then(Mono.defer(() ->
-                                        saveBilling(freelancerId, merged, existing.orElse(null), tenantId)))));
+                        .flatMap(current -> saveBilling(freelancerId,
+                                FreelancerGridPolicyMapper.merge(current, request),
+                                existing.orElse(null), tenantId)));
     }
 
     @Override
@@ -72,26 +83,23 @@ public class FreelancerPricingPolicyApplicationService implements FreelancerPric
                 .next();
     }
 
+    /**
+     * The grid a change applies to: the courier's own grid, or, for his first grid, the platform grid of his vehicle
+     * (D-058: the platform price is a proposal the courier adjusts field by field; a field he does not send keeps the
+     * proposed value instead of falling to 0).
+     */
     private Mono<FreelancerPricingDTO> currentGrid(UUID freelancerId, BillingPolicy policy) {
         if (policy != null) return Mono.just(FreelancerGridPolicyMapper.toGrid(policy));
-        return freelancerPricingRepository.findByDeliveryPersonId(freelancerId)
-                .map(FreelancerGridPolicyMapper::toGrid)
-                .defaultIfEmpty(FreelancerPricingDTO.builder().currency(FreelancerGridPolicyMapper.DEFAULT_CURRENCY).build());
-    }
-
-    private Mono<FreelancerPricingPolicy> saveLegacyMirror(UUID freelancerId, FreelancerPricingDTO grid) {
-        return freelancerPricingRepository.findByDeliveryPersonId(freelancerId)
-                .defaultIfEmpty(FreelancerPricingPolicy.builder().deliveryPersonId(freelancerId).build())
-                .flatMap(row -> {
-                    row.setBaseFee(grid.getBaseFee());
-                    row.setPricePerKm(grid.getPricePerKm());
-                    row.setPricePerKg(grid.getPricePerKg());
-                    row.setPricePerCbm(grid.getPricePerCbm());
-                    row.setFragileSurcharge(grid.getFragileSurcharge());
-                    row.setPerishableSurcharge(grid.getPerishableSurcharge());
-                    row.setCurrency(grid.getCurrency());
-                    return freelancerPricingRepository.save(row);
-                });
+        Mono<String> vehicleType = vehicleRepository == null ? Mono.empty()
+                : vehicleRepository.findByFreelancerId(freelancerId)
+                        .mapNotNull(FreelancerVehicle::getVehicleType)
+                        .onErrorResume(e -> {
+                            log.warn("Vehicle of delivery person {} unreadable ({}): first grid starts from the moto "
+                                    + "platform grid", freelancerId, e.getMessage());
+                            return Mono.empty();
+                        });
+        return vehicleType.map(courierPricing::gridForVehicle)
+                .switchIfEmpty(Mono.fromSupplier(() -> courierPricing.gridForVehicle(null)));
     }
 
     private Mono<FreelancerPricingDTO> saveBilling(UUID freelancerId, FreelancerPricingDTO grid,
@@ -103,12 +111,13 @@ public class FreelancerPricingPolicyApplicationService implements FreelancerPric
             return billingPolicyUseCase.updatePolicy(changed, existing.getTenantId())
                     .flatMap(saved -> ensureActive(saved));
         }
-        if (tenantId == null) {
-            log.warn("No tenant in the caller context: grid of delivery person {} stays in the legacy table "
-                    + "until a tenant-scoped update creates its billing policy", freelancerId);
-            return Mono.just(withSource(grid, "LEGACY"));
+        UUID tenant = tenantId;
+        if (tenant == null) {
+            log.info("No tenant in the caller context: grid of delivery person {} created in the system tenant",
+                    freelancerId);
+            tenant = TenantContextHolder.SYSTEM_TENANT;
         }
-        BillingPolicy fresh = FreelancerGridPolicyMapper.newPolicy(freelancerId.toString(), tenantId, grid);
+        BillingPolicy fresh = FreelancerGridPolicyMapper.newPolicy(freelancerId.toString(), tenant, grid);
         return billingPolicyUseCase.createPolicy(fresh).flatMap(this::ensureActive);
     }
 
@@ -117,10 +126,5 @@ public class FreelancerPricingPolicyApplicationService implements FreelancerPric
                 ? Mono.just(saved)
                 : billingPolicyUseCase.activatePolicy(saved.getId(), saved.getTenantId());
         return active.map(FreelancerGridPolicyMapper::toGrid);
-    }
-
-    private static FreelancerPricingDTO withSource(FreelancerPricingDTO grid, String source) {
-        grid.setSource(source);
-        return grid;
     }
 }

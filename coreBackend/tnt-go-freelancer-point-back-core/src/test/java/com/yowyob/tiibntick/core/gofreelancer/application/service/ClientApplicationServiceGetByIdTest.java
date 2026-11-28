@@ -19,7 +19,7 @@ class ClientApplicationServiceGetByIdTest {
     private final IFindClientUseCase find = mock(IFindClientUseCase.class);
     private final TenantContextHolder tenant = mock(TenantContextHolder.class);
     private final ClientApplicationService service = new ClientApplicationService(
-            mock(ICreateClientProfileUseCase.class), find, tenant, mock(PasswordHasherService.class));
+            mock(ICreateClientProfileUseCase.class), find, tenant);
 
     private final UUID tenantId = UUID.randomUUID();
 

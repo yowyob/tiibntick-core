@@ -52,3 +52,13 @@ Le Core envoyait bien email / SMS / WhatsApp / push au Kernel, mais :
 
 - Supprimer ou non `tnt_notifications` et `tnt_preference_notifications` (changeset Liquibase irréversible, comme pour le wallet).
 - Migrer ou non la boîte de réception propre à Go-Freelancer (entité `Notification`, flux SSE) vers l'inbox du Kernel.
+
+## Vérification réelle contre le Kernel de production (2026-11-21)
+
+Tenant `fbd90da6-629d-4d78-9a36-8735ff1762cb`, organisation « TiiBnTick Notif » (`a804a304-fb65-4970-bf97-b94390cdbdff`), client `tibntick-backend`, destinataire le compte `yow_npk`.
+
+- **Défaut corrigé** : les routes `/api/notifications/*` du Kernel renvoient l'objet ou le tableau **sans** l'enveloppe `{success, data, …}` (spec OpenAPI, réponses 200). `KernelNotificationClient` déballait toujours l'enveloppe : chaque envoi échouait au décodage (« Cannot map `null` into type `boolean` ») et chaque lecture renvoyait une liste vide. Le client lit désormais la charge utile directement ; `KernelNotificationBridgeTest` utilise des réponses sans enveloppe.
+- **Test réel** `LiveKernelNotificationLanguagesIT` (`tnt-notify-core`, ignoré sans `TNT_LIVE_KERNEL_API_KEY`) : avec le vrai code du Core (packs i18n, `UserLanguageService`, `NotificationService`, `KernelDeliveryAdapter`), deux e-mails réels sont partis vers `yow_npk@yowyob.com` — « Bienvenue sur TiiBnTick, yow_npk ! » (langue du compte `fr`), puis « Welcome to TiiBnTick, yow_npk! » après `choose(user, "en")`. L'historique du Kernel les enregistre `SENT`, corps identiques. Seule la table des langues est remplacée par une mémoire (pas de base dans ce test).
+- **Point ouvert (côté Kernel)** : `kernelWebClient` n'envoie que `X-Client-Id`/`X-Api-Key` (+ tenant/organisation). Dans cette forme, le Kernel répond **403 `ACCESS_DENIED`** à `POST /api/notifications/deliveries` ; l'appel n'aboutit qu'avec un jeton Bearer d'utilisateur, et `/oauth2/token` refuse `client_credentials`. Tant que le Kernel n'a pas précisé comment un service s'authentifie (compte de service, droits du client), les envois automatiques du Core (Kafka, notifications système) restent bloqués en production.
+- **Non vérifié** : `TNT_NOTIFY_KERNEL_TEMPLATES_ENABLED=true` (gabarits Kernel), les canaux SMS/WhatsApp/push, et le chemin HTTP du Core (`/api/v1/notifications/send`) avec un vrai jeton Core.
+

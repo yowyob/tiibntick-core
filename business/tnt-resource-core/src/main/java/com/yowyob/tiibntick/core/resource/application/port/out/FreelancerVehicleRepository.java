@@ -26,4 +26,12 @@ public interface FreelancerVehicleRepository {
     Mono<Boolean> existsByOwnerOrgIdAndPlateNumber(UUID ownerOrgId, String plateNumber);
 
     Mono<Void> deleteById(UUID vehicleId);
+
+    /** Personal vehicles of an actor (no organization), oldest first. */
+    Flux<FreelancerVehicle> findByOwnerActorId(UUID ownerActorId);
+
+    Mono<Long> countByOwnerActorId(UUID ownerActorId);
+
+    /** Whether a vehicle other than {@code excludedVehicleId} (nullable) already carries this plate. */
+    Mono<Boolean> existsByPlateNumberOnAnotherVehicle(String plateNumber, UUID excludedVehicleId);
 }

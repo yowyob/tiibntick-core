@@ -1,6 +1,9 @@
 package com.yowyob.tiibntick.core.dispute.infrastructure.adapter.out.persistence.entity;
 
+import com.yowyob.tiibntick.common.persistence.TntPersistableEntity;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.domain.Persistable;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
@@ -12,7 +15,18 @@ import java.time.LocalDateTime;
  * @author MANFOUO Braun
  */
 @Table("tnt_dispute_evidences")
-public class DisputeEvidenceEntity {
+public class DisputeEvidenceEntity implements Persistable<String>, TntPersistableEntity {
+
+    /** Lot L4: inserted when new (client-side id), updated once read back or found existing. */
+    @Transient
+    private boolean isNew = true;
+
+    @Override
+    public boolean isNew() { return isNew; }
+
+    @Override
+    public void markNotNew() { this.isNew = false; }
+
 
     @Id
     @Column("id")

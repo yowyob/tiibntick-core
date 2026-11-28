@@ -37,5 +37,20 @@ public record DeliveryDetailResponse(
         Instant actualDeliveryTime,
         String notes,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        // lot evt-l2 (spec §1.1, §1.2, §7.1): appended at the end, existing fields unchanged
+        String kind,
+        UUID parentDeliveryId,
+        String parcelStatus,
+        int failedAttempts,
+        int maxAttempts,
+        String failureReason,
+        String lastAttemptReason,
+        UUID relayHubId,
+        Integer relayStorageDays,
+        Instant relayStorageExpiresAt,
+        boolean late,
+        // D-147, D-151: return guarantee of a delivery to a relay hub (null when none is concerned)
+        String returnGuaranteeStatus,
+        String returnGuaranteeReason
 ) {}

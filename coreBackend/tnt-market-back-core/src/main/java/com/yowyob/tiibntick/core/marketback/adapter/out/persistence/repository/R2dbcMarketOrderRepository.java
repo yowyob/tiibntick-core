@@ -24,6 +24,8 @@ public interface R2dbcMarketOrderRepository extends ReactiveCrudRepository<Marke
 
     Flux<MarketOrderEntity> findByStatusAndTenantId(String status, String tenantId);
 
+    Flux<MarketOrderEntity> findByMissionIdAndTenantId(UUID missionId, String tenantId);
+
     @Query("SELECT * FROM tnt_market.market_orders WHERE listing_id = :listingId")
     Flux<MarketOrderEntity> findByListingId(UUID listingId);
 

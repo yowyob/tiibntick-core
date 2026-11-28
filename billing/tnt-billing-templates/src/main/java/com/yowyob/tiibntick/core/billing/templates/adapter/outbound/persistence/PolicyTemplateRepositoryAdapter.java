@@ -83,7 +83,7 @@ public class PolicyTemplateRepositoryAdapter implements IPolicyTemplateRepositor
     @Override
     public Flux<PolicyTemplate> findAll() {
         return templateRepo.findAll()
-                .flatMap(this::enrichWithParameters);
+                .flatMap(this::enrichForListing);
     }
 
     @Override
@@ -91,20 +91,20 @@ public class PolicyTemplateRepositoryAdapter implements IPolicyTemplateRepositor
         // Active templates filtered in-memory by applicableTo list
         // (filtering on JSON column is done post-retrieval for compatibility)
         return templateRepo.findByActiveTrue()
-                .flatMap(this::enrichWithParameters)
+                .flatMap(this::enrichForListing)
                 .filter(t -> t.isApplicableTo(ownerType));
     }
 
     @Override
     public Flux<PolicyTemplate> findActiveByCategory(TemplateCategory category) {
         return templateRepo.findByActiveTrueAndCategory(category.name())
-                .flatMap(this::enrichWithParameters);
+                .flatMap(this::enrichForListing);
     }
 
     @Override
     public Flux<PolicyTemplate> findActiveByOwnerTypeAndCategory(PolicyOwnerType ownerType, TemplateCategory category) {
         return templateRepo.findByActiveTrueAndCategory(category.name())
-                .flatMap(this::enrichWithParameters)
+                .flatMap(this::enrichForListing)
                 .filter(t -> t.isApplicableTo(ownerType));
     }
 
@@ -137,5 +137,18 @@ public class PolicyTemplateRepositoryAdapter implements IPolicyTemplateRepositor
         return paramRepo.findByTemplateId(entity.getId())
                 .collectList()
                 .map(params -> mapper.toDomain(entity, params));
+    }
+
+    /**
+     * Listing variant of {@link #enrichWithParameters}: a template row that cannot be read (unknown category,
+     * corrupt JSON…) is logged by its code and left out, instead of failing the whole catalog request, which
+     * made every template disappear from the UI because of one bad row.
+     */
+    private Mono<PolicyTemplate> enrichForListing(PolicyTemplateEntity entity) {
+        return enrichWithParameters(entity).onErrorResume(e -> {
+            log.error("Template '{}' cannot be read and is left out of the catalog: {}",
+                    entity.getTemplateCode(), e.toString());
+            return Mono.empty();
+        });
     }
 }

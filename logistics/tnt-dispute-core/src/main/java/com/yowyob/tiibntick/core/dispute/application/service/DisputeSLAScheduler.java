@@ -1,10 +1,8 @@
 package com.yowyob.tiibntick.core.dispute.application.service;
 
-import com.yowyob.tiibntick.core.dispute.application.command.CloseDisputeCommand;
-import com.yowyob.tiibntick.core.dispute.application.port.inbound.IDisputeCommandUseCase;
+import com.yowyob.tiibntick.core.dispute.application.port.inbound.IDisputeSystemUseCase;
 import com.yowyob.tiibntick.core.dispute.application.port.outbound.IDisputeNotificationPort;
 import com.yowyob.tiibntick.core.dispute.application.port.outbound.IDisputeRepository;
-import com.yowyob.tiibntick.core.dispute.domain.enums.ClosureType;
 import com.yowyob.tiibntick.core.dispute.domain.enums.DisputeStatus;
 import com.yowyob.tiibntick.core.dispute.domain.model.Dispute;
 import net.javacrumbs.shedlock.core.LockAssert;
@@ -36,12 +34,12 @@ public class DisputeSLAScheduler {
     private static final Logger log = LoggerFactory.getLogger(DisputeSLAScheduler.class);
 
     private final IDisputeRepository repository;
-    private final IDisputeCommandUseCase commandUseCase;
+    private final IDisputeSystemUseCase commandUseCase;
     private final IDisputeNotificationPort notificationPort;
 
     public DisputeSLAScheduler(
             final IDisputeRepository repository,
-            final IDisputeCommandUseCase commandUseCase,
+            final IDisputeSystemUseCase commandUseCase,
             final IDisputeNotificationPort notificationPort) {
         this.repository = Objects.requireNonNull(repository);
         this.commandUseCase = Objects.requireNonNull(commandUseCase);
@@ -62,7 +60,7 @@ public class DisputeSLAScheduler {
         repository.findExpiredByStatusBefore(DisputeStatus.OPEN, now)
                 .mergeWith(repository.findExpiredByStatusBefore(DisputeStatus.UNDER_INVESTIGATION, now))
                 .mergeWith(repository.findExpiredByStatusBefore(DisputeStatus.AWAITING_EVIDENCE, now))
-                .mergeWith(repository.findExpiredByStatusBefore(DisputeStatus.MEDIATION_IN_PROGRESS, now))
+                // row LT11: a dispute in mediation or later does not expire (lot L4)
                 .flatMap(this::expireDispute)
                 .doOnError(e -> log.error("SLA expiry check error: {}", e.getMessage()))
                 .subscribe();
@@ -95,15 +93,14 @@ public class DisputeSLAScheduler {
     private Mono<Dispute> expireDispute(final Dispute dispute) {
         log.warn("Expiring dispute id={} ref={} status={}", dispute.getId(), dispute.getReference(), dispute.getStatus());
 
-        final CloseDisputeCommand cmd = new CloseDisputeCommand(
-                dispute.getId(),
-                dispute.getTenantId(),
-                "SYSTEM",
-                ClosureType.EXPIRED,
-                "Automatically closed: SLA resolution deadline exceeded");
-
-        return commandUseCase.closeDispute(cmd)
-                .doOnSuccess(d -> log.info("Dispute {} expired and closed successfully", d.getId()))
+        // row LT11 through the system entry point (lot L4): closeDispute(EXPIRED) is refused since C10, and its
+        // @RequirePermission failed without a user session
+        return commandUseCase.expire(dispute.getId(), dispute.getTenantId())
+                .doOnSuccess(d -> {
+                    if (d != null) {
+                        log.info("Dispute {} expired and closed successfully", d.getId());
+                    }
+                })
                 .onErrorResume(e -> {
                     log.error("Failed to expire dispute {}: {}", dispute.getId(), e.getMessage());
                     return Mono.empty();

@@ -22,4 +22,5 @@ public class HubPackageEntryRepositoryAdapter implements HubPackageEntryReposito
     @Override public Mono<HubPackageEntry> findByTrackingCode(String trackingCode) { return r2dbc.findByTrackingCode(trackingCode).map(HubPackageEntryEntity::toDomain); }
     @Override public Flux<HubPackageEntry> findActiveByHub(UUID hubId) { return r2dbc.findActiveByHubId(hubId).map(HubPackageEntryEntity::toDomain); }
     @Override public Flux<HubPackageEntry> findAllByHub(UUID hubId) { return r2dbc.findByHubId(hubId).map(HubPackageEntryEntity::toDomain); }
+    @Override public Flux<HubPackageEntry> findAllByOwner(UUID ownerActorId) { return r2dbc.findByOwnerActorId(ownerActorId).map(HubPackageEntryEntity::toDomain); }
 }

@@ -1,0 +1,15 @@
+databaseChangeLog:
+  - changeSet:
+      id: evt-qo11-001-delivery-leg-start
+      author: evt-qo11
+      labels: evt-qo11
+      comment: >
+        QO-11 / D-153 (2026-11-27, maintainer): a replacement courier is paid by the compensation fund at the prorata
+        of the distance. The delivery remembers where the current courier's leg started (the last hand-over point;
+        NULL = the pickup address) to measure the leg of the courier who leaves at the next hand-over. Additive and
+        idempotent.
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS leg_start_latitude  DOUBLE PRECISION;
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS leg_start_longitude DOUBLE PRECISION;

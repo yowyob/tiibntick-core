@@ -191,6 +191,25 @@ public class NotifyCoreAutoConfiguration {
         return new KernelDeliveryQueryAdapter(client);
     }
 
+    /** In-app inbox held by the Kernel (channel IN_APP, decision D-157). */
+    @Bean
+    @ConditionalOnMissingBean
+    public com.yowyob.tiibntick.core.notify.application.port.out.IInAppInboxPort inAppInboxPort(
+            KernelNotificationClient client) {
+        return new com.yowyob.tiibntick.core.notify.infrastructure.adapter.kernel.KernelInAppInboxAdapter(client);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public com.yowyob.tiibntick.core.notify.application.port.in.IInAppInboxUseCase inAppInboxUseCase(
+            com.yowyob.tiibntick.core.notify.application.port.out.IInAppInboxPort inbox,
+            org.springframework.beans.factory.ObjectProvider<ITranslationPort> translations,
+            org.springframework.beans.factory.ObjectProvider<IRecipientLanguagePort> languages) {
+        var service = new com.yowyob.tiibntick.core.notify.application.service.InAppInboxService(inbox);
+        service.setLocalization(translations.getIfAvailable(), languages.getIfAvailable());
+        return service;
+    }
+
     /**
      * Admin use case exposing providers/templates/reminders/raw-deliveries
      * management to {@code NotificationController}.
@@ -216,9 +235,12 @@ public class NotifyCoreAutoConfiguration {
     public com.yowyob.tiibntick.core.notify.infrastructure.messaging.FreelancerOrgKafkaEventConsumer freelancerOrgKafkaEventConsumer(
             com.yowyob.tiibntick.core.notify.application.port.in.ISendNotificationUseCase notificationUseCase,
             @Qualifier("tntObjectMapper") com.fasterxml.jackson.databind.ObjectMapper objectMapper,
-            NotifyProperties properties) {
+            NotifyProperties properties,
+            org.springframework.beans.factory.ObjectProvider<com.yowyob.tiibntick.common.kafka.ReactiveListenerSupport>
+                    listenerSupport) {
         return new com.yowyob.tiibntick.core.notify.infrastructure.messaging.FreelancerOrgKafkaEventConsumer(
-                notificationUseCase, objectMapper, properties);
+                notificationUseCase, objectMapper, properties,
+                listenerSupport.getIfAvailable(com.yowyob.tiibntick.common.kafka.ReactiveListenerSupport::withDefaultTimeout));
     }
 
     /**

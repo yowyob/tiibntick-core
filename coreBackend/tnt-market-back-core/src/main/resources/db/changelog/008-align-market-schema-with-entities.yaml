@@ -1,0 +1,178 @@
+databaseChangeLog:
+  - changeSet:
+      id: 008-align-market-orders-with-entity
+      author: MANFOUO Braun
+      labels: market-schema-008
+      comment: >
+        The market_orders entity maps columns that 00x never created (found by the lot L8 wiring test: every read of a
+        market order by delivery failed with "column market_orders.mission_id does not exist"). Additive only: the
+        columns of the entity are added, the former ones are kept.
+      changes:
+        - sql:
+            splitStatements: true
+            stripComments: true
+            sql: |
+              ALTER TABLE tnt_market.market_orders
+                  ADD COLUMN IF NOT EXISTS mission_id UUID,
+                  ADD COLUMN IF NOT EXISTS distance_fee BIGINT,
+                  ADD COLUMN IF NOT EXISTS weight_fee BIGINT,
+                  ADD COLUMN IF NOT EXISTS insurance_fee BIGINT,
+                  ADD COLUMN IF NOT EXISTS express_fee BIGINT,
+                  ADD COLUMN IF NOT EXISTS discount_amount BIGINT,
+                  ADD COLUMN IF NOT EXISTS transaction_ref VARCHAR(255),
+                  ADD COLUMN IF NOT EXISTS mobile_money_phone VARCHAR(255),
+                  ADD COLUMN IF NOT EXISTS pickup_street VARCHAR(255),
+                  ADD COLUMN IF NOT EXISTS pickup_district VARCHAR(255),
+                  ADD COLUMN IF NOT EXISTS pickup_city VARCHAR(255),
+                  ADD COLUMN IF NOT EXISTS pickup_country VARCHAR(255),
+                  ADD COLUMN IF NOT EXISTS pickup_postal_code VARCHAR(255),
+                  ADD COLUMN IF NOT EXISTS pickup_lat DOUBLE PRECISION,
+                  ADD COLUMN IF NOT EXISTS pickup_lng DOUBLE PRECISION,
+                  ADD COLUMN IF NOT EXISTS pickup_landmark VARCHAR(255),
+                  ADD COLUMN IF NOT EXISTS delivery_street VARCHAR(255),
+                  ADD COLUMN IF NOT EXISTS delivery_district VARCHAR(255),
+                  ADD COLUMN IF NOT EXISTS delivery_city VARCHAR(255),
+                  ADD COLUMN IF NOT EXISTS delivery_country VARCHAR(255),
+                  ADD COLUMN IF NOT EXISTS delivery_postal_code VARCHAR(255),
+                  ADD COLUMN IF NOT EXISTS delivery_lat DOUBLE PRECISION,
+                  ADD COLUMN IF NOT EXISTS delivery_lng DOUBLE PRECISION,
+                  ADD COLUMN IF NOT EXISTS delivery_landmark VARCHAR(255),
+                  ADD COLUMN IF NOT EXISTS parcel_description TEXT,
+                  ADD COLUMN IF NOT EXISTS weight_kg DOUBLE PRECISION,
+                  ADD COLUMN IF NOT EXISTS length_cm DOUBLE PRECISION,
+                  ADD COLUMN IF NOT EXISTS width_cm DOUBLE PRECISION,
+                  ADD COLUMN IF NOT EXISTS height_cm DOUBLE PRECISION,
+                  ADD COLUMN IF NOT EXISTS value_xaf DOUBLE PRECISION,
+                  ADD COLUMN IF NOT EXISTS fragile BOOLEAN NOT NULL DEFAULT FALSE,
+                  ADD COLUMN IF NOT EXISTS perishable BOOLEAN NOT NULL DEFAULT FALSE,
+                  ADD COLUMN IF NOT EXISTS requires_insurance BOOLEAN NOT NULL DEFAULT FALSE,
+                  ADD COLUMN IF NOT EXISTS quantity INTEGER NOT NULL DEFAULT 1,
+                  ADD COLUMN IF NOT EXISTS desired_delivery_at TIMESTAMP WITH TIME ZONE,
+                  ADD COLUMN IF NOT EXISTS special_instructions TEXT;
+              -- the delivery and the payment reference were created under other names (004): carry them over
+              UPDATE tnt_market.market_orders SET mission_id = delivery_mission_id::uuid
+               WHERE mission_id IS NULL
+                 AND delivery_mission_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
+              UPDATE tnt_market.market_orders SET transaction_ref = transaction_id
+               WHERE transaction_ref IS NULL AND transaction_id IS NOT NULL;
+              CREATE INDEX IF NOT EXISTS idx_market_orders_mission_tenant ON tnt_market.market_orders (mission_id, tenant_id);
+  - changeSet:
+      id: 008-align-merchant-contracts-with-entity
+      author: MANFOUO Braun
+      labels: market-schema-008
+      comment: >
+        The merchant_contracts entity maps columns that 00x never created (found by the lot L8 wiring test: every read of a
+        market order by delivery failed with "column market_orders.mission_id does not exist"). Additive only: the
+        columns of the entity are added, the former ones are kept.
+      changes:
+        - sql:
+            splitStatements: true
+            stripComments: true
+            sql: |
+              ALTER TABLE tnt_market.merchant_contracts
+                  ADD COLUMN IF NOT EXISTS base_discount_pct DOUBLE PRECISION NOT NULL DEFAULT 0,
+                  ADD COLUMN IF NOT EXISTS max_monthly_orders INTEGER NOT NULL DEFAULT 0,
+                  ADD COLUMN IF NOT EXISTS min_monthly_orders INTEGER NOT NULL DEFAULT 0,
+                  ADD COLUMN IF NOT EXISTS payment_term_days INTEGER NOT NULL DEFAULT 0,
+                  ADD COLUMN IF NOT EXISTS dsl_expression_override TEXT,
+                  ADD COLUMN IF NOT EXISTS special_conditions TEXT;
+  - changeSet:
+      id: 008-align-provider-reviews-with-entity
+      author: MANFOUO Braun
+      labels: market-schema-008
+      comment: >
+        The provider_reviews entity maps columns that 00x never created (found by the lot L8 wiring test: every read of a
+        market order by delivery failed with "column market_orders.mission_id does not exist"). Additive only: the
+        columns of the entity are added, the former ones are kept.
+      changes:
+        - sql:
+            splitStatements: true
+            stripComments: true
+            sql: |
+              ALTER TABLE tnt_market.provider_reviews
+                  ADD COLUMN IF NOT EXISTS punctuality_score INTEGER NOT NULL DEFAULT 0,
+                  ADD COLUMN IF NOT EXISTS value_score INTEGER NOT NULL DEFAULT 0;
+  - changeSet:
+      id: 008-align-quote-requests-with-entity
+      author: MANFOUO Braun
+      labels: market-schema-008
+      comment: >
+        The quote_requests entity maps columns that 00x never created (found by the lot L8 wiring test: every read of a
+        market order by delivery failed with "column market_orders.mission_id does not exist"). Additive only: the
+        columns of the entity are added, the former ones are kept.
+      changes:
+        - sql:
+            splitStatements: true
+            stripComments: true
+            sql: |
+              ALTER TABLE tnt_market.quote_requests
+                  ADD COLUMN IF NOT EXISTS pickup_street VARCHAR(255),
+                  ADD COLUMN IF NOT EXISTS pickup_district VARCHAR(255),
+                  ADD COLUMN IF NOT EXISTS pickup_city VARCHAR(255),
+                  ADD COLUMN IF NOT EXISTS pickup_lat DOUBLE PRECISION,
+                  ADD COLUMN IF NOT EXISTS pickup_lng DOUBLE PRECISION,
+                  ADD COLUMN IF NOT EXISTS delivery_street VARCHAR(255),
+                  ADD COLUMN IF NOT EXISTS delivery_district VARCHAR(255),
+                  ADD COLUMN IF NOT EXISTS delivery_city VARCHAR(255),
+                  ADD COLUMN IF NOT EXISTS delivery_lat DOUBLE PRECISION,
+                  ADD COLUMN IF NOT EXISTS delivery_lng DOUBLE PRECISION,
+                  ADD COLUMN IF NOT EXISTS parcel_description TEXT,
+                  ADD COLUMN IF NOT EXISTS weight_kg DOUBLE PRECISION NOT NULL DEFAULT 0,
+                  ADD COLUMN IF NOT EXISTS length_cm DOUBLE PRECISION NOT NULL DEFAULT 0,
+                  ADD COLUMN IF NOT EXISTS width_cm DOUBLE PRECISION NOT NULL DEFAULT 0,
+                  ADD COLUMN IF NOT EXISTS height_cm DOUBLE PRECISION NOT NULL DEFAULT 0,
+                  ADD COLUMN IF NOT EXISTS value_xaf DOUBLE PRECISION NOT NULL DEFAULT 0,
+                  ADD COLUMN IF NOT EXISTS fragile BOOLEAN NOT NULL DEFAULT FALSE,
+                  ADD COLUMN IF NOT EXISTS perishable BOOLEAN NOT NULL DEFAULT FALSE,
+                  ADD COLUMN IF NOT EXISTS requires_insurance BOOLEAN NOT NULL DEFAULT FALSE,
+                  ADD COLUMN IF NOT EXISTS quantity INTEGER NOT NULL DEFAULT 1,
+                  ADD COLUMN IF NOT EXISTS desired_delivery_at TIMESTAMP WITH TIME ZONE,
+                  ADD COLUMN IF NOT EXISTS special_instructions TEXT,
+                  ADD COLUMN IF NOT EXISTS responses_json TEXT;
+  - changeSet:
+      id: 008-align-service-offers-with-entity
+      author: MANFOUO Braun
+      labels: market-schema-008
+      comment: >
+        The service_offers entity maps columns that 00x never created (found by the lot L8 wiring test: every read of a
+        market order by delivery failed with "column market_orders.mission_id does not exist"). Additive only: the
+        columns of the entity are added, the former ones are kept.
+      changes:
+        - sql:
+            splitStatements: true
+            stripComments: true
+            sql: |
+              ALTER TABLE tnt_market.service_offers
+                  ADD COLUMN IF NOT EXISTS per_km_rate NUMERIC(19,4),
+                  ADD COLUMN IF NOT EXISTS per_kg_rate NUMERIC(19,4),
+                  ADD COLUMN IF NOT EXISTS minimum_price NUMERIC(19,4),
+                  ADD COLUMN IF NOT EXISTS maximum_price NUMERIC(19,4),
+                  ADD COLUMN IF NOT EXISTS pricing_dsl_expression TEXT,
+                  ADD COLUMN IF NOT EXISTS max_length_cm DOUBLE PRECISION,
+                  ADD COLUMN IF NOT EXISTS max_width_cm DOUBLE PRECISION,
+                  ADD COLUMN IF NOT EXISTS max_height_cm DOUBLE PRECISION,
+                  ADD COLUMN IF NOT EXISTS max_value_xaf DOUBLE PRECISION,
+                  ADD COLUMN IF NOT EXISTS accepts_fragile BOOLEAN NOT NULL DEFAULT FALSE,
+                  ADD COLUMN IF NOT EXISTS accepts_perishable BOOLEAN NOT NULL DEFAULT FALSE,
+                  ADD COLUMN IF NOT EXISTS accepts_hazardous BOOLEAN NOT NULL DEFAULT FALSE,
+                  ADD COLUMN IF NOT EXISTS requires_insurance BOOLEAN NOT NULL DEFAULT FALSE,
+                  ADD COLUMN IF NOT EXISTS days_of_week TEXT,
+                  ADD COLUMN IF NOT EXISTS exceptional_closures TEXT;
+  - changeSet:
+      id: 008-add-market-optimistic-lock-versions
+      author: MANFOUO Braun
+      labels: market-schema-008
+      comment: >
+        The @Version column of five market entities was never created ("column market_orders.version does not
+        exist"). Default 1: the first version Spring Data gives a primitive version on insert, so an existing row is
+        not taken for a new one.
+      changes:
+        - sql:
+            splitStatements: true
+            stripComments: true
+            sql: |
+              ALTER TABLE tnt_market.market_orders ADD COLUMN IF NOT EXISTS version BIGINT NOT NULL DEFAULT 1;
+              ALTER TABLE tnt_market.service_offers ADD COLUMN IF NOT EXISTS version BIGINT NOT NULL DEFAULT 1;
+              ALTER TABLE tnt_market.provider_reviews ADD COLUMN IF NOT EXISTS version BIGINT NOT NULL DEFAULT 1;
+              ALTER TABLE tnt_market.merchant_contracts ADD COLUMN IF NOT EXISTS version BIGINT NOT NULL DEFAULT 1;
+              ALTER TABLE tnt_market.market_campaigns ADD COLUMN IF NOT EXISTS version BIGINT NOT NULL DEFAULT 1;

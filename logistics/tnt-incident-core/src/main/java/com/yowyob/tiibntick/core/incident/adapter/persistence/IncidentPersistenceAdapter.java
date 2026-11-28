@@ -42,17 +42,32 @@ public class IncidentPersistenceAdapter implements
     private final ParcelIncidentLinkR2dbcRepository linkRepo;
     private final IncidentMapper mapper;
 
+    /** Lot L3: optional for slim persistence test contexts (no outbox there). */
+    private IIncidentAggregateEventPublisher aggregatePublisher;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setAggregatePublisher(IIncidentAggregateEventPublisher aggregatePublisher) {
+        this.aggregatePublisher = aggregatePublisher;
+    }
+
     // ── IIncidentRepository ──────────────────────────────────────────
 
     @Override
     public Mono<Incident> save(Incident incident) {
-        var entity = mapper.toEntity(incident);
-        return incidentRepo.existsById(entity.getId())
-                .flatMap(exists -> {
-                    entity.setNew(!exists);
-                    return incidentRepo.save(entity);
-                })
-                .map(mapper::toDomain);
+        return Mono.defer(() -> {
+            var entity = mapper.toEntity(incident);
+            return incidentRepo.existsById(entity.getId())
+                    .flatMap(exists -> {
+                        entity.setNew(!exists);
+                        return incidentRepo.save(entity);
+                    })
+                    .map(mapper::toDomain)
+                    // lot L3: the changes of this save go to tnt.incident.events through the outbox, in the same
+                    // transaction; the returned incident has no pending change left (no double publication).
+                    .flatMap(saved -> aggregatePublisher == null || incident.getPendingTransitions().isEmpty()
+                            ? Mono.just(saved)
+                            : aggregatePublisher.publish(saved, incident).thenReturn(saved));
+        });
     }
 
     @Override
@@ -101,6 +116,16 @@ public class IncidentPersistenceAdapter implements
         return Flux.fromIterable(statuses)
                 .flatMap(s -> incidentRepo.findByTenantIdAndStatus(tenantId, s.name()))
                 .map(mapper::toDomain);
+    }
+
+    @Override
+    public Flux<Incident> findConfirmationExpired(Instant before, int limit) {
+        return incidentRepo.findConfirmationExpired(before, limit).map(mapper::toDomain);
+    }
+
+    @Override
+    public Flux<Incident> findAwaitingHandover(int limit) {
+        return incidentRepo.findAwaitingHandover(limit).map(mapper::toDomain);
     }
 
     @Override

@@ -2,8 +2,8 @@ package com.yowyob.tiibntick.core.incident.application.service;
 
 import java.util.Map;
 import com.yowyob.tiibntick.core.incident.application.command.*;
-import com.yowyob.tiibntick.core.incident.domain.event.IncidentDomainEvents.*;
 import com.yowyob.tiibntick.core.incident.domain.model.*;
+import com.yowyob.tiibntick.core.incident.domain.enums.*;
 import com.yowyob.tiibntick.core.incident.port.inbound.IInterAgencyCooperationUseCase;
 import com.yowyob.tiibntick.core.incident.port.outbound.*;
 import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
@@ -34,9 +34,9 @@ public class IncidentInterAgencyService implements IInterAgencyCooperationUseCas
     private final IIncidentCooperationRepository cooperationRepository;
     private final IIncidentRepository incidentRepository;
     private final IIncidentEventLogRepository eventLogRepository;
-    private final IIncidentEventPublisher eventPublisher;
     private final INotificationPort notificationPort;
     private final IBlockchainAuditPort blockchainAuditPort;
+    private final IncidentResolutionEffects resolutionEffects;
 
     /**
      * Creates a new inter-agency cooperation request and notifies the responding agency.
@@ -51,16 +51,19 @@ public class IncidentInterAgencyService implements IInterAgencyCooperationUseCas
         return incidentRepository.findById(command.getIncidentId())
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Incident not found")))
                 .flatMap(incident -> {
+                    if (incident.getAgencyId() == null) { // I19 guard: agency delivery only
+                        return Mono.error(new ResponseStatusException(HttpStatus.CONFLICT,
+                                "Inter-agency cooperation is only for an agency delivery"));
+                    }
+                    Incident waiting = IncidentAgencyManagementService.transition(incident::waitForInterAgency);
                     IncidentInterAgencyCooperation coop = IncidentInterAgencyCooperation.request(
                             command.getIncidentId(), command.getRequestingAgencyId(),
                             command.getRespondingAgencyId(), command.getCooperationType(),
                             command.getDetails());
                     return cooperationRepository.save(coop)
                             .flatMap(saved -> {
-                                Incident waiting = incident.waitForInterAgency();
                                 return incidentRepository.save(waiting)
                                         .then(notifyRespondingAgency(saved))
-                                        .then(publishCoopRequested(saved))
                                         .thenReturn(saved);
                             });
                 });
@@ -82,7 +85,8 @@ public class IncidentInterAgencyService implements IInterAgencyCooperationUseCas
                             .flatMap(saved -> {
                                 return incidentRepository.findById(saved.getIncidentId())
                                         .flatMap(incident -> {
-                                            Incident inProgress = incident.startInterAgencyCooperation();
+                                            Incident inProgress = IncidentAgencyManagementService
+                                                    .transition(incident::startInterAgencyCooperation);
                                             return incidentRepository.save(inProgress).thenReturn(saved);
                                         });
                             })
@@ -107,6 +111,12 @@ public class IncidentInterAgencyService implements IInterAgencyCooperationUseCas
                 .flatMap(coop -> {
                     IncidentInterAgencyCooperation rejected = coop.reject(command.getRejectionReason());
                     return cooperationRepository.save(rejected)
+                            // I21: back to the requesting agency's own handling
+                            .flatMap(saved -> incidentRepository.findById(saved.getIncidentId())
+                                    .flatMap(incident -> incidentRepository.save(IncidentAgencyManagementService
+                                            .transition(() -> incident.startAgencyHandling(
+                                                    incident.managerActor(null), "COOPERATION_REJECTED"))))
+                                    .thenReturn(saved))
                             .flatMap(saved -> notifyRequestingAgency(saved, "REJECTED", "Cooperation rejected: " + command.getRejectionReason(),
                                     String.valueOf(command.getRejectionReason())));
                 });
@@ -130,7 +140,17 @@ public class IncidentInterAgencyService implements IInterAgencyCooperationUseCas
                         .flatMap(txHash -> {
                             IncidentInterAgencyCooperation completed = coop.complete(txHash);
                             return cooperationRepository.save(completed)
-                                    .flatMap(saved -> publishCoopCompleted(saved));
+                                    // I22: cooperation succeeded → RESOLVED, delivery resumed (D16), unfreeze
+                                    .flatMap(saved -> incidentRepository.findById(saved.getIncidentId())
+                                            .flatMap(incident -> incidentRepository.save(IncidentAgencyManagementService
+                                                    .transition(() -> incident.resolve(
+                                                            ResolutionMode.INTERAGENCY_COOPERATION,
+                                                            IncidentDeliveryOutcome.RESUMED,
+                                                            IncidentResponsibleParty.NONE,
+                                                            "Inter-agency cooperation completed",
+                                                            "COOPERATION_COMPLETED", incident.managerActor(null)))))
+                                            .flatMap(resolved -> resolutionEffects.afterResolved(resolved, null, null))
+                                            .thenReturn(saved));
                         }));
     }
 
@@ -154,32 +174,7 @@ public class IncidentInterAgencyService implements IInterAgencyCooperationUseCas
         ).thenReturn(coop);
     }
 
-    private Mono<Void> publishCoopRequested(IncidentInterAgencyCooperation coop) {
-        var event = InterAgencyCoopRequestedEvent.builder()
-                .eventId(UUID.randomUUID())
-                .incidentId(coop.getIncidentId())
-                .tenantId(null)
-                .requestingAgencyId(coop.getRequestingAgencyId())
-                .respondingAgencyId(coop.getRespondingAgencyId())
-                .cooperationType(coop.getCooperationType())
-                .details(coop.getRequestDetails())
-                .occurredAt(Instant.now())
-                .build();
-        return eventPublisher.publish(event);
-    }
 
-    private Mono<IncidentInterAgencyCooperation> publishCoopCompleted(IncidentInterAgencyCooperation coop) {
-        var event = InterAgencyCoopCompletedEvent.builder()
-                .eventId(UUID.randomUUID())
-                .incidentId(coop.getIncidentId())
-                .tenantId(null)
-                .requestingAgencyId(coop.getRequestingAgencyId())
-                .respondingAgencyId(coop.getRespondingAgencyId())
-                .blockchainTxHash(coop.getBlockchainTxHash())
-                .occurredAt(Instant.now())
-                .build();
-        return eventPublisher.publish(event).thenReturn(coop);
-    }
 
     private String buildCoopPayload(IncidentInterAgencyCooperation coop) {
         return String.format("{\"type\":\"%s\",\"reqAgency\":\"%s\",\"respAgency\":\"%s\"}",

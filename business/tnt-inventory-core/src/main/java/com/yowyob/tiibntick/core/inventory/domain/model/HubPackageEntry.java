@@ -1,6 +1,7 @@
 package com.yowyob.tiibntick.core.inventory.domain.model;
 
 import java.time.Duration;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
@@ -30,12 +31,17 @@ public final class HubPackageEntry {
     private final UUID pickedUpByActorId;
     private final String recipientPhone;
     private final boolean notified;
+    private final UUID ownerActorId;
+    private final BigDecimal storageFee;
+    private final BigDecimal penaltyFee;
+    private final String feeCurrency;
 
     private HubPackageEntry(UUID id, UUID tenantId, UUID hubId, UUID packageId,
                              String trackingCode, String storageLocation,
                              Instant depositedAt, Instant pickedUpAt,
                              UUID depositedByActorId, UUID pickedUpByActorId,
-                             String recipientPhone, boolean notified) {
+                             String recipientPhone, boolean notified,
+                             UUID ownerActorId, BigDecimal storageFee, BigDecimal penaltyFee, String feeCurrency) {
         this.id = Objects.requireNonNull(id);
         this.tenantId = Objects.requireNonNull(tenantId);
         this.hubId = Objects.requireNonNull(hubId);
@@ -50,14 +56,34 @@ public final class HubPackageEntry {
         this.pickedUpByActorId = pickedUpByActorId;
         this.recipientPhone = recipientPhone;
         this.notified = notified;
+        if ((storageFee != null && storageFee.signum() < 0) || (penaltyFee != null && penaltyFee.signum() < 0)) {
+            throw new IllegalArgumentException("fees must not be negative");
+        }
+        this.ownerActorId = ownerActorId;
+        this.storageFee = storageFee;
+        this.penaltyFee = penaltyFee;
+        this.feeCurrency = feeCurrency;
     }
 
     /** Registers a new package deposit at the hub. */
     public static HubPackageEntry deposit(UUID tenantId, UUID hubId, UUID packageId,
                                            String trackingCode, String storageLocation,
                                            UUID depositedByActorId, String recipientPhone) {
+        return deposit(tenantId, hubId, packageId, trackingCode, storageLocation, depositedByActorId,
+                recipientPhone, null, null, null);
+    }
+
+    /**
+     * Registers a deposit that has an owner (the person who will collect the package) and a storage fee
+     * agreed at deposit time. The fee is informational here: collecting it is the caller's business.
+     */
+    public static HubPackageEntry deposit(UUID tenantId, UUID hubId, UUID packageId,
+                                           String trackingCode, String storageLocation,
+                                           UUID depositedByActorId, String recipientPhone,
+                                           UUID ownerActorId, BigDecimal storageFee, String feeCurrency) {
         return new HubPackageEntry(UUID.randomUUID(), tenantId, hubId, packageId, trackingCode,
-                storageLocation, Instant.now(), null, depositedByActorId, null, recipientPhone, false);
+                storageLocation, Instant.now(), null, depositedByActorId, null, recipientPhone, false,
+                ownerActorId, storageFee, null, feeCurrency);
     }
 
     public static HubPackageEntry rehydrate(UUID id, UUID tenantId, UUID hubId, UUID packageId,
@@ -66,7 +92,20 @@ public final class HubPackageEntry {
                                              UUID depositedByActorId, UUID pickedUpByActorId,
                                              String recipientPhone, boolean notified) {
         return new HubPackageEntry(id, tenantId, hubId, packageId, trackingCode, storageLocation,
-                depositedAt, pickedUpAt, depositedByActorId, pickedUpByActorId, recipientPhone, notified);
+                depositedAt, pickedUpAt, depositedByActorId, pickedUpByActorId, recipientPhone, notified,
+                null, null, null, null);
+    }
+
+    public static HubPackageEntry rehydrate(UUID id, UUID tenantId, UUID hubId, UUID packageId,
+                                             String trackingCode, String storageLocation,
+                                             Instant depositedAt, Instant pickedUpAt,
+                                             UUID depositedByActorId, UUID pickedUpByActorId,
+                                             String recipientPhone, boolean notified,
+                                             UUID ownerActorId, BigDecimal storageFee, BigDecimal penaltyFee,
+                                             String feeCurrency) {
+        return new HubPackageEntry(id, tenantId, hubId, packageId, trackingCode, storageLocation,
+                depositedAt, pickedUpAt, depositedByActorId, pickedUpByActorId, recipientPhone, notified,
+                ownerActorId, storageFee, penaltyFee, feeCurrency);
     }
 
     /**
@@ -76,13 +115,14 @@ public final class HubPackageEntry {
         if (isPickedUp()) throw new IllegalStateException("Package already picked up: " + trackingCode);
         return new HubPackageEntry(id, tenantId, hubId, packageId, trackingCode, storageLocation,
                 depositedAt, Instant.now(), depositedByActorId, pickedUpByActorId,
-                recipientPhone, notified);
+                recipientPhone, notified, ownerActorId, storageFee, penaltyFee, feeCurrency);
     }
 
     /** Marks the recipient as notified of package arrival. */
     public HubPackageEntry markNotified() {
         return new HubPackageEntry(id, tenantId, hubId, packageId, trackingCode, storageLocation,
-                depositedAt, pickedUpAt, depositedByActorId, pickedUpByActorId, recipientPhone, true);
+                depositedAt, pickedUpAt, depositedByActorId, pickedUpByActorId, recipientPhone, true,
+                ownerActorId, storageFee, penaltyFee, feeCurrency);
     }
 
     /**
@@ -119,4 +159,12 @@ public final class HubPackageEntry {
     public UUID pickedUpByActorId() { return pickedUpByActorId; }
     public String recipientPhone() { return recipientPhone; }
     public boolean isNotified() { return notified; }
+    /** The person who will collect the package (the client), when known. */
+    public UUID ownerActorId() { return ownerActorId; }
+    /** Storage fee agreed at deposit time, when there is one. */
+    public BigDecimal storageFee() { return storageFee; }
+    /** Penalty for an overstay, when one was charged. */
+    public BigDecimal penaltyFee() { return penaltyFee; }
+    /** Currency of the two fees. */
+    public String feeCurrency() { return feeCurrency; }
 }

@@ -9,6 +9,8 @@
 # ── Étapes et résultats attendus ────────────────────────────────────────────
 #   C0  Empreinte du binaire   CORE_URL/actuator/info → git.commit.id affiché
 #   C1  Auth freelancer        jeton JWT obtenu via BFF OTP
+#   APR Agrément admin         PATCH /api/v1/gofp/freelancer-profiles/{id}/status?status=APPROVED
+#                               (jeton TNT_E2E_ADMIN_TOKEN, ou factice en bypass-dev) : PENDING → APPROVED
 #   C2  Missions disponibles   GET /v1/freelancer/jobs/available → 200 + annonce semée
 #   C3  Accepter (via BFF)     POST /v1/freelancer/jobs/:id/accept → 200 + accepted
 #
@@ -83,9 +85,8 @@ E2E_RUN_START=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 E2E_ANN_C3_ID_PSQL="e2ebb000-0000-0000-0000-e2ebb0000099"
 E2E_PARCEL_C3_ID_PSQL="e2e0ba5e-0000-0000-0000-e2e0ba5e0001"
 
-# Mission A : utilisée par SETUP-PICKUP + C4
-# Entrée dans l'ancienne table announcements requise (FK fk_deliveries_announcement)
-# pour que softMirrorDeliveryAndInitOtp puisse créer la livraison dans deliveries.
+# Mission A : utilisée par SETUP-PICKUP + C4 (annonce du cœur seulement : l'ancienne table
+# announcements et sa FK fk_deliveries_announcement ont disparu à la clôture gdd-final).
 E2E_ANN_C4_ID_PSQL="e2ebb000-0000-0000-0000-e2ebb0000004"
 E2E_PARCEL_C4_ID_PSQL="e2e0ba5e-0000-0000-0000-e2e0ba5e0004"
 
@@ -119,8 +120,10 @@ OTHER_TENANT_ID="43427172-b6ee-4dbf-9148-96682702ffc9"
 OTHER_ANN_ID="e2ec4000-0000-0000-0000-000000000099"
 OTHER_PARCEL_ID="e2ec4000-0000-0000-0000-000000000098"
 
-# C10 — cancel par l'expéditeur (branche isSender) : annonce où client_id=FREELANCER_USER_ID
-#        et livraison sans livreur assigné (freelancer_id=NULL → isDeliveryPerson=false)
+# C10 — cancel par l'expéditeur (branche isSender) : annonce du cœur où client_id=FREELANCER_USER_ID
+#        et livraison du cœur sans livreur (delivery_person_id NULL → isDeliveryPerson=false)
+E2E_PARCEL_C10_ID="e2ec1000-0000-0000-0000-e2ec10000003"
+E2E_PARCEL_C11_ID="e2ec1100-0000-0000-0000-e2ec11000003"
 E2E_ANN_C10_ID="e2ec1000-0000-0000-0000-e2ec10000001"
 E2E_DEL_C10_ID="e2ec1000-0000-0000-0000-e2ec10000002"
 # C11 — cancel par un tiers → 403 : annonce avec client_id étranger, livreur étranger
@@ -129,8 +132,16 @@ E2E_DEL_C11_ID="e2ec1100-0000-0000-0000-e2ec11000002"
 E2E_C11_FAKE_CLIENT="00000000-cafe-cafe-cafe-000000000011"
 E2E_C11_FAKE_PROFILE="00000000-cafe-cafe-cafe-000000000012"
 
+# Nettoyage des seeds C10/C11 (cœur + extension gofp), avant le seed et en fin de run.
+c10_c11_cleanup() {
+  psql_q "DELETE FROM deliveries WHERE id IN ('${E2E_DEL_C10_ID}','${E2E_DEL_C11_ID}');
+          DELETE FROM tnt_deliveries WHERE id IN ('${E2E_DEL_C10_ID}','${E2E_DEL_C11_ID}');
+          DELETE FROM tnt_delivery_announcements WHERE id IN ('${E2E_ANN_C10_ID}','${E2E_ANN_C11_ID}');
+          DELETE FROM tnt_parcels WHERE id IN ('${E2E_PARCEL_C10_ID}','${E2E_PARCEL_C11_ID}');" > /dev/null 2>&1 || true
+}
+
 declare -A CR
-for c in C0 C0b C1 C2 C3 SETUP C4 C5 C6 C7 C8 C9 C10 C11; do CR[$c]="⬜ non exécuté"; done
+for c in C0 C0b C1 APPROVAL C2 C3 SETUP C4 C5 C6 C7 C8 C9 C10 C11; do CR[$c]="⬜ non exécuté"; done
 
 # ── Couleurs / helpers ─────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
@@ -195,8 +206,7 @@ cleanup() {
   # gofp_freelancers + tnt_delivery_persons — créés par GofpFreelancerProjectionService,
   # persistants : aucun nettoyage nécessaire.
   # Annonces + livraisons C10/C11 (cancel guard)
-  psql_q "DELETE FROM deliveries WHERE id IN ('${E2E_DEL_C10_ID}','${E2E_DEL_C11_ID}');" > /dev/null 2>&1 || true
-  psql_q "DELETE FROM announcements WHERE id IN ('${E2E_ANN_C10_ID}','${E2E_ANN_C11_ID}');" > /dev/null 2>&1 || true
+  c10_c11_cleanup
   # Annonce de test d'isolation (autre tenant)
   psql_q "DELETE FROM tnt_delivery_announcements WHERE id='${OTHER_ANN_ID}';" > /dev/null 2>&1 || true
   psql_q "DELETE FROM tnt_parcels WHERE id='${OTHER_PARCEL_ID}';" > /dev/null 2>&1 || true
@@ -206,7 +216,6 @@ cleanup() {
       psql_q "DELETE FROM tnt_deliveries WHERE announcement_id = '${ANN_ID}';" > /dev/null 2>&1 || true
       psql_q "DELETE FROM deliveries WHERE announcement_id = '${ANN_ID}';" > /dev/null 2>&1 || true
       psql_q "DELETE FROM tnt_delivery_announcements WHERE id = '${ANN_ID}';" > /dev/null 2>&1 || true
-      psql_q "DELETE FROM announcements WHERE id = '${ANN_ID}';" > /dev/null 2>&1 || true
     done
     psql_q "DELETE FROM tnt_parcels WHERE id IN ('${E2E_PARCEL_C3_ID_PSQL}','${E2E_PARCEL_C4_ID_PSQL}');" > /dev/null 2>&1 || true
     echo "Annonces + colis psql supprimés."
@@ -611,18 +620,89 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════════════
+# APPROBATION — agrément du livreur par un administrateur (lot L3 : projection en PENDING)
+#
+# Depuis le lot L3, la projection crée le livreur en PENDING (gofp_freelancers ET
+# tnt_delivery_persons) : il ne peut prendre aucune mission tant qu'un administrateur
+# ne l'a pas agréé. Le harnais ne suppose plus l'agrément automatique :
+#   1. déclenche la projection par une route du parcours livreur
+#      (GET /api/v1/gofp/freelancer-profiles/by-core-user/{userId}, jeton livreur) ;
+#   2. vérifie l'état PENDING des deux tables (lecture seule, jamais d'écriture SQL) ;
+#   3. agrée par la vraie route admin du cœur
+#      PATCH /api/v1/gofp/freelancer-profiles/{id}/status?status=APPROVED
+#      (permission gofp-admin:manage, machine à états delivery-core) ;
+#   4. vérifie APPROVED dans les deux tables.
+# Jeton administrateur : TNT_E2E_ADMIN_TOKEN (JWT d'un administrateur du MÊME tenant
+# que le livreur, porteur de gofp-admin:manage). En mode bypass-dev, tout jeton est
+# accepté comme TNT_ADMIN : un jeton factice suffit. Sans jeton admin en JWT réel,
+# l'étape échoue (C2-C4 échoueront ensuite par 409/403 : c'est voulu).
+# ══════════════════════════════════════════════════════════════════════════════
+step "APPROBATION — agrément du livreur par un administrateur"
+
+ADMIN_TOKEN="${TNT_E2E_ADMIN_TOKEN:-}"
+if [ -z "$ADMIN_TOKEN" ] && [ "$AUTH_MODE" = "bypass-dev" ]; then
+  ADMIN_TOKEN="e2e-bypass-admin"
+  info "APPROBATION : mode bypass-dev — jeton administrateur factice"
+fi
+
+if [ -z "${FREELANCER_USER_ID:-}" ] || [ -z "${TOKEN_FREELANCER:-}" ]; then
+  warn "APPROBATION ignorée : livreur non authentifié (C1)"
+  CR[APPROVAL]="⚠️ IGNORÉ — livreur non authentifié"
+else
+  APR_GET_HTTP=$(curl -s -o /tmp/tnt_approval_fl.json -w "%{http_code}" --max-time 30 \
+    "${CORE_DIRECT_URL}/api/v1/gofp/freelancer-profiles/by-core-user/${FREELANCER_USER_ID}" \
+    -H "Authorization: Bearer ${TOKEN_FREELANCER}" 2>/dev/null || echo "000")
+  assert_http "200" "$APR_GET_HTTP" "APPROBATION : projection du livreur déclenchée (by-core-user)"
+  APR_FL_ID=$(jq -r '.id // .data.id // empty' /tmp/tnt_approval_fl.json 2>/dev/null || echo "")
+  APR_STATUS_BEFORE=$(jq -r '.status // .data.status // empty' /tmp/tnt_approval_fl.json 2>/dev/null || echo "")
+  assert_nonempty "$APR_FL_ID" "APPROBATION : id du livreur projeté"
+
+  if psql_available 2>/dev/null && [ -n "$APR_FL_ID" ]; then
+    APR_DB_BEFORE=$(psql_q "SELECT g.status||'|'||coalesce(d.status,'∅') FROM gofp_freelancers g
+                            LEFT JOIN tnt_delivery_persons d ON d.id=g.id WHERE g.id='${APR_FL_ID}';" 2>/dev/null || echo "")
+    info "APPROBATION : état avant agrément (gofp|delivery-core) = ${APR_DB_BEFORE}"
+  fi
+
+  if [ "$APR_STATUS_BEFORE" = "APPROVED" ]; then
+    # Rejeu du harnais sur une base déjà utilisée : l'agrément est idempotent (200, rien écrit).
+    info "APPROBATION : livreur déjà APPROVED (rejeu) — l'appel admin reste exécuté (idempotent)"
+  elif [ -n "$APR_STATUS_BEFORE" ]; then
+    assert_eq "PENDING" "$APR_STATUS_BEFORE" "APPROBATION : un livreur nouvellement projeté attend l'agrément (PENDING)"
+  fi
+
+  if [ -z "$ADMIN_TOKEN" ]; then
+    fail "APPROBATION : TNT_E2E_ADMIN_TOKEN absent (AUTH_MODE=${AUTH_MODE}) — agrément impossible, le livreur reste PENDING"
+    CR[APPROVAL]="❌ FAIL — TNT_E2E_ADMIN_TOKEN absent"
+  elif [ -n "$APR_FL_ID" ]; then
+    APR_PATCH_HTTP=$(curl -s -o /tmp/tnt_approval_patch.json -w "%{http_code}" --max-time 30 -X PATCH \
+      "${CORE_DIRECT_URL}/api/v1/gofp/freelancer-profiles/${APR_FL_ID}/status?status=APPROVED" \
+      -H "Authorization: Bearer ${ADMIN_TOKEN}" 2>/dev/null || echo "000")
+    assert_http "200" "$APR_PATCH_HTTP" "APPROBATION : PATCH /status?status=APPROVED par l'administrateur"
+    if psql_available 2>/dev/null; then
+      APR_DB_AFTER=$(psql_q "SELECT g.status||'|'||coalesce(d.status,'∅') FROM gofp_freelancers g
+                             LEFT JOIN tnt_delivery_persons d ON d.id=g.id WHERE g.id='${APR_FL_ID}';" 2>/dev/null || echo "")
+      assert_eq "APPROVED|APPROVED" "$APR_DB_AFTER" \
+        "APPROBATION : gofp_freelancers et tnt_delivery_persons APPROVED (écrits par le cœur, pas par le script)"
+    fi
+    if [ "$APR_PATCH_HTTP" = "200" ]; then
+      CR[APPROVAL]="✅ PASS — ${APR_STATUS_BEFORE:-?} → APPROVED"
+    else
+      CR[APPROVAL]="❌ FAIL — PATCH HTTP ${APR_PATCH_HTTP}"
+    fi
+  else
+    CR[APPROVAL]="❌ FAIL — livreur non projeté"
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════════════
 # SEED — deux missions
 #
 # Mission B (E2E_ANN_C3_ID) : listée en C2, acceptée via BFF en C3.
 # Mission A (E2E_ANN_C4_ID) : assignée en direct dans SETUP-PICKUP pour
 #   capturer le pickupOtp ; parcourue via BFF en C4.
 #
-# La mission A nécessite une entrée dans l'ancienne table announcements
-# (schéma plat GOFP) pour satisfaire la FK de la table deliveries, dont
-# softMirrorDeliveryAndInitOtp a besoin pour créer la livraison locale.
-#
-# tnt_delivery_announcements : table lue par GET /api/announcements (C2).
-# announcements (ancienne) : table dont deliveries.announcement_id est FK.
+# tnt_delivery_announcements : table lue par GET /api/announcements (C2) et par la
+# façade IAnnouncementRepository ; l'ancienne table announcements n'existe plus (gdd-final).
 # ══════════════════════════════════════════════════════════════════════════════
 step "SEED — deux missions E2E"
 
@@ -646,7 +726,6 @@ if psql_available 2>/dev/null; then
     psql_q "DELETE FROM deliveries WHERE announcement_id='${ANN_ID}';" > /dev/null 2>&1 || true
     psql_q "DELETE FROM tnt_deliveries WHERE announcement_id='${ANN_ID}';" > /dev/null 2>&1 || true
     psql_q "DELETE FROM tnt_delivery_announcements WHERE id='${ANN_ID}';" > /dev/null 2>&1 || true
-    psql_q "DELETE FROM announcements WHERE id='${ANN_ID}';" > /dev/null 2>&1 || true
   done
   psql_q "DELETE FROM tnt_parcels WHERE id IN ('${E2E_PARCEL_C3_ID_PSQL}','${E2E_PARCEL_C4_ID_PSQL}');" > /dev/null 2>&1 || true
 
@@ -688,16 +767,6 @@ if psql_available 2>/dev/null; then
     ON CONFLICT (id) DO UPDATE SET status='PUBLISHED', created_delivery_id=NULL, updated_at=NOW();
   " > /dev/null
 
-  # FK deliveries.announcement_id → announcements(id)
-  # Sans cette entrée, softMirrorDeliveryAndInitOtp lève une FK violation,
-  # le miroir échoue silencieusement et la livraison n'existe pas dans deliveries.
-  psql_q "
-    INSERT INTO announcements (id, client_id, title, status, created_at, updated_at)
-    VALUES ('${E2E_ANN_C4_ID_PSQL}', '${FREELANCER_USER_ID}',
-            'E2E Lot C — SETUP/C4 (mirror FK)', 'PUBLISHED', NOW(), NOW())
-    ON CONFLICT (id) DO UPDATE SET status='PUBLISHED', updated_at=NOW();
-  " > /dev/null
-
   # Nettoyage des réponses résiduelles pour la mission B (cleanup idempotent — pas de pré-seed)
   # Le pré-seed avait été retiré : il créait une réponse avant subscribe,
   # ce qui déclenchait soit un 409 quota (pas de gofp_freelancers) soit un doublon.
@@ -717,34 +786,44 @@ if psql_available 2>/dev/null; then
   # ── Livraisons C10/C11 : gardes de propriété cancel ──────────────────────────
   # C10 : expéditeur (isSender) — freelancer_id NULL, client_id = FREELANCER_USER_ID
   # C11 : tiers → 403        — freelancer_id et client_id étrangers
-  psql_q "DELETE FROM deliveries WHERE id IN ('${E2E_DEL_C10_ID}','${E2E_DEL_C11_ID}');" > /dev/null 2>&1 || true
-  psql_q "DELETE FROM announcements WHERE id IN ('${E2E_ANN_C10_ID}','${E2E_ANN_C11_ID}');" > /dev/null 2>&1 || true
+  c10_c11_cleanup
   if [ -n "${E2E_TENANT_ID:-}" ]; then
-    NOW_TS=$(date -u +"%Y-%m-%d %H:%M:%S")
-    # Annonces dans la table announcements (lue par announcementRepository)
+    # Cœur seulement (clôture gdd-final) : colis, annonce (client_id = expéditeur), livraison
+    # (statut, livreur), puis la ligne d'extension gofp deliveries (id + annonce) lue par le
+    # dépôt Go, qui relit statut et livreur dans le cœur.
     psql_q "
-      INSERT INTO announcements (id, client_id, title, status, created_at, updated_at)
+      INSERT INTO tnt_parcels (id,weight_kg,width_cm,height_cm,length_cm,fragile,perishable,created_at,updated_at,version)
+      VALUES ('${E2E_PARCEL_C10_ID}',1.0,20.0,15.0,10.0,false,false,NOW(),NOW(),0),
+             ('${E2E_PARCEL_C11_ID}',1.0,20.0,15.0,10.0,false,false,NOW(),NOW(),0)
+      ON CONFLICT (id) DO NOTHING;
+      INSERT INTO tnt_delivery_announcements
+        (id,tenant_id,client_id,title,offered_amount,currency,parcel_id,
+         status,urgency,pickup_city,delivery_city,recipient_name,recipient_phone,
+         created_at,updated_at,version,pricing_mode,created_delivery_id)
       VALUES
-        ('${E2E_ANN_C10_ID}','${FREELANCER_USER_ID}','E2E C10 cancel-sender','PUBLISHED','${NOW_TS}','${NOW_TS}'),
-        ('${E2E_ANN_C11_ID}','${E2E_C11_FAKE_CLIENT}','E2E C11 cancel-tiers','PUBLISHED','${NOW_TS}','${NOW_TS}')
-      ON CONFLICT (id) DO UPDATE SET status='PUBLISHED', updated_at=NOW();
-    " > /dev/null
-    # Livraisons dans la table deliveries (lue par deliveryRepository)
-    psql_q "
-      INSERT INTO deliveries (id, announcement_id, freelancer_id, status,
-          pickup_min_time, pickup_max_time, delivery_min_time, delivery_max_time)
+        ('${E2E_ANN_C10_ID}','${E2E_TENANT_ID}','${FREELANCER_USER_ID}','E2E C10 cancel-sender',1000.0,'XAF',
+         '${E2E_PARCEL_C10_ID}','ASSIGNED','STANDARD','Yaounde','Douala','C10','+237600000010',
+         NOW(),NOW(),0,'FIXED_PRICE','${E2E_DEL_C10_ID}'),
+        ('${E2E_ANN_C11_ID}','${E2E_TENANT_ID}','${E2E_C11_FAKE_CLIENT}','E2E C11 cancel-tiers',1000.0,'XAF',
+         '${E2E_PARCEL_C11_ID}','ASSIGNED','STANDARD','Yaounde','Douala','C11','+237600000011',
+         NOW(),NOW(),0,'FIXED_PRICE','${E2E_DEL_C11_ID}')
+      ON CONFLICT (id) DO UPDATE SET status='ASSIGNED', updated_at=NOW();
+      INSERT INTO tnt_deliveries
+        (id,tenant_id,announcement_id,parcel_id,sender_id,delivery_person_id,status,urgency,
+         pickup_city,delivery_city,recipient_name,recipient_phone,created_at,updated_at)
       VALUES
-        ('${E2E_DEL_C10_ID}','${E2E_ANN_C10_ID}',NULL,'CREATED',
-         NOW()+INTERVAL '1 hour',NOW()+INTERVAL '2 hours',
-         NOW()+INTERVAL '3 hours',NOW()+INTERVAL '4 hours'),
-        ('${E2E_DEL_C11_ID}','${E2E_ANN_C11_ID}','${E2E_C11_FAKE_PROFILE}','CREATED',
-         NOW()+INTERVAL '1 hour',NOW()+INTERVAL '2 hours',
-         NOW()+INTERVAL '3 hours',NOW()+INTERVAL '4 hours')
+        ('${E2E_DEL_C10_ID}','${E2E_TENANT_ID}','${E2E_ANN_C10_ID}','${E2E_PARCEL_C10_ID}','${FREELANCER_USER_ID}',
+         NULL,'CREATED','STANDARD','Yaounde','Douala','C10','+237600000010',NOW(),NOW()),
+        ('${E2E_DEL_C11_ID}','${E2E_TENANT_ID}','${E2E_ANN_C11_ID}','${E2E_PARCEL_C11_ID}','${E2E_C11_FAKE_CLIENT}',
+         '${E2E_C11_FAKE_PROFILE}','CREATED','STANDARD','Yaounde','Douala','C11','+237600000011',NOW(),NOW())
       ON CONFLICT (id) DO UPDATE SET status='CREATED';
+      INSERT INTO deliveries (id, announcement_id)
+      VALUES ('${E2E_DEL_C10_ID}','${E2E_ANN_C10_ID}'), ('${E2E_DEL_C11_ID}','${E2E_ANN_C11_ID}')
+      ON CONFLICT (id) DO NOTHING;
     " > /dev/null 2>&1 || true
     C10_CHECK=$(psql_q "SELECT id FROM deliveries WHERE id='${E2E_DEL_C10_ID}';" 2>/dev/null || echo "")
     C11_CHECK=$(psql_q "SELECT id FROM deliveries WHERE id='${E2E_DEL_C11_ID}';" 2>/dev/null || echo "")
-    [ -n "$C10_CHECK" ] && setup_ok "SEED C10 livraison sender semée (freelancer_id=NULL, clientId=FREELANCER)" || warn "SEED C10 livraison non semée"
+    [ -n "$C10_CHECK" ] && setup_ok "SEED C10 livraison sender semée (delivery_person_id=NULL, clientId=FREELANCER)" || warn "SEED C10 livraison non semée"
     [ -n "$C11_CHECK" ] && setup_ok "SEED C11 livraison tiers semée (clientId étranger)" || warn "SEED C11 livraison non semée"
   fi
 
@@ -956,6 +1035,8 @@ else
 fi
 
 # ── Assertions C-18 : la projection a été faite par le code de production ─────
+# APPROVED attendu parce que l'étape APPROBATION a agréé le livreur par la route admin
+# (la projection seule crée PENDING depuis le lot L3).
 # Exécutées que subscribe ait réussi ou non : si la projection manque, c'est elle
 # qu'on veut voir rouge (et non un simple « subscribe 409 »). Le script n'écrit
 # JAMAIS dans gofp_freelancers ni tnt_delivery_persons (GofpProjectionTablesSeedGuardTest).
@@ -1327,7 +1408,7 @@ if [ -n "$DELIVERY_OTP" ] && [ "$DELIVERY_OTP" != "null" ]; then
     " 2>/dev/null || echo "?")
 
     DELIVERY_TARIF=$(psql_q "
-      SELECT COALESCE(tarif, 0) FROM deliveries WHERE id='${E2E_DELIVERY_ID}' LIMIT 1;
+      SELECT COALESCE(agreed_amount, 0) FROM tnt_deliveries WHERE id='${E2E_DELIVERY_ID}' LIMIT 1;
     " 2>/dev/null || echo "0")
 
     if [ "${WALLET_EXISTED_BEFORE:-unknown}" = "false" ]; then
@@ -1565,6 +1646,7 @@ printf "  %-5s  %-45s  %s\n" "─────" "──────────�
 printf "  %-5s  %-45s  %s\n" "C0"    "Empreinte binaire (git.commit.id)"                "${CR[C0]}"
 printf "  %-5s  %-45s  %s\n" "C0b"   "Mode d'authentification du core"                  "${CR[C0b]}"
 printf "  %-5s  %-45s  %s\n" "C1"    "Auth freelancer (OTP BFF)"                        "${CR[C1]}"
+printf "  %-5s  %-45s  %s\n" "APR"   "Agrément admin (PENDING → APPROVED)"              "${CR[APPROVAL]}"
 printf "  %-5s  %-45s  %s\n" "C2"    "Missions disponibles (mission B trouvée)"         "${CR[C2]}"
 printf "  %-5s  %-45s  %s\n" "C3"    "Accepter via BFF (Mission B)"                     "${CR[C3]}"
 printf "  %-5s  %-45s  %s\n" "SETUP" "Assign direct Mission A, capture pickupOtp"       "${CR[SETUP]}"

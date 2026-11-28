@@ -41,7 +41,7 @@ class IncidentDomainTest {
 
         assertThat(incident.getId()).isNotNull();
         assertThat(incident.getReferenceCode()).startsWith("TNT-INC-");
-        assertThat(incident.getStatus()).isEqualTo(IncidentStatus.DETECTED);
+        assertThat(incident.getStatus()).isEqualTo(IncidentStatus.REPORTED);
         assertThat(incident.getSeverity()).isEqualTo(IncidentSeverity.MEDIUM);
         assertThat(incident.isMultiParcelIncident()).isFalse();
     }
@@ -70,6 +70,7 @@ class IncidentDomainTest {
     void closedIncident_shouldNotBeTransitionable() {
         Incident incident = buildSampleIncident()
                 .acknowledge()
+                .triage(IncidentSeverity.LOW, null, null, false)
                 .resolve(ResolutionMode.MANUAL_AGENCY)
                 .close();
 

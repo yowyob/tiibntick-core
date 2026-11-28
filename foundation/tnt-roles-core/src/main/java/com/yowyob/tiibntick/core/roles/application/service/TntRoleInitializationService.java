@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.reactive.TransactionalOperator;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -21,6 +22,7 @@ import reactor.core.scheduler.Schedulers;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Startup service that seeds and reconciles TiiBnTick's canonical role definitions into the
@@ -64,6 +66,8 @@ public class TntRoleInitializationService {
     private final TransactionalOperator transactionalOperator;
     private final ObjectMapper objectMapper;
     private final UUID systemTenantId;
+    /** Single-flight guard: the registrar and the ApplicationReadyEvent both trigger a run at startup. */
+    private final AtomicBoolean systemRolesRunning = new AtomicBoolean(false);
 
     public TntRoleInitializationService(
             TntRoleDefinitionRegistry registry,
@@ -82,6 +86,10 @@ public class TntRoleInitializationService {
 
     @EventListener(ApplicationReadyEvent.class)
     public void provisionSystemRoles() {
+        if (!systemRolesRunning.compareAndSet(false, true)) {
+            log.info("TntRoleInitializationService: a system-role reconciliation is already running, not starting another one.");
+            return;
+        }
         log.info("TntRoleInitializationService: reconciling {} TiiBnTick role definitions for system tenant {}",
                 registry.size(), systemTenantId);
 
@@ -89,6 +97,7 @@ public class TntRoleInitializationService {
                 .then(reconcileTenantCopies())
                 .doOnSuccess(v -> log.info("TntRoleInitializationService: reconciliation complete."))
                 .doOnError(err -> log.error("TntRoleInitializationService: reconciliation error: {}", err.getMessage(), err))
+                .doFinally(signal -> systemRolesRunning.set(false))
                 .subscribeOn(Schedulers.boundedElastic())
                 .subscribe();
     }
@@ -130,7 +139,17 @@ public class TntRoleInitializationService {
         // incorrectly trigger on no-op paths if we used Mono<Void> directly.
         return roleRepository.findByCode(tenantId, definition.code())
                 .flatMap(existing -> reconcileExisting(tenantId, existing, definition))
-                .switchIfEmpty(Mono.defer(() -> provisionAndEnqueue(tenantId, definition).thenReturn(Boolean.TRUE)))
+                .switchIfEmpty(Mono.defer(() -> provisionAndEnqueue(tenantId, definition)
+                        .thenReturn(Boolean.TRUE)
+                        // Lost a race with a concurrent run (other instance / other trigger): the
+                        // role now exists and our whole transaction rolled back, so reconcile it.
+                        .onErrorResume(DuplicateKeyException.class, dup -> {
+                            log.info("Role {} for tenant {} was created concurrently, reconciling the existing row.",
+                                    definition.code(), tenantId);
+                            return roleRepository.findByCode(tenantId, definition.code())
+                                    .flatMap(existing -> reconcileExisting(tenantId, existing, definition))
+                                    .defaultIfEmpty(Boolean.TRUE);
+                        })))
                 .then();
     }
 

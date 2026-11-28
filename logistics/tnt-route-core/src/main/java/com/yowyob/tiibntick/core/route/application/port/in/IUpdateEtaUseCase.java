@@ -5,6 +5,6 @@ import com.yowyob.tiibntick.core.route.domain.model.GPSMeasurement;
 import reactor.core.publisher.Mono;
 
 public interface IUpdateEtaUseCase {
-    Mono<EtaResult> updateEta(String missionId, String trackingCode, GPSMeasurement measurement);
-    Mono<EtaResult> computeInitialEta(String missionId, double totalDistanceKm, double estimatedSpeedKmh);
+    Mono<EtaResult> updateEta(String deliveryId, String trackingCode, GPSMeasurement measurement);
+    Mono<EtaResult> computeInitialEta(String deliveryId, double totalDistanceKm, double estimatedSpeedKmh);
 }

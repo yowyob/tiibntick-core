@@ -172,6 +172,36 @@ public class SalesApplicationService implements
                         .thenReturn(saved));
     }
 
+    // ─── Delivery progress (lot L8, tnt.delivery.events) ─────────────────────
+
+    /**
+     * Moves the orders dispatched with a delivery along with it: picked up → IN_DELIVERY; delivered → DELIVERED
+     * (through IN_DELIVERY when the pickup was not seen); failed → RETURNED. An order already past the step is left
+     * as it is, so a redelivered event changes nothing.
+     */
+    public Mono<Void> followDelivery(UUID tenantId, UUID deliveryId, String eventType, ReturnReason failureReason,
+                                     String failureNote) {
+        return orderRepository.findByDeliveryId(tenantId, deliveryId)
+                .concatMap(order -> {
+                    SalesOrderStatus status = order.getStatus();
+                    return switch (eventType) {
+                        case "DeliveryPickedUp" -> status == SalesOrderStatus.DISPATCHED
+                                ? startDelivery(tenantId, order.getId()) : Mono.<TntSalesOrder>empty();
+                        case "DeliveryDelivered" -> status == SalesOrderStatus.DISPATCHED
+                                ? startDelivery(tenantId, order.getId())
+                                        .then(markDelivered(tenantId, order.getId()))
+                                : status == SalesOrderStatus.IN_DELIVERY
+                                ? markDelivered(tenantId, order.getId()) : Mono.<TntSalesOrder>empty();
+                        case "DeliveryFailed" -> status == SalesOrderStatus.DISPATCHED
+                                || status == SalesOrderStatus.IN_DELIVERY
+                                ? returnOrder(tenantId, order.getId(), failureReason, failureNote)
+                                : Mono.<TntSalesOrder>empty();
+                        default -> Mono.<TntSalesOrder>empty();
+                    };
+                })
+                .then();
+    }
+
     // ─── Return ───────────────────────────────────────────────────────────────
 
     @Override

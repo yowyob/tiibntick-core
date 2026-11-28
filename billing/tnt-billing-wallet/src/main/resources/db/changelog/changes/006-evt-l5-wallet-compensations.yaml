@@ -1,0 +1,24 @@
+databaseChangeLog:
+  - changeSet:
+      id: evt-l5-001-wallet-compensations
+      author: evt-l5
+      labels: evt-l5
+      comment: >
+        Lot L5 (spec §4.3): mirror of the compensations paid by the Kernel compensation fund for a dispute. One row
+        per dispute (unique), so that a repeated payment request returns the first payment without calling the
+        Kernel again. Balances stay in the Kernel (decision H).
+      changes:
+        - createTable:
+            schemaName: billing
+            tableName: wallet_compensations
+            columns:
+              - column: { name: id, type: UUID, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: tenant_id, type: UUID, constraints: { nullable: false } }
+              - column: { name: dispute_id, type: VARCHAR(64), constraints: { nullable: false, unique: true, uniqueConstraintName: uq_wallet_compensation_dispute } }
+              - column: { name: kernel_compensation_id, type: UUID, constraints: { nullable: false } }
+              - column: { name: fund_wallet_id, type: UUID }
+              - column: { name: beneficiary_actor_id, type: UUID, constraints: { nullable: false } }
+              - column: { name: beneficiary_wallet_id, type: UUID, constraints: { nullable: false } }
+              - column: { name: amount, type: "NUMERIC(19,4)", constraints: { nullable: false } }
+              - column: { name: currency, type: VARCHAR(3), constraints: { nullable: false } }
+              - column: { name: created_at, type: TIMESTAMP, defaultValueComputed: NOW(), constraints: { nullable: false } }

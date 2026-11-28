@@ -69,7 +69,10 @@ import java.util.UUID;
  * is explicitly ignored) — so a slow/down Kernel degrades to a fast, explicit error instead of
  * amplifying load with retries on genuine 4xx/5xx application responses.
  * Named instances: {@code kernelWebClient}, {@code kernelOrganizationWebClient},
- * {@code kernelTpWebClient} (see {@code resilience4j.*} in {@code application.yml}).
+ * {@code kernelTpWebClient}, {@code kernelUserWebClient}, {@code kernelFileWebClient},
+ * {@code kernelPaymentWebClient} (see {@code resilience4j.*} in {@code application.yml}). An instance with no
+ * entry there silently gets Resilience4j's library defaults (1 s time limit, 3 attempts): every named
+ * instance MUST be declared, which {@code KernelResilienceConfigTest} enforces.
  *
  * @author MANFOUO Braun
  */
@@ -106,6 +109,10 @@ public class KernelBridgeConfig {
 
     @Value("${tnt.kernel.response-timeout-ms:5000}")
     private int kernelResponseTimeoutMs;
+
+    /** Response timeout of file transfers (upload scans and types the file before answering). */
+    @Value("${tnt.kernel.file-response-timeout-ms:30000}")
+    private int kernelFileResponseTimeoutMs;
 
     /**
      * Primary Kernel WebClient — used by the majority of adapters.
@@ -170,6 +177,33 @@ public class KernelBridgeConfig {
                 .defaultHeader("X-Solution-Code", "TNT")
                 .clientConnector(timeoutConnector())
                 .filter(resilience("kernelServiceAccountWebClient", circuitBreakerRegistry, timeLimiterRegistry,
+                        retryRegistry))
+                .filter(propagateServiceAccountToken(tokenProvider))
+                .filter(logRequest())
+                .filter(logResponse())
+                .build();
+    }
+
+    /**
+     * Kernel WebClient for the <b>platform money operations</b> of {@code tnt-billing-wallet} (lot L5, spec §4):
+     * escrow release/refund/freeze/unfreeze, compensation fund, cash collections. Same service-account identity as
+     * {@code kernelServiceAccountWebClient}, but its own Resilience4j instances with <b>no transport retry</b>: a
+     * timed-out POST may already have moved money in the Kernel.
+     */
+    @Bean("kernelSettlementWebClient")
+    public WebClient kernelSettlementWebClient(
+            WebClient.Builder builder,
+            CircuitBreakerRegistry circuitBreakerRegistry,
+            TimeLimiterRegistry timeLimiterRegistry,
+            RetryRegistry retryRegistry,
+            KernelServiceAccountTokenProvider tokenProvider) {
+        return builder.clone()
+                .baseUrl(kernelBaseUrl)
+                .defaultHeader("X-Api-Key", kernelApiKey)
+                .defaultHeader("X-Client-Id", kernelClientId)
+                .defaultHeader("X-Solution-Code", "TNT")
+                .clientConnector(timeoutConnector())
+                .filter(resilience("kernelSettlementWebClient", circuitBreakerRegistry, timeLimiterRegistry,
                         retryRegistry))
                 .filter(propagateServiceAccountToken(tokenProvider))
                 .filter(logRequest())
@@ -260,6 +294,34 @@ public class KernelBridgeConfig {
                 .clientConnector(timeoutConnector())
                 .filter(propagateBearerToken())
                 .filter(resilience("kernelUserWebClient", circuitBreakerRegistry, timeLimiterRegistry, retryRegistry))
+                .filter(logRequest())
+                .filter(logResponse())
+                .build();
+    }
+
+    /**
+     * Kernel WebClient for <b>file transfers</b> on behalf of the signed-in user ({@code POST /api/files},
+     * profile photo): like {@link #kernelUserWebClient} but with a transfer-sized response timeout and no
+     * transport retry. A multipart body is streamed from the incoming request and cannot be replayed, and the
+     * Kernel scans the file before answering, which routinely takes longer than the 5 s of ordinary calls.
+     */
+    @Bean("kernelFileWebClient")
+    public WebClient kernelFileWebClient(
+            WebClient.Builder builder,
+            CircuitBreakerRegistry circuitBreakerRegistry,
+            TimeLimiterRegistry timeLimiterRegistry,
+            RetryRegistry retryRegistry) {
+        HttpClient httpClient = HttpClient.create()
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, kernelConnectTimeoutMs)
+                .responseTimeout(Duration.ofMillis(kernelFileResponseTimeoutMs));
+        return builder.clone()
+                .baseUrl(kernelBaseUrl)
+                .defaultHeader("X-Api-Key", kernelApiKey)
+                .defaultHeader("X-Client-Id", kernelClientId)
+                .defaultHeader("X-Solution-Code", "TNT")
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .filter(propagateBearerToken())
+                .filter(resilience("kernelFileWebClient", circuitBreakerRegistry, timeLimiterRegistry, retryRegistry))
                 .filter(logRequest())
                 .filter(logResponse())
                 .build();

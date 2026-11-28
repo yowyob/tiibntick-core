@@ -3,12 +3,12 @@ package com.yowyob.tiibntick.core.geo.adapter.out.persistence;
 import com.yowyob.tiibntick.core.geo.adapter.out.persistence.entity.RelayHubEntity;
 import com.yowyob.tiibntick.core.geo.application.port.out.IRelayHubRepository;
 import com.yowyob.tiibntick.core.geo.domain.model.GeoPoint;
+import com.yowyob.tiibntick.core.geo.domain.model.HubApprovalStatus;
 import com.yowyob.tiibntick.core.geo.domain.model.HubStatus;
 import com.yowyob.tiibntick.core.geo.domain.model.RelayHub;
 import org.springframework.data.r2dbc.core.R2dbcEntityTemplate;
 import org.springframework.data.relational.core.query.Criteria;
 import org.springframework.data.relational.core.query.Query;
-import org.springframework.data.relational.core.query.Update;
 import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
@@ -66,14 +66,16 @@ public class R2dbcRelayHubRepository implements IRelayHubRepository {
     public Flux<RelayHub> findAllActive(UUID tenantId) {
         return template.select(
                         Query.query(Criteria.where("tenant_id").is(tenantId)
-                                .and("status").is(HubStatus.ACTIVE.name())),
+                                .and("status").is(HubStatus.ACTIVE.name())
+                                .and("approval_status").is(HubApprovalStatus.APPROVED.name())),
                         RelayHubEntity.class)
                 .map(RelayHubEntity::toDomain);
     }
 
     /**
      * Spatial query joining relay_hubs with road_nodes to get hub coordinates.
-     * Filters ACTIVE hubs within the given radius, ordered by proximity.
+     * Filters ACTIVE and APPROVED hubs (D-140: a hub not approved is never proposed) within the given radius,
+     * ordered by proximity.
      */
     @Override
     public Flux<RelayHub> findAvailableWithinRadius(UUID tenantId, GeoPoint center, double radiusKm) {
@@ -81,11 +83,12 @@ public class R2dbcRelayHubRepository implements IRelayHubRepository {
         String sql = String.format(java.util.Locale.ROOT, """
                 SELECT h.id, h.tenant_id, h.branch_id, h.node_id,
                        h.capacity_slots, h.current_occupancy, h.operator_actor_id,
-                       h.status, h.created_at, h.updated_at
+                       h.status, h.approval_status, h.created_at, h.updated_at
                 FROM tnt_geography.relay_hubs h
                 INNER JOIN tnt_geography.road_nodes n ON n.id = h.node_id
                 WHERE h.tenant_id = :tenantId
                   AND h.status = 'ACTIVE'
+                  AND h.approval_status = 'APPROVED'
                   AND h.current_occupancy < h.capacity_slots
                   AND ST_DWithin(
                         ST_MakePoint(n.longitude, n.latitude)::geography,
@@ -110,6 +113,7 @@ public class R2dbcRelayHubRepository implements IRelayHubRepository {
                     e.setCurrentOccupancy(row.get("current_occupancy", Integer.class));
                     e.setOperatorActorId(row.get("operator_actor_id", String.class));
                     e.setStatus(row.get("status", String.class));
+                    e.setApprovalStatus(row.get("approval_status", String.class));
                     e.setCreatedAt(row.get("created_at", Instant.class));
                     e.setUpdatedAt(row.get("updated_at", Instant.class));
                     return e;
@@ -121,12 +125,19 @@ public class R2dbcRelayHubRepository implements IRelayHubRepository {
     @Override
     public Mono<RelayHub> updateOccupancy(UUID id, UUID tenantId, int newOccupancy) {
         String newStatus = newOccupancy > 0 ? HubStatus.FULL.name() : HubStatus.ACTIVE.name();
-        return template.update(
-                        Query.query(Criteria.where("id").is(id).and("tenant_id").is(tenantId)),
-                        Update.update("current_occupancy", newOccupancy)
-                                .set("status", newStatus)
-                                .set("updated_at", Instant.now()),
-                        RelayHubEntity.class)
+        // occupancy is a fact, updated whatever the approval (D-138); it never reopens a closed hub
+        return databaseClient.sql("""
+                        UPDATE tnt_geography.relay_hubs
+                           SET current_occupancy = :occupancy,
+                               status = CASE WHEN status IN ('ACTIVE', 'FULL') THEN :status ELSE status END,
+                               updated_at = now()
+                         WHERE id = :id AND tenant_id = :tenantId
+                        """)
+                .bind("occupancy", newOccupancy)
+                .bind("status", newStatus)
+                .bind("id", id)
+                .bind("tenantId", tenantId)
+                .fetch().rowsUpdated()
                 .flatMap(count -> count > 0 ? findById(id, tenantId) : Mono.empty());
     }
 }

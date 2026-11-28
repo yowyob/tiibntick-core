@@ -42,13 +42,10 @@ import java.util.UUID;
  * ({@code gofp.freelancer.provisioning.failures}) tracks silent errors. The filter only
  * calls it on the freelancer-journey routes and caches positive answers (lot C-19).
  *
- * <p><strong>TODO (décision métier reportée — validation logistique/KYC du livreur) :</strong>
- * {@code status = APPROVED} is set immediately on both rows so the accept-a-delivery
- * journey is testable end-to-end. Nothing in the code today verifies vehicle papers,
- * insurance or identity before a freelancer can subscribe: this is a deliberate,
- * temporary compromise. The business must decide whether a {@code PENDING} state plus an
- * admin approval step is required before {@code APPROVED}; until then every freelancer
- * profile is auto-approved on the logistics side.
+ * <p><strong>Vetting (lot L3, business decision):</strong> a projected delivery person starts {@code PENDING}
+ * and cannot take deliveries until an administrator approves it
+ * ({@code PATCH /api/v1/gofp/freelancer-profiles/{id}/status}, delivery-core state machine). Freelancers already
+ * approved keep their status: an existing row is never touched.
  *
  * @author KOUAM Kamdem
  */
@@ -105,7 +102,7 @@ public class GofpFreelancerProjectionService {
                             .id(profileId)
                             .coreFreelancerId(profileId)
                             .coreUserId(coreUserId)
-                            .status(FreelancerStatus.APPROVED) // TODO: see class javadoc — auto-approval pending business decision
+                            .status(FreelancerStatus.PENDING) // waits for an administrator's approval
                             .isActive(true)
                             .remainingDeliveries(DEFAULT_INITIAL_QUOTA)
                             .createdAt(Instant.now())

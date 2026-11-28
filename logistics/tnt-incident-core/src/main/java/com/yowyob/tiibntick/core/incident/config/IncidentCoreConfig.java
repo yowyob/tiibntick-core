@@ -32,10 +32,16 @@ import java.util.UUID;
 
 @Configuration
 @EnableScheduling
+@org.springframework.boot.context.properties.EnableConfigurationProperties(IncidentLifecycleProperties.class)
 //@EnableR2dbcAuditing
 @ComponentScan(basePackages = "com.yowyob.tiibntick.core.incident")
 @EnableR2dbcRepositories(basePackages = "com.yowyob.tiibntick.core.incident.adapter.persistence.repository")
 public class IncidentCoreConfig {
+
+    @Bean
+    public com.yowyob.tiibntick.core.incident.domain.service.IncidentBlockingPolicy incidentBlockingPolicy() {
+        return new com.yowyob.tiibntick.core.incident.domain.service.IncidentBlockingPolicy();
+    }
 
     @Bean
     public IncidentRiskScoringService incidentRiskScoringService() {
@@ -148,12 +154,20 @@ public class IncidentCoreConfig {
     }
 
     @Bean
-    @ConditionalOnMissingBean(IMissionStatusPort.class)
-    public IMissionStatusPort noOpMissionStatusPort() {
-        return new IMissionStatusPort() {
-            @Override public Mono<Void> pauseMission(UUID m, UUID i) { return Mono.empty(); }
-            @Override public Mono<Void> resumeMission(UUID m, UUID d, UUID v) { return Mono.empty(); }
-            @Override public Mono<MissionSnapshot> getMissionSnapshot(UUID m) { return Mono.empty(); }
+    @ConditionalOnMissingBean(IDeliveryStatusPort.class)
+    public IDeliveryStatusPort noOpDeliveryStatusPort() {
+        return new IDeliveryStatusPort() {
+            @Override public Mono<Void> pauseDelivery(UUID m, UUID i) { return Mono.empty(); }
+            @Override public Mono<Void> resumeDelivery(UUID m, UUID d, UUID v) { return Mono.empty(); }
+            @Override public Mono<Void> markIncidentReported(UUID m, UUID i) { return Mono.empty(); }
+            @Override public Mono<Void> resumeDelivery(UUID m, String t, UUID d, UUID v) { return Mono.empty(); }
+            @Override public Mono<Void> startHandover(UUID m) { return Mono.empty(); }
+            @Override public Mono<Void> abortHandover(UUID m) { return Mono.empty(); }
+            @Override public Mono<Void> failDelivery(UUID m, UUID i, String r) { return Mono.empty(); }
+            @Override public Mono<DeliverySnapshot> getDeliverySnapshot(UUID m) { return Mono.empty(); }
+            // fail closed: without delivery-core nobody can be checked as the assigned courier
+            @Override public Mono<Boolean> isAssignedCourier(UUID m, UUID a) { return Mono.just(false); }
+            @Override public Mono<Boolean> courierHoldsParcel(UUID m) { return Mono.just(false); }
         };
     }
 }

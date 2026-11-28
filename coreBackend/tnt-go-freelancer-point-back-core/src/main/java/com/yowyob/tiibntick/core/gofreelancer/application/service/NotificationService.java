@@ -1,27 +1,24 @@
 package com.yowyob.tiibntick.core.gofreelancer.application.service;
 
+import com.yowyob.tiibntick.core.gofreelancer.adapter.out.kafka.event.MatchingNotificationEvent;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.search.document.AnnouncementDocument;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.search.document.FreelancerDocument;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.Notification;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.notification.NotificationStatus;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.notification.NotificationType;
-import com.yowyob.tiibntick.core.gofreelancer.adapter.out.persistence.repository.NotificationRepository;
-
-import com.yowyob.tiibntick.core.gofreelancer.adapter.out.kafka.event.MatchingNotificationEvent;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.EmailPort;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.PushNotificationPort;
+import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpNotificationTemplates;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 /**
- * Service responsible for managing and sending notifications.
- * Orchestrates tnt-notify-core (email/push) and DB persistence.
+ * Sends the Go-Freelancer notifications. Every message is written once per language in the i18n catalog and
+ * rendered by tnt-notify-core in the language of the recipient's account ({@code sendLocalized}); the history of
+ * what was sent is notify-core's, this service keeps no notification table of its own.
  *
  * @author François-Charles ATANGA
  * @date 03/02/2026
@@ -31,96 +28,61 @@ import java.util.List;
 @RequiredArgsConstructor
 public class NotificationService {
 
-    private final NotificationRepository notificationRepository;
+    /**
+     * Title and message carried by the matching event of the live stream. They are the stream's own wire
+     * contract with the mobile app; the e-mail and push texts are rendered from the catalog, not from these.
+     */
+    static final String MATCHING_STREAM_TITLE = "Nouvelle course disponible !";
+    static final String MATCHING_STREAM_MESSAGE = "Une course correspond à votre position. Cliquez pour voir les détails.";
+
     private final EmailPort emailPort;
     private final PushNotificationPort pushNotificationPort;
     private final KafkaEventPublisher kafkaEventPublisher;
 
     /**
-     * Notifies eligible delivery persons about a new announcement match.
-     *
-     * @param freelancers List of eligible delivery persons.
-     * @param announcement    The matched announcement.
-     * @return A Flux of saved Notifications.
+     * Notifies eligible delivery persons about a new announcement match: e-mail and push rendered from the catalog,
+     * plus the Kafka matching event that feeds the live stream. Each recipient is best effort and independent.
      */
-    @Transactional
-    public Flux<Notification> notifyEligibleFreelancers(List<FreelancerDocument> freelancers,
-            AnnouncementDocument announcement) {
+    public Mono<Void> notifyEligibleFreelancers(List<FreelancerDocument> freelancers, AnnouncementDocument announcement) {
         log.info("Notifying {} delivery persons for Announcement {}", freelancers.size(), announcement.getId());
-
-        return Flux.fromIterable(freelancers)
-                .flatMap(dp -> sendNotification(dp, announcement));
+        return reactor.core.publisher.Flux.fromIterable(freelancers)
+                .flatMap(dp -> notifyMatch(dp, announcement))
+                .then();
     }
 
-    private Mono<Notification> sendNotification(FreelancerDocument dp, AnnouncementDocument announcement) {
-        String title = "Nouvelle course disponible !";
-        String message = "Une course correspond à votre position. Cliquez pour voir les détails.";
-
-        // 1. Create Notification Entity
-        Notification notification = new Notification();
-        notification.setPersonId(dp.getPersonId());
-        notification.setNotificationType(NotificationType.NEW_ANNOUNCEMENT);
-        notification.setTitle(title);
-        notification.setMessage(message);
-        notification.setNotificationStatus(NotificationStatus.SENT);
-
-        // 2. Persist to DB
-        return notificationRepository.save(notification)
-                .flatMap(savedNotification -> {
-                    // 3. Send Email
-                    Mono<Void> emailMono = emailPort.sendSimpleMessageReactive(
-                            dp.getEmail(),
-                            title,
-                            message + "\n\nAnnonce ID: " + announcement.getId()).onErrorResume(e -> {
-                                log.error("Error sending email to {}: {}", dp.getEmail(), e.getMessage());
-                                return Mono.empty();
-                            });
-
-                    // 4. Send Push Notification
-                    Mono<Void> pushMono = pushNotificationPort.sendPushNotification(
-                            dp.getId(),
-                            title,
-                            message).onErrorResume(e -> {
-                                return Mono.empty();
-                            });
-
-                    // 5. Send Kafka Notification
-                    MatchingNotificationEvent kafkaEvent = MatchingNotificationEvent.builder()
-                            .freelancerId(dp.getId())
-                            .announcementId(announcement.getId())
-                            .title(title)
-                            .message(message)
-                            .build();
-
-                    try {
-                        kafkaEventPublisher.publishMatchingNotification(kafkaEvent);
-                    } catch (Exception e) {
-                        log.error("Error sending Kafka notification for delivery person {}: {}", dp.getId(),
-                                e.getMessage());
-                    }
-
-                    // execute side effects without blocking the return of the saved notification
-                    return Mono.when(emailMono, pushMono)
-                            .thenReturn(savedNotification);
+    private Mono<Void> notifyMatch(FreelancerDocument dp, AnnouncementDocument announcement) {
+        Map<String, Object> params = Map.of("announcementId", String.valueOf(announcement.getId()));
+        Mono<Void> email = emailPort.sendLocalized(dp.getEmail(), dp.getId(),
+                GofpNotificationTemplates.ANNOUNCEMENT_AVAILABLE, params).onErrorResume(e -> {
+                    log.error("Error sending email to {}: {}", dp.getEmail(), e.getMessage());
+                    return Mono.empty();
                 });
+        Mono<Void> push = pushNotificationPort.sendLocalized(dp.getId(),
+                GofpNotificationTemplates.ANNOUNCEMENT_AVAILABLE, params).onErrorResume(e -> Mono.empty());
+
+        try {
+            kafkaEventPublisher.publishMatchingNotification(MatchingNotificationEvent.builder()
+                    .freelancerId(dp.getId())
+                    .announcementId(announcement.getId())
+                    .title(MATCHING_STREAM_TITLE)
+                    .message(MATCHING_STREAM_MESSAGE)
+                    .build());
+        } catch (Exception e) {
+            log.error("Error sending Kafka notification for delivery person {}: {}", dp.getId(), e.getMessage());
+        }
+        return Mono.when(email, push);
     }
 
-    public Mono<Void> sendEvaluationRequest(java.util.UUID personId, java.util.UUID deliveryId, String personEmail, String title, String message) {
-        Notification notification = new Notification();
-        notification.setPersonId(personId);
-        notification.setNotificationType(NotificationType.EVALUATION_REQUEST);
-        notification.setTitle(title);
-        notification.setMessage(message);
-        notification.setNotificationStatus(NotificationStatus.SENT);
-
-        return notificationRepository.save(notification)
-                .flatMap(saved -> {
-                    Mono<Void> emailMono = emailPort.sendSimpleMessageReactive(
-                            personEmail, title, message + "\n\nDelivery ID: " + deliveryId)
-                            .onErrorResume(e -> Mono.empty());
-                    Mono<Void> pushMono = pushNotificationPort.sendPushNotification(personId, title, message)
-                            .onErrorResume(e -> Mono.empty());
-                    return Mono.when(emailMono, pushMono);
-                });
+    /**
+     * Asks a person to rate a delivery: an e-mail and a push, both rendered from the catalog in the language of
+     * the person's account.
+     */
+    public Mono<Void> sendEvaluationRequest(UUID personId, String personEmail, String templateKey,
+            Map<String, Object> params) {
+        Mono<Void> email = emailPort.sendLocalized(personEmail, personId, templateKey, params)
+                .onErrorResume(e -> Mono.empty());
+        Mono<Void> push = pushNotificationPort.sendLocalized(personId, templateKey, params)
+                .onErrorResume(e -> Mono.empty());
+        return Mono.when(email, push);
     }
 }

@@ -2,7 +2,7 @@ package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web;
 
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpClient;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.client.ClientStatus;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.user.LoyaltyStatus;
+import com.yowyob.tiibntick.core.tp.domain.model.enums.LoyaltyTier;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.GofpClientUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -82,18 +82,25 @@ public class GofpClientController {
     @PatchMapping("/{id}/loyalty")
     public Mono<ResponseEntity<GofpClient>> updateLoyalty(
             @PathVariable UUID id,
-            @RequestParam LoyaltyStatus loyaltyStatus) {
+            @RequestParam LoyaltyTier loyaltyStatus) {
         return clientUseCase.updateLoyaltyStatus(id, loyaltyStatus)
                 .map(ResponseEntity::ok)
+                // the tier is derived from the points of the core loyalty account: it cannot be set by hand
+                .onErrorResume(e -> e.getClass() == IllegalStateException.class,
+                        e -> Mono.just(ResponseEntity.status(HttpStatus.CONFLICT).build()))
                 .onErrorResume(IllegalArgumentException.class,
                         e -> Mono.just(ResponseEntity.notFound().build()));
     }
 
-    /** Called after a completed order to increment counter and recompute loyalty tier. */
+    /**
+     * Deprecated (lot L3, C4): no-op answering 200 with the client. Completed deliveries are credited by the core
+     * (once per delivery); this route is kept so that current mobile builds do not fail, and goes at the closure.
+     */
+    @Deprecated
     @PostMapping("/by-core-client/{coreClientId}/record-order")
     public Mono<ResponseEntity<GofpClient>> recordOrder(@PathVariable UUID coreClientId) {
         return clientUseCase.recordOrder(coreClientId)
-                .map(ResponseEntity::ok)
+                .map(c -> ResponseEntity.ok().header("Deprecation", "true").body(c))
                 .onErrorResume(IllegalArgumentException.class,
                         e -> Mono.just(ResponseEntity.notFound().build()));
     }

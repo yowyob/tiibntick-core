@@ -43,6 +43,8 @@ public class DeliveryNeedResponseDTO {
     private String title;
     private String description;
     private DeliveryNeedStatus status;
+    /** QO-9: {@code DELIVERED} or {@code FAILED} when {@code status} is {@code COMPLETED}, otherwise absent. */
+    private String outcome;
     private Integer duration;
     private String signatureUrl;
     private String paymentMethod;

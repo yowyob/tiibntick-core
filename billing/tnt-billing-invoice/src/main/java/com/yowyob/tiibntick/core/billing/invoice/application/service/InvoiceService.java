@@ -91,7 +91,7 @@ public class InvoiceService implements GenerateInvoiceUseCase, SystemInvoicingUs
                     InvoiceNumber number = InvoiceNumber.generate(command.tenantCode(), year, seq);
                     Invoice draft = Invoice.createWithContext(
                             number, command.tenantId(), command.tenantCode(), command.countryCode(),
-                            command.missionId(), command.salesOrderId(), command.clientId(),
+                            command.deliveryId(), command.salesOrderId(), command.clientId(),
                             command.lines(), command.discounts(), command.currency(),
                             command.issuerOrgType(), command.issuerOrgId(), command.issuerTradeName(),
                             command.vatApplicable(), command.surchargeLines(),
@@ -148,10 +148,10 @@ public class InvoiceService implements GenerateInvoiceUseCase, SystemInvoicingUs
                 .switchIfEmpty(Mono.error(new InvoiceNotFoundException(invoiceNumber)));
     }
 
-    /** Same as {@link #listByMissionId(String)} but only inside {@code tenantId}. */
+    /** Same as {@link #listByDeliveryId(String)} but only inside {@code tenantId}. */
     @RequirePermission(resource = "invoice", action = "read")
-    public Flux<Invoice> listByMissionId(String missionId, UUID tenantId) {
-        return invoiceRepository.findByMissionId(missionId).filter(inv -> tenantId.equals(inv.getTenantId()));
+    public Flux<Invoice> listByDeliveryId(String missionId, UUID tenantId) {
+        return invoiceRepository.findByDeliveryId(missionId).filter(inv -> tenantId.equals(inv.getTenantId()));
     }
 
     /** Invoices issued by {@code issuerOrgId} (an organisation or a driver) inside {@code tenantId}. */
@@ -181,8 +181,8 @@ public class InvoiceService implements GenerateInvoiceUseCase, SystemInvoicingUs
      * @return a Flux of matching invoices
      */
     @RequirePermission(resource = "invoice", action = "read")
-    public Flux<Invoice> listByMissionId(String missionId) {
-        return invoiceRepository.findByMissionId(missionId);
+    public Flux<Invoice> listByDeliveryId(String missionId) {
+        return invoiceRepository.findByDeliveryId(missionId);
     }
 
     /**
@@ -308,8 +308,16 @@ public class InvoiceService implements GenerateInvoiceUseCase, SystemInvoicingUs
     }
 
     @Override
+    public Mono<Invoice> generateOnceAsSystem(GenerateInvoiceCommand command) {
+        return invoiceRepository.findByDeliveryId(command.deliveryId())
+                .filter(inv -> command.tenantId().equals(inv.getTenantId()))
+                .next()
+                .switchIfEmpty(Mono.defer(() -> doGenerate(command)));
+    }
+
+    @Override
     public Mono<Invoice> issuePaidInvoiceAsSystem(GenerateInvoiceCommand command, String paymentRef) {
-        return invoiceRepository.findByMissionId(command.missionId())
+        return invoiceRepository.findByDeliveryId(command.deliveryId())
                 .filter(inv -> command.tenantId().equals(inv.getTenantId()))
                 .next()
                 .switchIfEmpty(Mono.defer(() -> doGenerate(command)))

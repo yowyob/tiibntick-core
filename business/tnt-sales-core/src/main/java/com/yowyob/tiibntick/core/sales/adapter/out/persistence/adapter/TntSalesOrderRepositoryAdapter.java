@@ -84,6 +84,11 @@ public class TntSalesOrderRepositoryAdapter implements TntSalesOrderRepository {
         return headerRepo.findByTenantIdAndStatus(tenantId, status.name()).flatMap(this::toDomain);
     }
 
+    @Override
+    public Flux<TntSalesOrder> findByDeliveryId(UUID tenantId, UUID missionId) {
+        return headerRepo.findByTenantIdAndMissionId(tenantId, missionId).flatMap(this::toDomain);
+    }
+
     // ─── Mapping ──────────────────────────────────────────────────────────────
 
     private Mono<TntSalesOrder> toDomain(TntSalesOrderEntity e) {

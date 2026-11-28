@@ -199,4 +199,19 @@ class TntClientProfileServiceTest {
                         assertThat(updated.getTotalDeliveries()).isEqualTo(1))
                 .verifyComplete();
     }
+
+    @Test
+    @DisplayName("incrementDeliveriesIfProfiled() counts a profiled client and completes empty without profile")
+    void incrementDeliveriesIfProfiled_toleratesAMissingProfile() {
+        TntClientProfile profile = TntClientProfile.create(TENANT_ID, THIRD_PARTY_ID, ROLES, "fr", "XAF");
+        when(profileRepository.findByThirdPartyId(TENANT_ID, THIRD_PARTY_ID)).thenReturn(Mono.just(profile));
+        when(profileRepository.save(any(TntClientProfile.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        StepVerifier.create(profileService.incrementDeliveriesIfProfiled(TENANT_ID, THIRD_PARTY_ID))
+                .assertNext(updated -> assertThat(updated.getTotalDeliveries()).isEqualTo(1))
+                .verifyComplete();
+
+        UUID unknown = UUID.randomUUID();
+        when(profileRepository.findByThirdPartyId(TENANT_ID, unknown)).thenReturn(Mono.empty());
+        StepVerifier.create(profileService.incrementDeliveriesIfProfiled(TENANT_ID, unknown)).verifyComplete();
+    }
 }

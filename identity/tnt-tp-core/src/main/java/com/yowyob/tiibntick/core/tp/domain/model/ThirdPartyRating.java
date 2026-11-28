@@ -43,11 +43,17 @@ public final class ThirdPartyRating {
 
     private final Instant createdAt;
 
+    /** Optional free label of the rating situation (e.g. {@code CLIENT_TO_DP}). Nullable. */
+    private final String ratingContext;
+
+    /** Optional kind of the rated party: CLIENT, DELIVERY_PERSON or RELAY_OPERATOR. Nullable. */
+    private final String subjectKind;
+
     private ThirdPartyRating(
             UUID id, UUID tenantId,
             UUID ratedThirdPartyId, UUID raterActorId,
             String missionId, double score, String comment,
-            Instant createdAt) {
+            Instant createdAt, String ratingContext, String subjectKind) {
         this.id = Objects.requireNonNull(id, "id is required");
         this.tenantId = Objects.requireNonNull(tenantId, "tenantId is required");
         this.ratedThirdPartyId = Objects.requireNonNull(ratedThirdPartyId,
@@ -60,6 +66,8 @@ public final class ThirdPartyRating {
         this.score = score;
         this.comment = comment;
         this.createdAt = Objects.requireNonNull(createdAt, "createdAt is required");
+        this.ratingContext = ratingContext;
+        this.subjectKind = subjectKind;
     }
 
     // ─── Factory methods ─────────────────────────────────────────────────────
@@ -79,10 +87,20 @@ public final class ThirdPartyRating {
     public static ThirdPartyRating create(
             UUID tenantId, UUID ratedThirdPartyId, UUID raterActorId,
             String missionId, double score, String comment) {
+        return create(tenantId, ratedThirdPartyId, raterActorId, missionId, score, comment, null, null);
+    }
+
+    /**
+     * Creates a new rating carrying the optional rating context and rated-party kind.
+     */
+    public static ThirdPartyRating create(
+            UUID tenantId, UUID ratedThirdPartyId, UUID raterActorId,
+            String missionId, double score, String comment,
+            String ratingContext, String subjectKind) {
         return new ThirdPartyRating(
                 UUID.randomUUID(), tenantId,
                 ratedThirdPartyId, raterActorId,
-                missionId, score, comment, Instant.now());
+                missionId, score, comment, Instant.now(), ratingContext, subjectKind);
     }
 
     /**
@@ -107,8 +125,20 @@ public final class ThirdPartyRating {
             UUID ratedThirdPartyId, UUID raterActorId,
             String missionId, double score, String comment,
             Instant createdAt) {
+        return reconstitute(id, tenantId, ratedThirdPartyId, raterActorId,
+                missionId, score, comment, createdAt, null, null);
+    }
+
+    /**
+     * Reconstitutes a rating with its optional context and rated-party kind.
+     */
+    public static ThirdPartyRating reconstitute(
+            UUID id, UUID tenantId,
+            UUID ratedThirdPartyId, UUID raterActorId,
+            String missionId, double score, String comment,
+            Instant createdAt, String ratingContext, String subjectKind) {
         return new ThirdPartyRating(id, tenantId, ratedThirdPartyId, raterActorId,
-                missionId, score, comment, createdAt);
+                missionId, score, comment, createdAt, ratingContext, subjectKind);
     }
 
     // ─── Accessors ───────────────────────────────────────────────────────────
@@ -121,6 +151,8 @@ public final class ThirdPartyRating {
     public double getScore() { return score; }
     public String getComment() { return comment; }
     public Instant getCreatedAt() { return createdAt; }
+    public String getRatingContext() { return ratingContext; }
+    public String getSubjectKind() { return subjectKind; }
 
     @Override
     public boolean equals(Object o) {

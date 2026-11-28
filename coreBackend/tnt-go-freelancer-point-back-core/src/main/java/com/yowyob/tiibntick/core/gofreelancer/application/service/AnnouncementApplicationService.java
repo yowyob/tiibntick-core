@@ -10,26 +10,28 @@ import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.PacketDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.RespondAnnouncementRequestDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.SubscriptionResponseDTO;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.AnnouncementUseCase;
-import com.yowyob.tiibntick.core.gofreelancer.application.port.out.AnnouncementSubscriptionRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpFreelancerRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpUserRepository;
-import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IAnnouncementRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryAnnouncementPort;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.INegotiationChatPort;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.AnnouncementResponseSnapshot;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.AnnouncementSnapshot;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.AnnouncementExtras;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.PublishAnnouncementPortCommand;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.UpdateAnnouncementPortCommand;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.RespondToAnnouncementPortCommand;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Announcement;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpFreelancer;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpUser;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.announcement.AnnouncementStatus;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryStatus;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.AnnouncementStatus;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryStatus;
 import com.yowyob.tiibntick.core.gofreelancer.config.GofpDeliveryOtpProperties;
 import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
+import com.yowyob.tiibntick.core.gofreelancer.domain.exception.CodedStatusException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -42,9 +44,10 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * GOFP announcement orchestrator — delegates lifecycle to {@link IDeliveryAnnouncementPort}
- * (backed by {@code tnt-delivery-core}). Local {@link Announcement} persistence is kept only
- * for soft migration / legacy reads, not as a second business lifecycle.
+ * GOFP announcement orchestrator — delegates the whole lifecycle to {@link IDeliveryAnnouncementPort}
+ * (backed by {@code tnt-delivery-core}). No announcement is stored on the gofp side: the sender,
+ * the recipient e-mail, the payment/transport/vehicle preferences, the route estimate, the
+ * destination hub, the handover signature and the service fee all live on the core announcement.
  *
  * <p>This service never imports {@code tnt-delivery-core} types directly — see
  * {@code architecture/decisions.md} ADR-021. All translation to/from that module's own
@@ -61,13 +64,16 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
     private final TenantContextHolder tenantContextHolder;
     private final FreelancerQuotaService freelancerQuotaService;
     private final INegotiationChatPort negotiationChatPort;
-    private final IAnnouncementRepository announcementRepository;
-    private final AnnouncementSubscriptionRepository subscriptionRepository;
     private final GofpFreelancerRepository gofpFreelancerRepository;
     private final GofpUserRepository gofpUserRepository;
     private final DeliveryRepository deliveryRepository;
     private final DeliveryOtpService deliveryOtpService;
     private final GofpDeliveryOtpProperties deliveryOtpProperties;
+    /**
+     * Delivery lifecycle owned by tnt-delivery-core: the agreed price and windows are recorded there at
+     * selection. Mandatory: without it the delivery would have no price and would be completed unpaid.
+     */
+    private final com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryLifecyclePort deliveryLifecycle;
 
     /** Lien annonce ↔ besoin Go (injection optionnelle, cf. DeliveryNeedApplicationService). */
     /** Lot C-36 — in-app notifications of the journey (absent in narrow tests). */
@@ -106,10 +112,7 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
         return tenantContextHolder.currentTenantId()
                 .flatMap(tenantId -> {
                     PublishAnnouncementPortCommand cmd = toPublishCommand(tenantId, request);
-                    return deliveryAnnouncementPort.publish(cmd)
-                            .flatMap(published -> softMirrorLocal(published, request)
-                                    .thenReturn(toDTO(published)))
-                            .flatMap(this::enrichFromLocalMirror);
+                    return deliveryAnnouncementPort.publish(cmd).map(this::toDTO);
                 });
     }
 
@@ -117,8 +120,7 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
     public Flux<AnnouncementResponseDTO> getAllAnnouncements() {
         return tenantContextHolder.currentTenantId()
                 .flatMapMany(deliveryAnnouncementPort::findOpenAnnouncements)
-                .map(this::toDTO)
-                .flatMap(this::enrichFromLocalMirror);
+                .map(this::toDTO);
     }
 
     @Override
@@ -127,8 +129,7 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
         // Mêmes champs que getAllAnnouncements : seul l'ensemble des annonces change.
         return tenantContextHolder.currentTenantId()
                 .flatMapMany(tenantId -> deliveryAnnouncementPort.findOpenAnnouncementsNear(tenantId, criteria))
-                .map(this::toDTO)
-                .flatMap(this::enrichFromLocalMirror);
+                .map(this::toDTO);
     }
 
     @Override
@@ -162,7 +163,6 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
                 .flatMap(tenantId -> deliveryAnnouncementPort.findById(tenantId, id))
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("Announcement not found: " + id)))
                 .map(this::toDTO)
-                .flatMap(this::enrichFromLocalMirror)
                 .flatMap(this::enrichAssignedFreelancerProfile);
     }
 
@@ -171,55 +171,66 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
         return tenantContextHolder.currentTenantId()
                 .flatMap(tenantId -> deliveryAnnouncementPort.findById(tenantId, id))
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("Announcement not found: " + id)))
-                .map(a -> toCandidateDTO(a, viewerFreelancerId))
-                .flatMap(this::enrichFromLocalMirror);
+                .map(a -> toCandidateDTO(a, viewerFreelancerId));
     }
 
     @Override
     public Flux<AnnouncementResponseDTO> getAnnouncementsByClientId(UUID clientId) {
         return tenantContextHolder.currentTenantId()
                 .flatMapMany(tenantId -> deliveryAnnouncementPort.findByClient(tenantId, clientId))
-                .map(this::toDTO)
-                .flatMap(this::enrichFromLocalMirror);
+                .map(this::toDTO);
     }
 
     @Override
     @Deprecated
     public Mono<AnnouncementResponseDTO> updateAnnouncement(UUID id, AnnouncementRequestDTO request) {
-        return announcementRepository.findById(id)
-                .switchIfEmpty(Mono.error(new IllegalArgumentException(
-                        "Local announcement mirror not found: " + id
-                                + " — prefer cancel + republish via delivery-core")))
-                .flatMap(a -> {
-                    // Lot C-46 : une fois un livreur retenu (livraison créée), le mode de paiement et le
-                    // prix ne bougent plus — le paiement de la course les lit.
-                    boolean locked = a.getAssignedFreelancerId() != null
-                            || (a.getStatus() != null && a.getStatus() != AnnouncementStatus.DRAFT
-                                && a.getStatus() != AnnouncementStatus.PUBLISHED
-                                && a.getStatus() != AnnouncementStatus.IN_NEGOTIATION);
-                    boolean changesPayment = (request.getPaymentMethod() != null
-                                && !request.getPaymentMethod().equals(a.getPaymentMethod()))
-                            || (request.getAmount() != null && !request.getAmount().equals(a.getAmount()));
-                    if (locked && changesPayment) {
-                        return Mono.error(new org.springframework.web.server.ResponseStatusException(
-                                org.springframework.http.HttpStatus.CONFLICT,
-                                "The payment method and price of an assigned announcement can no longer change"));
-                    }
-                    if (request.getPaymentMethod() != null) a.setPaymentMethod(request.getPaymentMethod());
-                    if (request.getTransportMethod() != null) a.setTransportMethod(request.getTransportMethod());
-                    if (request.getDistance() != null) a.setDistance(request.getDistance());
-                    if (request.getLogisticsPrice() != null) a.setLogisticsPrice(request.getLogisticsPrice());
-                    if (request.getRequiredVehicleType() != null) a.setRequiredVehicleType(request.getRequiredVehicleType());
-                    if (request.getAmount() != null) a.setAmount(request.getAmount());
-                    if (request.getCurrency() != null) a.setCurrency(request.getCurrency());
-                    if (request.getSignatureUrl() != null) a.setSignatureUrl(request.getSignatureUrl());
-                    if (request.getShipperFirstName() != null) a.setShipperFirstName(request.getShipperFirstName());
-                    if (request.getShipperLastName() != null) a.setShipperLastName(request.getShipperLastName());
-                    if (request.getShipperEmail() != null) a.setShipperEmail(request.getShipperEmail());
-                    if (request.getShipperPhone() != null) a.setShipperPhone(request.getShipperPhone());
-                    return announcementRepository.save(a);
-                })
-                .map(this::localToDTO);
+        return tenantContextHolder.currentTenantId()
+                .flatMap(tenantId -> deliveryAnnouncementPort.findById(tenantId, id)
+                        .switchIfEmpty(Mono.error(new IllegalArgumentException("Announcement not found: " + id)))
+                        .flatMap(a -> {
+                            // Lot C-46 : une fois un livreur retenu (livraison créée), le mode de paiement et le
+                            // prix ne bougent plus — le paiement de la course les lit.
+                            boolean locked = AnnouncementViews.selectedDeliveryPerson(a) != null
+                                    || (a.status() != null && a.status() != AnnouncementStatus.DRAFT
+                                        && a.status() != AnnouncementStatus.PUBLISHED
+                                        && a.status() != AnnouncementStatus.IN_NEGOTIATION);
+                            boolean amountChanged = request.getAmount() != null
+                                    && (a.offeredAmount() == null
+                                        || a.offeredAmount().compareTo(BigDecimal.valueOf(request.getAmount())) != 0);
+                            boolean paymentChanged = request.getPaymentMethod() != null
+                                    && !request.getPaymentMethod().equals(a.extras().paymentMethod());
+                            if (locked && (amountChanged || paymentChanged)) {
+                                return Mono.error(new org.springframework.web.server.ResponseStatusException(
+                                        org.springframework.http.HttpStatus.CONFLICT,
+                                        "The payment method and price of an assigned announcement can no longer change"));
+                            }
+                            String senderName = request.getShipperFirstName() != null
+                                    || request.getShipperLastName() != null
+                                    ? AnnouncementViews.joinName(
+                                            request.getShipperFirstName() != null ? request.getShipperFirstName()
+                                                    : AnnouncementViews.firstName(a.extras().senderName()),
+                                            request.getShipperLastName() != null ? request.getShipperLastName()
+                                                    : AnnouncementViews.lastName(a.extras().senderName()))
+                                    : null;
+                            AnnouncementExtras patch = new AnnouncementExtras(
+                                    senderName, request.getShipperPhone(), request.getShipperEmail(),
+                                    null, null,
+                                    request.getRequiredVehicleType(), request.getPaymentMethod(),
+                                    request.getTransportMethod(), toBigDecimal(request.getDistance()),
+                                    request.getDuration(), request.getDestinationRelayPointId(),
+                                    request.getSignatureUrl(), toBigDecimal(request.getLogisticsPrice()),
+                                    null, null);
+                            return deliveryAnnouncementPort.update(new UpdateAnnouncementPortCommand(
+                                    tenantId, id, a.clientId(),
+                                    amountChanged ? BigDecimal.valueOf(request.getAmount()) : null,
+                                    amountChanged ? request.getCurrency() : null, patch));
+                        }))
+                .map(this::toDTO)
+                .flatMap(this::enrichAssignedFreelancerProfile);
+    }
+
+    private static BigDecimal toBigDecimal(Double v) {
+        return v != null ? BigDecimal.valueOf(v) : null;
     }
 
     @Override
@@ -227,7 +238,7 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
         return tenantContextHolder.currentTenantId()
                 .flatMap(tenantId -> deliveryAnnouncementPort.findById(tenantId, id)
                         .flatMap(a -> deliveryAnnouncementPort.cancel(tenantId, id, a.clientId())))
-                .then(announcementRepository.deleteById(id).onErrorResume(e -> Mono.empty()));
+                .then();
     }
 
     @Override
@@ -303,8 +314,7 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
                                                         freelancerId, priceOf(saved, freelancerId,
                                                                 request.getProposedPrice()))).thenReturn(saved));
                                     }))
-                            .map(saved -> toCandidateDTO(saved, freelancerId))
-                            .flatMap(this::enrichFromLocalMirror);
+                            .map(saved -> toCandidateDTO(saved, freelancerId));
                 });
     }
 
@@ -399,22 +409,20 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
         return tenantContextHolder.currentTenantId()
                 .flatMap(tenantId -> deliveryAnnouncementPort.findById(tenantId, announcementId))
                 .flatMapMany(a -> Flux.fromIterable(a.responses()))
-                .flatMap(this::toEnrichedSubscription)
-                .switchIfEmpty(subscriptionRepository.findAllByAnnouncementId(announcementId)
-                        .flatMap(s -> {
-                            SubscriptionResponseDTO dto = new SubscriptionResponseDTO();
-                            dto.setSubscriptionId(s.getId());
-                            dto.setFreelancerId(s.getFreelancerId());
-                            dto.setStatus(s.getStatus());
-                            dto.setCreatedAt(s.getCreatedAt());
-                            return enrichSubscriptionProfile(dto);
-                        }));
+                .flatMap(this::toEnrichedSubscription);
     }
 
     @Override
     @RequirePermission(resource = "announcement", action = "elect")
     public Mono<AnnouncementResponseDTO> assignResponse(
             UUID announcementId, UUID clientId, UUID responseId) {
+        return assignResponse(announcementId, clientId, responseId, null);
+    }
+
+    @Override
+    @RequirePermission(resource = "announcement", action = "elect")
+    public Mono<AnnouncementResponseDTO> assignResponse(
+            UUID announcementId, UUID clientId, UUID responseId, UUID deliveryId) {
         return tenantContextHolder.currentTenantId()
                 .flatMap(tenantId -> deliveryAnnouncementPort.findById(tenantId, announcementId)
                         .switchIfEmpty(Mono.error(new IllegalArgumentException(
@@ -426,12 +434,22 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
                                 return Mono.error(new IllegalArgumentException(
                                         "Response not found: " + responseId));
                             }
-                            return deliveryAnnouncementPort.selectResponse(
-                                    tenantId, announcementId, clientId, responseId);
+                            // Retry of a selection that the core already made (e.g. the agreed price could
+                            // not be recorded the first time): do not select again, replay what follows.
+                            // Every step below is idempotent (price recorded again, gofp row and codes
+                            // created only when absent).
+                            if (alreadySelected(before, responseId)) {
+                                log.info("Announcement {} already assigned to response {}: replaying the follow-up",
+                                        announcementId, responseId);
+                                return Mono.just(before);
+                            }
+                            return deliveryId == null
+                                    ? deliveryAnnouncementPort.selectResponse(
+                                            tenantId, announcementId, clientId, responseId)
+                                    : deliveryAnnouncementPort.selectResponse(
+                                            tenantId, announcementId, clientId, responseId, deliveryId);
                         }))
-                .flatMap(assigned -> softMirrorAssigned(assigned)
-                        .then(syncLinkedNeed(assigned))
-                        .then(softMirrorDeliveryAndInitOtp(assigned))
+                .flatMap(assigned -> softMirrorDeliveryAndInitOtp(assigned)
                         .flatMap(otpResult -> buildAssignResponse(assigned, otpResult)));
     }
 
@@ -456,69 +474,32 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
 
     @Override
     public Flux<AnnouncementResponseDTO> getSubscriptionsByFreelancerId(UUID freelancerId) {
-        return subscriptionRepository.findAllByFreelancerId(freelancerId)
-                .map(s -> s.getAnnouncementId())
-                .distinct()
-                .concatMap(announcementId -> getAnnouncement(announcementId)
-                        .onErrorResume(e -> Mono.empty()))
-                // Lot C-56 — livreur élu par invitation (aucune candidature locale) : l'annonce
-                // complète (adresses, contacts) plutôt que le seul miroir local.
-                .switchIfEmpty(announcementRepository.findAllByAssignedFreelancerId(freelancerId)
-                        .concatMap(a -> getAnnouncement(a.getId()).onErrorResume(e -> Mono.just(localToDTO(a)))));
-    }
-
-    // ── No escrow ────────────────────────────────────────────────────────────
-    //
-    // Kernel wallet migration: publishing an announcement or selecting a response no longer
-    // debits the client. A debit needs the owner's challenge code, which only the client's app can
-    // supply; the client pays the delivery person from their own Kernel wallet once the delivery
-    // is assigned (see DeliveryPaymentApplicationService, POST /api/v1/deliveries/{id}/payment).
-
-    // ── Soft local mirror (migration douce) ─────────────────────────────────
-
-    private Mono<Void> softMirrorLocal(AnnouncementSnapshot published, AnnouncementRequestDTO request) {
-        Announcement local = new Announcement();
-        local.setId(published.id());
-        local.setClientId(published.clientId());
-        local.setTitle(published.title());
-        local.setStatus(AnnouncementStatus.PUBLISHED);
-        local.setPaymentMethod(request.getPaymentMethod());
-        local.setTransportMethod(request.getTransportMethod());
-        local.setDistance(request.getDistance());
-        local.setLogisticsPrice(request.getLogisticsPrice());
-        local.setRequiredVehicleType(request.getRequiredVehicleType());
-        local.setDestinationRelayPointId(request.getDestinationRelayPointId());
-        local.setShipperFirstName(request.getShipperFirstName());
-        local.setShipperLastName(request.getShipperLastName());
-        local.setShipperEmail(request.getShipperEmail());
-        local.setShipperPhone(request.getShipperPhone());
-        local.setRecipientFirstName(request.getRecipientFirstName());
-        local.setRecipientLastName(request.getRecipientLastName());
-        local.setRecipientEmail(request.getRecipientEmail());
-        local.setRecipientPhone(request.getRecipientPhone());
-        local.setSignatureUrl(request.getSignatureUrl());
-        if (published.offeredAmount() != null) {
-            local.setAmount(published.offeredAmount().doubleValue());
-        }
-        local.setCurrency(published.currency());
-        return announcementRepository.save(local)
-                .onErrorResume(e -> {
-                    log.warn("[Mirror] Could not soft-mirror announcement {}: {}",
-                            published.id(), e.getMessage());
-                    return Mono.empty();
+        return findFreelancer(freelancerId)
+                .map(java.util.Optional::of)
+                .defaultIfEmpty(java.util.Optional.empty())
+                .onErrorReturn(java.util.Optional.empty())
+                .flatMapMany(gofp -> {
+                    java.util.Set<UUID> ids = new java.util.LinkedHashSet<>();
+                    ids.add(freelancerId);
+                    gofp.ifPresent(f -> {
+                        if (f.getId() != null) ids.add(f.getId());
+                        if (f.getCoreFreelancerId() != null) ids.add(f.getCoreFreelancerId());
+                    });
+                    return tenantContextHolder.currentTenantId()
+                            .flatMapMany(tenantId -> deliveryAnnouncementPort.findRespondedBy(tenantId, ids));
                 })
-                .then();
+                .map(this::toDTO)
+                .concatMap(this::enrichAssignedFreelancerProfile);
     }
 
-    /**
-     * Si l'annonce publie un besoin Go, le besoin passe ASSIGNED au même freelancer
-     * (même état que {@code DeliveryNeedApplicationService.assignFreelancer}). Les erreurs
-     * remontent : besoin et annonce ne doivent pas diverger.
-     */
-    private Mono<Void> syncLinkedNeed(AnnouncementSnapshot assigned) {
-        if (needAnnouncements == null) return Mono.empty();
-        return needAnnouncements.syncAssignment(assigned.id(), selectedFreelancer(assigned));
-    }
+    // ── Escrow (lot L5) ──────────────────────────────────────────────────────
+    //
+    // The paid selection holds the price in a Kernel escrow before electing (SelectionPaymentService:
+    // challenge, then confirm with the client's code, then assignResponse with the delivery id the escrow
+    // names). An election without payment (this method called directly, a Go need, an accepted invitation)
+    // is paid afterwards into the same escrow (DeliveryPaymentApplicationService).
+
+    // ── Livraison locale (OTP) ───────────────────────────────────────────────
 
     private static java.util.Optional<BigDecimal> selectedProposedPrice(AnnouncementSnapshot assigned) {
         return assigned.responses().stream()
@@ -528,29 +509,15 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
                 .findFirst();
     }
 
-    private static UUID selectedFreelancer(AnnouncementSnapshot assigned) {
-        return assigned.responses().stream()
-                .filter(r -> r.id().equals(assigned.selectedResponseId()))
-                .map(AnnouncementResponseSnapshot::deliveryPersonId)
-                .findFirst()
-                .orElse(null);
+    /** The core already selected this very response and created its delivery. */
+    static boolean alreadySelected(AnnouncementSnapshot announcement, UUID responseId) {
+        return announcement.status() == AnnouncementStatus.ASSIGNED
+                && responseId.equals(announcement.selectedResponseId())
+                && announcement.createdDeliveryId() != null;
     }
 
-    private Mono<Void> softMirrorAssigned(AnnouncementSnapshot assigned) {
-        return announcementRepository.findById(assigned.id())
-                .flatMap(local -> {
-                    local.setStatus(AnnouncementStatus.ASSIGNED);
-                    local.setAssignedFreelancerId(
-                            assigned.responses().stream()
-                                    .filter(r -> r.id().equals(assigned.selectedResponseId()))
-                                    .map(AnnouncementResponseSnapshot::deliveryPersonId)
-                                    .findFirst()
-                                    .orElse(null));
-                    return announcementRepository.save(local);
-                })
-                .onErrorResume(e -> Mono.empty())
-                .then();
-    }
+    /** Stable error code when the agreed terms could not be recorded on the core delivery. */
+    static final String AGREED_TERMS_NOT_RECORDED = "AGREED_TERMS_NOT_RECORDED";
 
     /**
      * Soft-mirrors the delivery-core Delivery into the gofp {@code deliveries} table (same UUID)
@@ -562,46 +529,68 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
             log.warn("[Mirror] Announcement {} has no createdDeliveryId after select", assigned.id());
             return Mono.just(new OtpInitResult(null, null, null, false));
         }
-        UUID freelancerId = assigned.responses().stream()
-                .filter(r -> r.id().equals(assigned.selectedResponseId()))
-                .map(AnnouncementResponseSnapshot::deliveryPersonId)
-                .findFirst()
-                .orElse(null);
-
         Instant now = Instant.now();
-        Mono<java.util.Optional<UUID>> linkedNeed = needAnnouncements == null
-                ? Mono.just(java.util.Optional.empty())
-                : needAnnouncements.needIdOf(assigned.id()).map(java.util.Optional::of)
-                        .defaultIfEmpty(java.util.Optional.empty());
-        return linkedNeed.flatMap(needId -> deliveryRepository.findById(deliveryId)
-                .switchIfEmpty(Mono.defer(() -> {
-                    Delivery local = new Delivery();
-                    local.setId(deliveryId);
-                    local.setAnnouncementId(assigned.id());
-                    // Course issue d'un besoin Go : la livraison reste rattachée au besoin,
-                    // donc le paiement lit le mode du besoin (CASH → règlement espèces),
-                    // et le tarif est le prix proposé retenu (QUOTE_REQUEST n'a pas de prix offert).
-                    needId.ifPresent(local::setDeliveryNeedId);
-                    local.setFreelancerId(freelancerId);
-                    local.setStatus(DeliveryStatus.CREATED);
-                    local.setPickupMinTime(now);
-                    local.setPickupMaxTime(now.plus(4, ChronoUnit.HOURS));
-                    local.setDeliveryMinTime(now.plus(1, ChronoUnit.HOURS));
-                    local.setDeliveryMaxTime(now.plus(24, ChronoUnit.HOURS));
-                    if (assigned.offeredAmount() != null) {
-                        local.setTarif(assigned.offeredAmount().doubleValue());
-                    } else if (needId.isPresent()) {
-                        selectedProposedPrice(assigned).ifPresent(p -> local.setTarif(p.doubleValue()));
-                    }
-                    return deliveryRepository.save(local)
-                            .onErrorResume(e -> {
-                                log.warn("[Mirror] Could not soft-mirror delivery {}: {}",
-                                        deliveryId, e.getMessage());
-                                return Mono.empty();
-                            });
-                }))
+        // The Go need a request was taken from is carried by the announcement itself (its origin extras).
+        Mono<java.util.Optional<UUID>> linkedNeed = Mono.just(java.util.Optional.ofNullable(
+                AnnouncementExtras.ORIGIN_DELIVERY_NEED.equals(assigned.extras().originRefType())
+                        ? assigned.extras().originRefId() : null));
+        // The status, the assigned delivery person, the price and the windows are the core delivery's: the
+        // agreed terms are recorded there FIRST (unless already recorded), and a failure fails the selection
+        // (a delivery without its price would be completed unpaid). Only then is the product extension row
+        // created when absent, then the handover codes when absent. Each step is idempotent, so selecting the
+        // same response again after a failure finishes the job.
+        return linkedNeed.flatMap(needId -> ensureAgreedTermsInCore(assigned, deliveryId, needId.isPresent(), now)
+                .then(deliveryRepository.findById(deliveryId)
+                        .switchIfEmpty(Mono.defer(() -> {
+                            Delivery local = new Delivery();
+                            local.setId(deliveryId);
+                            local.setAnnouncementId(assigned.id());
+                            // Course issue d'un besoin Go : la livraison reste rattachée au besoin,
+                            // donc le paiement lit le mode du besoin (CASH → règlement espèces).
+                            needId.ifPresent(local::setDeliveryNeedId);
+                            return deliveryRepository.save(local)
+                                    .onErrorResume(e -> {
+                                        log.warn("[Mirror] Could not soft-mirror delivery {}: {}",
+                                                deliveryId, e.getMessage());
+                                        return Mono.empty();
+                                    });
+                        })))
                 .flatMap(deliveryOtpService::initOtpIfAbsentWithCodes))
                 .defaultIfEmpty(new OtpInitResult(null, null, null, false));
+    }
+
+    /**
+     * Records on the core delivery the terms agreed at selection: the price (the offered amount; for a
+     * request taken from a Go need, which has no offered price, the selected response's proposed price)
+     * and the default pickup / hand-over windows (collection within 4 h, hand-over between 1 h and 24 h
+     * from now). A failure is propagated as a 503 {@value #AGREED_TERMS_NOT_RECORDED}: the selection fails
+     * instead of leaving a delivery without its price. The core selection itself is not rolled back; selecting
+     * the same response again replays this step (see {@link #alreadySelected}).
+     */
+    private Mono<Void> ensureAgreedTermsInCore(AnnouncementSnapshot assigned, UUID deliveryId,
+                                               boolean fromNeed, Instant now) {
+        // Already recorded (a replay after success, or a delivery migrated with its terms): keep them as they
+        // are, so a replay never shifts the windows.
+        return deliveryLifecycle.findState(assigned.tenantId(), deliveryId)
+                .map(state -> state.agreedAmount() != null || state.pickupWindowStart() != null)
+                .defaultIfEmpty(false)
+                .flatMap(recorded -> recorded ? Mono.<Void>empty()
+                        : recordAgreedTermsInCore(assigned, deliveryId, fromNeed, now))
+                .onErrorMap(e -> !(e instanceof CodedStatusException), e -> {
+                    log.error("[Mirror] Could not record the agreed terms of delivery {} in the core", deliveryId, e);
+                    return new CodedStatusException(HttpStatus.SERVICE_UNAVAILABLE, AGREED_TERMS_NOT_RECORDED,
+                            "The response is selected but its agreed price could not be recorded. "
+                                    + "Select the same response again to finish (it will not be selected twice).");
+                });
+    }
+
+    private Mono<Void> recordAgreedTermsInCore(AnnouncementSnapshot assigned, UUID deliveryId,
+                                               boolean fromNeed, Instant now) {
+        java.math.BigDecimal price = assigned.offeredAmount() != null ? assigned.offeredAmount()
+                : fromNeed ? selectedProposedPrice(assigned).orElse(null) : null;
+        return deliveryLifecycle.recordAgreedTerms(assigned.tenantId(), deliveryId, price, assigned.currency(),
+                        now, now.plus(4, ChronoUnit.HOURS), now.plus(1, ChronoUnit.HOURS), now.plus(24, ChronoUnit.HOURS))
+                .then();
     }
 
     private Mono<AnnouncementResponseDTO> buildAssignResponse(
@@ -616,7 +605,7 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
                 dto.setDeliveryOtpDeliveryMode("PREVIEW_ONLY");
             }
         }
-        return enrichFromLocalMirror(dto).flatMap(this::enrichAssignedFreelancerProfile);
+        return enrichAssignedFreelancerProfile(dto);
     }
 
     // ── Mapping ─────────────────────────────────────────────────────────────
@@ -643,7 +632,7 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
         Address pickup = toAddress(request.getPickupAddress());
         Address delivery = toAddress(request.getDeliveryAddress());
 
-        String recipientName = joinName(request.getRecipientFirstName(), request.getRecipientLastName());
+        String recipientName = AnnouncementViews.joinName(request.getRecipientFirstName(), request.getRecipientLastName());
         // Lot C-56 — « — » quand un contact manque vraiment, jamais « Recipient » / +237000000000.
         if (recipientName.isBlank()) {
             recipientName = NeedAnnouncementService.ABSENT;
@@ -668,109 +657,35 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
                 pickup,
                 delivery,
                 recipientName,
-                phone);
+                phone,
+                null,
+                extrasOf(request));
+    }
+
+    private static AnnouncementExtras extrasOf(AnnouncementRequestDTO r) {
+        String senderName = AnnouncementViews.joinName(r.getShipperFirstName(), r.getShipperLastName());
+        return new AnnouncementExtras(
+                senderName.isBlank() ? null : senderName, r.getShipperPhone(), r.getShipperEmail(),
+                r.getRecipientEmail(), r.getUrgency(), r.getRequiredVehicleType(), r.getPaymentMethod(),
+                r.getTransportMethod(), toBigDecimal(r.getDistance()), r.getDuration(),
+                r.getDestinationRelayPointId(), r.getSignatureUrl(), toBigDecimal(r.getLogisticsPrice()),
+                null, null);
     }
 
     private static Address toAddress(AddressDTO dto) {
         return dto != null ? dto.getAddress() : null;
     }
 
-    private static String joinName(String first, String last) {
-        String f = first != null ? first.trim() : "";
-        String l = last != null ? last.trim() : "";
-        return (f + " " + l).trim();
-    }
-
     private AnnouncementResponseDTO toDTO(AnnouncementSnapshot a) {
-        return toCandidateDTO(a, null);
+        return AnnouncementViews.toDto(a);
     }
 
     private AnnouncementResponseDTO toCandidateDTO(AnnouncementSnapshot a, UUID viewerFreelancerId) {
-        AnnouncementResponseDTO dto = new AnnouncementResponseDTO();
-        dto.setId(a.id());
-        dto.setClientId(a.clientId());
-        dto.setTitle(a.title());
-        dto.setDescription(a.description());
-        dto.setStatus(a.status());
-        dto.setCreatedAt(a.createdAt());
-        dto.setUpdatedAt(a.updatedAt());
-        if (a.offeredAmount() != null) {
-            dto.setAmount(a.offeredAmount().doubleValue());
-        }
-        dto.setCurrency(a.currency());
-        dto.setPricingMode(a.pricingMode());
-        dto.setRecipientPhone(a.recipientPhone());
-        dto.setRecipientFirstName(a.recipientName());
-        dto.setDeliveryId(a.createdDeliveryId());
-        dto.setTrackingCode(a.trackingCode());
-
-        if (a.pickupAddress() != null) {
-            dto.setPickupAddress(AddressDTO.builder().address(a.pickupAddress()).build());
-        }
-        if (a.deliveryAddress() != null) {
-            dto.setDeliveryAddress(AddressDTO.builder().address(a.deliveryAddress()).build());
-        }
-        dto.setPacket(toPacketDto(a));
-
-        if (a.selectedResponseId() != null) {
-            a.responses().stream()
-                    .filter(r -> r.id().equals(a.selectedResponseId()))
-                    .findFirst()
-                    .ifPresent(r -> dto.setAssignedFreelancerId(r.deliveryPersonId()));
-        }
         if (viewerFreelancerId != null) {
             log.trace("[Asymmetry] Candidate view for freelancer {} on announcement {}",
                     viewerFreelancerId, a.id());
         }
-        return dto;
-    }
-
-    private static PacketDTO toPacketDto(AnnouncementSnapshot a) {
-        if (a.packetWeightKg() == null && a.packetWidthCm() == null && a.packetDescription() == null
-                && a.packetPhotoUrl() == null && a.packetVolumetricWeightDm3() <= 0) {
-            return null;
-        }
-        PacketDTO packet = new PacketDTO();
-        packet.setWeight(a.packetWeightKg());
-        packet.setWidth(a.packetWidthCm());
-        packet.setHeight(a.packetHeightCm());
-        packet.setLength(a.packetLengthCm());
-        packet.setFragile(a.packetFragile());
-        packet.setIsPerishable(a.packetPerishable());
-        packet.setDescription(a.packetDescription());
-        packet.setPhotoPacket(a.packetPhotoUrl());
-        return packet;
-    }
-
-    private Mono<AnnouncementResponseDTO> enrichFromLocalMirror(AnnouncementResponseDTO dto) {
-        if (dto.getId() == null) {
-            return Mono.just(dto);
-        }
-        return announcementRepository.findById(dto.getId())
-                .map(local -> {
-                    if (dto.getShipperFirstName() == null) dto.setShipperFirstName(local.getShipperFirstName());
-                    if (dto.getShipperLastName() == null) dto.setShipperLastName(local.getShipperLastName());
-                    if (dto.getShipperEmail() == null) dto.setShipperEmail(local.getShipperEmail());
-                    if (dto.getShipperPhone() == null) dto.setShipperPhone(local.getShipperPhone());
-                    if (dto.getRecipientLastName() == null) dto.setRecipientLastName(local.getRecipientLastName());
-                    if (dto.getRecipientEmail() == null) dto.setRecipientEmail(local.getRecipientEmail());
-                    if (dto.getRecipientPhone() == null) dto.setRecipientPhone(local.getRecipientPhone());
-                    if (dto.getSignatureUrl() == null) dto.setSignatureUrl(local.getSignatureUrl());
-                    if (dto.getPaymentMethod() == null) dto.setPaymentMethod(local.getPaymentMethod());
-                    if (dto.getTransportMethod() == null) dto.setTransportMethod(local.getTransportMethod());
-                    if (dto.getDistance() == null) dto.setDistance(local.getDistance());
-                    if (dto.getLogisticsPrice() == null) dto.setLogisticsPrice(local.getLogisticsPrice());
-                    if (dto.getRequiredVehicleType() == null) dto.setRequiredVehicleType(local.getRequiredVehicleType());
-                    if (dto.getDestinationRelayPointId() == null) {
-                        dto.setDestinationRelayPointId(local.getDestinationRelayPointId());
-                    }
-                    if (dto.getAssignedFreelancerId() == null) {
-                        dto.setAssignedFreelancerId(local.getAssignedFreelancerId());
-                    }
-                    return dto;
-                })
-                .defaultIfEmpty(dto)
-                .onErrorResume(e -> Mono.just(dto));
+        return AnnouncementViews.toDto(a);
     }
 
     private Mono<AnnouncementResponseDTO> enrichAssignedFreelancerProfile(AnnouncementResponseDTO dto) {
@@ -831,36 +746,6 @@ public class AnnouncementApplicationService implements AnnouncementUseCase {
     private Mono<GofpFreelancer> findFreelancer(UUID freelancerId) {
         return gofpFreelancerRepository.findById(freelancerId)
                 .switchIfEmpty(gofpFreelancerRepository.findByCoreFreelancerId(freelancerId));
-    }
-
-    private AnnouncementResponseDTO localToDTO(Announcement a) {
-        AnnouncementResponseDTO dto = new AnnouncementResponseDTO();
-        dto.setId(a.getId());
-        dto.setClientId(a.getClientId());
-        dto.setTitle(a.getTitle());
-        dto.setDescription(a.getDescription());
-        dto.setPaymentMethod(a.getPaymentMethod());
-        dto.setTransportMethod(a.getTransportMethod());
-        dto.setDistance(a.getDistance());
-        dto.setLogisticsPrice(a.getLogisticsPrice());
-        dto.setRequiredVehicleType(a.getRequiredVehicleType());
-        dto.setDestinationRelayPointId(a.getDestinationRelayPointId());
-        dto.setAssignedFreelancerId(a.getAssignedFreelancerId());
-        dto.setShipperFirstName(a.getShipperFirstName());
-        dto.setShipperLastName(a.getShipperLastName());
-        dto.setShipperEmail(a.getShipperEmail());
-        dto.setShipperPhone(a.getShipperPhone());
-        dto.setRecipientFirstName(a.getRecipientFirstName());
-        dto.setRecipientLastName(a.getRecipientLastName());
-        dto.setRecipientEmail(a.getRecipientEmail());
-        dto.setRecipientPhone(a.getRecipientPhone());
-        dto.setSignatureUrl(a.getSignatureUrl());
-        dto.setAmount(a.getAmount());
-        dto.setCurrency(a.getCurrency());
-        dto.setStatus(a.getStatus());
-        dto.setCreatedAt(a.getCreatedAt());
-        dto.setUpdatedAt(a.getUpdatedAt());
-        return dto;
     }
 
     /** Lot C-36 — price of this courier's response (server price when set), else the one proposed. */

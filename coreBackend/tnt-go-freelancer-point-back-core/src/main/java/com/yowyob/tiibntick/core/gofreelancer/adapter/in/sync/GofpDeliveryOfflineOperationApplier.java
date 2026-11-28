@@ -9,7 +9,7 @@ import com.yowyob.tiibntick.core.gofreelancer.application.service.DeliveryProofS
 import com.yowyob.tiibntick.core.gofreelancer.application.service.DeliveryProofService.NewProof;
 import com.yowyob.tiibntick.core.gofreelancer.application.service.DeliveryStatusApplicationService;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryStatus;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryStatus;
 import com.yowyob.tiibntick.core.sync.application.port.out.IOfflineOperationApplier;
 import com.yowyob.tiibntick.core.sync.domain.model.OfflineOperation;
 import com.yowyob.tiibntick.core.sync.domain.model.enums.OfflineOpType;

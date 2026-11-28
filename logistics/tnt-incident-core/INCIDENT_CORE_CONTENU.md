@@ -165,7 +165,7 @@ DETECTED → ACKNOWLEDGED → TRIAGED
 | `INotificationPort` | Implémenté par `tnt-notify-core` |
 | `IPaymentFreezePort` | Implémenté par `tnt-billing-wallet` |
 | `IActorReputationPort` | Implémenté par `tnt-actor-core` |
-| `IMissionStatusPort` | Implémenté par `tnt-delivery-core` |
+| `IDeliveryStatusPort` | Implémenté par `tnt-delivery-core` |
 | `IIncidentEventPublisher` | `IncidentKafkaEventPublisher` (Kafka) |
 | `IMediaStoragePort` | Implémenté par `tnt-media-core` (MinIO) |
 

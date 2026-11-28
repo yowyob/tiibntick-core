@@ -41,6 +41,12 @@ public class AnnouncementRequestDTO {
      */
     private String requiredVehicleType;
 
+    /**
+     * Urgence de la livraison (optionnelle) : STANDARD (défaut), EXPRESS, SAME_DAY ou SCHEDULED.
+     * {@code NORMAL}, ancienne valeur Go, reste accepté comme synonyme de STANDARD.
+     */
+    private String urgency;
+
     private AddressDTO pickupAddress;
     private AddressDTO deliveryAddress;
     private PacketDTO packet;

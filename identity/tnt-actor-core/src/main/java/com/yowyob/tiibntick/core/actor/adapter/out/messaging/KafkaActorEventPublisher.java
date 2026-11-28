@@ -48,14 +48,14 @@ public class KafkaActorEventPublisher implements IActorEventPublisher {
     static final String TOPIC_ACTOR_STATUS_CHANGED      = "tnt.actor.status.changed";
     static final String TOPIC_ACTOR_LOCATION_UPDATED    = "tnt.actor.location.updated";
     static final String TOPIC_BADGE_EARNED              = "tnt.actor.badge.earned";
-    static final String TOPIC_FREELANCER_ASSOCIATED     = "tnt.actor.freelancer.associated";
-    static final String TOPIC_FREELANCER_DISSOCIATED    = "tnt.actor.freelancer.dissociated";
+    static final String TOPIC_FREELANCER_ASSOCIATED     = com.yowyob.tiibntick.common.kafka.TntTopics.ACTOR_FREELANCER_ASSOCIATED;
+    static final String TOPIC_FREELANCER_DISSOCIATED    = com.yowyob.tiibntick.common.kafka.TntTopics.ACTOR_FREELANCER_DISSOCIATED;
     static final String TOPIC_KYC_VALIDATED             = "tnt.actor.kyc.validated";
     static final String TOPIC_MISSION_ASSIGNED          = "tnt.actor.mission.assigned";
     /**  — published when a freelancer is linked to a FreelancerOrganization. */
-    static final String TOPIC_FREELANCER_ORG_LINKED     = "tnt.actor.freelancer.org.linked";
+    static final String TOPIC_FREELANCER_ORG_LINKED     = com.yowyob.tiibntick.common.kafka.TntTopics.ACTOR_FREELANCER_ORG_LINKED;
     /**  — published when a freelancer's FreelancerOrganization link is removed. */
-    static final String TOPIC_FREELANCER_ORG_UNLINKED   = "tnt.actor.freelancer.org.unlinked";
+    static final String TOPIC_FREELANCER_ORG_UNLINKED   = com.yowyob.tiibntick.common.kafka.TntTopics.ACTOR_FREELANCER_ORG_UNLINKED;
 
     private static final String AGGREGATE_TYPE = "Actor";
     private static final String SOLUTION_CODE = "TNT";

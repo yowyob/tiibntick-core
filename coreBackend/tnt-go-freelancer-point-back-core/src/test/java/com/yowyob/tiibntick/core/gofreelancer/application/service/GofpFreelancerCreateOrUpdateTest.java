@@ -28,12 +28,14 @@ class GofpFreelancerCreateOrUpdateTest {
 
     @Mock private GofpFreelancerRepository freelancerRepository;
     @Mock private GofpUserRepository userRepository;
+    @Mock private com.yowyob.tiibntick.core.delivery.application.port.out.DeliveryPersonRepository deliveryPersons;
+    @Mock private TenantContextHolder tenantContextHolder;
 
     private GofpFreelancerService service;
 
     @BeforeEach
     void setUp() {
-        service = new GofpFreelancerService(freelancerRepository, userRepository);
+        service = new GofpFreelancerService(freelancerRepository, userRepository, deliveryPersons, tenantContextHolder);
     }
 
     @Test
@@ -66,5 +68,70 @@ class GofpFreelancerCreateOrUpdateTest {
                 .as("entity passed to save() must have isNew=false (UPDATE, not INSERT)")
                 .isFalse();
         assertThat(captor.getValue().getId()).isEqualTo(existingPk);
+    }
+
+    private static final UUID TENANT = UUID.randomUUID();
+
+    /**
+     * New freelancer (lot L3, C1): the row id is coreFreelancerId and a delivery person exists at the same id,
+     * PENDING, so that its status is read back and the vetting transitions find it.
+     */
+    @Test
+    void createOrUpdate_newRecord_takesCoreFreelancerIdAndCreatesTheDeliveryPerson() {
+        UUID profileId = UUID.randomUUID();
+        UUID actor = UUID.randomUUID();
+        GofpFreelancer incoming = new GofpFreelancer();
+        incoming.setId(UUID.randomUUID()); // ignored
+        incoming.setCoreFreelancerId(profileId);
+        incoming.setCoreUserId(actor);
+        when(tenantContextHolder.currentTenantId()).thenReturn(Mono.just(TENANT));
+        when(freelancerRepository.findByCoreFreelancerId(profileId)).thenReturn(Mono.empty());
+        when(deliveryPersons.findById(TENANT, profileId)).thenReturn(Mono.empty());
+        when(deliveryPersons.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(freelancerRepository.save(any(GofpFreelancer.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(userRepository.findByCoreUserId(actor)).thenReturn(Mono.empty());
+
+        GofpFreelancer saved = service.createOrUpdate(incoming).block();
+
+        assertThat(saved.getId()).isEqualTo(profileId);
+        var dp = ArgumentCaptor.forClass(com.yowyob.tiibntick.core.delivery.domain.model.aggregate.DeliveryPerson.class);
+        verify(deliveryPersons).save(dp.capture());
+        assertThat(dp.getValue().getId()).isEqualTo(profileId);
+        assertThat(dp.getValue().getTenantId()).isEqualTo(TENANT);
+        assertThat(dp.getValue().getActorId()).isEqualTo(actor);
+        assertThat(dp.getValue().getStatus())
+                .isEqualTo(com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryPersonStatus.PENDING);
+    }
+
+    @Test
+    void createOrUpdate_newRecord_keepsAnExistingDeliveryPerson() {
+        UUID profileId = UUID.randomUUID();
+        UUID actor = UUID.randomUUID();
+        GofpFreelancer incoming = new GofpFreelancer();
+        incoming.setCoreFreelancerId(profileId);
+        incoming.setCoreUserId(actor);
+        var existing = com.yowyob.tiibntick.core.delivery.domain.model.aggregate.DeliveryPerson
+                .projection(profileId, TENANT, actor, 100);
+        when(tenantContextHolder.currentTenantId()).thenReturn(Mono.just(TENANT));
+        when(freelancerRepository.findByCoreFreelancerId(profileId)).thenReturn(Mono.empty());
+        when(deliveryPersons.findById(TENANT, profileId)).thenReturn(Mono.just(existing));
+        when(freelancerRepository.save(any(GofpFreelancer.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(userRepository.findByCoreUserId(actor)).thenReturn(Mono.empty());
+
+        StepVerifier.create(service.createOrUpdate(incoming))
+                .expectNextMatches(f -> profileId.equals(f.getId()))
+                .verifyComplete();
+        verify(deliveryPersons, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
+    void createOrUpdate_newRecord_withoutActor_isRejected() {
+        UUID profileId = UUID.randomUUID();
+        GofpFreelancer incoming = new GofpFreelancer();
+        incoming.setCoreFreelancerId(profileId);
+        when(freelancerRepository.findByCoreFreelancerId(profileId)).thenReturn(Mono.empty());
+
+        StepVerifier.create(service.createOrUpdate(incoming)).expectError(IllegalArgumentException.class).verify();
+        verify(freelancerRepository, org.mockito.Mockito.never()).save(any());
     }
 }

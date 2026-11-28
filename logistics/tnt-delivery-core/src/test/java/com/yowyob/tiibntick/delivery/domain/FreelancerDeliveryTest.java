@@ -8,8 +8,8 @@ import com.yowyob.tiibntick.core.delivery.domain.model.enums.FreelancerRole;
 import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.DeliveryAddress;
 import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.PackageSpecification;
 import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.RecipientInfo;
-import com.yowyob.tiibntick.core.delivery.domain.event.FreelancerOrgAssignedEvent;
-import com.yowyob.tiibntick.core.delivery.domain.event.MissionStatusChangedEvent;
+import com.yowyob.tiibntick.core.delivery.domain.event.AggregateEvent;
+import com.yowyob.tiibntick.core.delivery.domain.event.DeliverySnapshot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -70,32 +70,31 @@ class FreelancerDeliveryTest {
         }
 
         @Test
-        @DisplayName("Should emit FreelancerOrgAssignedEvent")
+        @DisplayName("Should emit DeliveryFreelancerOrgAssigned (lot L8)")
         void shouldEmitFreelancerOrgAssignedEvent() {
             String orgId = "FRL-" + UUID.randomUUID();
             delivery.assignToFreelancerOrg(orgId, FreelancerRole.OWNER);
 
-            boolean hasEvent = delivery.getDomainEvents().stream()
-                    .anyMatch(e -> e instanceof FreelancerOrgAssignedEvent foa
-                            && foa.freelancerOrgId().equals(orgId)
-                            && "OWNER".equals(foa.freelancerRole()));
+            boolean hasEvent = delivery.getAggregateEvents().stream()
+                    .anyMatch(e -> "DeliveryFreelancerOrgAssigned".equals(e.eventType())
+                            && orgId.equals(((DeliverySnapshot) e.snapshot()).freelancerOrgId())
+                            && "OWNER".equals(e.details().get("role")));
             assertThat(hasEvent).isTrue();
         }
 
         @Test
-        @DisplayName("MissionStatusChangedEvent should contain freelancerOrgId when org is assigned")
+        @DisplayName("the delivery snapshot of the next transition carries the freelancer org (lot L8)")
         void missionEventShouldContainFreelancerOrgId() {
             String orgId = "FRL-" + UUID.randomUUID();
             delivery.assignToFreelancerOrg(orgId, FreelancerRole.SUB_DELIVERER);
             delivery.clearDomainEvents();
 
-            // Trigger a status change to confirm freelancer context propagates
-            delivery.confirmPickup();
+            // Trigger a status change (D2) to confirm freelancer context propagates
+            delivery.assignDeliveryPerson(UUID.randomUUID(), null, 1.0, null);
 
-            boolean hasMissionEvent = delivery.getDomainEvents().stream()
-                    .anyMatch(e -> e instanceof MissionStatusChangedEvent mse
-                            && orgId.equals(mse.freelancerOrgId())
-                            && "SUB_DELIVERER".equals(mse.freelancerRole()));
+            boolean hasMissionEvent = delivery.getAggregateEvents().stream()
+                    .anyMatch(e -> "DeliveryAssigned".equals(e.eventType())
+                            && orgId.equals(((DeliverySnapshot) e.snapshot()).freelancerOrgId()));
             assertThat(hasMissionEvent).isTrue();
         }
 
@@ -158,18 +157,9 @@ class FreelancerDeliveryTest {
     class AttemptNumber {
 
         @Test
-        @DisplayName("Default attempt number should be 1")
-        void defaultShouldBeOne() {
-            assertThat(delivery.getDeliveryAttemptNumber()).isEqualTo(1);
-        }
-
-        @Test
-        @DisplayName("Should increment on each call")
-        void shouldIncrement() {
-            delivery.incrementDeliveryAttempt();
-            assertThat(delivery.getDeliveryAttemptNumber()).isEqualTo(2);
-            delivery.incrementDeliveryAttempt();
-            assertThat(delivery.getDeliveryAttemptNumber()).isEqualTo(3);
+        @DisplayName("Counts failed attempts: 0 at creation (lot evt-l2, decision [C.2])")
+        void defaultShouldBeZero() {
+            assertThat(delivery.getDeliveryAttemptNumber()).isZero();
         }
     }
 }

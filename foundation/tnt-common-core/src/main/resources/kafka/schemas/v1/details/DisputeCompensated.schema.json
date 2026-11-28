@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:tnt:kafka:v1:details:DisputeCompensated",
+  "title": "details of DisputeCompensated",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["amount", "currency", "paymentRef"],
+  "properties": {"amount": {"type": ["string", "null"], "pattern": "^[0-9]+(\\.[0-9]+)?$"}, "currency": {"type": ["string", "null"]}, "paymentRef": {"type": ["string", "null"]}}
+}

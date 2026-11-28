@@ -40,7 +40,7 @@
 ── rôles ──
     code    |          assignment_tenant           |             role_tenant              
 ------------+--------------------------------------+--------------------------------------
- FREELANCER | dbae6615-8f7e-4ef5-9e58-23a6179acf22 | 00000000-0000-0000-0000-000000000001
+ FREELANCER | dbae6615-8f7e-4ef5-9e58-23a6179acf22 | <SYSTEM_TENANT_ID>
 (1 row)
 
 ── wallet + transactions ──

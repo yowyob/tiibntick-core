@@ -1,6 +1,7 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request;
 
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryUrgency;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryUrgency;
 import java.time.Instant;
 import lombok.Data;
 
@@ -13,6 +14,7 @@ import lombok.Data;
 @Data
 public class DeliveryUpdateDTO {
     private Double tarif;
+    @JsonDeserialize(using = DeliveryUrgencyInputDeserializer.class)
     private DeliveryUrgency urgency;
     private Instant pickupMinTime;
     private Instant pickupMaxTime;

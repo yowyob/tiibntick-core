@@ -122,6 +122,8 @@ public final class DeliveryCostPolicy {
             case CAR       -> CAR_RATE_XAF_KM;
             case VAN       -> VAN_RATE_XAF_KM;
             case TRUCK     -> TRUCK_RATE_XAF_KM;
+            // No dedicated rate decided yet for these types: same fallback as an unknown type (null) above.
+            case SCOOTER, TRICYCLE, BUS -> MOTORBIKE_RATE_XAF_KM;
         };
     }
 

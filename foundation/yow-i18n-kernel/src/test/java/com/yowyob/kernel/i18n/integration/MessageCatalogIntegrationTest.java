@@ -203,4 +203,50 @@ class MessageCatalogIntegrationTest {
                 Map.of("reference", "X", "incidentType", "T", "missionId", "M")).orElseThrow())
                 .isEqualTo("Nouvel incident X — type T, mission M.");
     }
+
+    @Test
+    void deliveryVocabularyKeysReplaceTheMissionKeysAndCarryAnAdminEdit() throws Exception {
+        // Lot L8 (spec §2.3), changeset i18n-006: the new keys exist in fr and en, the old ones are gone.
+        MessageCatalog catalog = loadedCatalog();
+        Map<String, Object> p = Map.of("deliveryId", "D-7", "freelancerOrgId", "ORG-1", "orgId", "ORG-1", "ref", " TNT-9");
+        for (String lang : List.of("fr", "en")) {
+            assertThat(catalog.render("notify", "notify.freelancer_org.delivery_assigned", lang, null, p).orElseThrow())
+                    .contains("D-7").contains("ORG-1").doesNotContain("{{").doesNotContainIgnoringCase("mission");
+            assertThat(catalog.render("notify", "notify.sub_deliverer.delivery_assigned", lang, null, p).orElseThrow())
+                    .contains("D-7").doesNotContainIgnoringCase("mission");
+            assertThat(catalog.render("notify", "notify.gofp.delivery.at_relay_hub", lang, null, p).orElseThrow())
+                    .contains("TNT-9");
+            for (String old : List.of("notify.freelancer_org.mission_assigned", "notify.sub_deliverer.mission_assigned",
+                    "notify.gofp.delivery.at_relay_point")) {
+                assertThat(catalog.resolve("notify", old, lang, null)).as(old).isEmpty();
+            }
+        }
+
+        // A database where an administrator had edited the old key before the upgrade keeps that edit under the new key.
+        try (Connection conn = DriverManager.getConnection(
+                POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+             var st = conn.createStatement()) {
+            st.execute("DELETE FROM i18n.message WHERE namespace = 'notify' AND msg_key = 'notify.gofp.delivery.at_relay_hub'"
+                    + " AND language = 'fr'");
+        }
+        port.save("notify", "notify.gofp.delivery.at_relay_point", "fr", "DEFAULT",
+                "Edité par l'admin{{ref}}", true, "admin-it").block(Duration.ofSeconds(10));
+        String sql;
+        try (var in = MessageCatalogIntegrationTest.class.getClassLoader().getResourceAsStream(
+                "db/changelog/changes/i18n-006-rename-delivery-vocabulary-keys.sql")) {
+            sql = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        }
+        try (Connection conn = DriverManager.getConnection(
+                POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+             var st = conn.createStatement()) {
+            st.execute(sql);
+        }
+        MessageCatalog reloaded = loadedCatalog();
+        assertThat(reloaded.render("notify", "notify.gofp.delivery.at_relay_hub", "fr", null, p).orElseThrow())
+                .isEqualTo("Edité par l'admin TNT-9");
+        assertThat(reloaded.resolve("notify", "notify.gofp.delivery.at_relay_point", "fr", null)).isEmpty();
+        // the English seed row was not touched
+        assertThat(reloaded.render("notify", "notify.gofp.delivery.at_relay_hub", "en", null, p).orElseThrow())
+                .contains("relay point").contains("TNT-9");
+    }
 }

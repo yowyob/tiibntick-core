@@ -1,6 +1,7 @@
 package com.yowyob.tiibntick.core.gofreelancer.application.service;
 
 import com.yowyob.tiibntick.core.delivery.application.port.in.DeliveryQueryUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpNotificationTemplates;
 import com.yowyob.tiibntick.core.delivery.domain.model.aggregate.DeliveryAnnouncement;
 import com.yowyob.tiibntick.core.delivery.domain.model.entity.AnnouncementResponse;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.persistence.repository.GofpUserR2dbcRepository;
@@ -144,8 +145,11 @@ public class NegotiationChatService {
         String preview = m.content().length() > 80 ? m.content().substring(0, 80) + "…" : m.content();
         return tenantContextHolder.currentTenantId()
                 .defaultIfEmpty(TenantContextHolder.SYSTEM_TENANT)
-                .flatMap(tenant -> push.sendPushNotification(tenant, access.otherPartyUserId(),
-                        "Nouveau message" + (who.isEmpty() ? "" : " de " + who), preview))
+                .flatMap(tenant -> push.sendLocalized(tenant, access.otherPartyUserId(),
+                        who.isEmpty() ? GofpNotificationTemplates.CHAT_NEW_MESSAGE
+                                : GofpNotificationTemplates.CHAT_NEW_MESSAGE_FROM,
+                        who.isEmpty() ? java.util.Map.of("preview", preview)
+                                : java.util.Map.of("sender", who, "preview", preview)))
                 .onErrorResume(e -> {
                     log.warn("Chat push failed: {}", e.getMessage());
                     return Mono.empty();

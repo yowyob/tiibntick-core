@@ -30,6 +30,7 @@ public class IncidentHandoverController {
     private final IAssignReplacementDriverUseCase assignDriverUseCase;
     private final IConfirmHandoverUseCase confirmHandoverUseCase;
     private final IQueryIncidentUseCase queryIncidentUseCase;
+    private final com.yowyob.tiibntick.core.incident.application.service.IncidentAutoResolutionService autoResolution;
 
     private IncidentRequesterContext contextOf(TntUserIdentity identity) {
         return new IncidentRequesterContext(
@@ -58,11 +59,18 @@ public class IncidentHandoverController {
                            @RequestParam UUID actorId,
                            @RequestParam boolean confirmingAsOriginalDriver) {
         IncidentAccess.requireSelfUnlessManager(identity, actorId);
-        return queryIncidentUseCase.getById(incidentId, contextOf(identity))
-                .flatMap(existing -> confirmHandoverUseCase.execute(ConfirmHandoverCommand.builder()
-                        .incidentId(incidentId)
-                        .actorId(actorId)
-                        .confirmingAsOriginalDriver(confirmingAsOriginalDriver)
-                        .build()));
+        // the replacement courier is not the declarant: the use case checks that actorId is the courier of that side
+        return confirmHandoverUseCase.execute(ConfirmHandoverCommand.builder()
+                .incidentId(incidentId)
+                .actorId(actorId)
+                .confirmingAsOriginalDriver(confirmingAsOriginalDriver)
+                .build());
+    }
+
+    /** I12/I16 (lot L3): the proposed replacement courier accepts the delivery (the first one wins, [D.4]). */
+    @PostMapping("/accept")
+    public Mono<?> accept(@CurrentUser TntUserIdentity identity, @PathVariable UUID incidentId) {
+        IncidentAccess.requireCreate(identity);
+        return autoResolution.acceptReplacement(incidentId, identity.actorId());
     }
 }

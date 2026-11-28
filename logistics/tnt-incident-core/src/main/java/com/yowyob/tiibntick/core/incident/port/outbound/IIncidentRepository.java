@@ -33,4 +33,10 @@ public interface IIncidentRepository {
     Flux<Incident> findByStatusIn(Iterable<IncidentStatus> statuses, UUID tenantId);
     Flux<Incident> findEscalatedIncidents(UUID tenantId);
     Mono<Long> countActiveByAgency(UUID agencyId);
+
+    /** Lot L3 (QO-14): PENDING_CONFIRMATION incidents proposed before {@code before}, all tenants. */
+    Flux<Incident> findConfirmationExpired(Instant before, int limit);
+
+    /** Lot L3 (I15): AWAITING_HANDOVER incidents, all tenants. */
+    Flux<Incident> findAwaitingHandover(int limit);
 }

@@ -92,20 +92,15 @@ public class DeliveryPerson {
     /**
      * Projection factory — creates a {@code DeliveryPerson} whose id is imposed by the caller.
      *
-     * <p>Use ONLY from projection services that need to mirror an already-validated
-     * freelancer profile ({@code tnt_actor.freelancer_profiles}) into the logistics layer.
-     * Unlike {@link #register}, this factory:
+     * <p>Use ONLY from projection services that need to mirror a freelancer profile
+     * ({@code tnt_actor.freelancer_profiles}) into the logistics layer. Unlike {@link #register}, this factory:
      * <ul>
      *   <li>Uses the supplied {@code id} (must equal {@code freelancer_profiles.id})</li>
-     *   <li>Sets {@code status = APPROVED} immediately (no vetting is performed anywhere today)</li>
-     *   <li>Uses placeholder vehicle data {@code MOTORBIKE / STANDARD / tank 5.0} — the same
-     *       values the E2E harness used to seed by hand; the freelancer profile carries no
-     *       vehicle information to project from</li>
+     *   <li>Sets {@code status = PENDING}: the delivery person waits for an administrator's vetting
+     *       ({@link #approve()}) before taking deliveries — no auto-approval (business decision, lot L3)</li>
+     *   <li>Uses placeholder vehicle data {@code MOTORBIKE / STANDARD / tank 5.0} — the freelancer
+     *       profile carries no vehicle information to project from</li>
      * </ul>
-     *
-     * <p>TODO (business decision deferred): APPROVED bypasses any platform-side logistics
-     * vetting (identity/KYC, insurance, vehicle registration). The business must decide
-     * whether projection should create {@code PENDING} rows and require {@link #approve()}.
      */
     public static DeliveryPerson projection(UUID id, UUID tenantId, UUID actorId,
                                              int remainingDeliveries) {
@@ -121,7 +116,7 @@ public class DeliveryPerson {
                 .remainingDeliveries(remainingDeliveries)
                 .failedDeliveries(0)
                 .totalDeliveries(0)
-                .status(DeliveryPersonStatus.APPROVED)
+                .status(DeliveryPersonStatus.PENDING)
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
                 .build();
@@ -137,21 +132,52 @@ public class DeliveryPerson {
     }
 
     /**
-     * Approves the delivery person for platform operations.
+     * Approves the delivery person for platform operations (from PENDING), or lifts a
+     * suspension (from SUSPENDED).
      */
     public void approve() {
-        if (status != DeliveryPersonStatus.PENDING) {
-            throw new DeliveryDomainException("Only PENDING delivery persons can be approved");
-        }
-        this.status = DeliveryPersonStatus.APPROVED;
-        this.updatedAt = Instant.now();
+        transitionTo(DeliveryPersonStatus.APPROVED);
     }
 
     /**
-     * Suspends the delivery person from accepting new deliveries.
+     * Suspends the delivery person from accepting new deliveries (from APPROVED).
      */
     public void suspend() {
-        this.status = DeliveryPersonStatus.SUSPENDED;
+        transitionTo(DeliveryPersonStatus.SUSPENDED);
+    }
+
+    /**
+     * Rejects a pending application (terminal).
+     */
+    public void reject() {
+        transitionTo(DeliveryPersonStatus.REJECTED);
+    }
+
+    /**
+     * Withdraws the approval for good (from APPROVED or SUSPENDED, terminal).
+     */
+    public void revoke() {
+        transitionTo(DeliveryPersonStatus.REVOKED);
+    }
+
+    /**
+     * Applies a vetting transition following {@link DeliveryPersonStatus#canTransitionTo}.
+     * A transition to the current status is a no-op.
+     *
+     * @throws DeliveryDomainException when the transition is not allowed
+     */
+    public void transitionTo(DeliveryPersonStatus target) {
+        if (target == null) {
+            throw new DeliveryDomainException("Target status is required");
+        }
+        if (status == target) {
+            return;
+        }
+        if (status == null || !status.canTransitionTo(target)) {
+            throw new DeliveryDomainException(
+                    "Delivery person status transition " + status + " -> " + target + " is not allowed");
+        }
+        this.status = target;
         this.updatedAt = Instant.now();
     }
 

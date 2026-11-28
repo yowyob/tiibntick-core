@@ -170,6 +170,48 @@ est donc sans objet : ne pas démarrer le service du tout, ~1 Go économisé.
 qui crée le rôle/base `tiibntick_test`. Un Postgres installé à la main sans droits
 superuser ne convient pas.
 
+### 4.4 Kafka : départ des groupes, anti-doublons, relance de l'outbox (décisions du 2026-11-26)
+
+- **Départ des groupes de consommateurs.** Un groupe qui n'a encore aucun offset
+  enregistré lit son topic **depuis le début** (`auto-offset-reset: earliest`). C'est le cas
+  partout : dans `spring.kafka.consumer` de `application.yml` et dans chaque fabrique de
+  conteneurs des modules, `gofpJsonKafkaListenerContainerFactory` comprise. Le test
+  `KafkaAsyncWiringTest.everyGroupStartsAtEarliest` le vérifie. Seule exception : le groupe
+  par instance du cache de permissions (`tnt-roles-cache-<uuid>`, `latest`). Un nouveau groupe
+  y est créé à chaque démarrage, et seules les invalidations reçues après le démarrage
+  comptent.
+- **Aucune bascule manuelle.** Il n'y a pas de données de production à conserver. Il n'existe
+  donc ni script ni commande `kafka-consumer-groups --reset-offsets` à lancer. Un
+  environnement de dev ou de staging qui garde un vieil historique Kafka est **remis à zéro
+  par son propre déploiement** : les topics et les volumes du broker sont recréés. En local,
+  depuis `tnt-bootstrap/` : `docker compose rm -sf kafka`, puis
+  `docker volume rm <projet>_kafka-data` (le nom exact est donné par `docker volume ls`), puis
+  `docker compose up -d kafka`. Les topics sont recréés au démarrage de l'application
+  (`NewTopic`). Conserver la base est sans risque. Un message sans id d'événement est
+  identifié par le hachage topic + partition + offset + horodatage du message. Un topic recréé
+  repart bien à l'offset 0, mais ses messages portent d'autres horodatages : ils ne sont donc
+  pas pris pour des doublons. Pour repartir d'une table propre :
+  `TRUNCATE event_bus.processed_events;`.
+- **Filet anti-doublons.** Tous les `@KafkaListener` passent par un filtre commun, qui ignore
+  un événement déjà traité avec succès par le même groupe sur le même topic. Ce filtre
+  s'appuie sur la table `event_bus.processed_events` et sur l'id `X-Yow-Envelope-Id`, à
+  défaut sur `eventId`. Un rejeu d'historique (nouveau groupe, rebalancement, renvoi par
+  l'outbox) ne produit donc pas un second effet. Ce filet ne couvre que les événements reçus
+  pendant la rétention configurée (14 jours). Les variables utiles sont
+  `YOW_EVENT_IDEMPOTENCY_ENABLED`, `YOW_EVENT_IDEMPOTENCY_RETENTION` et
+  `YOW_EVENT_IDEMPOTENCY_PURGE_CRON`.
+- **Relance automatique de l'outbox.** Une enveloppe dont l'envoi a échoué (`FAILED`), ou qui
+  est restée `PENDING` après un plantage, est renvoyée automatiquement :
+  - le relanceur tourne toutes les 5 s, sur une seule instance (verrou ShedLock
+    `yow-event-outbox-relay`) ;
+  - le délai entre deux tentatives double à chaque échec (backoff exponentiel) ;
+  - au bout de 10 tentatives, l'enveloppe passe `DEAD` : une entrée est créée dans la file
+    des messages morts, et le log `OUTBOX_ENVELOPE_DEAD` ainsi que la métrique
+    `yow_event_outbox_dead_total` sont émis ;
+  - les réglages se font par les variables `YOW_EVENT_RELAY_*` (voir `application.yml`).
+
+  Un broker arrêté ne consomme aucune tentative : le cycle du relanceur est simplement sauté.
+
 ---
 
 ## 5. Démarrage de l'application
@@ -179,7 +221,7 @@ cd ~/projets/tiibntick-core
 DB_HOST=localhost DB_PORT=5433 DB_NAME=tiibntick_core \
 DB_USER=tiibntick DB_PASSWORD=tiibntick_pass \
 REDIS_HOST=localhost REDIS_PORT=6379 \
-KAFKA_BOOTSTRAP_SERVERS=localhost:9092 \
+KAFKA_BOOTSTRAP=localhost:9092 \
 MINIO_ENDPOINT=http://localhost:9000 \
 ELASTICSEARCH_ENABLED=false \
 TNT_SENTIMENT_ENABLED=false \
@@ -188,6 +230,8 @@ TNT_AUTH_ALLOW_ANONYMOUS=true \
 TNT_ROLES_PROVISION_ON_STARTUP=false \
 java -Xms512m -Xmx2g -jar tnt-bootstrap/target/tnt-bootstrap-0.0.1.jar
 ```
+
+> La variable lue par `application.yml` est `KAFKA_BOOTSTRAP` (`spring.kafka.bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}`) ; `KAFKA_BOOTSTRAP_SERVERS` est ignorée.
 
 Sortie attendue :
 

@@ -1,18 +1,16 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.out.persistence.repository;
 
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.persistence.entity.AddressEntity;
-import org.springframework.data.repository.reactive.ReactiveCrudRepository;
-import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
 /**
- * Repository R2DBC pour la persistance des adresses.
+ * Read access to an address by id. Backed by the core address book ({@code tnt-geo-core}) through
+ * {@code GeoCoreAddressReader}; the module no longer owns an address table. Empty when the address does not exist
+ * (or is not visible to the current tenant).
  */
-public interface AddressReactiveRepository extends ReactiveCrudRepository<AddressEntity, UUID> {
-    
-    /**
-     * Recherche textuelle simple (par repère ou rue).
-     */
-    Flux<AddressEntity> findByLandmarkContainingIgnoreCaseOrStreetContainingIgnoreCase(String landmark, String street);
+public interface AddressReactiveRepository {
+
+    Mono<AddressEntity> findById(UUID id);
 }

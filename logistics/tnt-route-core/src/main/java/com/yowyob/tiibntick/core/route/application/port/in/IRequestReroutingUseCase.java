@@ -5,7 +5,7 @@ import reactor.core.publisher.Mono;
 import java.util.UUID;
 
 public interface IRequestReroutingUseCase {
-    Mono<ReroutingDecision> evaluateRerouting(String missionId, String currentNodeId,
+    Mono<ReroutingDecision> evaluateRerouting(String deliveryId, String currentNodeId,
                                                String destinationNodeId, double initialCost,
                                                UUID tenantId);
 }

@@ -30,6 +30,9 @@ public class MicrometerEventMetrics implements EventMetricsPort {
     private static final String METRIC_DURATION    = "yow.event.publish.duration";
     private static final String METRIC_OUTBOX_PEND = "yow.event.outbox.pending";
     private static final String METRIC_DLQ_PEND    = "yow.event.dlq.pending";
+    private static final String METRIC_RELAY       = "yow.event.outbox.relay.total";
+    private static final String METRIC_RELAY_DEAD  = "yow.event.outbox.dead.total";
+    private static final String METRIC_DUPLICATE   = "yow.event.consumer.duplicate.total";
 
     private final MeterRegistry registry;
 
@@ -71,6 +74,36 @@ public class MicrometerEventMetrics implements EventMetricsPort {
     public void recordMovedToDlq(final DomainEventEnvelope envelope) {
         try {
             counter(METRIC_DLQ_MOVED, envelope, null).increment();
+        } catch (Exception ignored) {}
+    }
+
+    @Override
+    public void recordRelayOutcome(final DomainEventEnvelope envelope, final String outcome) {
+        try {
+            Counter.builder(METRIC_RELAY)
+                .tag("topic", envelope.getKafkaTopic())
+                .tag("outcome", outcome)
+                .register(registry)
+                .increment();
+            if ("DEAD".equals(outcome)) {
+                // Dedicated counter so an alert rule is a plain "increase(yow_event_outbox_dead_total[5m]) > 0".
+                Counter.builder(METRIC_RELAY_DEAD)
+                    .tag("topic", envelope.getKafkaTopic())
+                    .tag("eventType", envelope.getEventType())
+                    .register(registry)
+                    .increment();
+            }
+        } catch (Exception ignored) {}
+    }
+
+    @Override
+    public void recordDuplicateSkipped(final String consumerGroup, final String topic) {
+        try {
+            Counter.builder(METRIC_DUPLICATE)
+                .tag("group", consumerGroup != null ? consumerGroup : "unknown")
+                .tag("topic", topic != null ? topic : "unknown")
+                .register(registry)
+                .increment();
         } catch (Exception ignored) {}
     }
 

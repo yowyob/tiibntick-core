@@ -29,4 +29,6 @@ public class ReportIncidentRequest {
     List<UUID> affectedParcelIds;
     Double currentLat;
     Double currentLng;
+    /** Lot L3 (QO-2): "I cannot go on" — the courier forces the incident as blocking. */
+    boolean blockingForced;
 }

@@ -1,7 +1,7 @@
 package com.yowyob.tiibntick.core.gofreelancer.application.port.out;
 
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryStatus;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryStatus;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -23,6 +23,16 @@ public interface DeliveryRepository {
     Flux<Delivery> findAllByStatus(DeliveryStatus status);
 
     Mono<Delivery> findByDeliveryNeedId(UUID deliveryNeedId);
+
+    /**
+     * The delivery carrying this parcel, or empty: the core delivery whose parcel it is (whatever parcel the
+     * core created), else the delivery of the need that registered it. A relay deposit is keyed on the parcel
+     * id, so this is how a deposit finds its delivery.
+     * <p><b>Reserved</b> for the retrieval of a parcel deposited at a relay point (a deposit is keyed on the
+     * parcel id and has no tenant context). It crosses tenants: do not call it from anywhere else
+     * ({@code ParcelLookupCallersArchitectureTest} fails the build otherwise).
+     */
+    Mono<Delivery> findByParcelId(UUID parcelId);
 
     Mono<Void> deleteById(UUID id);
 
@@ -47,9 +57,8 @@ public interface DeliveryRepository {
     /**
      * Returns the total volume (m³) currently occupying a freelancer's trunk.
      *
-     * <p>Joins deliveries → delivery_needs → packets and sums
-     * {@code packets.length * packets.width * packets.height} for active
-     * deliveries (PICKED_UP, IN_TRANSIT). Dimensions are assumed to be in metres.
+     * <p>Sums the volume of the core parcels of the freelancer's active deliveries (PICKED_UP,
+     * IN_TRANSIT), read from {@code tnt-delivery-core} (lot L1: there is no {@code packets} table any more).
      *
      * @param freelancerId the freelancer UUID
      * @return total occupied volume in m³; 0.0 when no active delivery

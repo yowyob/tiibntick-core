@@ -96,4 +96,35 @@ class LoyaltyServiceTest {
                 MISSION_ID);
         assert gold.getCurrentTier() == LoyaltyTier.GOLD;
     }
+
+    /** Lot L3 (C4): a completed delivery is credited once, a redelivered message credits nothing. */
+    @Test
+    void creditCompletedDelivery_isIdempotentPerMission() {
+        LoyaltyAccount account = LoyaltyAccount.create(TENANT_ID, TP_ID);
+        when(loyaltyAccountRepository.existsByThirdPartyId(TENANT_ID, TP_ID)).thenReturn(Mono.just(true));
+        when(loyaltyAccountRepository.findByThirdPartyId(TENANT_ID, TP_ID)).thenReturn(Mono.just(account));
+        when(loyaltyAccountRepository.recordTransactionOnce(account.getId(), 10, "EARNED_FROM_DELIVERY", MISSION_ID))
+                .thenReturn(Mono.just(true), Mono.just(false));
+        when(loyaltyAccountRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(eventPublisher.publish(any())).thenReturn(Mono.empty());
+        when(profileService.updateLoyaltyTierOnProfile(any(), any(), anyInt())).thenReturn(Mono.empty());
+        EarnLoyaltyPointsCommand command = new EarnLoyaltyPointsCommand(TENANT_ID, TP_ID, 10, MISSION_ID);
+
+        StepVerifier.create(loyaltyService.creditCompletedDelivery(command))
+                .expectNextMatches(a -> a.getLifetimePoints() == 10)
+                .verifyComplete();
+        StepVerifier.create(loyaltyService.creditCompletedDelivery(command)).verifyComplete(); // empty: already credited
+
+        org.mockito.Mockito.verify(loyaltyAccountRepository, org.mockito.Mockito.times(1)).save(any());
+        org.mockito.Mockito.verify(eventPublisher, org.mockito.Mockito.times(1)).publish(any());
+    }
+
+    @Test
+    void creditCompletedDelivery_withoutMission_isRefused() {
+        StepVerifier.create(loyaltyService.creditCompletedDelivery(
+                        new EarnLoyaltyPointsCommand(TENANT_ID, TP_ID, 10, null)))
+                .expectError(IllegalArgumentException.class)
+                .verify();
+        org.mockito.Mockito.verifyNoInteractions(loyaltyAccountRepository);
+    }
 }

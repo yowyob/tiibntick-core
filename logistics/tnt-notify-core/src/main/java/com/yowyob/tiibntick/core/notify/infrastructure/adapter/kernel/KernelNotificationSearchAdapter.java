@@ -11,21 +11,40 @@ import com.yowyob.tiibntick.core.notify.infrastructure.adapter.kernel.dto.Notifi
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Reads the notification history from the Kernel's delivery log. The Kernel offers no per-id or per-user
  * query, so the tenant/organization list is filtered here.
  *
+ * <p>That list is the whole log of the tenant, and every signed-in user polls their own history, so it is
+ * fetched once per tenant/organization and shared for a few seconds ({@link #DEFAULT_LOG_TTL}): concurrent and
+ * repeated reads cost one Kernel call, not one each. The Kernel reads are fail-open, so a Kernel hiccup shows
+ * as an empty history for at most that long.
+ *
  * @author MANFOUO Braun
  */
 public class KernelNotificationSearchAdapter implements ISearchNotificationsPort {
 
+    /** How long a fetched delivery log is shared between readers. */
+    static final Duration DEFAULT_LOG_TTL = Duration.ofSeconds(10);
+
     private final KernelNotificationClient client;
+    private final Duration logTtl;
+    /** One cached read per tenant/organization; the Mono itself re-fetches once its TTL has elapsed. */
+    private final ConcurrentHashMap<String, Mono<List<NotificationDeliveryDto>>> logs = new ConcurrentHashMap<>();
 
     public KernelNotificationSearchAdapter(KernelNotificationClient client) {
+        this(client, DEFAULT_LOG_TTL);
+    }
+
+    KernelNotificationSearchAdapter(KernelNotificationClient client, Duration logTtl) {
         this.client = client;
+        this.logTtl = logTtl;
     }
 
     @Override
@@ -57,7 +76,14 @@ public class KernelNotificationSearchAdapter implements ISearchNotificationsPort
     }
 
     private Flux<NotificationDeliveryDto> all(String tenantId, String organizationId) {
-        return client.listDeliveries(tenantId, organizationId);
+        if (logTtl.isZero() || logTtl.isNegative()) {
+            return client.listDeliveries(tenantId, organizationId);
+        }
+        String key = tenantId + "|" + organizationId;
+        return logs.computeIfAbsent(key, k -> client.listDeliveries(tenantId, organizationId)
+                        .collectList()
+                        .cache(list -> logTtl, error -> Duration.ZERO, () -> logTtl))
+                .flatMapMany(Flux::fromIterable);
     }
 
     private static boolean isRecipient(NotificationDeliveryDto d, String recipientId) {

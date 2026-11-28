@@ -18,5 +18,13 @@ public record SendNotificationRequestDto(
         String subject,
         String body,
         Map<String, Object> variables,
-        Map<String, String> metadata) {
+        Map<String, String> metadata,
+        /** Application the delivery belongs to; the Kernel inbox can be filtered on it (C-36 in-app inbox). */
+        String application) {
+
+    public SendNotificationRequestDto(UUID recipientUserId, String recipientAddress, String channel,
+            String templateCode, String subject, String body, Map<String, Object> variables,
+            Map<String, String> metadata) {
+        this(recipientUserId, recipientAddress, channel, templateCode, subject, body, variables, metadata, null);
+    }
 }

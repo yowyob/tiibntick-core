@@ -76,6 +76,16 @@ public final class TntPermission {
     public static final String ACTOR_SUSPEND = "actor:suspend";
 
     // ─────────────────────────────────────────────────────────────
+    // RATING / LOYALTY — Generic grants for the third-party ratings and the loyalty account
+    // (tnt-tp-core), so that an end user (client, livreur) can rate a mission and read their own
+    // loyalty tier without holding the broader actor:write / billing:write permissions.
+    // ─────────────────────────────────────────────────────────────
+
+    public static final String RATING_CREATE = "rating:create";
+    public static final String RATING_READ   = "rating:read";
+    public static final String LOYALTY_READ  = "loyalty:read";
+
+    // ─────────────────────────────────────────────────────────────
     // FREELANCER — Freelancer profile (FreelancerController, actor-core)
     // ─────────────────────────────────────────────────────────────
 
@@ -97,6 +107,17 @@ public final class TntPermission {
     public static final String RELAY_READ    = "relay:read";
     public static final String RELAY_WRITE   = "relay:write";
     public static final String RELAY_OPERATE = "relay:operate";
+    /**
+     * Revoke a relay point / hub for good, with a reason (maintainer decision D-129). Deliberately granted to no
+     * role's defaultPermissions: only TNT_ADMIN's "*" wildcard satisfies it (platform administrator only).
+     */
+    public static final String RELAY_REVOKE  = "relay:revoke";
+    /**
+     * Approve, reject, suspend or reactivate a relay hub through the core routes (maintainer decision D-141).
+     * Deliberately granted to no role's defaultPermissions: only TNT_ADMIN's "*" wildcard satisfies it. The
+     * revocation keeps its own {@link #RELAY_REVOKE}.
+     */
+    public static final String RELAY_APPROVE = "relay:approve";
 
     // ─────────────────────────────────────────────────────────────
     // BILLING — Invoices, pricing and billing engine
@@ -155,6 +176,26 @@ public final class TntPermission {
     // ─────────────────────────────────────────────────────────────
 
     public static final String PLATFORM_CLIENTS_MANAGE = "platform:clients";
+
+    /**
+     * TiiBnTick platform administration (platform-wide settings such as the delivery thresholds,
+     * {@code /api/v1/admin/settings/delivery-thresholds}). Like {@link #PLATFORM_CLIENTS_MANAGE}, granted to no
+     * role's defaultPermissions: only TNT_ADMIN's {@code *} satisfies it. Checked as
+     * {@code @RequirePermission(resource = "tnt:platform", action = "admin")}.
+     */
+    public static final String TNT_PLATFORM_ADMIN = "tnt:platform:admin";
+
+    // ─────────────────────────────────────────────────────────────
+    // ORGANIZATION DELIVERY SETTINGS — per-organization overrides of the platform delivery
+    // thresholds (TiiBnTick Agency, decision D-087 / [B.5] of decisions-evenements-colis-livraison.md).
+    // The agency's manager decides who in the organization may change them: AGENCY_MANAGER and
+    // ORG_ADMIN hold WRITE by default and grant it to the members they choose (Kernel role of
+    // the agency); every agency-scoped role can READ the effective values.
+    // Checked as @RequirePermission(resource = "organization:delivery-settings", action = "read"|"write").
+    // ─────────────────────────────────────────────────────────────
+
+    public static final String ORGANIZATION_DELIVERY_SETTINGS_READ  = "organization:delivery-settings:read";
+    public static final String ORGANIZATION_DELIVERY_SETTINGS_WRITE = "organization:delivery-settings:write";
 
     // ─────────────────────────────────────────────────────────────
     // DISPUTE — Delivery dispute management

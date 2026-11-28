@@ -44,6 +44,7 @@ public class IncidentController {
     private final IEscalateIncidentUseCase escalateIncidentUseCase;
     private final IAttachEvidenceUseCase attachEvidenceUseCase;
     private final IQueryIncidentUseCase queryIncidentUseCase;
+    private final com.yowyob.tiibntick.core.incident.port.inbound.IResolutionConfirmationUseCase resolutionConfirmationUseCase;
     private final IncidentWebMapper webMapper;
 
     /**
@@ -93,8 +94,18 @@ public class IncidentController {
                         .reportedByRole(req.getReportedByRole())
                         .affectedParcelIds(req.getAffectedParcelIds())
                         .currentLat(req.getCurrentLat()).currentLng(req.getCurrentLng())
+                        .blockingForced(req.isBlockingForced())
                         .build()
         ).map(webMapper::toResponse);
+    }
+
+    /**
+     * Lot L3: the incident types a courier may declare (QO-12), in declaration order, for the declaration form.
+     */
+    @GetMapping("/declarable-types")
+    public reactor.core.publisher.Flux<com.yowyob.tiibntick.core.incident.domain.enums.IncidentType> declarableTypes() {
+        return reactor.core.publisher.Flux.fromIterable(
+                com.yowyob.tiibntick.core.incident.domain.enums.IncidentType.declarableByCourier());
     }
 
     /**
@@ -261,7 +272,17 @@ public class IncidentController {
     public Mono<IncidentResponse> resolve(@CurrentUser TntUserIdentity identity,
                                            @PathVariable UUID id,
                                            @Valid @RequestBody ResolveRequest req) {
-        IncidentAccess.requireManage(identity);
+        if (!isPrivileged(identity)) {
+            // I6: the declaring courier closes his own non-blocking incident
+            IncidentAccess.requireSelfUnlessManager(identity, req.getResolvedByActorId());
+            IncidentAccess.requireCreate(identity);
+            return resolutionConfirmationUseCase.resolveOwnNonBlocking(id, identity.actorId(), req.getResolutionNotes())
+                    .map(webMapper::toResponse);
+        }
+        if (req.getResolutionMode() == null) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "resolutionMode is required");
+        }
         return queryIncidentUseCase.getById(id, contextOf(identity))
                 .flatMap(existing -> resolveIncidentUseCase.execute(
                         ResolveIncidentCommand.builder()
@@ -269,9 +290,37 @@ public class IncidentController {
                                 .resolvedByActorId(req.getResolvedByActorId())
                                 .resolutionMode(req.getResolutionMode())
                                 .resolutionNotes(req.getResolutionNotes())
+                                .deliveryOutcome(req.getDeliveryOutcome())
+                                .responsibleParty(req.getResponsibleParty())
                                 .build()
                 ))
                 .map(webMapper::toResponse);
+    }
+
+    /** I23 (QO-14): the manager proposes a resolution; the declaring courier confirms or contests it. */
+    @PostMapping("/{id}/propose-resolution")
+    public Mono<IncidentResponse> proposeResolution(@CurrentUser TntUserIdentity identity, @PathVariable UUID id,
+                                                    @Valid @RequestBody ProposeResolutionRequest req) {
+        IncidentAccess.requireManage(identity);
+        return queryIncidentUseCase.getById(id, contextOf(identity))
+                .flatMap(existing -> resolutionConfirmationUseCase.propose(id, identity.actorId(),
+                        req.getDeliveryOutcome(), req.getResponsibleParty(), req.getNote()))
+                .map(webMapper::toResponse);
+    }
+
+    /** I24: the declaring courier confirms the proposed resolution. */
+    @PostMapping("/{id}/confirm-resolution")
+    public Mono<IncidentResponse> confirmResolution(@CurrentUser TntUserIdentity identity, @PathVariable UUID id) {
+        IncidentAccess.requireCreate(identity);
+        return resolutionConfirmationUseCase.confirm(id, identity.actorId()).map(webMapper::toResponse);
+    }
+
+    /** I25: the declaring courier contests the proposed resolution; back to the manager. */
+    @PostMapping("/{id}/contest-resolution")
+    public Mono<IncidentResponse> contestResolution(@CurrentUser TntUserIdentity identity, @PathVariable UUID id,
+                                                    @RequestParam String reason) {
+        IncidentAccess.requireCreate(identity);
+        return resolutionConfirmationUseCase.contest(id, identity.actorId(), reason).map(webMapper::toResponse);
     }
 
     /**
@@ -306,7 +355,17 @@ public class IncidentController {
                                           @RequestParam String reason) {
         IncidentAccess.requireSelfUnlessManager(identity, cancelledByActorId);
         return queryIncidentUseCase.getById(id, contextOf(identity))
-                .flatMap(existing -> cancelIncidentUseCase.execute(id, cancelledByActorId, reason))
+                .flatMap(existing -> {
+                    // I31: the courier cancels only while REPORTED / ACKNOWLEDGED / TRIAGED, the manager afterwards
+                    if (!isPrivileged(identity) && existing.getStatus() != IncidentStatus.REPORTED
+                            && existing.getStatus() != IncidentStatus.ACKNOWLEDGED
+                            && existing.getStatus() != IncidentStatus.TRIAGED) {
+                        return Mono.error(new org.springframework.web.server.ResponseStatusException(
+                                HttpStatus.CONFLICT, "Incident " + existing.getStatus()
+                                + " can only be cancelled by its manager"));
+                    }
+                    return cancelIncidentUseCase.execute(id, cancelledByActorId, reason);
+                })
                 .map(webMapper::toResponse);
     }
 

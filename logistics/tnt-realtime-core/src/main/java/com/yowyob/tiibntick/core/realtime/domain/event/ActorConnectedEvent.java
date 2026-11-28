@@ -10,7 +10,7 @@ import com.yowyob.tiibntick.core.realtime.domain.model.enums.DeviceType;
  */
 public class ActorConnectedEvent extends RealtimeDomainEvent {
 
-    private static final String TOPIC = "tnt.realtime.actor.connected";
+    private static final String TOPIC = com.yowyob.tiibntick.common.kafka.TntTopics.REALTIME_ACTOR_CONNECTED;
 
     private final String sessionId;
     private final String userId;

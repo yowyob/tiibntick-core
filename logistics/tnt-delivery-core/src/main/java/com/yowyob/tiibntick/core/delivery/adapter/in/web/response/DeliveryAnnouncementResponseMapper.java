@@ -2,6 +2,8 @@ package com.yowyob.tiibntick.core.delivery.adapter.in.web.response;
 
 import com.yowyob.tiibntick.core.delivery.domain.model.aggregate.DeliveryAnnouncement;
 import com.yowyob.tiibntick.core.delivery.domain.model.entity.AnnouncementResponse;
+import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.AnnouncementDetails;
+import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.SenderInfo;
 
 import java.util.Collections;
 import java.util.List;
@@ -44,6 +46,8 @@ public final class DeliveryAnnouncementResponseMapper {
                                 .toList()
                         : Collections.emptyList();
 
+        AnnouncementDetails d = a.getDetails() != null ? a.getDetails() : AnnouncementDetails.EMPTY;
+        SenderInfo sender = a.getSender();
         return new DeliveryAnnouncementResponse(
                 a.getId(),
                 a.getTenantId(),
@@ -63,7 +67,21 @@ public final class DeliveryAnnouncementResponseMapper {
                 a.getSelectedResponseId(),
                 a.getCreatedDeliveryId(),
                 a.getCreatedAt(),
-                a.getUpdatedAt());
+                a.getUpdatedAt(),
+                a.getRecipient() != null ? a.getRecipient().email() : null,
+                sender != null ? sender.name() : null,
+                sender != null ? sender.phoneNumber() : null,
+                sender != null ? sender.email() : null,
+                d.requiredVehicleType(),
+                d.paymentMethod(),
+                d.transportMethod(),
+                d.distanceKm(),
+                d.estimatedDurationMin(),
+                d.destinationHubId(),
+                d.handoverSignatureRef(),
+                d.serviceFee(),
+                d.originRefType(),
+                d.originRefId());
     }
 
     private static DeliveryAnnouncementResponse.ResponseSummary toSummary(

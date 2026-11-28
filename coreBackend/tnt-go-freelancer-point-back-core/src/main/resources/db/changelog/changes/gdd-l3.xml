@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="
+           http://www.liquibase.org/xml/ns/dbchangelog
+           http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.23.xsd">
+
+    <!-- Lot L3 (actors): ratings and loyalty moved to the core, profile ids aligned on the core, vetting status
+         moved to delivery-core. Each file prints its diagnostic counts with RAISE NOTICE.
+         Order matters: the ratings (302) are converted while the Go ids of evaluations.evaluator_id /
+         evaluated_id (foreign keys to the legacy persons table, not repointable) still match the Go rows. -->
+
+    <changeSet id="gdd-l3-302-evaluations-to-tp-ratings" author="gdd-l3" labels="gdd-l3">
+        <comment>Go evaluations copied to tnt_tp_ratings with actor ids (id kept, duplicates counted).</comment>
+        <sqlFile path="db/changelog/20261125_gdd_l3_302_evaluations_to_tp_ratings.sql"
+                 relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="gdd-l3-303-loyalty-accounts-from-orders" author="gdd-l3" labels="gdd-l3">
+        <comment>tp-core loyalty accounts created or completed from Go order counts (total_orders * 10, H3).</comment>
+        <sqlFile path="db/changelog/20261125_gdd_l3_303_loyalty_accounts_from_orders.sql"
+                 relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="gdd-l3-304-rating-averages-from-tp-ratings" author="gdd-l3" labels="gdd-l3">
+        <comment>Profile averages (actor-core ActorRating, relay point rating) recomputed from tnt_tp_ratings.</comment>
+        <sqlFile path="db/changelog/20261126_gdd_l3_304_rating_averages_from_tp_ratings.sql"
+                 relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="gdd-l3-310-gofp-users-id-realign" author="gdd-l3" labels="gdd-l3">
+        <comment>gofp_users.id realigned on core_user_id (actor id); foreign keys on gofp_users(id) repointed.</comment>
+        <sqlFile path="db/changelog/20261125_gdd_l3_310_gofp_users_id_realign.sql"
+                 relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="gdd-l3-311-gofp-clients-id-to-client-profile" author="gdd-l3" labels="gdd-l3">
+        <comment>gofp_clients.id becomes the id of the actor-core client profile; foreign keys repointed.</comment>
+        <sqlFile path="db/changelog/20261125_gdd_l3_311_gofp_clients_id_to_client_profile.sql"
+                 relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="gdd-l3-312-gofp-freelancers-id-realign" author="gdd-l3" labels="gdd-l3">
+        <comment>gofp_freelancers.id realigned on core_freelancer_id (H9); references repointed.</comment>
+        <sqlFile path="db/changelog/20261125_gdd_l3_312_gofp_freelancers_id_realign.sql"
+                 relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="gdd-l3-320-delivery-person-vetting-status" author="gdd-l3" labels="gdd-l3">
+        <comment>Vetting statuses REJECTED/REVOKED/SUSPENDED copied to tnt_delivery_persons.</comment>
+        <sqlFile path="db/changelog/20261125_gdd_l3_320_delivery_person_vetting_status.sql"
+                 relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="gdd-l3-331-gofreelancer-vehicles-core-reference" author="gdd-l3" labels="gdd-l3">
+        <comment>Courier vehicles owned by tnt-resource-core (H10): fictitious core_vehicle_id reset; rows without a core vehicle counted (re-declared by the courier, capacity mandatory).</comment>
+        <sqlFile path="db/changelog/20261126_gdd_l3_331_gofreelancer_vehicles_core_reference.sql"
+                 relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+</databaseChangeLog>

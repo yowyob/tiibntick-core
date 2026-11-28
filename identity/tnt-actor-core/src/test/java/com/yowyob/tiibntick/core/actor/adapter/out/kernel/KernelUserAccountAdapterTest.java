@@ -24,7 +24,9 @@ class KernelUserAccountAdapterTest {
     void start() throws Exception {
         server = new MockWebServer();
         server.start();
-        adapter = new KernelUserAccountAdapter(WebClient.builder().baseUrl(server.url("/").toString()).build());
+        // The user client and the file client differ only by timeout/retry in production: both hit the local server here.
+        WebClient client = WebClient.builder().baseUrl(server.url("/").toString()).build();
+        adapter = new KernelUserAccountAdapter(client, client);
     }
 
     @AfterEach

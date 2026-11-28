@@ -24,6 +24,7 @@ import java.util.Set;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.notContaining;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
@@ -82,7 +83,7 @@ class KernelNotificationBridgeTest {
     }
 
     private static final String DELIVERY_OK = """
-            {"success": true, "data": {"id": "5b1f6e2a-1111-4c3a-9a2a-000000000001", "status": "SENT"}}
+            {"id": "5b1f6e2a-1111-4c3a-9a2a-000000000001", "status": "SENT"}
             """;
 
     /** Minimal i18n stand-in: every key has the same raw pattern. */
@@ -112,10 +113,10 @@ class KernelNotificationBridgeTest {
     void deliver_shouldPostToDeliveriesEndpoint_withTenantHeadersTemplateAndVariables() {
         wireMock.stubFor(get(urlPathEqualTo("/api/notifications/templates"))
                 .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json")
-                        .withBody("{\"success\": true, \"data\": []}")));
+                        .withBody("[]")));
         wireMock.stubFor(post(urlEqualTo("/api/notifications/templates"))
                 .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json")
-                        .withBody("{\"success\": true, \"data\": {\"code\": \"notify.gofp.account_approved\"}}")));
+                        .withBody("{\"code\": \"notify.gofp.account_approved\"}")));
         wireMock.stubFor(post(urlEqualTo("/api/notifications/deliveries"))
                 .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json")
                         .withBody(DELIVERY_OK)));
@@ -139,13 +140,57 @@ class KernelNotificationBridgeTest {
     }
 
     @Test
+    void deliver_shouldSendTheNotificationOrganizationWithItsOwnTenant_whenTheCallerKnowsOnlyItsBusinessTenant() {
+        wireMock.stubFor(post(urlEqualTo("/api/notifications/deliveries"))
+                .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json")
+                        .withBody(DELIVERY_OK)));
+        KernelNotificationClient withDefaults = clientWith("11111111-0000-0000-0000-00000000000a",
+                "22222222-0000-0000-0000-00000000000b");
+        KernelDeliveryAdapter adapter = new KernelDeliveryAdapter(withDefaults,
+                new KernelTemplateRegistrar(withDefaults, new FakeTranslation()), false);
+        INotificationDeliveryPort.OutboundMessage businessTenantOnly = new INotificationDeliveryPort.OutboundMessage(
+                NotificationChannel.EMAIL, "99999999-0000-0000-0000-0000000000cc", null, "someone@x.com",
+                "someone@x.com", "account.welcome", "fr_CM", Map.of(), "Bienvenue", NotificationPriority.NORMAL, null);
+
+        StepVerifier.create(adapter.deliver(businessTenantOnly)).expectNextCount(1).verifyComplete();
+
+        // An organization belongs to one tenant: the business tenant must not travel with the notification org.
+        wireMock.verify(postRequestedFor(urlEqualTo("/api/notifications/deliveries"))
+                .withHeader("X-Tenant-Id", equalTo("11111111-0000-0000-0000-00000000000a"))
+                .withHeader("X-Organization-Id", equalTo("22222222-0000-0000-0000-00000000000b")));
+    }
+
+    @Test
+    void deliver_shouldGiveAnEmailWithoutWrittenSubjectTheBrandAsSubject_butLeaveOtherChannelsAlone() {
+        wireMock.stubFor(post(urlEqualTo("/api/notifications/deliveries"))
+                .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json")
+                        .withBody(DELIVERY_OK)));
+        INotificationDeliveryPort.OutboundMessage email = new INotificationDeliveryPort.OutboundMessage(
+                NotificationChannel.EMAIL, TENANT_ID, ORGANIZATION_ID, "someone@x.com", "someone@x.com",
+                "account.welcome", "en_CM", Map.of(), "Welcome", NotificationPriority.NORMAL, null);
+        INotificationDeliveryPort.OutboundMessage sms = new INotificationDeliveryPort.OutboundMessage(
+                NotificationChannel.SMS_LOCAL, TENANT_ID, ORGANIZATION_ID, null, "+237691000001",
+                "account.welcome", "en_CM", Map.of(), "Welcome", NotificationPriority.NORMAL, null);
+
+        StepVerifier.create(adapter(false).deliver(email)).expectNextCount(1).verifyComplete();
+        StepVerifier.create(adapter(false).deliver(sms)).expectNextCount(1).verifyComplete();
+
+        wireMock.verify(postRequestedFor(urlEqualTo("/api/notifications/deliveries"))
+                .withRequestBody(matchingJsonPath("$.channel", equalTo("EMAIL")))
+                .withRequestBody(matchingJsonPath("$.subject", equalTo("TiiBnTick"))));
+        wireMock.verify(postRequestedFor(urlEqualTo("/api/notifications/deliveries"))
+                .withRequestBody(matchingJsonPath("$.channel", equalTo("SMS")))
+                .withRequestBody(notContaining("TiiBnTick")));
+    }
+
+    @Test
     void deliver_shouldRegisterTheTemplateOnceThenReuseIt() {
         wireMock.stubFor(get(urlPathEqualTo("/api/notifications/templates"))
                 .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json")
-                        .withBody("{\"success\": true, \"data\": []}")));
+                        .withBody("[]")));
         wireMock.stubFor(post(urlEqualTo("/api/notifications/templates"))
                 .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json")
-                        .withBody("{\"success\": true, \"data\": {\"code\": \"c\"}}")));
+                        .withBody("{\"code\": \"c\"}")));
         wireMock.stubFor(post(urlEqualTo("/api/notifications/deliveries"))
                 .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json")
                         .withBody(DELIVERY_OK)));
@@ -251,10 +296,35 @@ class KernelNotificationBridgeTest {
     void client_shouldFailExplicitly_withoutCallingTheKernel_whenNoOrganizationIsAvailable() {
         StepVerifier.create(client.send(TENANT_ID, null, new SendNotificationRequestDto(
                         null, "a@b.c", "EMAIL", null, null, "x", null, null)))
-                .expectErrorSatisfies(e -> assertThat(e).isInstanceOf(IllegalStateException.class)
+                .expectErrorSatisfies(e -> assertThat(e).isInstanceOf(KernelContextMissingException.class)
                         .hasMessageContaining("organization"))
                 .verify();
         wireMock.verify(0, postRequestedFor(urlEqualTo("/api/notifications/deliveries")));
+    }
+
+    @Test
+    void reads_shouldFailOpenWithAnEmptyList_whenNoOrganizationIsAvailable() {
+        // Regression: this used to surface as HTTP 409 on every history poll of the front.
+        wireMock.resetRequests();
+        StepVerifier.create(client.listDeliveries(TENANT_ID, null)).verifyComplete();
+        StepVerifier.create(new KernelNotificationSearchAdapter(client).findByRecipientId(TENANT_ID, null, "u"))
+                .verifyComplete();
+        wireMock.verify(0, getRequestedFor(urlPathEqualTo("/api/notifications/deliveries")));
+    }
+
+    @Test
+    void search_shouldShareOneKernelRead_betweenConcurrentAndRepeatedCalls() {
+        wireMock.resetAll();
+        wireMock.stubFor(get(urlPathEqualTo("/api/notifications/deliveries"))
+                .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json")
+                        .withBody("[]")));
+        KernelNotificationSearchAdapter search = new KernelNotificationSearchAdapter(client);
+
+        for (int i = 0; i < 5; i++) {
+            StepVerifier.create(search.findByRecipientId(TENANT_ID, ORGANIZATION_ID, "u")).verifyComplete();
+        }
+
+        wireMock.verify(1, getRequestedFor(urlPathEqualTo("/api/notifications/deliveries")));
     }
 
     @Test
@@ -263,7 +333,7 @@ class KernelNotificationBridgeTest {
         wireMock.stubFor(get(urlPathEqualTo("/api/notifications/deliveries"))
                 .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json")
                         .withBody("""
-                                {"success": true, "data": [
+                                [
                                   {"id": "5b1f6e2a-0001-4c3a-9a2a-000000000001", "recipientUserId": "%s",
                                    "channel": "PUSH", "status": "SENT", "body": "a", "metadata": {"priority": "HIGH"}},
                                   {"id": "5b1f6e2a-0001-4c3a-9a2a-000000000002", "recipientUserId": "%s",
@@ -271,7 +341,7 @@ class KernelNotificationBridgeTest {
                                   {"id": "5b1f6e2a-0001-4c3a-9a2a-000000000003",
                                    "recipientUserId": "5b1f6e2a-0000-4c3a-9a2a-0000000000ff",
                                    "channel": "EMAIL", "status": "FAILED", "body": "c"}
-                                ]}
+                                ]
                                 """.formatted(user, user))));
         KernelNotificationSearchAdapter search = new KernelNotificationSearchAdapter(client);
 
@@ -296,11 +366,11 @@ class KernelNotificationBridgeTest {
                 .willReturn(aResponse().withStatus(200)
                         .withHeader("Content-Type", "application/json")
                         .withBody("""
-                                {"success": true, "data": [
+                                [
                                   {"userId": "%s", "channel": "EMAIL", "enabled": true,  "locale": "fr_CM"},
                                   {"userId": "%s", "channel": "SMS",   "enabled": false, "locale": "fr_CM"},
                                   {"userId": "%s", "channel": "WHATSAPP", "enabled": true, "locale": "en_CM"}
-                                ]}
+                                ]
                                 """.formatted(userId, userId, userId))));
 
         KernelNotificationPreferenceAdapter adapter = new KernelNotificationPreferenceAdapter(client);
@@ -327,7 +397,7 @@ class KernelNotificationBridgeTest {
                 .willReturn(aResponse().withStatus(200)
                         .withHeader("Content-Type", "application/json")
                         .withBody("""
-                                {"success": true, "data": []}
+                                []
                                 """)));
 
         KernelNotificationPreferenceAdapter adapter = new KernelNotificationPreferenceAdapter(client);
@@ -342,13 +412,13 @@ class KernelNotificationBridgeTest {
                 .willReturn(aResponse().withStatus(200)
                         .withHeader("Content-Type", "application/json")
                         .withBody("""
-                                {"success": true, "data": {"userId": "%s", "channel": "EMAIL", "enabled": true, "locale": "fr_CM"}}
+                                {"userId": "%s", "channel": "EMAIL", "enabled": true, "locale": "fr_CM"}
                                 """.formatted(userId))));
         wireMock.stubFor(get(urlPathEqualTo("/api/notifications/preferences/users/" + userId))
                 .willReturn(aResponse().withStatus(200)
                         .withHeader("Content-Type", "application/json")
                         .withBody("""
-                                {"success": true, "data": [{"userId": "%s", "channel": "EMAIL", "enabled": true, "locale": "fr_CM"}]}
+                                [{"userId": "%s", "channel": "EMAIL", "enabled": true, "locale": "fr_CM"}]}
                                 """.formatted(userId))));
 
         KernelNotificationPreferenceAdapter adapter = new KernelNotificationPreferenceAdapter(client);

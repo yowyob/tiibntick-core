@@ -54,7 +54,11 @@ public final class DisputeResponses {
             String respondentOrgId,
             String impliedSubDelivererId,
             Boolean subDelivererInvolved,
-            List<CommentResponse> comments) {}
+            List<CommentResponse> comments,
+            // lot L4, appended: party judged responsible, incident it was escalated from, closing time
+            String responsibleParty,
+            String incidentId,
+            LocalDateTime closedAt) {}
 
     /** A message on the dispute thread; internal notes are only ever returned to mediators. */
     public record CommentResponse(

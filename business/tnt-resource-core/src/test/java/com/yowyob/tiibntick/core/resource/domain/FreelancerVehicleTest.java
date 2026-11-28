@@ -243,4 +243,52 @@ class FreelancerVehicleTest {
             assertThat(EquipmentType.valueOf("GPS_TRACKER")).isEqualTo(EquipmentType.GPS_TRACKER);
         }
     }
+
+    /** Lot L3: personal vehicle of an independent courier, and the update of a declared vehicle. */
+    @Nested
+    @DisplayName("Personal vehicle and update")
+    class PersonalVehicleAndUpdate {
+
+        @Test
+        void personalVehicleHasAnActorOwnerAndNoOrganization() {
+            UUID actor = UUID.randomUUID(), id = UUID.randomUUID();
+            FreelancerVehicle v = FreelancerVehicle.registerPersonal(id, actor, VehicleType.SCOOTER, null, null,
+                    "lt 123 ab", 25.0, null, null, null, null, null);
+            assertThat(v.vehicleId()).isEqualTo(id);
+            assertThat(v.ownerActorId()).isEqualTo(actor);
+            assertThat(v.ownerOrgId()).isNull();
+            assertThat(v.plateNumber()).isEqualTo("LT 123 AB");
+            assertThat(v.isAvailable()).isTrue();
+        }
+
+        @Test
+        void maximumCapacityStaysMandatoryForAPersonalVehicle() {
+            assertThatThrownBy(() -> FreelancerVehicle.registerPersonal(null, UUID.randomUUID(), VehicleType.BUS,
+                    null, null, "BUS-1", 0, null, null, null, null, null))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+
+        @Test
+        void aVehicleWithoutAnyOwnerIsRefused() {
+            assertThatThrownBy(() -> FreelancerVehicle.rehydrate(UUID.randomUUID(), null, null, VehicleType.CAR,
+                    null, null, "X-1", 100, null, null, null, null, null, true, null, null,
+                    java.time.Instant.now(), java.time.Instant.now()))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+
+        @Test
+        void updateKeepsIdentityOwnerAndMissionAndValidatesTheCapacity() {
+            FreelancerVehicle onMission = moto.assignToMission("M-1");
+            FreelancerVehicle updated = onMission.update(VehicleType.TRICYCLE, "Bajaj", "RE", "cmr-002", 300.0,
+                    1.5, FuelType.DIESEL, 3.0);
+            assertThat(updated.vehicleId()).isEqualTo(moto.vehicleId());
+            assertThat(updated.ownerOrgId()).isEqualTo(orgId);
+            assertThat(updated.type()).isEqualTo(VehicleType.TRICYCLE);
+            assertThat(updated.plateNumber()).isEqualTo("CMR-002");
+            assertThat(updated.maxCapacityKg()).isEqualTo(300.0);
+            assertThat(updated.currentMissionId()).isEqualTo("M-1");
+            assertThatThrownBy(() -> moto.update(VehicleType.MOTO, null, null, "CMR-001-AB", -1, null, null, null))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+    }
 }

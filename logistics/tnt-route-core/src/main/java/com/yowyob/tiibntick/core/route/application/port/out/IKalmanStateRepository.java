@@ -5,6 +5,6 @@ import reactor.core.publisher.Mono;
 
 public interface IKalmanStateRepository {
     Mono<KalmanState> save(KalmanState state);
-    Mono<KalmanState> findByMissionId(String missionId);
-    Mono<Void> deleteByMissionId(String missionId);
+    Mono<KalmanState> findByDeliveryId(String deliveryId);
+    Mono<Void> deleteByDeliveryId(String deliveryId);
 }

@@ -7,7 +7,7 @@ import java.util.UUID;
 /**
  * Use case — Mark order as in-delivery (DISPATCHED → IN_DELIVERY).
  *
- * <p>Typically triggered by the Kafka event {@code tnt.delivery.mission.started}
+ * <p>Typically triggered by {@code DeliveryPickedUp} of {@code tnt.delivery.events}
  * emitted by tnt-delivery-core when the deliverer picks up the parcel.</p>
  *
  * @author MANFOUO Braun

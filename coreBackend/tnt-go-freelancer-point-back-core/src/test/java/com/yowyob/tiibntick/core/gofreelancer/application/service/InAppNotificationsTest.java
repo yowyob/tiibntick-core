@@ -4,115 +4,126 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import com.yowyob.kernel.event.application.port.out.ProcessedEventStorePort;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.AddressUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpFreelancerRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpRelayPointRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpUserRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IAnnouncementRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryNeedRepository;
-import com.yowyob.tiibntick.core.gofreelancer.application.port.out.NotificationRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IInAppInboxPort;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Announcement;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.DeliveryNeed;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpFreelancer;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpRelayPoint;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpUser;
+import com.yowyob.tiibntick.core.gofreelancer.domain.model.InAppNotification;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.NeedInvitation;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.Notification;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.notification.NotificationType;
 import java.math.BigDecimal;
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Objects;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
-/** Lot C-36 — in-app inbox of the three roles: the P1 events, "mine only", retention. */
+/**
+ * Lot C-36 — in-app inbox of the three roles, held by the Kernel (decision D-157): the P1 events, "mine only",
+ * idempotency through the shared table of processed events.
+ */
 class InAppNotificationsTest {
 
-    /** In-memory notifications table, same semantics as the SQL of the R2DBC repository. */
-    static final class FakeNotifications implements NotificationRepository {
-        final List<Notification> rows = new ArrayList<>();
+    /**
+     * In-memory Kernel inbox: messages of every user; {@code mine()} answers for {@link #caller}, as the Kernel
+     * answers for the user of the request's token.
+     */
+    static final class FakeKernelInbox implements IInAppInboxPort {
+        final List<InAppNotification> rows = new ArrayList<>();
+        UUID caller;
+        Instant clock = NOW;
 
-        @Override public Mono<Notification> save(Notification n) {
-            if (n.getId() == null) {
-                if (n.getEventKey() != null && rows.stream().anyMatch(r -> n.getEventKey().equals(r.getEventKey()))) {
-                    return Mono.error(new org.springframework.dao.DuplicateKeyException(n.getEventKey()));
-                }
-                n.setId(UUID.randomUUID());
-                rows.add(n);
-            }
-            return Mono.just(n);
-        }
-        @Override public Mono<Notification> findById(UUID id) {
-            return Mono.justOrEmpty(rows.stream().filter(r -> r.getId().equals(id)).findFirst());
-        }
-        @Override public Mono<Boolean> existsByEventKey(String key) {
-            return Mono.just(rows.stream().anyMatch(r -> key.equals(r.getEventKey())));
-        }
-        @Override public Flux<Notification> findInbox(UUID personId, int limit, long offset) {
-            return Flux.fromStream(rows.stream().filter(r -> personId.equals(r.getPersonId()))
-                    .sorted(Comparator.comparing((Notification r) -> r.getReadAt() != null)
-                            .thenComparing(Notification::getCreatedAt, Comparator.reverseOrder()))
-                    .skip(offset).limit(limit));
-        }
-        @Override public Mono<Long> countUnread(UUID personId) {
-            return Mono.just(rows.stream().filter(r -> personId.equals(r.getPersonId()) && r.getReadAt() == null).count());
-        }
-        @Override public Mono<Long> markAllRead(UUID personId, Instant at) {
-            long n = rows.stream().filter(r -> personId.equals(r.getPersonId()) && r.getReadAt() == null)
-                    .peek(r -> r.setReadAt(at)).count();
-            return Mono.just(n);
-        }
-        @Override public Mono<Void> deleteById(UUID id) {
-            rows.removeIf(r -> r.getId().equals(id));
+        @Override public Mono<Void> send(UUID recipient, String title, String message, Map<String, String> meta) {
+            clock = clock.plusSeconds(1);
+            rows.add(new InAppNotification(UUID.randomUUID(), recipient, NotificationType.valueOf(meta.get(META_TYPE)),
+                    title, message, meta.get(META_PARAMS), meta.get(META_LINK_KIND),
+                    meta.get(META_LINK_ID) == null ? null : UUID.fromString(meta.get(META_LINK_ID)), clock, null));
             return Mono.empty();
         }
-        @Override public Mono<Long> deleteExpired(Instant readBefore, Instant createdBefore) {
-            int before = rows.size();
-            rows.removeIf(r -> (r.getReadAt() != null && r.getReadAt().isBefore(readBefore))
-                    || (r.getCreatedAt() != null && r.getCreatedAt().isBefore(createdBefore)));
-            return Mono.just((long) (before - rows.size()));
+        @Override public Flux<InAppNotification> mine() {
+            return Flux.fromIterable(List.copyOf(rows)).filter(r -> r.recipientUserId().equals(caller));
         }
+        @Override public Mono<InAppNotification> markRead(UUID id) {
+            for (int i = 0; i < rows.size(); i++) {
+                InAppNotification r = rows.get(i);
+                if (r.id().equals(id) && r.recipientUserId().equals(caller)) {
+                    InAppNotification read = new InAppNotification(r.id(), r.recipientUserId(), r.type(), r.title(),
+                            r.message(), r.params(), r.linkKind(), r.linkId(), r.createdAt(), NOW.plusSeconds(3600));
+                    rows.set(i, read);
+                    return Mono.just(read);
+                }
+            }
+            return Mono.error(new IllegalArgumentException("not in the caller's inbox"));
+        }
+        InAppNotification stored(UUID owner, Duration age, boolean read) {
+            InAppNotification n = new InAppNotification(UUID.randomUUID(), owner, NotificationType.PARCEL_PICKED_UP,
+                    "t", "m", null, null, null, NOW.minus(age), read ? NOW : null);
+            rows.add(n);
+            return n;
+        }
+        List<InAppNotification> of(UUID user) {
+            return rows.stream().filter(r -> user.equals(r.recipientUserId())).toList();
+        }
+        InAppNotification byId(UUID id) {
+            return rows.stream().filter(r -> r.id().equals(id)).findFirst().orElseThrow();
+        }
+    }
 
-        List<Notification> of(UUID user) {
-            return rows.stream().filter(r -> user.equals(r.getPersonId())).toList();
+    /** In-memory event_bus.processed_events. */
+    static final class FakeProcessed implements ProcessedEventStorePort {
+        final Set<String> ids = new HashSet<>();
+        @Override public Mono<Boolean> isProcessed(String group, String topic, String eventId) {
+            return Mono.just(ids.contains(group + "/" + topic + "/" + eventId));
         }
+        @Override public Mono<Void> markProcessed(String group, String topic, String eventId) {
+            ids.add(group + "/" + topic + "/" + eventId);
+            return Mono.empty();
+        }
+        @Override public Mono<Long> purgeOlderThan(Duration retention) {
+            return Mono.just(0L);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    static ObjectProvider<ProcessedEventStorePort> provider(ProcessedEventStorePort store) {
+        ObjectProvider<ProcessedEventStorePort> p = mock(ObjectProvider.class);
+        when(p.getIfAvailable()).thenReturn(store);
+        return p;
     }
 
     static final Instant NOW = Instant.parse("2026-11-26T10:00:00Z");
 
-    FakeNotifications table;
+    FakeKernelInbox kernel;
+    FakeProcessed processed;
     InAppNotificationService inbox;
 
     @BeforeEach
     void setUpInbox() {
-        table = new FakeNotifications();
-        inbox = new InAppNotificationService(table, 30, 90);
-        inbox.setClock(Clock.fixed(NOW, ZoneOffset.UTC));
-    }
-
-    private Notification stored(UUID owner, Duration age, Duration readAgo) {
-        Notification n = new Notification();
-        n.setPersonId(owner);
-        n.setNotificationType(NotificationType.PARCEL_PICKED_UP);
-        n.setTitle("t");
-        n.setMessage("m");
-        n.setCreatedAt(NOW.minus(age));
-        n.setReadAt(readAgo == null ? null : NOW.minus(readAgo));
-        n.setEventKey(UUID.randomUUID().toString());
-        return table.save(n).block();
+        kernel = new FakeKernelInbox();
+        processed = new FakeProcessed();
+        inbox = new InAppNotificationService(kernel, provider(processed));
     }
 
     // ── "mine only" ──────────────────────────────────────────────────────
@@ -122,63 +133,88 @@ class InAppNotificationsTest {
         final UUID me = UUID.randomUUID();
         final UUID other = UUID.randomUUID();
 
+        @BeforeEach
+        void asMe() {
+            kernel.caller = me;
+        }
+
         @Test
         void listsOnlyMyNotificationsUnreadFirst() {
-            Notification read = stored(me, Duration.ofHours(1), Duration.ofMinutes(5));
-            Notification unreadOld = stored(me, Duration.ofDays(2), null);
-            stored(other, Duration.ofMinutes(1), null);
+            InAppNotification read = kernel.stored(me, Duration.ofHours(1), true);
+            InAppNotification unreadOld = kernel.stored(me, Duration.ofDays(2), false);
+            kernel.stored(other, Duration.ofMinutes(1), false);
 
             InAppNotificationService.Inbox box = inbox.mine(me, 0, 30).block();
-            assertThat(box.items()).extracting(Notification::getId).containsExactly(unreadOld.getId(), read.getId());
+            assertThat(box.items()).extracting(InAppNotification::id).containsExactly(unreadOld.id(), read.id());
             assertThat(box.unread()).isEqualTo(1);
+            assertThat(inbox.mine(me, 1, 1).block().items()).extracting(InAppNotification::id)
+                    .as("second page of one").containsExactly(read.id());
         }
 
         @Test
         void someoneElsesNotificationCannotBeReadOrDeleted() {
-            Notification theirs = stored(other, Duration.ofMinutes(1), null);
+            InAppNotification theirs = kernel.stored(other, Duration.ofMinutes(1), false);
 
-            StepVerifier.create(inbox.markRead(theirs.getId(), me))
+            StepVerifier.create(inbox.markRead(theirs.id(), me))
                     .expectErrorMatches(e -> e instanceof ResponseStatusException r && r.getStatusCode().value() == 404)
                     .verify();
-            StepVerifier.create(inbox.delete(theirs.getId(), me))
+            StepVerifier.create(inbox.delete(theirs.id(), me))
                     .expectErrorMatches(e -> e instanceof ResponseStatusException r && r.getStatusCode().value() == 404)
                     .verify();
-            assertThat(theirs.getReadAt()).isNull();
-            assertThat(table.of(other)).hasSize(1);
+            assertThat(kernel.byId(theirs.id()).readAt()).isNull();
         }
 
         @Test
         void markReadDeleteAndReadAllActOnMineOnly() {
-            Notification a = stored(me, Duration.ofMinutes(3), null);
-            Notification b = stored(me, Duration.ofMinutes(2), null);
-            Notification theirs = stored(other, Duration.ofMinutes(1), null);
+            InAppNotification a = kernel.stored(me, Duration.ofMinutes(3), false);
+            InAppNotification b = kernel.stored(me, Duration.ofMinutes(2), false);
+            InAppNotification theirs = kernel.stored(other, Duration.ofMinutes(1), false);
 
-            assertThat(inbox.markRead(a.getId(), me).block().getReadAt()).isEqualTo(NOW);
-            inbox.delete(b.getId(), me).block();
-            stored(me, Duration.ofMinutes(1), null);
+            assertThat(inbox.markRead(a.id(), me).block().readAt()).isNotNull();
+            inbox.delete(b.id(), me).block();
+            assertThat(kernel.byId(b.id()).readAt()).as("the Kernel has no deletion: marked read").isNotNull();
+            kernel.stored(me, Duration.ofMinutes(1), false);
             assertThat(inbox.markAllRead(me).block()).isEqualTo(1);
 
-            assertThat(table.of(me)).hasSize(2).allMatch(n -> n.getReadAt() != null);
-            assertThat(theirs.getReadAt()).isNull();
+            assertThat(kernel.of(me)).hasSize(3).allMatch(n -> n.readAt() != null);
+            assertThat(kernel.byId(theirs.id()).readAt()).isNull();
+        }
+
+        @Test
+        void kernelDownIsA503NotAnEmptyInbox() {
+            IInAppInboxPort down = mock(IInAppInboxPort.class);
+            when(down.mine()).thenReturn(Flux.error(new IllegalStateException("kernel down")));
+            StepVerifier.create(new InAppNotificationService(down, provider(processed)).mine(me, 0, 30))
+                    .expectErrorMatches(e -> e instanceof ResponseStatusException r && r.getStatusCode().value() == 503)
+                    .verify();
         }
     }
 
-    // ── retention ────────────────────────────────────────────────────────
+    @Test
+    void idempotentAcrossInstancesAndPerRecipient() {
+        UUID me = UUID.randomUUID();
+        UUID other = UUID.randomUUID();
+        inbox.emit(me, NotificationType.PARCEL_PICKED_UP, "picked-up:x", "t", "m", Map.of(), null, null).block();
+        // a second instance (restart, other node) shares event_bus.processed_events
+        new InAppNotificationService(kernel, provider(processed))
+                .emit(me, NotificationType.PARCEL_PICKED_UP, "picked-up:x", "t", "m", Map.of(), null, null).block();
+        inbox.emit(other, NotificationType.PARCEL_PICKED_UP, "picked-up:x", "t", "m", Map.of(), null, null).block();
+        assertThat(kernel.of(me)).hasSize(1);
+        assertThat(kernel.of(other)).hasSize(1);
+    }
 
     @Test
-    void retentionDeletesReadAfter30DaysAndEverythingAfter90() {
+    void metadataCarriesTheGoFields() {
         UUID me = UUID.randomUUID();
-        Notification read31 = stored(me, Duration.ofDays(40), Duration.ofDays(31));
-        Notification unread31 = stored(me, Duration.ofDays(31), null);
-        Notification read10 = stored(me, Duration.ofDays(20), Duration.ofDays(10));
-        Notification unread91 = stored(me, Duration.ofDays(91), null);
-
-        assertThat(inbox.purge().block()).isEqualTo(2);
-        assertThat(table.rows).extracting(Notification::getId)
-                .containsExactlyInAnyOrder(unread31.getId(), read10.getId())
-                .doesNotContain(read31.getId(), unread91.getId());
-        // idempotent
-        assertThat(inbox.purge().block()).isZero();
+        UUID need = UUID.randomUUID();
+        inbox.emit(me, NotificationType.CANDIDATE_APPLIED, "applied:a:b", "Nouveau candidat", "m",
+                InAppNotificationService.params("name", "Paul \"Le\" Biya", "price", "2500"), InAppEvents.LINK_SHIPMENT, need).block();
+        assertThat(kernel.of(me)).singleElement().satisfies(n -> {
+            assertThat(n.type()).isEqualTo(NotificationType.CANDIDATE_APPLIED);
+            assertThat(n.linkKind()).isEqualTo(InAppEvents.LINK_SHIPMENT);
+            assertThat(n.linkId()).isEqualTo(need);
+            assertThat(n.params()).isEqualTo("{\"name\":\"Paul \\\"Le\\\" Biya\",\"price\":\"2500\"}");
+        });
     }
 
     // ── P1 events ────────────────────────────────────────────────────────
@@ -243,23 +279,23 @@ class InAppNotificationsTest {
         }
 
         private List<NotificationType> typesOf(UUID user) {
-            return table.of(user).stream().map(Notification::getNotificationType).toList();
+            return kernel.of(user).stream().map(InAppNotification::type).toList();
         }
 
         private void nobodyElse(UUID... recipients) {
             List<UUID> allowed = List.of(recipients);
-            assertThat(table.rows).allMatch(n -> allowed.contains(n.getPersonId()));
-            assertThat(table.of(stranger)).isEmpty();
+            assertThat(kernel.rows).allMatch(n -> allowed.contains(n.recipientUserId()));
+            assertThat(kernel.of(stranger)).isEmpty();
         }
 
         @Test
         void candidateApplied_toSenderOnce() {
             twice(events.candidateApplied(announcementId, courier.getCoreFreelancerId(), new BigDecimal("2500")));
-            assertThat(table.of(sender)).singleElement().satisfies(n -> {
-                assertThat(n.getNotificationType()).isEqualTo(NotificationType.CANDIDATE_APPLIED);
-                assertThat(n.getMessage()).isEqualTo("Nouveau candidat : Paul Biya, 2500 XAF");
-                assertThat(n.getLinkKind()).isEqualTo(InAppEvents.LINK_SHIPMENT);
-                assertThat(n.getLinkId()).isEqualTo(needId);
+            assertThat(kernel.of(sender)).singleElement().satisfies(n -> {
+                assertThat(n.type()).isEqualTo(NotificationType.CANDIDATE_APPLIED);
+                assertThat(n.message()).isEqualTo("Nouveau candidat : Paul Biya, 2500 XAF");
+                assertThat(n.linkKind()).isEqualTo(InAppEvents.LINK_SHIPMENT);
+                assertThat(n.linkId()).isEqualTo(needId);
             });
             nobodyElse(sender);
         }
@@ -269,9 +305,9 @@ class InAppNotificationsTest {
             NeedInvitation inv = NeedInvitation.builder().id(UUID.randomUUID()).deliveryNeedId(needId)
                     .freelancerId(courier.getId()).status(NeedInvitation.OPEN).estimatedPrice(3000.0).build();
             twice(events.courseOffered(inv));
-            assertThat(table.of(courierUser)).singleElement().satisfies(n -> {
-                assertThat(n.getNotificationType()).isEqualTo(NotificationType.COURSE_OFFERED);
-                assertThat(n.getMessage()).startsWith("Course proposée pour toi : ").endsWith(", 3000 XAF");
+            assertThat(kernel.of(courierUser)).singleElement().satisfies(n -> {
+                assertThat(n.type()).isEqualTo(NotificationType.COURSE_OFFERED);
+                assertThat(n.message()).startsWith("Course proposée pour toi : ").endsWith(", 3000 XAF");
             });
             nobodyElse(courierUser);
         }
@@ -280,9 +316,9 @@ class InAppNotificationsTest {
         void courierAssigned_toSenderAndChosenCourierOnce() {
             twice(events.courierAssigned(need, courier));
             assertThat(typesOf(sender)).containsExactly(NotificationType.COURSE_ACCEPTED);
-            assertThat(table.of(sender).get(0).getMessage()).isEqualTo("Paul Biya a accepté ta course");
+            assertThat(kernel.of(sender).get(0).message()).isEqualTo("Paul Biya a accepté ta course");
             assertThat(typesOf(courierUser)).containsExactly(NotificationType.COURIER_SELECTED);
-            assertThat(table.of(courierUser).get(0).getMessage())
+            assertThat(kernel.of(courierUser).get(0).message())
                     .isEqualTo("Tu as été choisi pour la course " + InAppEvents.ref(needId));
             nobodyElse(sender, courierUser);
         }
@@ -297,7 +333,7 @@ class InAppNotificationsTest {
             twice(events.invitationClosed(expired));
             assertThat(typesOf(sender)).containsExactlyInAnyOrder(
                     NotificationType.INVITATION_DECLINED, NotificationType.INVITATION_EXPIRED);
-            assertThat(table.of(sender)).extracting(Notification::getMessage).containsExactlyInAnyOrder(
+            assertThat(kernel.of(sender)).extracting(InAppNotification::message).containsExactlyInAnyOrder(
                     "Paul Biya a décliné : choisis un autre livreur",
                     "L'invitation a expiré : choisis un autre livreur");
             nobodyElse(sender);
@@ -307,15 +343,15 @@ class InAppNotificationsTest {
         void acceptedInvitationTellsNobodyAsClosed() {
             events.invitationClosed(NeedInvitation.builder().id(UUID.randomUUID()).deliveryNeedId(needId)
                     .freelancerId(courier.getId()).status(NeedInvitation.ACCEPTED).build()).block();
-            assertThat(table.rows).isEmpty();
+            assertThat(kernel.rows).isEmpty();
         }
 
         @Test
         void relayChosen_toRelayOwnerOnce() {
             twice(events.relayChosen(need));
-            assertThat(table.of(relayUser)).singleElement().satisfies(n -> {
-                assertThat(n.getNotificationType()).isEqualTo(NotificationType.RELAY_PARCEL_INCOMING);
-                assertThat(n.getMessage()).isEqualTo("Un colis va arriver : réf " + InAppEvents.ref(needId));
+            assertThat(kernel.of(relayUser)).singleElement().satisfies(n -> {
+                assertThat(n.type()).isEqualTo(NotificationType.RELAY_PARCEL_INCOMING);
+                assertThat(n.message()).isEqualTo("Un colis va arriver : réf " + InAppEvents.ref(needId));
             });
             nobodyElse(relayUser);
         }
@@ -323,18 +359,18 @@ class InAppNotificationsTest {
         @Test
         void pickedUp_toSenderOnce() {
             twice(events.pickedUp(needId));
-            assertThat(table.of(sender)).singleElement()
-                    .satisfies(n -> assertThat(n.getMessage()).isEqualTo("Ton colis est en route"));
+            assertThat(kernel.of(sender)).singleElement()
+                    .satisfies(n -> assertThat(n.message()).isEqualTo("Ton colis est en route"));
             nobodyElse(sender);
         }
 
         @Test
         void depositedAtRelay_toSenderAndRelayOnce() {
             twice(events.depositedAtRelay(needId, relay.getCoreRelayPointId()));
-            assertThat(table.of(sender)).singleElement()
-                    .satisfies(n -> assertThat(n.getMessage()).isEqualTo("Ton colis est au relais Boutique Awa"));
-            assertThat(table.of(relayUser)).singleElement()
-                    .satisfies(n -> assertThat(n.getMessage()).isEqualTo("Colis reçu, en attente de retrait"));
+            assertThat(kernel.of(sender)).singleElement()
+                    .satisfies(n -> assertThat(n.message()).isEqualTo("Ton colis est au relais Boutique Awa"));
+            assertThat(kernel.of(relayUser)).singleElement()
+                    .satisfies(n -> assertThat(n.message()).isEqualTo("Colis reçu, en attente de retrait"));
             nobodyElse(sender, relayUser);
         }
 
@@ -350,18 +386,19 @@ class InAppNotificationsTest {
         @Test
         void directHandOverDoesNotTellAnyRelay() {
             events.handedOver(needId, courier.getId(), null).block();
-            assertThat(table.of(relayUser)).isEmpty();
+            assertThat(kernel.of(relayUser)).isEmpty();
             nobodyElse(sender, courierUser);
         }
 
         @Test
-        void aFailingStoreNeverFailsTheAction() {
-            NotificationRepository broken = mock(NotificationRepository.class);
-            lenient().when(broken.existsByEventKey(any())).thenReturn(Mono.error(new IllegalStateException("db down")));
-            InAppEvents withBrokenStore = new InAppEvents(new InAppNotificationService(broken, 30, 90),
+        void aFailingInboxNeverFailsTheAction() {
+            IInAppInboxPort broken = mock(IInAppInboxPort.class);
+            lenient().when(broken.send(any(), any(), any(), any())).thenReturn(Mono.error(new IllegalStateException("kernel down")));
+            InAppEvents withBrokenInbox = new InAppEvents(new InAppNotificationService(broken, provider(processed)),
                     needs, announcements, freelancers, relays, users, addresses);
-            StepVerifier.create(withBrokenStore.pickedUp(needId)).verifyComplete();
-            assertThat(Objects.requireNonNull(table.rows)).isEmpty();
+            StepVerifier.create(withBrokenInbox.pickedUp(needId)).verifyComplete();
+            assertThat(kernel.rows).isEmpty();
+            assertThat(processed.ids).as("a failed send is not recorded: it will be retried by a replay").isEmpty();
         }
     }
 }

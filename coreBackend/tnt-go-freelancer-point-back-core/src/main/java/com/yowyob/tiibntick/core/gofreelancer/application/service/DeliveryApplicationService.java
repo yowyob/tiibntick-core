@@ -15,7 +15,7 @@ import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryNeed
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Announcement;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.DeliveryNeed;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryStatus;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryStatus;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.DeliveryUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.CachePort;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepository;
@@ -120,18 +120,26 @@ public class DeliveryApplicationService implements DeliveryUseCase {
     // Mutations
     // ══════════════════════════════════════════════════════════════════════
 
+    /**
+     * Updates the agreed price and the pickup / hand-over windows. They belong to the delivery in
+     * {@code tnt-delivery-core}, which is where they are recorded; a field absent from the request keeps
+     * the value the core already has. (The notes carried by the request are not part of this update.)
+     */
     @Override
     public Mono<DeliveryResponseDTO> updateDelivery(UUID id, DeliveryUpdateDTO dto) {
-        return deliveryRepository.findById(id)
-                .switchIfEmpty(Mono.error(new IllegalArgumentException("Delivery not found: " + id)))
-                .flatMap(delivery -> {
-                    if (dto.getTarif() != null)           delivery.setTarif(dto.getTarif());
-                    if (dto.getPickupMinTime() != null)   delivery.setPickupMinTime(dto.getPickupMinTime());
-                    if (dto.getPickupMaxTime() != null)   delivery.setPickupMaxTime(dto.getPickupMaxTime());
-                    if (dto.getDeliveryMinTime() != null) delivery.setDeliveryMinTime(dto.getDeliveryMinTime());
-                    if (dto.getDeliveryMaxTime() != null) delivery.setDeliveryMaxTime(dto.getDeliveryMaxTime());
-                    return deliveryRepository.save(delivery);
-                })
+        return tenantContextHolder.currentTenantId()
+                .defaultIfEmpty(TenantContextHolder.SYSTEM_TENANT)
+                .flatMap(tenantId -> deliveryRepository.findById(id)
+                        .switchIfEmpty(Mono.error(new IllegalArgumentException("Delivery not found: " + id)))
+                        .flatMap(delivery -> lifecyclePort.findState(tenantId, id)
+                                .flatMap(current -> lifecyclePort.recordAgreedTerms(tenantId, id,
+                                        dto.getTarif() != null ? java.math.BigDecimal.valueOf(dto.getTarif()) : null,
+                                        current.agreedCurrency() != null ? current.agreedCurrency() : "XAF",
+                                        dto.getPickupMinTime() != null ? dto.getPickupMinTime() : current.pickupWindowStart(),
+                                        dto.getPickupMaxTime() != null ? dto.getPickupMaxTime() : current.pickupWindowEnd(),
+                                        dto.getDeliveryMinTime() != null ? dto.getDeliveryMinTime() : current.deliveryWindowStart(),
+                                        dto.getDeliveryMaxTime() != null ? dto.getDeliveryMaxTime() : current.deliveryWindowEnd()))
+                                .map(state -> CoreDeliveryAssembler.hydrate(delivery, state))))
                 .map(this::toResponseDTO);
     }
 
@@ -152,10 +160,8 @@ public class DeliveryApplicationService implements DeliveryUseCase {
                         // The core state machine refuses a terminal/illegal state (409); nothing is written then.
                         .flatMap(delivery -> lifecyclePort.cancel(tenantId, id, requesterId,
                                         reason != null && !reason.isBlank() ? reason : "Cancelled by the requester")
-                                .flatMap(state -> {
-                                    CoreDeliveryProjection.apply(delivery, state);
-                                    return deliveryRepository.save(delivery);
-                                })))
+                                // The cancellation is recorded in the core; read the state it returned back.
+                                .map(state -> CoreDeliveryAssembler.hydrate(delivery, state))))
                 .map(this::toResponseDTO);
     }
 
@@ -326,14 +332,16 @@ public class DeliveryApplicationService implements DeliveryUseCase {
             return "Statut inconnu — contactez le support si besoin.";
         }
         return switch (status) {
-            case CREATED -> "Rendez-vous au point de collecte.";
-            case PICKED_UP, IN_TRANSIT -> "Livrez le colis à destination.";
-            case AT_RELAY_POINT -> "Colis déposé au point relais — en attente de retrait client.";
+            case CREATED, ASSIGNED -> "Rendez-vous au point de collecte.";
+            case PICKED_UP, IN_TRANSIT, OUT_FOR_DELIVERY -> "Livrez le colis à destination.";
+            case DELIVERY_ATTEMPT_FAILED -> "Tentative de remise échouée — nouvel essai possible.";
+            case AT_RELAY_HUB -> "Colis déposé au point relais — en attente de retrait client.";
             case DELIVERED -> "Livraison terminée.";
             case FAILED -> "Livraison échouée — demandez de l'assistance.";
             case CANCELLED -> "Livraison annulée.";
-            case PAUSED_BY_INCIDENT -> "Livraison suspendue suite à un incident — en attente de reprise.";
-            case TIMED_OUT, SLA_BREACHED -> "Délai dépassé — contactez le support si besoin.";
+            case PAUSED_BY_INCIDENT, INCIDENT_HANDOVER ->
+                    "Livraison suspendue suite à un incident — en attente de reprise.";
+            case INCIDENT_REPORTED -> "Incident signalé — en cours d'examen.";
         };
     }
 
@@ -436,7 +444,7 @@ public class DeliveryApplicationService implements DeliveryUseCase {
         dto.setAnnouncementId(announcement.getId());
         dto.setDeliveryNeedId(deliveryNeed.getId());
         dto.setFreelancerId(announcement.getAssignedFreelancerId());
-        dto.setStatus(delivery.getStatus()); // status is now a real column on Delivery
+        dto.setStatus(delivery.getStatus()); // read from tnt-delivery-core (lot L1)
 
         Mono<AddressEntity> pickupAddress = addressRepository.findById(deliveryNeed.getPickupAddressId());
         Mono<AddressEntity> deliveryAddress = addressRepository.findById(deliveryNeed.getDeliveryAddressId());

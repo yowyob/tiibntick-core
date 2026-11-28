@@ -22,7 +22,8 @@ public class MatchingNotificationConsumer {
 
     private final NotificationStreamPort notificationStreamPort;
 
-    @KafkaListener(topics = TntTopics.GOFP_MATCHING_NOTIFICATIONS, groupId = "tiibntick-stream-group")
+    @KafkaListener(topics = TntTopics.GOFP_MATCHING_NOTIFICATIONS, groupId = "tiibntick-stream-group",
+            containerFactory = "gofpJsonKafkaListenerContainerFactory")
     public void consumeMatchingNotification(MatchingNotificationEvent event) {
         log.info("Consumed MatchingNotificationEvent from Kafka: {}", event);
         notificationStreamPort.pushNotification(new MatchingNotification(

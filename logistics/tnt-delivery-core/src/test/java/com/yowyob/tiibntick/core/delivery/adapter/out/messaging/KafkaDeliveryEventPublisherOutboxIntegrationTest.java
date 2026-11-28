@@ -8,8 +8,17 @@ import com.yowyob.kernel.event.application.port.in.PublishEventUseCase;
 import com.yowyob.kernel.event.application.port.out.EventEnvelopeRepository;
 import com.yowyob.kernel.event.config.YowEventKernelAutoConfiguration;
 import com.yowyob.kernel.event.domain.enums.EnvelopeStatus;
-import com.yowyob.tiibntick.core.delivery.domain.event.FreelancerOrgAssignedEvent;
-import com.yowyob.tiibntick.core.delivery.domain.event.MissionStatusChangedEvent;
+import com.yowyob.tiibntick.common.kafka.TntEventActor;
+import com.yowyob.tiibntick.common.kafka.TntTopics;
+import com.yowyob.tiibntick.core.delivery.domain.event.DeliveryDomainEvent;
+import com.yowyob.tiibntick.core.delivery.domain.model.aggregate.Delivery;
+import com.yowyob.tiibntick.core.delivery.domain.model.aggregate.Parcel;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryUrgency;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.FreelancerRole;
+import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.DeliveryAddress;
+import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.GeoCoordinates;
+import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.PackageSpecification;
+import com.yowyob.tiibntick.core.delivery.domain.model.valueobject.RecipientInfo;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import liquibase.Contexts;
@@ -57,6 +66,7 @@ import java.sql.DriverManager;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -86,16 +96,10 @@ import static org.springframework.kafka.test.utils.KafkaTestUtils.getSingleRecor
  */
 @SpringBootTest(classes = KafkaDeliveryEventPublisherOutboxIntegrationTest.TestConfig.class)
 @Testcontainers
-@EmbeddedKafka(partitions = 1, topics = {
-        KafkaDeliveryEventPublisherOutboxIntegrationTest.MISSION_STATUS_TOPIC,
-        KafkaDeliveryEventPublisherOutboxIntegrationTest.FREELANCER_ORG_TOPIC,
-        KafkaDeliveryEventPublisherOutboxIntegrationTest.PACKAGE_UPDATED_TOPIC})
+@EmbeddedKafka(partitions = 1, topics = {TntTopics.DELIVERY_EVENTS, TntTopics.PARCEL_EVENTS})
 @Tag("integration")
 class KafkaDeliveryEventPublisherOutboxIntegrationTest {
 
-    static final String MISSION_STATUS_TOPIC = "tnt.delivery.mission.status.changed";
-    static final String FREELANCER_ORG_TOPIC = "tnt.delivery.freelancer_org.assigned";
-    static final String PACKAGE_UPDATED_TOPIC = "tnt.delivery.package.updated";
 
     @Container
     @SuppressWarnings("resource")
@@ -139,111 +143,76 @@ class KafkaDeliveryEventPublisherOutboxIntegrationTest {
     private EmbeddedKafkaBroker embeddedKafka;
 
     @Test
-    @DisplayName("publish() publishes straight to Kafka (envelope PUBLISHED); the record is "
-            + "delivered to the exact topic/payload format consumers expect")
-    void publishPublishesDirectlyToKafka() throws Exception {
-        ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
-
-        UUID deliveryId = UUID.randomUUID();
+    @DisplayName("lot L8: a delivery transition is published once, on tnt.delivery.events only (no legacy topic)")
+    void transitionGoesToTheAggregateTopicOnly() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
         UUID tenantId = UUID.randomUUID();
-        UUID parcelId = UUID.randomUUID();
-        MissionStatusChangedEvent event = new MissionStatusChangedEvent(
-                deliveryId, tenantId,
-                "IN_TRANSIT", "ASSIGNED",
-                UUID.randomUUID(), null,
-                "GO", parcelId,
-                "TNT-20260725-A1B2C3D4",
-                Instant.now());
+        Delivery delivery = newDelivery(tenantId);
+        delivery.clearDomainEvents();
+        delivery.assignDeliveryPerson(UUID.randomUUID(), null, 2.0, null);
+        List<DeliveryDomainEvent> deliveryEvents = delivery.getDomainEvents().stream()
+                .filter(e -> e.aggregateId().equals(delivery.getId())).toList();
 
-        publisher.publish(event).block(Duration.ofSeconds(10));
+        publisher.publishAll(deliveryEvents).block(Duration.ofSeconds(10));
 
-        // 1. The envelope is persisted and already PUBLISHED: the event goes straight to Kafka (outbox decommissioned).
-        // MissionStatusChangedEvent fans out to two topics: the dedicated mission-status
-        // topic (tnt-incident-core, tnt-realtime-core, tnt-market-back-core) and the generic
-        // package-updated topic (tnt-sync-core) — Audit n°5 P-01, tnt.delivery.package.updated
-        // used to have no producer at all.
-        java.util.List<com.yowyob.kernel.event.domain.model.DomainEventEnvelope> envelopes =
-                envelopeRepository.findByAggregateId(deliveryId.toString(), "Delivery", tenantId.toString())
+        List<com.yowyob.kernel.event.domain.model.DomainEventEnvelope> envelopes =
+                envelopeRepository.findByAggregateId(delivery.getId().toString(), "DELIVERY", tenantId.toString())
                         .collectList().block(Duration.ofSeconds(10));
-        assertThat(envelopes).hasSize(2);
-        assertThat(envelopes).extracting(
-                com.yowyob.kernel.event.domain.model.DomainEventEnvelope::getKafkaTopic)
-                .containsExactlyInAnyOrder(MISSION_STATUS_TOPIC, PACKAGE_UPDATED_TOPIC);
-        assertThat(envelopes).allSatisfy(envelope -> {
-            assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED);
-            assertThat(envelope.getTenantId()).isEqualTo(tenantId.toString());
-        });
+        assertThat(envelopes).hasSize(1);
+        assertThat(envelopes.get(0).getKafkaTopic()).isEqualTo(TntTopics.DELIVERY_EVENTS);
+        assertThat(envelopes.get(0).getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED);
 
-        Map<String, Object> consumerProps = new HashMap<>(
-                KafkaTestUtils.consumerProps(embeddedKafka, "delivery-outbox-it", true));
-        consumerProps.put(org.apache.kafka.clients.consumer.ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
-                StringDeserializer.class);
-        consumerProps.put(org.apache.kafka.clients.consumer.ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
-                StringDeserializer.class);
-        consumerProps.put(org.apache.kafka.clients.consumer.ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-
-        try (Consumer<String, String> rawConsumer =
-                     new org.apache.kafka.clients.consumer.KafkaConsumer<>(consumerProps)) {
-            embeddedKafka.consumeFromAnEmbeddedTopic(rawConsumer, MISSION_STATUS_TOPIC);
-
-
+        try (Consumer<String, String> rawConsumer = consumer("delivery-outbox-it")) {
+            embeddedKafka.consumeFromAnEmbeddedTopic(rawConsumer, TntTopics.DELIVERY_EVENTS);
             ConsumerRecord<String, String> received =
-                    getSingleRecord(rawConsumer, MISSION_STATUS_TOPIC, Duration.ofSeconds(15));
-
-            assertThat(received.topic()).isEqualTo(MISSION_STATUS_TOPIC);
-            assertThat(received.key()).isEqualTo(deliveryId.toString());
-
-            JsonNode wireEnvelope = objectMapper.readTree(received.value());
-            assertThat(wireEnvelope.get("eventType").asText()).isEqualTo("MissionStatusChangedEvent");
-            assertThat(wireEnvelope.get("aggregateId").asText()).isEqualTo(deliveryId.toString());
-            assertThat(wireEnvelope.get("tenantId").asText()).isEqualTo(tenantId.toString());
-            assertThat(wireEnvelope.get("payload").get("newStatus").asText()).isEqualTo("IN_TRANSIT");
+                    getSingleRecord(rawConsumer, TntTopics.DELIVERY_EVENTS, Duration.ofSeconds(15));
+            assertThat(received.key()).isEqualTo(delivery.getId().toString());
+            JsonNode wire = objectMapper.readTree(received.value());
+            assertThat(wire.path("eventType").asText()).isEqualTo("DeliveryAssigned");
+            assertThat(wire.path("schemaVersion").asInt()).isPositive();
+            assertThat(wire.path("previousState").path("status").asText()).isEqualTo("CREATED");
+            assertThat(wire.path("payload").path("status").asText()).isEqualTo("ASSIGNED");
         }
-
-        // 3. Once relayed, both fanned-out envelopes transition to PUBLISHED.
-        java.util.List<com.yowyob.kernel.event.domain.model.DomainEventEnvelope> publishedEnvelopes =
-                envelopeRepository.findByAggregateId(deliveryId.toString(), "Delivery", tenantId.toString())
-                        .collectList().block(Duration.ofSeconds(10));
-        assertThat(publishedEnvelopes).hasSize(2)
-                .allSatisfy(envelope -> assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED));
     }
 
     @Test
-    @DisplayName("publishAll() batches a FreelancerOrgAssignedEvent to its own topic through the outbox")
-    void publishAllRoutesFreelancerOrgEventToItsTopic() throws Exception {
-        UUID deliveryId = UUID.randomUUID();
+    @DisplayName("lot L8: the freelancer-org assignment is DeliveryFreelancerOrgAssigned on tnt.delivery.events")
+    void freelancerOrgAssignmentOnTheAggregateTopic() throws Exception {
         UUID tenantId = UUID.randomUUID();
-        FreelancerOrgAssignedEvent event = new FreelancerOrgAssignedEvent(
-                deliveryId, tenantId, "org-42", "OWNER", Instant.now());
+        Delivery delivery = newDelivery(tenantId);
+        delivery.clearDomainEvents();
+        delivery.assignToFreelancerOrg("org-42", FreelancerRole.OWNER);
 
-        publisher.publishAll(java.util.List.of(event)).block(Duration.ofSeconds(10));
+        publisher.publishAll(new java.util.ArrayList<>(delivery.getDomainEvents())).block(Duration.ofSeconds(10));
 
         StepVerifier.create(envelopeRepository.findByAggregateId(
-                        deliveryId.toString(), "Delivery", tenantId.toString()))
+                        delivery.getId().toString(), "DELIVERY", tenantId.toString()))
                 .assertNext(envelope -> {
-                    assertThat(envelope.getKafkaTopic()).isEqualTo(FREELANCER_ORG_TOPIC);
+                    assertThat(envelope.getKafkaTopic()).isEqualTo(TntTopics.DELIVERY_EVENTS);
+                    assertThat(envelope.getEventType()).isEqualTo("DeliveryFreelancerOrgAssigned");
                     assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED);
                 })
                 .verifyComplete();
+    }
 
-        Map<String, Object> consumerProps = new HashMap<>(
-                KafkaTestUtils.consumerProps(embeddedKafka, "delivery-outbox-freelancer-it", true));
+    private Consumer<String, String> consumer(String group) {
+        Map<String, Object> consumerProps = new HashMap<>(KafkaTestUtils.consumerProps(embeddedKafka, group, true));
         consumerProps.put(org.apache.kafka.clients.consumer.ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
                 StringDeserializer.class);
         consumerProps.put(org.apache.kafka.clients.consumer.ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
                 StringDeserializer.class);
         consumerProps.put(org.apache.kafka.clients.consumer.ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        return new org.apache.kafka.clients.consumer.KafkaConsumer<>(consumerProps);
+    }
 
-        try (Consumer<String, String> rawConsumer =
-                     new org.apache.kafka.clients.consumer.KafkaConsumer<>(consumerProps)) {
-            embeddedKafka.consumeFromAnEmbeddedTopic(rawConsumer, FREELANCER_ORG_TOPIC);
-
-
-            ConsumerRecord<String, String> received =
-                    getSingleRecord(rawConsumer, FREELANCER_ORG_TOPIC, Duration.ofSeconds(15));
-            assertThat(received.topic()).isEqualTo(FREELANCER_ORG_TOPIC);
-            assertThat(received.key()).isEqualTo(deliveryId.toString());
-        }
+    private static Delivery newDelivery(UUID tenantId) {
+        UUID sender = UUID.randomUUID();
+        Parcel parcel = Parcel.create(new PackageSpecification(1, 10, 10, 10, false, false, "Box"), tenantId, sender,
+                TntEventActor.of(TntEventActor.Type.SENDER, sender));
+        return Delivery.create(tenantId, null, sender, parcel,
+                new DeliveryAddress(null, "Rue 1", "Mokolo", "Yaoundé", "CM", new GeoCoordinates(3.87, 11.51)),
+                new DeliveryAddress(null, "Rue 2", "Bastos", "Yaoundé", "CM", new GeoCoordinates(3.88, 11.52)),
+                new RecipientInfo("Jean", "+237690000001", null), DeliveryUrgency.STANDARD, null, null);
     }
 
     @Configuration
@@ -287,7 +256,9 @@ class KafkaDeliveryEventPublisherOutboxIntegrationTest {
                 PublishEventUseCase publishEventUseCase,
                 PublishEventBatchUseCase publishEventBatchUseCase,
                 @Qualifier("deliveryObjectMapper") ObjectMapper deliveryObjectMapper) {
-            return new KafkaDeliveryEventPublisher(publishEventUseCase, publishEventBatchUseCase, deliveryObjectMapper);
+            return new KafkaDeliveryEventPublisher(publishEventUseCase, publishEventBatchUseCase,
+                    new org.springframework.beans.factory.support.StaticListableBeanFactory()
+                            .getBeanProvider(com.yowyob.tiibntick.common.kafka.TntEventMasking.class));
         }
     }
 }

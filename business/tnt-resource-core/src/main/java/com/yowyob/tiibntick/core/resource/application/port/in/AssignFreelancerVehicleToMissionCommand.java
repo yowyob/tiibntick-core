@@ -16,5 +16,5 @@ import java.util.UUID;
 public record AssignFreelancerVehicleToMissionCommand(
         @NotNull UUID vehicleId,
         @NotNull UUID ownerOrgId,
-        @NotBlank String missionId
+        @NotBlank String deliveryId
 ) {}

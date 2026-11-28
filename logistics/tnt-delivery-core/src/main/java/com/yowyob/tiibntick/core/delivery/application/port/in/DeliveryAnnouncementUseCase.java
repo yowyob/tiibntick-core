@@ -3,6 +3,7 @@ package com.yowyob.tiibntick.core.delivery.application.port.in;
 import com.yowyob.tiibntick.core.delivery.application.port.in.command.CreateDeliveryAnnouncementCommand;
 import com.yowyob.tiibntick.core.delivery.application.port.in.command.RespondToAnnouncementCommand;
 import com.yowyob.tiibntick.core.delivery.application.port.in.command.SelectAnnouncementResponseCommand;
+import com.yowyob.tiibntick.core.delivery.application.port.in.command.UpdateDeliveryAnnouncementCommand;
 import com.yowyob.tiibntick.core.delivery.domain.model.aggregate.Delivery;
 import com.yowyob.tiibntick.core.delivery.domain.model.aggregate.DeliveryAnnouncement;
 import reactor.core.publisher.Mono;
@@ -43,4 +44,10 @@ public interface DeliveryAnnouncementUseCase {
      * Client cancels their announcement.
      */
     Mono<Void> cancelAnnouncement(UUID tenantId, UUID announcementId, UUID clientId);
+
+    /**
+     * Amends the amount/currency (only while the announcement is open to responses), the sender and
+     * the generic details of an announcement; only its client may do so.
+     */
+    Mono<DeliveryAnnouncement> updateAnnouncement(UpdateDeliveryAnnouncementCommand command);
 }

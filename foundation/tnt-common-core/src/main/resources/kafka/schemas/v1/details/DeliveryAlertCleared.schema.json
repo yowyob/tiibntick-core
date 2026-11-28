@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:tnt:kafka:v1:details:DeliveryAlertCleared",
+  "title": "details of DeliveryAlertCleared",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "alertType"
+  ],
+  "properties": {
+    "alertType": {
+      "type": "string"
+    },
+    "observedValue": {},
+    "threshold": {}
+  }
+}

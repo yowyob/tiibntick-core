@@ -22,8 +22,8 @@ jeton expire : 01:54:18Z
 
 ── Journal core pendant la mesure 2 (provisioning / projection / erreurs) ──
 2026-10-02 01:40:53.441 [main] INFO  [] [] c.y.t.bootstrap.startup.StartupStep - [5/9] Starting: RoleRegistration — Provision 9 canonical TntRole definitions via tnt-roles-core (TntRoleInitializationService, idempotent, system tenant)
-2026-10-02 01:40:53.448 [main] INFO  [] [] c.y.t.b.registry.TntRoleRegistrar - TiiBnTick role provisioning completed via tnt-roles-core — 9 roles provisioned for system tenant [00000000-0000-0000-0000-000000000001]
+2026-10-02 01:40:53.448 [main] INFO  [] [] c.y.t.b.registry.TntRoleRegistrar - TiiBnTick role provisioning completed via tnt-roles-core — 9 roles provisioned for system tenant [<SYSTEM_TENANT_ID>]
 2026-10-02 01:40:54.641 [reactor-tcp-epoll-1] INFO  [] [] c.y.t.c.g.a.s.GofpUserProvisioningService - Auto-provisioning GofpUser for coreUserId=ab57d86b-bb7a-4bd0-aa76-b7c041dadb06
 2026-10-02 01:41:40.804 [main] INFO  [] [] c.y.t.bootstrap.startup.StartupStep - [5/9] Starting: RoleRegistration — Provision 9 canonical TntRole definitions via tnt-roles-core (TntRoleInitializationService, idempotent, system tenant)
-2026-10-02 01:41:40.814 [main] INFO  [] [] c.y.t.b.registry.TntRoleRegistrar - TiiBnTick role provisioning completed via tnt-roles-core — 9 roles provisioned for system tenant [00000000-0000-0000-0000-000000000001]
+2026-10-02 01:41:40.814 [main] INFO  [] [] c.y.t.b.registry.TntRoleRegistrar - TiiBnTick role provisioning completed via tnt-roles-core — 9 roles provisioned for system tenant [<SYSTEM_TENANT_ID>]
 ═══ fin ═══

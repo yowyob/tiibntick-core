@@ -1,6 +1,7 @@
 package com.yowyob.tiibntick.core.gofreelancer.application.service;
 
 import com.yowyob.tiibntick.core.realtime.application.port.in.IBroadcastEtaUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpNotificationTemplates;
 import com.yowyob.tiibntick.core.realtime.domain.model.ReroutingAlert;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery;
 import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryStatus;
@@ -81,10 +82,10 @@ public class FreelancerReroutingService {
                     Mono<Void> broadcast = broadcastEtaUseCase.broadcastReroutingAlert(alert);
 
                     // 2. Push notification for immediate device-level awareness
-                    Mono<Void> pushNotify = freelancerId == null ? Mono.empty() : pushNotificationPort.sendPushNotification(
+                    Mono<Void> pushNotify = freelancerId == null ? Mono.empty() : pushNotificationPort.sendLocalized(
                             freelancerId,
-                            "Itinéraire Mis à Jour !",
-                            "Votre itinéraire pour la livraison en cours a été modifié. Raison : " + reason
+                            GofpNotificationTemplates.ROUTE_UPDATED,
+                            java.util.Map.of("reason", String.valueOf(reason))
                     ).onErrorResume(e -> {
                         log.error("Failed to send push notification for delivery reroute {}", deliveryId, e);
                         return Mono.empty();
@@ -116,12 +117,11 @@ public class FreelancerReroutingService {
 
                     Mono<Void> broadcast = broadcastEtaUseCase.broadcastReroutingAlert(alert);
 
-                    Mono<Void> pushNotify = freelancerId == null ? Mono.empty() : pushNotificationPort.sendPushNotification(
+                    Mono<Void> pushNotify = freelancerId == null ? Mono.empty() : pushNotificationPort.sendLocalized(
                             freelancerId,
-                            "Meilleur Itinéraire Trouvé !",
-                            "Un itinéraire optimisé a été trouvé pour votre livraison. " +
-                                    "Économie : " + String.format("%.1f", alert.distanceSavedKm()) + " km, " +
-                                    alert.timeSavedMin() + " min gagnées."
+                            GofpNotificationTemplates.ROUTE_IMPROVED,
+                            java.util.Map.of("distanceSavedKm", String.format("%.1f", alert.distanceSavedKm()),
+                                    "timeSavedMin", alert.timeSavedMin())
                     ).onErrorResume(e -> {
                         log.error("Failed to send push notification for auto-reroute on delivery {}", deliveryId, e);
                         return Mono.empty();

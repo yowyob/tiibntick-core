@@ -42,9 +42,10 @@ public class AddressController {
         return addressUseCase.getAllAddresses();
     }
 
-    @GetMapping("/search")
-    public Flux<AddressDTO> searchAddresses(@RequestParam String query) {
-        return addressUseCase.searchAddresses(query);
+    @GetMapping(value = "/search", produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+    public Flux<AddressDTO> searchAddresses(@RequestParam String query,
+                                            @RequestParam(required = false) String city) {
+        return addressUseCase.searchAddresses(query, city);
     }
 
     @PutMapping("/{id}")

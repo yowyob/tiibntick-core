@@ -71,10 +71,18 @@ public interface AnnouncementUseCase {
     Flux<SubscriptionResponseDTO> getSubscriptionsForAnnouncement(UUID announcementId);
 
     /**
-     * Client selects a response via delivery-core {@code selectResponse} (by responseId).
-     * Escrow for QUOTE_REQUEST happens here; FIXED_PRICE was escrowed at publish.
+     * Client selects a response via delivery-core {@code selectResponse} (by responseId). Without payment: the
+     * client pays afterwards ({@code /api/v1/deliveries/{id}/payment}); the paid selection is
+     * {@code SelectionPaymentService} (lot L5).
      */
     Mono<AnnouncementResponseDTO> assignResponse(UUID announcementId, UUID clientId, UUID responseId);
+
+    /**
+     * Same, the delivery being created with {@code deliveryId} (lot L5: chosen when the payment was secured at
+     * selection, see {@code SelectionPaymentService}).
+     */
+    Mono<AnnouncementResponseDTO> assignResponse(UUID announcementId, UUID clientId, UUID responseId,
+                                                 UUID deliveryId);
 
     /** @deprecated Prefer {@link #assignResponse} with responseId. */
     @Deprecated

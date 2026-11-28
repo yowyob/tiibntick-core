@@ -2,9 +2,7 @@ package com.yowyob.tiibntick.core.incident.application.service;
 
 import java.util.Map;
 import com.yowyob.tiibntick.core.incident.application.command.ConfirmHandoverCommand;
-import com.yowyob.tiibntick.core.incident.domain.enums.ActorRole;
-import com.yowyob.tiibntick.core.incident.domain.enums.ResolutionMode;
-import com.yowyob.tiibntick.core.incident.domain.event.IncidentDomainEvents.*;
+import com.yowyob.tiibntick.core.incident.domain.enums.*;
 import com.yowyob.tiibntick.core.incident.domain.model.Incident;
 import com.yowyob.tiibntick.core.incident.domain.model.IncidentDriverReplacement;
 import com.yowyob.tiibntick.core.incident.domain.model.IncidentEventLog;
@@ -39,11 +37,12 @@ public class IncidentHandoverService implements IConfirmHandoverUseCase {
     private final IIncidentDriverReplacementRepository replacementRepository;
     private final IIncidentEventLogRepository eventLogRepository;
     private final IIncidentBlockchainRepository blockchainRepository;
-    private final IIncidentEventPublisher eventPublisher;
     private final INotificationPort notificationPort;
     private final IBlockchainAuditPort blockchainAuditPort;
-    private final IMissionStatusPort missionStatusPort;
+    private final IDeliveryStatusPort deliveryStatusPort;
     private final IPaymentFreezePort paymentFreezePort;
+    private final IncidentResolutionEffects resolutionEffects;
+    private final com.yowyob.tiibntick.core.incident.config.IncidentLifecycleProperties lifecycle;
 
     /**
      * Processes one side of the dual-confirmation handover.
@@ -54,7 +53,7 @@ public class IncidentHandoverService implements IConfirmHandoverUseCase {
      */
     @Override
     @Transactional
-    @RequirePermission(resource = "incident", action = "manage")
+    @RequirePermission(resource = "incident", action = "create")
     public Mono<IncidentDriverReplacement> execute(ConfirmHandoverCommand command) {
         return incidentRepository.findById(command.getIncidentId())
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Incident not found")))
@@ -69,13 +68,24 @@ public class IncidentHandoverService implements IConfirmHandoverUseCase {
                 ? rep.confirmByOriginalDriver()
                 : rep.confirmByReplacementDriver();
 
+        if (incident.getStatus() != IncidentStatus.AWAITING_HANDOVER) {
+            return Mono.error(new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Incident " + incident.getId() + " is not waiting for a hand-over (" + incident.getStatus() + ")"));
+        }
+        UUID expected = command.isConfirmingAsOriginalDriver() ? rep.getOriginalDriverId() : rep.getReplacementDriverId();
+        if (command.getActorId() == null || !command.getActorId().equals(expected)) {
+            return Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Only the couriers of the hand-over may confirm it"));
+        }
+        String side = command.isConfirmingAsOriginalDriver() ? "ORIGINAL" : "REPLACEMENT";
+        com.yowyob.tiibntick.common.kafka.TntEventActor actor = com.yowyob.tiibntick.common.kafka.TntEventActor.of(
+                com.yowyob.tiibntick.common.kafka.TntEventActor.Type.COURIER, command.getActorId());
         return replacementRepository.save(updated)
-                .flatMap(saved -> {
-                    if (saved.isHandoverComplete()) {
-                        return finalizeHandover(incident, saved);
-                    }
-                    return logPartialConfirmation(incident, saved, command.getActorId()).thenReturn(saved);
-                });
+                .flatMap(saved -> incidentRepository.save(incident.recordHandoverConfirmed(side, actor))
+                        .flatMap(withConfirmation -> saved.isHandoverComplete()
+                                ? finalizeHandover(withConfirmation, saved)
+                                : logPartialConfirmation(withConfirmation, saved, command.getActorId())
+                                .thenReturn(saved)));
     }
 
     private Mono<IncidentDriverReplacement> finalizeHandover(Incident incident,
@@ -105,23 +115,13 @@ public class IncidentHandoverService implements IConfirmHandoverUseCase {
 
     private Mono<Void> resumeMissionAndResolve(Incident incident, IncidentDriverReplacement rep,
                                                 String txHash) {
-        Incident resolved = incident.resolve(ResolutionMode.FULLY_AUTOMATIC);
-        var handoverEvent = HandoverCompletedEvent.builder()
-                .eventId(UUID.randomUUID())
-                .incidentId(incident.getId())
-                .tenantId(incident.getTenantId())
-                .missionId(incident.getMissionId())
-                .originalDriverId(rep.getOriginalDriverId())
-                .replacementDriverId(rep.getReplacementDriverId())
-                .blockchainTxHash(txHash)
-                .occurredAt(Instant.now())
-                .build();
-
+        Incident resolved = incident.resolve(ResolutionMode.FULLY_AUTOMATIC, IncidentDeliveryOutcome.RESUMED,
+                IncidentResponsibleParty.NONE, "Hand-over completed", "HANDOVER_COMPLETED",
+                com.yowyob.tiibntick.common.kafka.TntEventActor.system());
+        // I14 then D18 (resume with the replacement courier) and unfreeze
         return incidentRepository.save(resolved)
-                .then(missionStatusPort.resumeMission(incident.getMissionId(),
-                        rep.getReplacementDriverId(), rep.getReplacementVehicleId()))
-                .then(paymentFreezePort.unfreezePayment(incident.getMissionId(), "Handover completed"))
-                .then(eventPublisher.publish(handoverEvent))
+                .flatMap(saved -> resolutionEffects.afterResolved(saved, rep.getReplacementDriverId(),
+                        rep.getReplacementVehicleId(), rep.getHandoverLatitude(), rep.getHandoverLongitude()))
                 .then(notificationPort.notifyActor(rep.getOriginalDriverId(),
                         "Handover confirmed", "Parcel transfer recorded on blockchain",
                         "HANDOVER_CONFIRMED", incident.getId(),
@@ -139,6 +139,29 @@ public class IncidentHandoverService implements IConfirmHandoverUseCase {
                 actorId, ActorRole.SYSTEM,
                 "{\"status\":\"" + rep.getHandoverStatus() + "\"}");
         return eventLogRepository.save(log).then();
+    }
+
+    /**
+     * I15 then D19: a hand-over not confirmed by both couriers in time is aborted; the incident searches a
+     * replacement again (REASSIGNING_DRIVER) and the delivery goes back to PAUSED_BY_INCIDENT.
+     */
+    public Mono<Long> abortExpiredHandovers(Instant now) {
+        Instant limit = now.minus(lifecycle.getHandoverTimeout());
+        return incidentRepository.findAwaitingHandover(lifecycle.getBatchSize())
+                .concatMap(incident -> replacementRepository.findReplacementByIncidentId(incident.getId())
+                        .filter(rep -> rep.getHandoverScheduledAt() != null && rep.getHandoverScheduledAt().isBefore(limit))
+                        .flatMap(rep -> abortHandover(incident, "hand-over not confirmed within "
+                                + lifecycle.getHandoverTimeout())))
+                .count();
+    }
+
+    public Mono<Incident> abortHandover(Incident incident, String reason) {
+        return replacementRepository.findReplacementByIncidentId(incident.getId())
+                .flatMap(rep -> replacementRepository.save(rep.markTimedOut()))
+                .then(incidentRepository.save(incident.startReassigningDriver()))
+                .flatMap(saved -> deliveryStatusPort.abortHandover(saved.getMissionId()).thenReturn(saved))
+                .flatMap(saved -> eventLogRepository.save(IncidentEventLog.of(saved.getId(), "HANDOVER_ABORTED",
+                        null, ActorRole.SYSTEM, "{\"reason\":\"" + reason + "\"}")).thenReturn(saved));
     }
 
     private String buildHandoverPayload(IncidentDriverReplacement rep) {

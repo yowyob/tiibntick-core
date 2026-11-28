@@ -438,6 +438,12 @@
                  relativeToChangelogFile="false"/>
     </changeSet>
 
+    <changeSet id="075-relocate-guest-person" author="TiiBnTickTeam">
+        <comment>Corrective migration for 033: the Guest person gets a regular random id instead of the fixed legacy one; references are repointed.</comment>
+        <sqlFile path="db/changelog/20261114_relocate_guest_person.sql"
+                 relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
     <!-- Go delivery need published as an open QUOTE_REQUEST announcement: link column on the
          local announcement mirror. Non-numeric id on purpose: it cannot collide with the NNN series.
          The label only lets the upgrade test rebuild a database migrated by the previous version;
@@ -492,5 +498,14 @@
         <sqlFile path="db/changelog/20261126_c36_in_app_notifications.sql"
                  relativeToChangelogFile="false" splitStatements="true"/>
     </changeSet>
+
+    <!-- Go-Freelancer de-duplication: one file per work lot, appended to by that lot only. -->
+    <include file="db/changelog/changes/gdd-l1.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/gdd-l2.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/gdd-l3.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/gdd-l4.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/gdd-final.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/evt-l2.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/evt-l5.xml" relativeToChangelogFile="false"/>
 
 </databaseChangeLog>

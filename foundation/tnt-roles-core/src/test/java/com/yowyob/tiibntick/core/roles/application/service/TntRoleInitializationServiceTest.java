@@ -16,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.reactive.TransactionalOperator;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
@@ -29,6 +30,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -232,5 +234,40 @@ class TntRoleInitializationServiceTest {
         verify(roleRepository, never()).save(any(Role.class));
         verify(roleRepository, never()).findByCode(any(), any());
         verify(outboxRepository, never()).save(any(RoleSyncOutboxEntry.class));
+    }
+
+    // ── Race: a concurrent run inserts the role between our lookup and our insert ──
+
+    @Test
+    void provisionForTenant_lostInsertRace_shouldReconcileExistingRowInsteadOfFailing() {
+        registry.getAllDefinitions().forEach(definition -> {
+            Role winner = new Role(UUID.randomUUID(), SYSTEM_TENANT_ID,
+                    definition.code(), definition.name(), definition.scopeType(),
+                    definition.defaultPermissions(), false);
+            // 1st lookup: absent (we will try to insert); 2nd lookup: created by the other run.
+            when(roleRepository.findByCode(SYSTEM_TENANT_ID, definition.code()))
+                    .thenReturn(Mono.empty(), Mono.just(winner));
+        });
+        when(roleRepository.save(any(Role.class)))
+                .thenReturn(Mono.error(new DuplicateKeyException("tnt_roles_tenant_id_code_key")));
+
+        StepVerifier.create(service.provisionForTenant(SYSTEM_TENANT_ID)).verifyComplete();
+
+        verify(outboxRepository, never()).save(any(RoleSyncOutboxEntry.class));
+    }
+
+    // ── Startup: registrar + ApplicationReadyEvent must not run two reconciliations at once ──
+
+    @Test
+    void provisionSystemRoles_secondCallWhileFirstRuns_shouldNotStartAnotherRun() {
+        // The first lookup never completes → the first run stays "in flight".
+        when(roleRepository.findByCode(any(), any())).thenReturn(Mono.never());
+
+        service.provisionSystemRoles();
+        verify(roleRepository, timeout(2000).times(1)).findByCode(any(), any());
+        service.provisionSystemRoles();
+        service.provisionSystemRoles();
+
+        verify(roleRepository, times(1)).findByCode(any(), any());
     }
 }

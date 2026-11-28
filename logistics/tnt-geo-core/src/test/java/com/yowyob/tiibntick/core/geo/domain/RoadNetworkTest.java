@@ -130,6 +130,7 @@ class RoadNetworkTest {
     void relayHub_addParcel_updatesOccupancy() {
         RelayHub hub = RelayHub.create(TENANT, UUID.randomUUID(),
                 RoadNodeId.generate(), 10, "actor-001");
+        hub.approve(); // D-140: only an approved hub takes parcels
         hub.addParcel();
         assertThat(hub.currentOccupancy()).isEqualTo(1);
         assertThat(hub.status()).isEqualTo(HubStatus.ACTIVE);
@@ -139,6 +140,7 @@ class RoadNetworkTest {
     void relayHub_fillToCapacity_statusBecomeFull() {
         RelayHub hub = RelayHub.create(TENANT, UUID.randomUUID(),
                 RoadNodeId.generate(), 1, "actor-001");
+        hub.approve(); // D-140: only an approved hub takes parcels
         hub.addParcel();
         assertThat(hub.status()).isEqualTo(HubStatus.FULL);
     }

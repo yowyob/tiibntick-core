@@ -19,7 +19,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Mono;
@@ -56,7 +55,11 @@ class DeliveryLifecycleServiceTest {
     @Mock
     com.yowyob.tiibntick.core.route.application.port.in.IUpdateEtaUseCase updateEtaUseCase;
 
-    @InjectMocks
+    @Mock
+    com.yowyob.tiibntick.core.delivery.application.port.out.DeliveryThresholdsPort thresholds;
+    @Mock
+    com.yowyob.tiibntick.core.delivery.application.port.out.DeliveryAnnouncementRepository announcementRepository;
+
     DeliveryLifecycleService service;
 
     private static final UUID TENANT_ID          = UUID.randomUUID();
@@ -70,15 +73,20 @@ class DeliveryLifecycleServiceTest {
 
     @BeforeEach
     void setUp() {
-        Parcel parcel = Parcel.create(new PackageSpecification(2.0, 25, 20, 15, false, false, "Test"));
-        deliveryCreated = Delivery.create(TENANT_ID, null, UUID.randomUUID(), parcel,
+        var executor = new com.yowyob.tiibntick.core.delivery.application.service.DeliveryTransitionExecutor(
+                deliveryRepository, announcementRepository, eventPublisher,
+                new com.yowyob.tiibntick.core.delivery.application.service.ReturnDeliveryService(
+                        announcementRepository, thresholds));
+        service = new DeliveryLifecycleService(deliveryRepository, deliveryPersonRepository, etaComputationPort,
+                deliveryProofAnchorPort, updateEtaUseCase, thresholds, executor);
+        deliveryCreated = Delivery.create(TENANT_ID, null, UUID.randomUUID(), newParcel(),
                 addr("Mokolo"), addr("Bastos"),
                 new RecipientInfo("Test User", "+237690000001", null),
                 DeliveryUrgency.STANDARD, null, null);
         deliveryCreated.assignDeliveryPerson(DELIVERY_PERSON_ID, null, 5.0,
                 Instant.now().plusSeconds(3600));
 
-        deliveryPickedUp = Delivery.create(TENANT_ID, null, UUID.randomUUID(), parcel,
+        deliveryPickedUp = Delivery.create(TENANT_ID, null, UUID.randomUUID(), newParcel(),
                 addr("Mokolo"), addr("Bastos"),
                 new RecipientInfo("Test User", "+237690000001", null),
                 DeliveryUrgency.STANDARD, null, null);
@@ -86,7 +94,7 @@ class DeliveryLifecycleServiceTest {
                 Instant.now().plusSeconds(3600));
         deliveryPickedUp.confirmPickup();
 
-        deliveryInTransit = Delivery.create(TENANT_ID, null, UUID.randomUUID(), parcel,
+        deliveryInTransit = Delivery.create(TENANT_ID, null, UUID.randomUUID(), newParcel(),
                 addr("Mokolo"), addr("Bastos"),
                 new RecipientInfo("Test User", "+237690000001", null),
                 DeliveryUrgency.STANDARD, null, null);
@@ -102,7 +110,28 @@ class DeliveryLifecycleServiceTest {
     }
 
     @Test
-    @DisplayName("confirmPickup should transition CREATED to PICKED_UP")
+    @DisplayName("recordAgreedTerms stores the terms and saves, without publishing any event")
+    void shouldRecordAgreedTerms() {
+        when(deliveryRepository.findById(TENANT_ID, DELIVERY_ID)).thenReturn(Mono.just(deliveryCreated));
+        when(deliveryRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        Instant t = Instant.now();
+
+        var cmd = new com.yowyob.tiibntick.core.delivery.application.port.in.command.RecordAgreedTermsCommand(
+                TENANT_ID, DELIVERY_ID, new java.math.BigDecimal("1500"), "XAF",
+                t, t.plusSeconds(3600), t.plusSeconds(7200), t.plusSeconds(86400));
+
+        StepVerifier.create(service.recordAgreedTerms(cmd))
+                .assertNext(d -> {
+                    assertThat(d.getAgreedAmount()).isEqualByComparingTo("1500");
+                    assertThat(d.getPickupWindowStart()).isEqualTo(t);
+                    assertThat(d.getStatus()).isEqualTo(DeliveryStatus.ASSIGNED);
+                })
+                .verifyComplete();
+        org.mockito.Mockito.verifyNoInteractions(eventPublisher);
+    }
+
+    @Test
+    @DisplayName("confirmPickup should transition ASSIGNED to PICKED_UP (D4)")
     void shouldConfirmPickup() {
         when(deliveryRepository.findById(TENANT_ID, DELIVERY_ID)).thenReturn(Mono.just(deliveryCreated));
         when(deliveryRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
@@ -176,7 +205,7 @@ class DeliveryLifecycleServiceTest {
     }
 
     @Test
-    @DisplayName("cancelDelivery should transition CREATED to CANCELLED")
+    @DisplayName("cancelDelivery should transition ASSIGNED to CANCELLED (D3)")
     void shouldCancelDelivery() {
         when(deliveryRepository.findById(TENANT_ID, DELIVERY_ID)).thenReturn(Mono.just(deliveryCreated));
         when(deliveryRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
@@ -254,7 +283,29 @@ class DeliveryLifecycleServiceTest {
                 .verifyComplete();
     }
 
+    @Test
+    @DisplayName("D-140: a deposit at a hub that is not APPROVED is refused before D7, nothing is loaded nor saved")
+    void depositRefusedOutsideAnApprovedHub() {
+        UUID hub = UUID.randomUUID();
+        var guard = mock(com.yowyob.tiibntick.core.geo.application.port.in.ICheckHubAcceptsDepositsUseCase.class);
+        when(guard.requireAcceptsDeposits(hub)).thenReturn(Mono.error(
+                new com.yowyob.tiibntick.core.geo.domain.exception.RelayHubStateException("Hub is SUSPENDED")));
+        service.setHubDepositGuard(guard);
+
+        StepVerifier.create(service.depositAtRelayHub(
+                        new com.yowyob.tiibntick.core.delivery.application.port.in.command.DepositAtRelayHubCommand(
+                                TENANT_ID, DELIVERY_ID, DELIVERY_PERSON_ID, hub)))
+                .expectError(com.yowyob.tiibntick.core.geo.domain.exception.RelayHubStateException.class)
+                .verify();
+        verifyNoInteractions(deliveryRepository, eventPublisher);
+        assertThat(deliveryInTransit.getStatus()).isEqualTo(DeliveryStatus.IN_TRANSIT);
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────
+
+    private static Parcel newParcel() {
+        return Parcel.create(new PackageSpecification(2.0, 25, 20, 15, false, false, "Test"));
+    }
 
     private static DeliveryAddress addr(String landmark) {
         return new DeliveryAddress(null, landmark, landmark, "Yaoundé", "CM",

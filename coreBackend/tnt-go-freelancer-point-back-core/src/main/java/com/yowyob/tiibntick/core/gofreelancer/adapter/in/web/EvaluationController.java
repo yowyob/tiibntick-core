@@ -19,10 +19,19 @@ public class EvaluationController {
     private final EvaluationUseCase evaluationUseCase;
 
     @PostMapping
-    public Mono<ResponseEntity<Evaluation>> submitEvaluation(@RequestBody EvaluationDTO dto) {
-        return evaluationUseCase.submitEvaluation(dto)
+    public Mono<ResponseEntity<Evaluation>> submitEvaluation(
+            @RequestBody EvaluationDTO dto,
+            @com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser(required = false)
+            com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext ctx) {
+        return evaluationUseCase.submitEvaluation(dto, ctx)
                 .map(ResponseEntity::ok)
-                .onErrorResume(IllegalArgumentException.class, e -> Mono.just(ResponseEntity.badRequest().build()));
+                .onErrorResume(IllegalArgumentException.class, e -> Mono.just(ResponseEntity.badRequest().build()))
+                // the core keeps one rating per mission and rater
+                .onErrorResume(e -> e.getClass() == IllegalStateException.class,
+                        e -> Mono.just(ResponseEntity.status(org.springframework.http.HttpStatus.CONFLICT).build()))
+                // evaluator other than the caller (C5)
+                .onErrorResume(org.springframework.security.access.AccessDeniedException.class,
+                        e -> Mono.just(ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN).build()));
     }
 
     @GetMapping("/person/{personId}")

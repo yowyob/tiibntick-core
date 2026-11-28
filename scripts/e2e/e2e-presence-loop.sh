@@ -18,9 +18,9 @@
 #   ACTOR_TENANT_ID = claim "tid"        (validé par TntSecurityConfig)
 #   Redis key = tnt:presence:{ACTOR_TENANT_ID}:{ACTOR_USER_ID}
 #
-# Seed users : uniquement en mode dev-bypass (SEEDED_USER=1 si créé par ce script).
-#   En mode jwt, l'utilisateur existe par construction — son absence est un bug de
-#   provisioning à signaler, pas à masquer par un INSERT.
+# Besoin assigné semé dans le cœur (clôture gdd-final) : l'annonce d'origine du besoin
+#   (origin_ref_type = DELIVERY_NEED) et la réponse retenue portent le livreur ; la table
+#   users et les colonnes status / assigned_freelancer_id de delivery_needs n'existent plus.
 #
 # Garde-fou jar périmé : compare le jar à la date du dernier commit src/main.
 # M5 (régression guard) : COLD_CHECK + upsert intacts, appliqués à ACTOR_*.
@@ -57,14 +57,12 @@ TEST_LON="11.5180034"
 E2E_FL_ID="e2e0f1ee-0000-0000-0000-e2e000000001"          # gofp_freelancers.id
 E2E_CORE_FL_ID="e2e0f1ee-0000-0000-0000-e2e000000002"     # core_freelancer_id (fictif)
 E2E_NEED_ID="e2e0deed-0000-0000-0000-e2e000000001"        # delivery_needs.id
+E2E_ANN_ID="e2e0deed-0000-0000-0000-e2e000000002"         # annonce du cœur du besoin
+E2E_RESP_ID="e2e0deed-0000-0000-0000-e2e000000003"        # réponse retenue (livreur)
+E2E_PARCEL_ID="e2e0deed-0000-0000-0000-e2e000000004"      # colis du cœur
 E2E_ADDR1="55555555-5555-5555-5555-555555555501"           # pickup address
 E2E_ADDR2="55555555-5555-5555-5555-555555555502"           # delivery address
 
-# Trace si ce script a seedé la ligne users (pour ne supprimer que ce qu'on a créé)
-SEEDED_USER=0
-
-# Flag pour le [WARN] §2 lot 17 : repli 11111111-… sur delivery_need.user_id
-DELIVERY_USER_FALLBACK=0  # 1 si le delivery_need.user_id ≠ acteur authentifié (repli 11111111-…)
 
 # ─── État global ──────────────────────────────────────────────────────────────
 FAILED=0
@@ -149,12 +147,9 @@ cleanup() {
   echo "──── NETTOYAGE ────"
   psql_q "DELETE FROM delivery_needs WHERE id = '${E2E_NEED_ID}';" > /dev/null 2>&1 || true
   psql_q "DELETE FROM gofp_freelancers WHERE id = '${E2E_FL_ID}';" > /dev/null 2>&1 || true
-  # Ne supprime la ligne users que si c'est CE script qui l'a créée (SEEDED_USER=1).
-  # Un nettoyage qui supprime ce qu'il n'a pas créé est un nettoyage dangereux.
-  if [ "$SEEDED_USER" = "1" ]; then
-    psql_q "DELETE FROM users WHERE id = '${ACTOR_USER_ID}' AND last_name = 'e2e-test' AND first_name = 'actor';" \
-      > /dev/null 2>&1 || true
-  fi
+  psql_q "DELETE FROM tnt_announcement_responses WHERE id = '${E2E_RESP_ID}';
+          DELETE FROM tnt_delivery_announcements WHERE id = '${E2E_ANN_ID}';
+          DELETE FROM tnt_parcels WHERE id = '${E2E_PARCEL_ID}';" > /dev/null 2>&1 || true
   [ -n "$PRESENCE_KEY" ] && redis_cli DEL "$PRESENCE_KEY" > /dev/null 2>&1 || true
   redis_cli DEL "tracking:need:${ACTOR_TENANT_ID}:${E2E_NEED_ID}" > /dev/null 2>&1 || true
   redis_cli DEL "tnt:presence:${ACTOR_TENANT_ID}:${E2E_FL_ID}" > /dev/null 2>&1 || true
@@ -383,61 +378,49 @@ assert_eq "1" "$PROV_ROW" "GofpUserProvisioningFilter a créé gofp_users pour a
 # ══════════════════════════════════════════════════════════════════════════════
 step "5. SETUP DONNÉES DE TEST"
 
-# Seed minimal dans users (FK de delivery_needs).
-# En mode dev-bypass : DEV_USER_ID n'existe pas dans la table users du Kernel — on
-#   l'insère, on mémorise SEEDED_USER=1, et on le supprime au cleanup.
-# En mode jwt : l'utilisateur existe par construction (le jeton vient de son auth).
-#   S'il manque, c'est un bug de provisioning à signaler, pas à masquer par un INSERT.
-if [ "$AUTH_MODE" = "dev-bypass" ]; then
-  EXISTING_USER=$(psql_q "SELECT COUNT(*) FROM users WHERE id='${ACTOR_USER_ID}';" 2>/dev/null || echo "0")
-  if [ "$EXISTING_USER" = "0" ]; then
-    # password : chaîne non-BCrypt → compte inutilisable pour toute tentative de login
-    psql_q "
-      INSERT INTO users (id, last_name, first_name, password)
-      VALUES ('${ACTOR_USER_ID}', 'e2e-test', 'actor', 'NO-AUTH-BYPASS-ONLY')
-      ON CONFLICT (id) DO NOTHING;
-    " > /dev/null
-    SEEDED_USER=1
-  fi
-  E2E_DELIVERY_USER_ID="$ACTOR_USER_ID"
-else
-  # Mode jwt : l'utilisateur doit exister (provisionné par le Kernel).
-  # S'il manque, le FK delivery_needs.user_id serait violé ; on utilise un user de
-  # repli (pré-seedé) pour ne pas bloquer le test GPS, et on enregistre le FAIL.
-  JWT_USER_EXISTS=$(psql_q "SELECT COUNT(*) FROM users WHERE id='${ACTOR_USER_ID}';" 2>/dev/null || echo "0")
-  if [ "$JWT_USER_EXISTS" = "0" ]; then
-    fail "SETUP : actorUserId ($ACTOR_USER_ID) absent de la table users — la table locale ne synchronise pas le Kernel de prod"
-    warn "SETUP : repli sur user 11111111-... pour la FK delivery_needs.user_id (n'affecte pas les assertions GPS)"
-    warn "AUTORISATION : delivery_need.user_id (11111111-…) ≠ acteur authentifié ($ACTOR_USER_ID) — la lecture GET /tracking réussit sans contrôle de propriété (trou à corriger dans un lot dédié)"
-    E2E_DELIVERY_USER_ID="11111111-1111-1111-1111-111111111111"
-    DELIVERY_USER_FALLBACK=1
-  else
-    E2E_DELIVERY_USER_ID="$ACTOR_USER_ID"
-  fi
-fi
-
 psql_q "
   INSERT INTO gofp_freelancers (id, core_freelancer_id, core_user_id, status, is_active)
   VALUES ('${E2E_FL_ID}', '${E2E_CORE_FL_ID}', '${ACTOR_USER_ID}', 'APPROVED', true)
   ON CONFLICT (id) DO NOTHING;
 " > /dev/null
 
+# Le besoin appartient à l'acteur authentifié (garde de propriété du suivi) ; son livreur est
+# dérivé de l'annonce du cœur qui en est issue (réponse retenue = E2E_CORE_FL_ID).
 psql_q "
   INSERT INTO delivery_needs
-    (id, user_id, title, status, pickup_address_id, delivery_address_id, assigned_freelancer_id)
+    (id, user_id, title, pickup_address_id, delivery_address_id, announcement_id)
   VALUES
-    ('${E2E_NEED_ID}', '${E2E_DELIVERY_USER_ID}', 'E2E GPS loop test',
-     'ASSIGNED', '${E2E_ADDR1}', '${E2E_ADDR2}', '${E2E_FL_ID}')
+    ('${E2E_NEED_ID}', '${ACTOR_USER_ID}', 'E2E GPS loop test',
+     '${E2E_ADDR1}', '${E2E_ADDR2}', '${E2E_ANN_ID}')
   ON CONFLICT (id) DO NOTHING;
+  INSERT INTO tnt_parcels (id, weight_kg, width_cm, height_cm, length_cm, fragile, perishable, created_at, updated_at, version)
+  VALUES ('${E2E_PARCEL_ID}', 1.0, 20.0, 15.0, 10.0, false, false, NOW(), NOW(), 0)
+  ON CONFLICT (id) DO NOTHING;
+  INSERT INTO tnt_delivery_announcements
+    (id, tenant_id, client_id, title, offered_amount, currency, parcel_id, status, urgency,
+     pickup_city, delivery_city, recipient_name, recipient_phone, created_at, updated_at, version,
+     pricing_mode, origin_ref_type, origin_ref_id)
+  VALUES
+    ('${E2E_ANN_ID}', '${ACTOR_TENANT_ID}', '${ACTOR_USER_ID}', 'E2E GPS loop test', 1000.0, 'XAF',
+     '${E2E_PARCEL_ID}', 'ASSIGNED', 'STANDARD', 'Yaounde', 'Yaounde', 'E2E', '+237600000000', NOW(), NOW(), 0,
+     'FIXED_PRICE', 'DELIVERY_NEED', '${E2E_NEED_ID}')
+  ON CONFLICT (id) DO NOTHING;
+  INSERT INTO tnt_announcement_responses
+    (id, announcement_id, delivery_person_id, estimated_arrival_time, status, created_at, updated_at, version)
+  VALUES
+    ('${E2E_RESP_ID}', '${E2E_ANN_ID}', '${E2E_CORE_FL_ID}', NOW() + INTERVAL '1 hour', 'ACCEPTED', NOW(), NOW(), 0)
+  ON CONFLICT (id) DO NOTHING;
+  UPDATE tnt_delivery_announcements SET selected_response_id = '${E2E_RESP_ID}' WHERE id = '${E2E_ANN_ID}';
 " > /dev/null
 
 FL_INSERTED=$(psql_q "SELECT core_user_id FROM gofp_freelancers WHERE id = '${E2E_FL_ID}';" \
     2>/dev/null || echo "")
-NEED_INSERTED=$(psql_q "SELECT assigned_freelancer_id FROM delivery_needs WHERE id = '${E2E_NEED_ID}';" \
-    2>/dev/null || echo "")
+NEED_INSERTED=$(psql_q "SELECT r.delivery_person_id FROM tnt_delivery_announcements a
+    JOIN tnt_announcement_responses r ON r.id = a.selected_response_id
+    WHERE a.origin_ref_type = 'DELIVERY_NEED' AND a.origin_ref_id = '${E2E_NEED_ID}';" 2>/dev/null || echo "")
 
 assert_eq "$ACTOR_USER_ID" "$FL_INSERTED" "gofp_freelancers.core_user_id == actorUserId"
-assert_eq "$E2E_FL_ID"     "$NEED_INSERTED" "delivery_needs.assigned_freelancer_id == e2eFlId"
+assert_eq "$E2E_CORE_FL_ID" "$NEED_INSERTED" "livreur du besoin (réponse retenue dans le cœur) == coreFreelancerId"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 6. PING GPS PRINCIPAL — coordonnées mémorisées
@@ -720,9 +703,5 @@ else
   done
 fi
 # ── Avertissements structurels — visibles même quand tout passe ───────────────
-if [ "$DELIVERY_USER_FALLBACK" = "1" ]; then
-  echo -e "${YELLOW}  [WARN]${RESET} AUTORISATION : delivery_need.user_id=11111111-… ≠ acteur JWT"
-  echo -e "${YELLOW}  [WARN]${RESET} AUTORISATION : GET /tracking réussit sans contrôle de propriété (trou de sécurité à traiter)"
-fi
 echo "════════════════════════════════════════"
 exit "$FAILED"

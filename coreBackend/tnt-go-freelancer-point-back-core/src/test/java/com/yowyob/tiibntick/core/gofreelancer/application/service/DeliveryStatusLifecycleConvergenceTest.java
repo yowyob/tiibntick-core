@@ -17,7 +17,7 @@ import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryNeed
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.PushNotificationPort;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.DeliveryNeed;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryStatus;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryStatus;
 import com.yowyob.tiibntick.core.trust.application.port.in.RecordCustodyTransferUseCase;
 import com.yowyob.tiibntick.core.trust.application.port.in.RecordMissionUseCase;
 import com.yowyob.tiibntick.core.trust.application.port.in.RecordPaymentUseCase;
@@ -87,8 +87,8 @@ class DeliveryStatusLifecycleConvergenceTest {
     void setUp() {
         gofpDelivery = new Delivery();
         gofpDelivery.setId(deliveryId);
-        gofpDelivery.setFreelancerId(driver);
-        gofpDelivery.setStatus(DeliveryStatus.CREATED);
+        com.yowyob.tiibntick.core.gofreelancer.TestDeliveries.driver(gofpDelivery, driver);
+        com.yowyob.tiibntick.core.gofreelancer.TestDeliveries.status(gofpDelivery, DeliveryStatus.CREATED);
         gofpDelivery.setPickupOtpHash("pickup-hash");
         gofpDelivery.setDeliveryOtpHash("delivery-hash");
 
@@ -127,7 +127,7 @@ class DeliveryStatusLifecycleConvergenceTest {
     }
 
     @Test
-    @DisplayName("PICKED_UP with the sender's code: the core confirms pickup, the row mirrors it with the pickup instant, custody is anchored")
+    @DisplayName("PICKED_UP with the sender's code: the core confirms pickup, the delivery reads its status and pickup instant from it, custody is anchored")
     void pickup_goesThroughTheCore_thenProjects() {
         coreIsIn("CREATED");
         when(lifecycle.confirmPickup(tenantId, deliveryId, driver)).thenReturn(Mono.just(
@@ -142,7 +142,8 @@ class DeliveryStatusLifecycleConvergenceTest {
                 })
                 .verifyComplete();
 
-        assertThat(writes).containsExactly(DeliveryStatus.PICKED_UP);
+        // The status lives in the core only: the gofp row is never rewritten (lot L1).
+        assertThat(writes).isEmpty();
         verify(custodyTransferUseCase).record(any());
     }
 
@@ -203,9 +204,9 @@ class DeliveryStatusLifecycleConvergenceTest {
     }
 
     @Test
-    @DisplayName("IN_TRANSIT from AT_RELAY_POINT is a resume: no second mission-created anchor")
+    @DisplayName("IN_TRANSIT from AT_RELAY_HUB is a resume: no second mission-created anchor")
     void inTransit_resumeFromRelay_doesNotAnchorAgain() {
-        coreIsIn("AT_RELAY_POINT");
+        coreIsIn("AT_RELAY_HUB");
         when(lifecycle.startOrResumeTransit(tenantId, deliveryId, driver)).thenReturn(Mono.just(
                 new CoreDeliveryState(deliveryId, "IN_TRANSIT", "TNT-1", driver, pickupAt, null)));
 
@@ -220,7 +221,7 @@ class DeliveryStatusLifecycleConvergenceTest {
     @DisplayName("DELIVERED straight after pickup: the transit is started first because the core refuses PICKED_UP -> DELIVERED")
     void deliveredAfterPickup_startsTransitFirst() {
         coreIsIn("PICKED_UP");
-        gofpDelivery.setStatus(DeliveryStatus.PICKED_UP);
+        com.yowyob.tiibntick.core.gofreelancer.TestDeliveries.status(gofpDelivery, DeliveryStatus.PICKED_UP);
         when(otpService.verifyOtp("222222", "delivery-hash")).thenReturn(true);
         when(lifecycle.startOrResumeTransit(tenantId, deliveryId, driver)).thenReturn(Mono.just(
                 new CoreDeliveryState(deliveryId, "IN_TRANSIT", "TNT-1", driver, pickupAt, null)));
@@ -239,21 +240,34 @@ class DeliveryStatusLifecycleConvergenceTest {
         org.mockito.InOrder order = org.mockito.Mockito.inOrder(lifecycle);
         order.verify(lifecycle).startOrResumeTransit(tenantId, deliveryId, driver);
         order.verify(lifecycle).complete(tenantId, deliveryId, driver);
-        assertThat(writes).as("a single DELIVERED write").containsExactly(DeliveryStatus.DELIVERED);
+        assertThat(writes).as("the gofp row is never rewritten: the status is the core's").isEmpty();
     }
 
     @Test
-    @DisplayName("FAILED carries the reason to the core and the row follows")
+    @DisplayName("FAILED records a failed attempt with its reason code in the core (D9/D10) and the row follows")
     void failed_recordsReasonInTheCore() {
         coreIsIn("IN_TRANSIT");
-        when(lifecycle.fail(tenantId, deliveryId, driver, "Recipient absent")).thenReturn(Mono.just(
-                new CoreDeliveryState(deliveryId, "FAILED", "TNT-1", driver, pickupAt, null)));
+        when(lifecycle.recordFailedAttempt(tenantId, deliveryId, driver,
+                com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryFailureReason.CLIENT_REFUSED_RECEPTION))
+                .thenReturn(Mono.just(new CoreDeliveryState(deliveryId, "FAILED", "TNT-1", driver, pickupAt, null)));
         DeliveryStatusUpdateDTO d = dto(DeliveryStatus.FAILED);
-        d.setReason("Recipient absent");
+        d.setReason("CLIENT_REFUSED_RECEPTION");
 
         StepVerifier.create(service().updateStatus(deliveryId, d))
                 .assertNext(saved -> assertThat(saved.getStatus()).isEqualTo(DeliveryStatus.FAILED))
                 .verifyComplete();
+    }
+
+    @Test
+    @DisplayName("a failed attempt without a reason code is refused before reaching the core (QO-3)")
+    void failed_requiresAReasonCode() {
+        coreIsIn("IN_TRANSIT");
+        DeliveryStatusUpdateDTO d = dto(DeliveryStatus.FAILED);
+        d.setReason("Recipient absent");
+        StepVerifier.create(service().updateStatus(deliveryId, d))
+                .expectError(IllegalArgumentException.class).verify();
+        org.mockito.Mockito.verify(lifecycle, org.mockito.Mockito.never())
+                .recordFailedAttempt(any(), any(), any(), any());
     }
 
     @Test
@@ -278,10 +292,10 @@ class DeliveryStatusLifecycleConvergenceTest {
     }
 
     @Test
-    @DisplayName("AT_RELAY_POINT without a relay point is refused")
+    @DisplayName("AT_RELAY_HUB without a relay point is refused")
     void relayDeposit_requiresRelayPoint() {
         coreIsIn("IN_TRANSIT");
-        StepVerifier.create(service().updateStatus(deliveryId, dto(DeliveryStatus.AT_RELAY_POINT)))
+        StepVerifier.create(service().updateStatus(deliveryId, dto(DeliveryStatus.AT_RELAY_HUB)))
                 .expectError(IllegalArgumentException.class).verify();
     }
 

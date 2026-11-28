@@ -4,7 +4,7 @@ import com.yowyob.tiibntick.core.sync.domain.model.enums.ConflictResolution;
 
 public class SyncConflictDetectedEvent extends SyncDomainEvent {
 
-    private static final String TOPIC = "tnt.sync.conflict.detected";
+    private static final String TOPIC = com.yowyob.tiibntick.common.kafka.TntTopics.SYNC_CONFLICT_DETECTED;
 
     private final String sessionId;
     private final String userId;

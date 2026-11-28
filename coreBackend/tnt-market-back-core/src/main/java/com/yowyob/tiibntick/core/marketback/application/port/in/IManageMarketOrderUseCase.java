@@ -23,6 +23,9 @@ public interface IManageMarketOrderUseCase {
     Mono<MarketOrderResponse> completeOrder(UUID orderId, String tenantId);
     Mono<MarketOrderResponse> cancelOrder(UUID orderId, String reason, String tenantId);
     Mono<MarketOrderResponse> getOrder(UUID orderId, String tenantId);
+
+    /** Lot L8: the orders dispatched with this core delivery. */
+    Flux<MarketOrderResponse> getOrdersByDelivery(UUID deliveryId, String tenantId);
     Flux<MarketOrderResponse> getOrdersByClient(UUID clientId, String tenantId);
     Flux<MarketOrderResponse> getOrdersByProvider(UUID providerId, String tenantId);
     Flux<MarketOrderResponse> getOrdersByStatus(OrderStatus status, String tenantId);

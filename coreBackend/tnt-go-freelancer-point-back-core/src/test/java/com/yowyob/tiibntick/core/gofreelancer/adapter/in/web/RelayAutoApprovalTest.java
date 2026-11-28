@@ -84,7 +84,11 @@ class RelayAutoApprovalTest {
     private final PushNotificationPort push = mock(PushNotificationPort.class);
     private final IRelayHubPort hubs = mock(IRelayHubPort.class);
     private final AddressUseCase addressUseCase = mock(AddressUseCase.class);
+    private final com.yowyob.tiibntick.core.geo.application.port.in.IManageHubApprovalUseCase hubApproval =
+            mock(com.yowyob.tiibntick.core.geo.application.port.in.IManageHubApprovalUseCase.class);
     private final AddressReactiveRepository addresses = mock(AddressReactiveRepository.class);
+    private final com.yowyob.tiibntick.core.gofreelancer.application.service.GofpRelayRevocationApplier revocationApplier =
+            mock(com.yowyob.tiibntick.core.gofreelancer.application.service.GofpRelayRevocationApplier.class);
 
     private Mono<GofpRelayPoint> save(GofpRelayPoint rp) {
         if (rp.getId() == null) rp.setId(UUID.randomUUID());
@@ -112,6 +116,10 @@ class RelayAutoApprovalTest {
         when(useCase.findActiveApproved()).thenAnswer(i -> Flux.fromIterable(store.values().stream()
                 .filter(rp -> rp.getStatus() == RelayPointStatus.APPROVED && Boolean.TRUE.equals(rp.getIsActive())).toList()));
         when(kyc.validateKyc(any())).thenReturn(Mono.empty());
+        // D-138 on this branch: the core hub is approved first (authoritative), the relay point copies it.
+        when(hubApproval.approve(any(), any(), any())).thenReturn(Mono.empty());
+        // H1 on this branch: the hub operator is the owner's actor (none known here).
+        when(revocationApplier.operatorActor(any(), any())).thenReturn(Mono.empty());
         when(addresses.findById(any(UUID.class))).thenReturn(Mono.empty());
         when(hubs.findHub(any(), any())).thenReturn(Mono.error(new GeoNotFoundException("RelayHub", "x")));
         when(hubs.provisionHub(any(), any(), anyString(), anyString(), anyInt(), any())).thenReturn(Mono.empty());
@@ -125,7 +133,10 @@ class RelayAutoApprovalTest {
                 .authenticated(true).roles(Set.of("ROLE_FREELANCER")).build();
         RelayPointAccessGuard guard = new RelayPointAccessGuard(relayPoints, freelancers);
         AdminRelayPointApplicationService admin = new AdminRelayPointApplicationService(kyc, email, push, relayPoints,
-                mock(IRelayOperatorRepository.class), mock(FreelancerVehicleApplicationService.class), hubs, addressUseCase);
+                mock(IRelayOperatorRepository.class), mock(FreelancerVehicleApplicationService.class), hubs, addressUseCase,
+                mock(com.yowyob.tiibntick.core.geo.application.port.in.IRevokeRelayHubUseCase.class),
+                revocationApplier,
+                hubApproval);
         GofpRelayPointProfileController controller = new GofpRelayPointProfileController(useCase, guard,
                 new RelayPointDirectoryService(addresses, mock(IDeliveryNeedRepository.class),
                         mock(RelayDepositRepository.class), mock(IAnnouncementRepository.class)));
@@ -197,7 +208,10 @@ class RelayAutoApprovalTest {
         save(GofpRelayPoint.builder().coreRelayPointId(UUID.randomUUID()).coreFreelancerId(STRANGER_FREELANCER)
                 .name("Refusé").status(RelayPointStatus.REJECTED).isActive(false).build());
         AdminRelayPointApplicationService admin = new AdminRelayPointApplicationService(kyc, email, push, relayPoints,
-                mock(IRelayOperatorRepository.class), mock(FreelancerVehicleApplicationService.class), hubs, addressUseCase);
+                mock(IRelayOperatorRepository.class), mock(FreelancerVehicleApplicationService.class), hubs, addressUseCase,
+                mock(com.yowyob.tiibntick.core.geo.application.port.in.IRevokeRelayHubUseCase.class),
+                revocationApplier,
+                hubApproval);
 
         new RelayAutoApproval(admin, relayPoints, true).catchUpPending();
 

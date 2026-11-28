@@ -14,7 +14,7 @@ import com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepos
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpRelayPointRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryNeedRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.PushNotificationPort;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryStatus;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryStatus;
 import com.yowyob.tiibntick.core.trust.application.port.in.RecordCustodyTransferUseCase;
 import com.yowyob.tiibntick.core.trust.application.port.in.RecordMissionUseCase;
 import com.yowyob.tiibntick.core.trust.application.port.in.RecordPaymentUseCase;
@@ -99,11 +99,11 @@ class DeliveryStatusPaymentActorResolutionTest {
         com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery gofpDelivery =
                 new com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery();
         gofpDelivery.setId(deliveryId);
-        gofpDelivery.setFreelancerId(freelancerProfileId);
+        com.yowyob.tiibntick.core.gofreelancer.TestDeliveries.driver(gofpDelivery, freelancerProfileId);
         gofpDelivery.setAnnouncementId(announcementId);
-        gofpDelivery.setTarif(5000.0);
+        com.yowyob.tiibntick.core.gofreelancer.TestDeliveries.tarif(gofpDelivery, 5000.0);
         gofpDelivery.setDeliveryOtpHash(otpHash);
-        gofpDelivery.setStatus(DeliveryStatus.IN_TRANSIT);
+        com.yowyob.tiibntick.core.gofreelancer.TestDeliveries.status(gofpDelivery, DeliveryStatus.IN_TRANSIT);
 
         // Core delivery — uses @Builder
         com.yowyob.tiibntick.core.delivery.domain.model.aggregate.Delivery coreDelivery =
@@ -121,9 +121,11 @@ class DeliveryStatusPaymentActorResolutionTest {
         // delivery-core is the lifecycle authority: it sits in IN_TRANSIT and accepts the completion.
         when(lifecycle.findState(tenantId, deliveryId)).thenReturn(Mono.just(new CoreDeliveryState(
                 deliveryId, "IN_TRANSIT", null, freelancerProfileId, null, null)));
-        when(lifecycle.complete(eq(tenantId), eq(deliveryId), any())).thenReturn(Mono.just(new CoreDeliveryState(
-                deliveryId, "DELIVERED", null, freelancerProfileId, null, java.time.Instant.now())));
-        when(gofpDeliveryRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        // The agreed price is the core delivery's (lot L1): the completed state carries it.
+        when(lifecycle.complete(eq(tenantId), eq(deliveryId), any())).thenReturn(Mono.just(
+                com.yowyob.tiibntick.core.gofreelancer.TestDeliveries.priced(new CoreDeliveryState(
+                        deliveryId, "DELIVERED", null, freelancerProfileId, null, java.time.Instant.now()), 5000.0)));
+        // No save stub: completing a delivery no longer rewrites the gofp row (lot L1).
 
         // The key: profile ID → kernel actorId
         when(deliveryQueryUseCase.resolveActorIdForDeliveryPerson(tenantId, freelancerProfileId))

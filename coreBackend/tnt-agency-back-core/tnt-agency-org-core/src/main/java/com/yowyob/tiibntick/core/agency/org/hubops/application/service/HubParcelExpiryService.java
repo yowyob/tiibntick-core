@@ -34,15 +34,18 @@ public class HubParcelExpiryService {
                 .map(Long::intValue);
     }
 
-    /** Process expired parcels across all tenants (scheduled job). */
+    /**
+     * Marks the hub parcel of this tracking code EXPIRED when it is still DEPOSITED (frees its place, publishes
+     * {@code HubParcelExpired}); empty when it is unknown or already handled (a replay changes nothing). Called when
+     * the core reports the parcel not collected at the end of its storage (lot L8: replaces the agency's own
+     * scheduled sweep).
+     */
     @Transactional
-    public Mono<Integer> processExpiredAllTenants() {
-        Instant now = Instant.now();
-        return parcelRepo.findByStatusAndWithdrawalDeadlineBefore(ParcelStatus.DEPOSITED.name(), now)
+    public Mono<HubParcelRecord> expireDeposited(String trackingCode, UUID tenantId, Instant now) {
+        return parcelRepo.findByTrackingCodeAndTenantId(trackingCode, tenantId)
                 .map(HubParcelMapper::toDomain)
-                .flatMap(record -> expireOne(record, now))
-                .count()
-                .map(Long::intValue);
+                .filter(parcel -> parcel.getStatus() == ParcelStatus.DEPOSITED)
+                .flatMap(parcel -> expireOne(parcel, now));
     }
 
     private Mono<HubParcelRecord> expireOne(HubParcelRecord record, Instant now) {

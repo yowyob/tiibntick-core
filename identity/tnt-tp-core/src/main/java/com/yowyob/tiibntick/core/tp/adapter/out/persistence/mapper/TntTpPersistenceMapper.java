@@ -220,6 +220,8 @@ public class TntTpPersistenceMapper {
         entity.setScore(rating.getScore());
         entity.setComment(rating.getComment());
         entity.setCreatedAt(rating.getCreatedAt());
+        entity.setRatingContext(rating.getRatingContext());
+        entity.setSubjectKind(rating.getSubjectKind());
         return entity;
     }
 
@@ -240,7 +242,9 @@ public class TntTpPersistenceMapper {
                 entity.getMissionId(),
                 entity.getScore(),
                 entity.getComment(),
-                entity.getCreatedAt()
+                entity.getCreatedAt(),
+                entity.getRatingContext(),
+                entity.getSubjectKind()
         );
     }
 

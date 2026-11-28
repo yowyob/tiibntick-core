@@ -92,9 +92,14 @@ public class CommissionService {
         return mutate(commissionId, tenantId, c -> c.dispute(reason, Instant.now()));
     }
 
+    /**
+     * Marks a VALIDATED commission PAID when its wallet payment is confirmed. The wallet confirms every payment of the
+     * platform, and only those whose {@code invoiceId} is an agency commission concern this module: an unknown id is
+     * therefore not an error (completes empty), so that the Kafka listener does not dead-letter foreign payments.
+     */
     @Transactional
     public Mono<Void> confirmWalletPayment(UUID tenantId, UUID commissionId) {
-        return requireCommissionEntity(commissionId, tenantId)
+        return commissionRepo.findByIdAndTenantId(commissionId, tenantId)
                 .flatMap(entity -> {
                     CommissionRecord record = CommissionMapper.toDomain(entity);
                     if (record.getStatus() == CommissionStatus.PAID) {

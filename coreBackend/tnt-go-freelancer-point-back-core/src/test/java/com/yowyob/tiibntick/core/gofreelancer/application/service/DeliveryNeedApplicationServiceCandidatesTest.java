@@ -21,7 +21,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.r2dbc.core.DatabaseClient;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
@@ -55,7 +54,6 @@ class DeliveryNeedApplicationServiceCandidatesTest {
     @Mock private GofpFreelancerRepository gofpFreelancerRepository;
     @Mock private FreelancerPriceQuoteUseCase freelancerPriceQuoteUseCase;
     @Mock private FreelancerEligibilityUseCase freelancerEligibilityUseCase;
-    @Mock private DatabaseClient databaseClient;
 
     private DeliveryNeedApplicationService service;
 
@@ -76,7 +74,7 @@ class DeliveryNeedApplicationServiceCandidatesTest {
         service = new DeliveryNeedApplicationService(
                 deliveryNeedRepository, adminRelayPointUseCase, pushNotificationPort,
                 matchingUseCase, addressUseCase, gofpUserRepository,
-                gofpFreelancerRepository, freelancerPriceQuoteUseCase, freelancerEligibilityUseCase, databaseClient);
+                gofpFreelancerRepository, freelancerPriceQuoteUseCase, freelancerEligibilityUseCase);
     }
 
     @Test

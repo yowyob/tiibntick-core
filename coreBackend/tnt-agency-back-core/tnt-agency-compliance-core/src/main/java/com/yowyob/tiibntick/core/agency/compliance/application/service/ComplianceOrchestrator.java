@@ -48,9 +48,9 @@ public class ComplianceOrchestrator {
         if (!enabled) {
             return Mono.empty();
         }
-        UUID reporter = delivererId != null ? delivererId : agencyId;
+        // lot L3: only the assigned courier declares an incident; never the agency in his place
         return incidentCore.reportIncident(new IncidentCorePort.ReportIncidentRequest(
-                        tenantId, agencyId, missionId, anomalyType, description, reporter))
+                        tenantId, agencyId, missionId, anomalyType, description, delivererId))
                 .onErrorResume(e -> {
                     log.warn("[Compliance] incident report failed mission={}: {}", missionId, e.getMessage());
                     return Mono.empty();

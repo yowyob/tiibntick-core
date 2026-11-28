@@ -56,7 +56,7 @@ public class ComplianceController {
         return queryService.getDispute(tenantId, disputeId)
                 .map(d -> new DisputeDetailResponse(
                         d.id(), d.reference(), d.status(), d.category(), d.priority(),
-                        d.missionId(), d.trackingCode(), d.description(), d.claimantId(),
+                        d.deliveryId(), d.trackingCode(), d.description(), d.claimantId(),
                         d.assignedMediatorId(), d.filedAt(), d.deadline(), d.evidenceCount()))
                 .map(ApiResponse::success);
     }
@@ -83,7 +83,7 @@ public class ComplianceController {
             @PathVariable UUID incidentId) {
         return queryService.getIncident(incidentId)
                 .map(i -> new IncidentDetailResponse(
-                        i.id(), i.referenceCode(), i.missionId(), i.type(), i.status(),
+                        i.id(), i.referenceCode(), i.deliveryId(), i.type(), i.status(),
                         i.severity(), i.description(), i.reportedAt(), i.resolvedAt(), i.slaBreached()))
                 .map(ApiResponse::success);
     }
@@ -104,12 +104,12 @@ public class ComplianceController {
     private static DisputeItemResponse toDisputeItem(DisputeCorePort.DisputeSummary d) {
         return new DisputeItemResponse(
                 d.id(), d.reference(), d.status(), d.category(), d.priority(),
-                d.missionId(), d.trackingCode(), d.description(), d.filedAt());
+                d.deliveryId(), d.trackingCode(), d.description(), d.filedAt());
     }
 
     private static IncidentResponse toIncident(IncidentCorePort.IncidentSummary i) {
         return new IncidentResponse(
-                i.id(), i.referenceCode(), i.missionId(), i.type(), i.status(),
+                i.id(), i.referenceCode(), i.deliveryId(), i.type(), i.status(),
                 i.description(), i.reportedAt());
     }
 

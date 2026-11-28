@@ -72,6 +72,21 @@ public class GofpNotifyEmailAdapter implements EmailPort {
                 .then();
     }
 
+    @Override
+    public Mono<Void> sendLocalized(String to, UUID recipientUserId, String templateKey, Map<String, Object> params) {
+        if (to == null || to.isBlank()) {
+            return Mono.empty();
+        }
+        NotificationModel model = NotificationModel.of(templateKey, FR, params != null ? params : Map.of());
+        // The account id, when known, lets the notification module read the recipient's own language.
+        String recipientId = recipientUserId != null ? recipientUserId.toString() : to;
+        return sendNotificationUseCase
+                .send(defaultTenantId(), null, recipientId, to, model, NotificationChannel.EMAIL)
+                .doOnError(e -> log.warn("Localized e-mail {} to {} failed: {}", templateKey, to, e.getMessage()))
+                .onErrorResume(e -> Mono.empty())
+                .then();
+    }
+
     private void dispatch(String to, String templateKey, Map<String, String> params) {
         Map<String, Object> objectParams = new HashMap<>();
         objectParams.putAll(params);

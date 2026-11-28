@@ -5,7 +5,6 @@ import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import com.yowyob.tiibntick.common.session.AuthenticatedSessionPublisher;
 import com.yowyob.tiibntick.core.billing.wallet.adapter.out.kernel.KernelPaymentGatewayAdapter;
-import com.yowyob.tiibntick.core.billing.wallet.application.port.in.IWalletHoldUseCase;
 import com.yowyob.tiibntick.core.billing.wallet.application.service.KernelWalletService;
 import com.yowyob.tiibntick.core.billing.wallet.application.service.WalletAutoProvisioningListener;
 import com.yowyob.tiibntick.core.platformgateway.application.port.out.IKernelAuthGatewayPort;
@@ -92,7 +91,7 @@ class WalletAutoProvisioningEndToEndTest {
                 RetryRegistry.ofDefaults());
 
         KernelWalletService wallets = new KernelWalletService(
-                new KernelPaymentGatewayAdapter(paymentClient), mock(IWalletHoldUseCase.class));
+                new KernelPaymentGatewayAdapter(paymentClient));
         var listener = new WalletAutoProvisioningListener(wallets, new ObjectMapper(),
                 Duration.ofHours(1), Duration.ofMinutes(5), Clock.systemUTC());
         publisher = new AuthenticatedSessionPublisher(() -> List.of(listener));

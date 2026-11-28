@@ -48,6 +48,11 @@
             <groupId>com.yowyob.tiibntick.core</groupId>
             <artifactId>tnt-actor-core</artifactId>
         </dependency>
+        <!-- Third-party core: ratings and loyalty accounts (lot L3 de-duplication: evaluations and loyalty tier) -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-tp-core</artifactId>
+        </dependency>
 
         <!-- Spring Boot -->
         <dependency>
@@ -201,9 +206,19 @@
             <groupId>com.yowyob.tiibntick.core</groupId>
             <artifactId>tnt-delivery-core</artifactId>
         </dependency>
+        <!-- Lot evt-l2 / D-130: bounds of the storage of an independent relay (L2 administration, lot L1 thresholds) -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-administration-core</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>
             <artifactId>tnt-inventory-core</artifactId>
+        </dependency>
+        <!-- Lot L3: the courier's vehicle is owned by tnt-resource-core (personal vehicle, owner = actor) -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-resource-core</artifactId>
         </dependency>
         <dependency>
             <groupId>com.yowyob.tiibntick.core</groupId>

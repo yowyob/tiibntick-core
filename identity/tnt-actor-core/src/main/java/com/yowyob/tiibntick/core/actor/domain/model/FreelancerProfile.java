@@ -45,7 +45,7 @@ public final class FreelancerProfile extends TntActorProfile {
 
     /**
      * Number of incidents in which this freelancer was involved.
-     * Incremented by {@code IncidentEventConsumer} on {@code tnt.incident.closed}.
+     * Incremented by {@code IncidentEventConsumer} on {@code IncidentClosed} ({@code tnt.incident.events}).
      */
     private final int incidentHistoryCount;
 

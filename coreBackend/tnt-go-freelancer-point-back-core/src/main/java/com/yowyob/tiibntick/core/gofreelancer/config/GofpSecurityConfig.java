@@ -22,8 +22,6 @@ import org.springframework.security.web.server.util.matcher.ServerWebExchangeMat
  *   <li>{@code POST /api/auth/login} — credential authentication</li>
  *   <li>{@code POST /api/auth/register} — new user/client registration</li>
  *   <li>{@code POST /api/auth/refresh} — token renewal</li>
- *   <li>{@code POST /api/auth/setup-password} — first-time password setup (token link)</li>
- *   <li>{@code POST /api/auth/request-password-reset} — request reset email</li>
  *   <li>{@code GET  /uploads/**} — static file serving (photos already stored)</li>
  * </ul>
  *
@@ -40,8 +38,6 @@ public class GofpSecurityConfig {
             // Auth — credential endpoints (no token needed to log in or refresh)
             "/api/auth/login",
             "/api/auth/refresh",
-            "/api/auth/setup-password",
-            "/api/auth/request-password-reset",
             // Static files — uploaded images served without auth
             "/uploads/**",
     };

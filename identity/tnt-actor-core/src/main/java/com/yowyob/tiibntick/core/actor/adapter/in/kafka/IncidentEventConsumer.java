@@ -10,27 +10,16 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import java.util.UUID;
 
 /**
  * Kafka consumer for incident events published by {@code tnt-incident-core}.
  *
- * <p>Listens to:
- * <ul>
- *   <li>{@code tnt.incident.closed} — increments {@code incident_history_count} for the
- *       primary driver (deliverer or freelancer) involved in the closed incident.</li>
- * </ul>
- *
- * <p>The event payload is expected to contain at least:
- * <pre>{@code
- * {
- *   "driverActorId": "<UUID>",
- *   "tenantId": "<UUID>",
- *   "platform": "GO | FREELANCER | POINT | AGENCY"
- * }
- * }</pre>
+ * <p>Listens to {@code IncidentClosed} of {@code tnt.incident.events} (lot L8, was {@code tnt.incident.closed}):
+ * increments {@code incident_history_count} of the courier the incident is attributed to — the reporter when a
+ * courier (or an automatic detector naming the driver, role SYSTEM) reported it, never the system actor. Other event
+ * types and legacy records are ignored. The work is awaited (lot L7 rule): a failure is retried, then dead-lettered.
  *
  * <p>This consumer maintains the local {@code incident_history_count} counter in actor-core
  * without a direct dependency on tnt-incident-core's domain model. The counter is read back
@@ -43,6 +32,10 @@ import java.util.UUID;
 @Component("actorIncidentEventConsumer")
 public class IncidentEventConsumer {
 
+    static final String CLOSED = "IncidentClosed";
+    private static final java.util.Set<String> COURIER_ROLES = java.util.Set.of("GO_BIKER", "FREELANCER_DRIVER",
+            "PERMANENT_DRIVER", "AGENCY_DRIVER", "SYSTEM");
+
     private final IDelivererRepository delivererRepository;
     private final IFreelancerRepository freelancerRepository;
     private final ObjectMapper objectMapper;
@@ -54,45 +47,41 @@ public class IncidentEventConsumer {
         this.objectMapper = new ObjectMapper();
     }
 
-    /**
-     * Handles the {@code tnt.incident.closed} event.
-     *
-     * <p>Extracts the {@code driverActorId} and {@code tenantId} from the event payload
-     * and atomically increments the driver's {@code incident_history_count}.
-     * If the actor is not found (incident closed without a driver assignment), the event
-     * is silently ignored.
-     *
-     * @param record the Kafka consumer record
-     */
     @KafkaListener(
-            topics = TntTopics.INCIDENT_CLOSED,
-            groupId = "${spring.kafka.consumer.group-id:tiibntick-core}",
+            topics = TntTopics.INCIDENT_EVENTS,
+            groupId = "${tnt.kafka.consumer.groups.actor-incident:tnt-actor-incident-consumer}",
             containerFactory = "actorKafkaListenerContainerFactory")
-    public void onIncidentClosed(ConsumerRecord<String, String> record) {
-        log.debug("Received tnt.incident.closed event: key={}", record.key());
+    public void onIncidentClosed(ConsumerRecord<String, String> record) throws Exception {
+        JsonNode event = objectMapper.readTree(record.value());
+        if (!com.yowyob.tiibntick.common.kafka.TntAggregateEvent.isAggregateEvent(event)
+                || !CLOSED.equals(event.path("eventType").asText())) {
+            return;
+        }
+        UUID courier = courierInvolved(event.path("payload"));
+        UUID tenantId = extractUuid(event, "tenantId");
+        if (courier == null || tenantId == null) {
+            log.debug("IncidentClosed {}: no courier involved, no count increment", event.path("aggregateId").asText());
+            return;
+        }
+        String platform = event.path("payload").path("platform").asText("UNKNOWN");
+        com.yowyob.tiibntick.common.kafka.ReactiveListenerSupport.awaitBounded(
+                incrementIncidentCount(courier, tenantId, platform).then(Mono.just(true)),
+                java.time.Duration.ofSeconds(30));
+    }
 
-        Mono.fromCallable(() -> objectMapper.readTree(record.value()))
-                .flatMap(payload -> {
-                    UUID driverActorId = extractUuid(payload, "driverActorId");
-                    UUID tenantId = extractUuid(payload, "tenantId");
-
-                    if (driverActorId == null || tenantId == null) {
-                        // No driver involved in this incident (e.g. RELAY_POINT incident)
-                        log.debug("tnt.incident.closed: no driverActorId in payload, skipping count increment");
-                        return Mono.empty();
-                    }
-
-                    String platform = payload.has("platform")
-                            ? payload.get("platform").asText() : "UNKNOWN";
-
-                    return incrementIncidentCount(driverActorId, tenantId, platform);
-                })
-                .subscribeOn(Schedulers.boundedElastic())
-                .subscribe(
-                        null,
-                        error -> log.error("Failed to process tnt.incident.closed event: {}",
-                                error.getMessage(), error)
-                );
+    /** Same rule as incident-core's {@code IncidentEscalationService.courierInvolved}. */
+    static UUID courierInvolved(JsonNode incident) {
+        String role = incident.path("reportedByRole").asText(null);
+        String reporter = incident.path("reportedByActorId").asText(null);
+        if (role == null || reporter == null || !COURIER_ROLES.contains(role)
+                || reporter.equals(String.valueOf(com.yowyob.tiibntick.common.tenant.SystemTenant.systemActorId()))) {
+            return null;
+        }
+        try {
+            return UUID.fromString(reporter);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     /**

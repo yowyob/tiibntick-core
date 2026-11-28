@@ -1,0 +1,20 @@
+databaseChangeLog:
+  - changeSet:
+      id: evt-l5-003-drop-wallet-holds
+      author: evt-l5
+      labels: evt-l5
+      comment: >
+        Decision H.1 of 2026-11-26 (user): the freeze goes through the Kernel escrow. The money of a delivery under
+        incident or dispute stays in the escrow of the delivery (POST /api/payments/escrows/{id}/freeze), so the local
+        hold of funds already paid to the courier (billing.wallet_holds, lot wallet migration 004) has no use left.
+        No production data to keep (holds were only placed by the removed dispute listener).
+      preConditions:
+        - onFail: MARK_RAN
+        - tableExists:
+            schemaName: billing
+            tableName: wallet_holds
+      changes:
+        - dropTable:
+            schemaName: billing
+            tableName: wallet_holds
+            cascadeConstraints: true

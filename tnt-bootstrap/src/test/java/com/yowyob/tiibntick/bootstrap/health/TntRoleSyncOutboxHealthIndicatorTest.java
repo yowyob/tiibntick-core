@@ -38,7 +38,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class TntRoleSyncOutboxHealthIndicatorTest {
 
-    private static final UUID SYSTEM_TENANT = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private static final UUID SYSTEM_TENANT = com.yowyob.tiibntick.common.tenant.SystemTenant.id();
 
     private InMemoryOutbox outbox;
     private SimpleMeterRegistry registry;

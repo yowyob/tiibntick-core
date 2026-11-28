@@ -28,12 +28,17 @@ class GofpClientCreateOrUpdateTest {
 
     @Mock private GofpClientRepository clientRepository;
     @Mock private GofpUserRepository userRepository;
+    @Mock private com.yowyob.tiibntick.core.actor.application.port.out.IClientProfileRepository clientProfiles;
+    @Mock private TenantContextHolder tenantContextHolder;
+    @Mock private com.yowyob.tiibntick.core.tp.application.service.LoyaltyService loyaltyService;
+    @Mock private com.yowyob.tiibntick.core.actor.application.port.in.ICreateClientProfileUseCase createClientProfile;
 
     private GofpClientService service;
 
     @BeforeEach
     void setUp() {
-        service = new GofpClientService(clientRepository, userRepository);
+        service = new GofpClientService(clientRepository, userRepository, loyaltyService, clientProfiles, tenantContextHolder,
+                createClientProfile);
     }
 
     @Test
@@ -66,5 +71,71 @@ class GofpClientCreateOrUpdateTest {
                 .as("entity passed to save() must have isNew=false (UPDATE, not INSERT)")
                 .isFalse();
         assertThat(captor.getValue().getId()).isEqualTo(existingPk);
+    }
+
+    private static final UUID TENANT = UUID.randomUUID();
+
+    private GofpClient newClient(UUID coreClientId, UUID actor) {
+        GofpClient c = new GofpClient();
+        c.setId(UUID.randomUUID()); // ignored: the id is the client profile id
+        c.setCoreClientId(coreClientId);
+        c.setCoreUserId(actor);
+        return c;
+    }
+
+    /** New row whose coreClientId is a client profile id: the row takes that id (lot L3, C1). */
+    @Test
+    void createOrUpdate_newRecord_takesTheClientProfileId() {
+        UUID actor = UUID.randomUUID();
+        var profile = com.yowyob.tiibntick.core.actor.domain.model.ClientProfile.create(TENANT, actor);
+        when(tenantContextHolder.currentTenantId()).thenReturn(Mono.just(TENANT));
+        when(clientRepository.findByCoreClientId(profile.id())).thenReturn(Mono.empty());
+        when(clientProfiles.findById(TENANT, profile.id())).thenReturn(Mono.just(profile));
+        when(clientRepository.save(any(GofpClient.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        org.mockito.Mockito.lenient().when(clientProfiles.findByActorId(TENANT, actor)).thenReturn(Mono.just(profile));
+        org.mockito.Mockito.lenient().when(userRepository.findByCoreUserId(actor)).thenReturn(Mono.empty());
+        org.mockito.Mockito.lenient().when(loyaltyService.getByThirdPartyId(TENANT, actor)).thenReturn(Mono.empty());
+
+        GofpClient saved = service.createOrUpdate(newClient(profile.id(), actor)).block();
+
+        assertThat(saved.getId()).isEqualTo(profile.id());
+        org.mockito.Mockito.verifyNoInteractions(createClientProfile);
+    }
+
+    /** coreClientId unknown to actor-core: the actor's client profile is found or created by the core. */
+    @Test
+    void createOrUpdate_newRecord_withoutProfile_usesTheProfileFoundOrCreatedByTheCore() {
+        UUID actor = UUID.randomUUID();
+        UUID goId = UUID.randomUUID();
+        var profile = com.yowyob.tiibntick.core.actor.domain.model.ClientProfile.create(TENANT, actor);
+        when(tenantContextHolder.currentTenantId()).thenReturn(Mono.just(TENANT));
+        when(clientRepository.findByCoreClientId(goId)).thenReturn(Mono.empty());
+        when(clientProfiles.findById(TENANT, goId)).thenReturn(Mono.empty());
+        when(createClientProfile.createClientProfile(any())).thenReturn(Mono.just(profile));
+        when(clientRepository.save(any(GofpClient.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        org.mockito.Mockito.lenient().when(clientProfiles.findByActorId(TENANT, actor)).thenReturn(Mono.just(profile));
+        org.mockito.Mockito.lenient().when(userRepository.findByCoreUserId(actor)).thenReturn(Mono.empty());
+        org.mockito.Mockito.lenient().when(loyaltyService.getByThirdPartyId(TENANT, actor)).thenReturn(Mono.empty());
+
+        GofpClient saved = service.createOrUpdate(newClient(goId, actor)).block();
+
+        assertThat(saved.getId()).isEqualTo(profile.id());
+        var cmd = ArgumentCaptor.forClass(com.yowyob.tiibntick.core.actor.application.command.CreateClientProfileCommand.class);
+        verify(createClientProfile).createClientProfile(cmd.capture());
+        assertThat(cmd.getValue().actorId()).isEqualTo(actor);
+        assertThat(cmd.getValue().tenantId()).isEqualTo(TENANT);
+    }
+
+    @Test
+    void createOrUpdate_newRecord_withoutProfileNorActor_isRejected() {
+        UUID goId = UUID.randomUUID();
+        when(tenantContextHolder.currentTenantId()).thenReturn(Mono.just(TENANT));
+        when(clientRepository.findByCoreClientId(goId)).thenReturn(Mono.empty());
+        when(clientProfiles.findById(TENANT, goId)).thenReturn(Mono.empty());
+
+        StepVerifier.create(service.createOrUpdate(newClient(goId, null)))
+                .expectError(IllegalArgumentException.class)
+                .verify();
+        verify(clientRepository, org.mockito.Mockito.never()).save(any());
     }
 }

@@ -121,9 +121,20 @@ public class PolicyTemplateMapper {
                 .minValue(entity.getMinValue())
                 .maxValue(entity.getMaxValue())
                 .unit(entity.getUnit())
-                .type(ParameterType.valueOf(entity.getParameterType()))
+                .type(parameterTypeOf(entity))
                 .helpText(entity.getHelpText())
                 .build();
+    }
+
+    /** A parameter type this enum does not know is shown as a plain decimal rather than hiding the template. */
+    private ParameterType parameterTypeOf(TemplateParameterEntity entity) {
+        try {
+            return ParameterType.valueOf(entity.getParameterType().trim().toUpperCase(java.util.Locale.ROOT));
+        } catch (RuntimeException e) {
+            log.warn("Unknown parameter type '{}' on parameter '{}': read as DECIMAL",
+                    entity.getParameterType(), entity.getParameterKey());
+            return ParameterType.DECIMAL;
+        }
     }
 
     // ─── CustomPolicyTemplate: Entity → Domain ────────────────────────────
@@ -180,14 +191,40 @@ public class PolicyTemplateMapper {
         }
     }
 
+    /**
+     * Owner types stored on a template. Rows written by hand or by an older release may hold a name this enum
+     * does not know; one such value must not make the whole catalog unreadable ({@code valueOf} used to throw and
+     * took every template down with it). Unknown names are skipped and logged; {@code FREELANCER} is the legacy
+     * spelling of {@code FREELANCER_ORG}.
+     */
     private List<PolicyOwnerType> deserializeOwnerTypes(String json) {
         if (json == null || json.isBlank()) return List.of();
         try {
             List<String> names = objectMapper.readValue(json, new TypeReference<>() {});
-            return names.stream().map(PolicyOwnerType::valueOf).toList();
+            List<PolicyOwnerType> types = new ArrayList<>();
+            for (String raw : names) {
+                PolicyOwnerType type = ownerTypeOf(raw);
+                if (type == null) {
+                    log.warn("Ignoring unknown owner type '{}' stored in applicable_to_json {}", raw, json);
+                } else if (!types.contains(type)) {
+                    types.add(type);
+                }
+            }
+            return types;
         } catch (JsonProcessingException e) {
             log.error("Failed to deserialize owner types from JSON: {}", json, e);
             return List.of();
+        }
+    }
+
+    private static PolicyOwnerType ownerTypeOf(String raw) {
+        if (raw == null) return null;
+        String name = raw.trim().toUpperCase(java.util.Locale.ROOT);
+        if (name.equals("FREELANCER")) name = PolicyOwnerType.FREELANCER_ORG.name();
+        try {
+            return PolicyOwnerType.valueOf(name);
+        } catch (IllegalArgumentException e) {
+            return null;
         }
     }
 

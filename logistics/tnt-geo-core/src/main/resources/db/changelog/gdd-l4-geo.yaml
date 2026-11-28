@@ -1,0 +1,31 @@
+databaseChangeLog:
+  - changeSet:
+      id: gdd-l4-401-geo-addresses-schema
+      author: gdd-l4
+      labels: gdd-l4
+      comment: Generic address book (tnt_addresses) and owner/address links (tnt_address_links).
+      changes:
+        - sqlFile:
+            path: gdd-l4/V401__gdd_l4_401_geo_addresses_schema.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+  - changeSet:
+      id: gdd-l4-418-relay-hub-revocation
+      author: gdd-l4
+      labels: gdd-l4
+      comment: Relay hub REVOKED status (D-129) with its reason, date and administrator.
+      changes:
+        - sqlFile:
+            path: gdd-l4/V418__gdd_l4_418_relay_hub_revocation.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+  - changeSet:
+      id: gdd-l4-421-relay-hub-approval-status
+      author: gdd-l4
+      labels: gdd-l4,gdd-l4-approval
+      comment: Relay hub approval status separate from the operating status (D-138); existing hubs approved, revoked ones moved to the approval.
+      changes:
+        - sqlFile:
+            path: gdd-l4/V421__gdd_l4_421_relay_hub_approval_status.sql
+            relativeToChangelogFile: true
+            splitStatements: false

@@ -49,6 +49,19 @@ public class DisputeExceptionHandler {
         return Mono.just(detail);
     }
 
+    @ExceptionHandler(com.yowyob.tiibntick.core.dispute.domain.exception.DisputeCompensationException.class)
+    public Mono<org.springframework.http.ResponseEntity<ProblemDetail>> handleCompensation(
+            com.yowyob.tiibntick.core.dispute.domain.exception.DisputeCompensationException ex) {
+        log.warn("Dispute compensation not paid: {} {}", ex.getCode(), ex.getMessage());
+        HttpStatus status = HttpStatus.valueOf(ex.getHttpStatus());
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(status, ex.getMessage());
+        detail.setType(URI.create("https://tiibntick.yowyob.com/errors/" + ex.getCode().toLowerCase().replace('_', '-')));
+        detail.setTitle(ex.getCode());
+        detail.setProperty("code", ex.getCode());
+        detail.setProperty("timestamp", Instant.now());
+        return Mono.just(org.springframework.http.ResponseEntity.status(status).body(detail));
+    }
+
     @ExceptionHandler(DisputeAccessDeniedException.class)
     public Mono<ProblemDetail> handleAccessDenied(DisputeAccessDeniedException ex) {
         log.warn("Dispute access denied: {}", ex.getMessage());

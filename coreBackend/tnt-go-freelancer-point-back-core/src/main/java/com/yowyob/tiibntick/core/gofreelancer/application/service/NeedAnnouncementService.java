@@ -3,15 +3,10 @@ package com.yowyob.tiibntick.core.gofreelancer.application.service;
 import com.yowyob.tiibntick.common.vo.Address;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.AnnouncementSnapshot;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.PublishAnnouncementPortCommand;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.Announcement;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.announcement.AnnouncementStatus;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.deliveryNeed.DeliveryNeedStatus;
-import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IAnnouncementRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.AnnouncementExtras;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.AnnouncementStatus;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryAnnouncementPort;
-import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryNeedRepository;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.DeliveryNeed;
-import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpFreelancerRepository;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpFreelancer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,10 +19,11 @@ import java.util.UUID;
  * Un besoin de livraison Go est publié comme annonce {@code QUOTE_REQUEST}, que les
  * livreurs de la zone voient et à laquelle ils répondent.
  *
- * <p>Le lien besoin → annonce est porté par le core, dans le miroir local gofp de l'annonce
- * ({@code announcements.delivery_need_id}, unique). Un seul état de vérité : l'annonce n'est que
- * la face « marché » du besoin — l'assigner assigne le besoin, assigner ou supprimer le besoin
- * retire l'annonce.
+ * <p>Le lien besoin → annonce est la référence d'origine de l'annonce du core
+ * ({@code origin_ref_type = DELIVERY_NEED}, {@code origin_ref_id} = id du besoin, unique). Un seul
+ * état de vérité : l'annonce n'est que la face « marché » du besoin, dont le statut est dérivé
+ * de l'annonce et de la livraison (rien à synchroniser) ; supprimer ou assigner directement le
+ * besoin retire l'annonce.
  */
 @Slf4j
 @Service
@@ -36,18 +32,7 @@ public class NeedAnnouncementService {
 
     private final IDeliveryAnnouncementPort deliveryAnnouncementPort;
     private final TenantContextHolder tenantContextHolder;
-    private final IAnnouncementRepository announcementRepository;
-    private final IDeliveryNeedRepository deliveryNeedRepository;
-    private final GofpFreelancerRepository gofpFreelancerRepository;
 
-    /**
-     * Publie le besoin en annonce {@code QUOTE_REQUEST} (aucun séquestre à la publication : le prix
-     * vient des réponses des livreurs) et écrit le miroir local qui porte le lien besoin → annonce.
-     * Les erreurs remontent : appelé dans la transaction de création du besoin, un échec annule
-     * le besoin — jamais de besoin « publié » sans annonce, ni d'annonce orpheline.
-     *
-     * @return l'identifiant de l'annonce publiée
-     */
     /**
      * Colis tel que l'annonce le décrit ; {@code null} pour un champ inconnu (valeurs neutres
      * appliquées, comme {@code AnnouncementApplicationService.toPublishCommand}).
@@ -56,79 +41,56 @@ public class NeedAnnouncementService {
                              Boolean fragile, Boolean perishable, String description) {
     }
 
+    /**
+     * Publie le besoin en annonce {@code QUOTE_REQUEST} du cœur (aucun séquestre à la publication : le
+     * prix vient des réponses des livreurs), reliée au besoin par sa référence d'origine. Les erreurs
+     * remontent : appelé dans la transaction de création du besoin, un échec annule le besoin.
+     *
+     * <p>Idempotent (lot L2) : une annonce déjà publiée pour ce besoin (rejeu) est rendue telle quelle
+     * au lieu d'une seconde publication que l'index unique {@code uq_tnt_ann_origin_ref} refuserait ; si
+     * une publication concurrente gagne la course, l'annonce gagnante est relue.
+     *
+     * @return l'identifiant de l'annonce du besoin
+     */
     public Mono<UUID> publishFor(DeliveryNeed need, Address pickup, Address delivery, ParcelSpec parcel) {
         return tenantContextHolder.currentTenantId()
-                .flatMap(tenantId -> deliveryAnnouncementPort.publish(toCommand(tenantId, need, pickup, delivery, parcel)))
-                .flatMap(published -> {
-                    Announcement local = new Announcement();
-                    local.setId(published.id());
-                    local.setClientId(published.clientId());
-                    local.setTitle(published.title());
-                    local.setStatus(AnnouncementStatus.PUBLISHED);
-                    local.setPaymentMethod(need.getPaymentMethod());
-                    local.setTransportMethod(need.getTransportMethod());
-                    local.setRequiredVehicleType(need.getRequiredVehicleType()); // lot C-54
-                    local.setDistance(need.getDistance());
-                    local.setCurrency(published.currency());
-                    local.setDeliveryNeedId(need.getId());
-                    // Lot C-56 — le livreur voit qui envoie et qui reçoit (plus de « - » ni « Recipient »).
-                    local.setShipperFirstName(need.getSenderFirstName());
-                    local.setShipperLastName(need.getSenderLastName());
-                    local.setShipperPhone(need.getSenderPhone());
-                    local.setRecipientFirstName(need.getRecipientFirstName());
-                    local.setRecipientLastName(need.getRecipientLastName());
-                    local.setRecipientPhone(need.getRecipientPhone());
-                    log.info("DeliveryNeed {} published as QUOTE_REQUEST announcement {}", need.getId(), published.id());
-                    return announcementRepository.save(local).thenReturn(published.id());
-                });
+                .flatMap(tenantId -> existingFor(tenantId, need.getId())
+                        .doOnNext(a -> log.info("DeliveryNeed {} already published as announcement {}: reused",
+                                need.getId(), a.id()))
+                        .switchIfEmpty(Mono.defer(() -> deliveryAnnouncementPort
+                                .publish(toCommand(tenantId, need, pickup, delivery, parcel))
+                                .doOnNext(published -> log.info(
+                                        "DeliveryNeed {} published as QUOTE_REQUEST announcement {}",
+                                        need.getId(), published.id()))
+                                .onErrorResume(org.springframework.dao.DataIntegrityViolationException.class,
+                                        e -> existingFor(tenantId, need.getId())
+                                                .switchIfEmpty(Mono.error(e))))))
+                .map(AnnouncementSnapshot::id);
     }
 
-    /**
-     * L'expéditeur a retenu une réponse sur l'annonce : si elle publie un besoin, le besoin passe
-     * dans le même état que par {@code DeliveryNeedApplicationService.assignFreelancer}.
-     */
-    public Mono<Void> syncAssignment(UUID announcementId, UUID freelancerId) {
-        if (freelancerId == null) return Mono.empty();
-        return needIdOf(announcementId)
-                .flatMap(deliveryNeedRepository::findById)
-                .flatMap(need -> assignableIdOf(freelancerId)
-                        .map(java.util.Optional::of)
-                        .defaultIfEmpty(java.util.Optional.empty())
-                        .flatMap(gofpId -> {
-                            // delivery_needs.assigned_freelancer_id references gofp_freelancers(id)
-                            // (changeset 070): a response carries the responder's profile id, which
-                            // may live in another identity space — translate it, never store it raw.
-                            gofpId.ifPresentOrElse(need::setAssignedFreelancerId, () -> log.warn(
-                                    "Announcement {} assigned to {} with no gofp freelancer row — "
-                                            + "DeliveryNeed {} ASSIGNED without assigned_freelancer_id",
-                                    announcementId, freelancerId, need.getId()));
-                            need.setStatus(DeliveryNeedStatus.ASSIGNED);
-                            need.setUpdatedAt(Instant.now());
-                            log.info("Announcement {} assigned → DeliveryNeed {} ASSIGNED to {}",
-                                    announcementId, need.getId(), gofpId.orElse(null));
-                            return deliveryNeedRepository.save(need);
-                        }))
-                .then();
-    }
-
-    /** Same resolution as {@code FreelancerQuotaService}: gofp id first, then the core freelancer id. */
-    private Mono<UUID> assignableIdOf(UUID freelancerId) {
-        return gofpFreelancerRepository.findById(freelancerId)
-                .switchIfEmpty(Mono.defer(() -> gofpFreelancerRepository.findByCoreFreelancerId(freelancerId)))
-                .map(GofpFreelancer::getId);
+    private Mono<AnnouncementSnapshot> existingFor(UUID tenantId, UUID deliveryNeedId) {
+        return deliveryAnnouncementPort.findByOrigin(tenantId, AnnouncementExtras.ORIGIN_DELIVERY_NEED, deliveryNeedId);
     }
 
     /** Besoin publié par cette annonce, ou vide. */
     public Mono<UUID> needIdOf(UUID announcementId) {
-        return announcementRepository.findById(announcementId)
-                .flatMap(a -> Mono.justOrEmpty(a.getDeliveryNeedId()));
+        return tenantContextHolder.currentTenantId()
+                .flatMap(tenantId -> deliveryAnnouncementPort.findById(tenantId, announcementId))
+                .flatMap(a -> Mono.justOrEmpty(AnnouncementExtras.ORIGIN_DELIVERY_NEED.equals(a.extras().originRefType())
+                        ? a.extras().originRefId() : null));
     }
 
     /** Annonce encore ouverte (PUBLISHED ou IN_NEGOTIATION) publiée pour ce besoin, ou vide. */
-    public Mono<Announcement> openAnnouncementOf(UUID deliveryNeedId) {
-        return announcementRepository.findByDeliveryNeedId(deliveryNeedId)
-                .filter(a -> a.getStatus() == AnnouncementStatus.PUBLISHED
-                        || a.getStatus() == AnnouncementStatus.IN_NEGOTIATION);
+    public Mono<AnnouncementSnapshot> openAnnouncementOf(UUID deliveryNeedId) {
+        return announcementOf(deliveryNeedId)
+                .filter(a -> a.status() == AnnouncementStatus.PUBLISHED
+                        || a.status() == AnnouncementStatus.IN_NEGOTIATION);
+    }
+
+    private Mono<AnnouncementSnapshot> announcementOf(UUID deliveryNeedId) {
+        return tenantContextHolder.currentTenantId()
+                .flatMap(tenantId -> deliveryAnnouncementPort.findByOrigin(
+                        tenantId, AnnouncementExtras.ORIGIN_DELIVERY_NEED, deliveryNeedId));
     }
 
     /**
@@ -185,25 +147,19 @@ public class NeedAnnouncementService {
 
     /** Annonce publiée pour ce besoin, ou vide. */
     public Mono<UUID> announcementIdOf(UUID deliveryNeedId) {
-        return announcementRepository.findByDeliveryNeedId(deliveryNeedId).map(Announcement::getId);
+        return announcementOf(deliveryNeedId).map(AnnouncementSnapshot::id);
     }
 
     /**
      * Le besoin n'attend plus de livreur (supprimé, ou assigné directement sans passer par
-     * l'annonce) : son annonce encore ouverte est annulée dans tnt-delivery-core et dans le miroir.
+     * l'annonce) : son annonce encore ouverte est annulée dans tnt-delivery-core.
      */
     public Mono<Void> withdrawFor(UUID deliveryNeedId) {
-        return announcementRepository.findByDeliveryNeedId(deliveryNeedId)
-                .filter(a -> a.getStatus() == AnnouncementStatus.PUBLISHED
-                        || a.getStatus() == AnnouncementStatus.IN_NEGOTIATION)
+        return openAnnouncementOf(deliveryNeedId)
                 .flatMap(a -> tenantContextHolder.currentTenantId()
-                        .flatMap(tenantId -> deliveryAnnouncementPort.cancel(tenantId, a.getId(), a.getClientId()))
-                        .then(Mono.defer(() -> {
-                            a.setStatus(AnnouncementStatus.CANCELLED);
-                            log.info("DeliveryNeed {} no longer open → announcement {} CANCELLED",
-                                    deliveryNeedId, a.getId());
-                            return announcementRepository.save(a);
-                        })))
+                        .flatMap(tenantId -> deliveryAnnouncementPort.cancel(tenantId, a.id(), a.clientId()))
+                        .doOnSuccess(x -> log.info("DeliveryNeed {} no longer open → announcement {} CANCELLED",
+                                deliveryNeedId, a.id())))
                 .then();
     }
 
@@ -235,7 +191,15 @@ public class NeedAnnouncementService {
                 pickup,
                 delivery,
                 orDash(fullName(need.getRecipientFirstName(), need.getRecipientLastName())),
-                orDash(need.getRecipientPhone()));
+                orDash(need.getRecipientPhone()),
+                null,
+                new AnnouncementExtras(fullName(need.getSenderFirstName(), need.getSenderLastName()),
+                        blankToNull(need.getSenderPhone()), null, null, null, need.getRequiredVehicleType(),
+                        need.getPaymentMethod(), need.getTransportMethod(),
+                        need.getDistance() != null ? java.math.BigDecimal.valueOf(need.getDistance()) : null,
+                        null, null, null, null, AnnouncementExtras.ORIGIN_DELIVERY_NEED, need.getId()))
+                // The goods registered with the need keep their parcel id in the announcement and the delivery.
+                .withParcelId(need.getPacketId());
     }
 
     /** Lot C-56 — valeur affichée quand un contact manque vraiment. */
@@ -246,6 +210,10 @@ public class NeedAnnouncementService {
         String l = last == null ? "" : last.strip();
         String n = (f + " " + l).strip();
         return n.isEmpty() ? null : n;
+    }
+
+    private static String blankToNull(String v) {
+        return v == null || v.isBlank() ? null : v.strip();
     }
 
     private static String orDash(String v) {

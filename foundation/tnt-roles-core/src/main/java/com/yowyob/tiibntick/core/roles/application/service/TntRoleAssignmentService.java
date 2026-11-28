@@ -87,12 +87,33 @@ public class TntRoleAssignmentService implements AssignTntRoleUseCase {
         this.permissionChangeNotifier = permissionChangeNotifier;
     }
 
+    /**
+     * Decision D-171: TNT_ADMIN is no longer a per-tenant assignment. It goes to the registry of platform
+     * administrators, which holds it whatever the tenant of the login (D-159) and never writes the Kernel (D-170).
+     */
+    private com.yowyob.tiibntick.core.roles.application.port.in.ManagePlatformAdminsUseCase platformAdmins;
+
+    public void setPlatformAdmins(com.yowyob.tiibntick.core.roles.application.port.in.ManagePlatformAdminsUseCase admins) {
+        this.platformAdmins = admins;
+    }
+
     @Override
     public Mono<TntRoleAssignmentResult> assignRole(UUID tenantId, UUID targetUserId, String roleCode, UUID scopeId) {
         if (!TntRole.isKnownRole(roleCode)) {
             return Mono.error(TntRoleException.unknownRole(roleCode));
         }
         TntRole role = TntRole.fromCode(roleCode);
+        if (role == TntRole.TNT_ADMIN) {
+            if (platformAdmins == null) {
+                return Mono.error(new IllegalStateException("The platform admin registry is not wired"));
+            }
+            return PlatformAdminCallers.current()
+                    .switchIfEmpty(Mono.error(new org.springframework.web.server.ResponseStatusException(
+                            org.springframework.http.HttpStatus.UNAUTHORIZED, "Authentication required")))
+                    .flatMap(caller -> platformAdmins.grant(caller, targetUserId))
+                    .map(g -> new TntRoleAssignmentResult(g.id(), g.userId(), role.code(),
+                            RoleScopeType.SYSTEM.name(), systemTenantId));
+        }
         RoleScopeType scopeType = role.scopeType();
 
         UUID resolvedScopeId = scopeType == RoleScopeType.SYSTEM ? systemTenantId : scopeId;

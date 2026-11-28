@@ -15,6 +15,7 @@ import com.yowyob.kernel.event.domain.enums.EnvelopeStatus;
 import com.yowyob.kernel.event.domain.model.DomainEventEnvelope;
 import com.yowyob.kernel.event.domain.vo.EnvelopeId;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
@@ -137,6 +138,80 @@ public class R2dbcEventEnvelopeRepository implements EventEnvelopeRepository {
 
         return template.update(Query.query(criteria), update, DomainEventEnvelopeEntity.class)
             .map(Long::intValue);
+    }
+
+    // ── Outbox relay ─────────────────────────────────────────────────────────
+    // Raw SQL: next_attempt_at is a relay-only column (changeset 006) deliberately absent from
+    // DomainEventEnvelopeEntity, so that inserts never send it and the DEFAULT NOW() applies;
+    // every time comparison is done with the database clock.
+
+    private static final String RELAY_CANDIDATES_SQL = """
+        SELECT * FROM event_bus.domain_event_envelopes
+         WHERE (status IN ('FAILED', 'RETRYING') AND next_attempt_at <= NOW())
+            OR (status = 'PENDING' AND next_attempt_at <= NOW() - make_interval(secs => :graceSeconds))
+         ORDER BY next_attempt_at
+         LIMIT :limit
+        """;
+
+    private static final String CLAIM_SQL = """
+        UPDATE event_bus.domain_event_envelopes
+           SET status = 'RETRYING',
+               version = version + 1,
+               next_attempt_at = NOW() + make_interval(secs => :claimSeconds)
+         WHERE id = :id AND version = :version AND status IN ('PENDING', 'FAILED', 'RETRYING')
+        """;
+
+    private static final String RELAY_FAILURE_SQL = """
+        UPDATE event_bus.domain_event_envelopes
+           SET status = :status,
+               last_error = :lastError,
+               retry_count = :retryCount,
+               version = :version,
+               next_attempt_at = NOW() + make_interval(secs => :retrySeconds)
+         WHERE id = :id AND version = :previousVersion
+        """;
+
+    @Override
+    public Flux<DomainEventEnvelope> findRelayCandidates(final Duration pendingGrace, final int limit) {
+        return template.getDatabaseClient().sql(RELAY_CANDIDATES_SQL)
+            .bind("graceSeconds", seconds(pendingGrace))
+            .bind("limit", limit)
+            .map((row, meta) -> template.getConverter().read(DomainEventEnvelopeEntity.class, row, meta))
+            .all()
+            .map(mapper::toDomain);
+    }
+
+    @Override
+    public Mono<Boolean> claimForRelay(final EnvelopeId id, final int expectedVersion, final Duration claimTimeout) {
+        return template.getDatabaseClient().sql(CLAIM_SQL)
+            .bind("claimSeconds", seconds(claimTimeout))
+            .bind("id", id.value())
+            .bind("version", expectedVersion)
+            .fetch().rowsUpdated()
+            .map(count -> count == 1L);
+    }
+
+    @Override
+    public Mono<Integer> recordRelayFailure(
+            final EnvelopeId id,
+            final EnvelopeStatus status,
+            final String lastError,
+            final int retryCount,
+            final int version,
+            final Duration retryIn) {
+        var spec = template.getDatabaseClient().sql(RELAY_FAILURE_SQL)
+            .bind("status", status.name())
+            .bind("retryCount", retryCount)
+            .bind("version", version)
+            .bind("retrySeconds", seconds(retryIn))
+            .bind("id", id.value())
+            .bind("previousVersion", version - 1);
+        spec = lastError == null ? spec.bindNull("lastError", String.class) : spec.bind("lastError", lastError);
+        return spec.fetch().rowsUpdated().map(Long::intValue);
+    }
+
+    private static double seconds(final Duration duration) {
+        return duration == null ? 0d : duration.toMillis() / 1000d;
     }
 
     @Override

@@ -1,5 +1,9 @@
 package com.yowyob.tiibntick.delivery.application.service;
 
+import com.yowyob.tiibntick.core.delivery.application.port.out.DeliveryThresholdsPort;
+import com.yowyob.tiibntick.core.delivery.application.service.DeliveryTransitionExecutor;
+import com.yowyob.tiibntick.core.delivery.application.service.ReturnDeliveryService;
+
 import com.yowyob.tiibntick.core.delivery.application.port.in.command.CreateDirectDeliveryCommand;
 import com.yowyob.tiibntick.core.delivery.application.port.out.*;
 import com.yowyob.tiibntick.core.delivery.application.service.DeliveryAnnouncementService;
@@ -44,9 +48,12 @@ class DeliveryAnnouncementServiceCreateDirectTest {
 
     @BeforeEach
     void setUp() {
+        DeliveryThresholdsPort thresholds = org.mockito.Mockito.mock(DeliveryThresholdsPort.class);
+        DeliveryTransitionExecutor executor = new DeliveryTransitionExecutor(deliveryRepository,
+                announcementRepository, eventPublisher, new ReturnDeliveryService(announcementRepository, thresholds));
         service = new DeliveryAnnouncementService(
                 announcementRepository, deliveryRepository, deliveryPersonRepository,
-                costComputationPort, etaComputationPort, eventPublisher);
+                costComputationPort, etaComputationPort, executor, thresholds);
     }
 
     private CreateDirectDeliveryCommand command(UUID tenantId, UUID senderId, UUID agencyId) {

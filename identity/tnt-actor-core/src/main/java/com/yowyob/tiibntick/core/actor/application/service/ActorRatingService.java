@@ -3,6 +3,7 @@ package com.yowyob.tiibntick.core.actor.application.service;
 import com.yowyob.tiibntick.core.actor.application.command.RateActorCommand;
 import com.yowyob.tiibntick.core.actor.application.port.in.IRateActorUseCase;
 import com.yowyob.tiibntick.core.actor.application.port.out.IActorEventPublisher;
+import com.yowyob.tiibntick.core.actor.application.port.out.IClientProfileRepository;
 import com.yowyob.tiibntick.core.actor.application.port.out.IDelivererRepository;
 import com.yowyob.tiibntick.core.actor.application.port.out.IFreelancerRepository;
 import com.yowyob.tiibntick.core.actor.application.port.out.IRelayOperatorRepository;
@@ -29,15 +30,18 @@ public class ActorRatingService implements IRateActorUseCase {
     private final IFreelancerRepository freelancerRepository;
     private final IRelayOperatorRepository relayOperatorRepository;
     private final IActorEventPublisher eventPublisher;
+    private final IClientProfileRepository clientProfileRepository;
 
     public ActorRatingService(IDelivererRepository delivererRepository,
                                IFreelancerRepository freelancerRepository,
                                IRelayOperatorRepository relayOperatorRepository,
-                               IActorEventPublisher eventPublisher) {
+                               IActorEventPublisher eventPublisher,
+                               IClientProfileRepository clientProfileRepository) {
         this.delivererRepository = delivererRepository;
         this.freelancerRepository = freelancerRepository;
         this.relayOperatorRepository = relayOperatorRepository;
         this.eventPublisher = eventPublisher;
+        this.clientProfileRepository = clientProfileRepository;
     }
 
     /**
@@ -51,13 +55,14 @@ public class ActorRatingService implements IRateActorUseCase {
      * @return empty Mono on success
      */
     @Override
-    @RequirePermission(resource = "actor", action = "write")
+    @RequirePermission(resource = "rating", action = "create")
     public Mono<Void> rateActor(RateActorCommand command) {
         Objects.requireNonNull(command, "command must not be null");
         return switch (command.actorType()) {
             case PERMANENT_DELIVERER -> rateDeliverer(command);
             case FREELANCER          -> rateFreelancer(command);
             case RELAY_OPERATOR      -> rateRelayOperator(command);
+            case CLIENT              -> rateClient(command);
             default -> Mono.error(new IllegalArgumentException(
                     "Rating not supported for actor type: " + command.actorType()));
         };
@@ -82,6 +87,13 @@ public class ActorRatingService implements IRateActorUseCase {
                 .flatMap(profile -> relayOperatorRepository.save(
                         profile.withRating(profile.rating().addRating(command.score()))))
                 .then(publishProfileUpdated(command, "RELAY_OPERATOR"));
+    }
+
+    private Mono<Void> rateClient(RateActorCommand command) {
+        return clientProfileRepository.findByActorId(command.tenantId(), command.actorId())
+                .flatMap(profile -> clientProfileRepository.save(
+                        profile.withRating(profile.rating().addRating(command.score()))))
+                .then(publishProfileUpdated(command, "CLIENT"));
     }
 
     private Mono<Void> publishProfileUpdated(RateActorCommand command, String actorType) {

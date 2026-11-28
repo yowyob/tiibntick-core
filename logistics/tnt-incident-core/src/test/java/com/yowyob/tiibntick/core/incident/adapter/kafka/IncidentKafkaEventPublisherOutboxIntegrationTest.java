@@ -9,11 +9,12 @@ import com.yowyob.kernel.event.config.YowEventKernelAutoConfiguration;
 import com.yowyob.kernel.event.domain.enums.EnvelopeStatus;
 import com.yowyob.tiibntick.core.incident.domain.enums.ActorRole;
 import com.yowyob.tiibntick.core.incident.domain.enums.IncidentCategory;
-import com.yowyob.tiibntick.core.incident.domain.enums.IncidentStatus;
 import com.yowyob.tiibntick.core.incident.domain.enums.IncidentType;
 import com.yowyob.tiibntick.core.incident.domain.enums.PlatformType;
-import com.yowyob.tiibntick.core.incident.domain.event.IncidentDomainEvents.IncidentCreatedEvent;
-import com.yowyob.tiibntick.core.incident.domain.event.IncidentDomainEvents.IncidentStatusChangedEvent;
+import com.yowyob.tiibntick.common.kafka.TntEventMasking;
+import com.yowyob.tiibntick.common.kafka.TntTopics;
+import com.yowyob.tiibntick.core.incident.domain.model.Incident;
+import com.yowyob.kernel.event.application.port.in.PublishEventBatchUseCase;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import liquibase.Contexts;
@@ -68,20 +69,12 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.kafka.test.utils.KafkaTestUtils.getSingleRecord;
 
 /**
- * <b>Current behaviour (outbox decommissioned 2026-09-18):</b> the event is persisted, then published
- * directly to Kafka, and the envelope ends {@code PUBLISHED} ({@code FAILED} if the broker refuses it).
- * The paragraphs below describe the original outbox migration and are kept for history.
- *
- * End-to-end integration test proving the Chantier C · Audit n°3 · P5 migration:
- * {@link IncidentKafkaEventPublisher} now enqueues events into the {@code yow-event-kernel}
- * transactional outbox instead of fire-and-forget {@code KafkaTemplate.send} calls, and
- * {@code OutboxPollerService} relays them asynchronously — same topics, same
- * raw-domain-event-JSON wire format and incident-id record key existing consumers
- * (tnt-delivery-core, tnt-dispute-core, tnt-billing-wallet, tnt-notify-core, tnt-trust-core)
- * already expect.
+ * Lot L8: the incident events reach Kafka only on {@code tnt.incident.events} ({@link IncidentAggregateEventOutboxPublisher}
+ * through the yow-event-kernel envelope store, envelope {@code PUBLISHED}); the twelve per-event topics
+ * ({@code tnt.incident.created}, {@code tnt.incident.status.changed}…) and their publisher are gone. The record is
+ * the §3.3 envelope, masked (no description), keyed by the incident id.
  *
  * <p>Follows the same template as {@code tnt-delivery-core}'s
  * {@code KafkaDeliveryEventPublisherOutboxIntegrationTest}.
@@ -90,14 +83,9 @@ import static org.springframework.kafka.test.utils.KafkaTestUtils.getSingleRecor
  */
 @SpringBootTest(classes = IncidentKafkaEventPublisherOutboxIntegrationTest.TestConfig.class)
 @Testcontainers
-@EmbeddedKafka(partitions = 1, topics = {
-        IncidentKafkaEventPublisherOutboxIntegrationTest.CREATED_TOPIC,
-        IncidentKafkaEventPublisherOutboxIntegrationTest.STATUS_CHANGED_TOPIC})
+@EmbeddedKafka(partitions = 1, topics = TntTopics.INCIDENT_EVENTS)
 @Tag("integration")
 class IncidentKafkaEventPublisherOutboxIntegrationTest {
-
-    static final String CREATED_TOPIC = "tnt.incident.created";
-    static final String STATUS_CHANGED_TOPIC = "tnt.incident.status.changed";
 
     @Container
     @SuppressWarnings("resource")
@@ -132,7 +120,7 @@ class IncidentKafkaEventPublisherOutboxIntegrationTest {
     }
 
     @Autowired
-    private IncidentKafkaEventPublisher publisher;
+    private IncidentAggregateEventOutboxPublisher publisher;
 
     @Autowired
     private EventEnvelopeRepository envelopeRepository;
@@ -141,39 +129,23 @@ class IncidentKafkaEventPublisherOutboxIntegrationTest {
     private EmbeddedKafkaBroker embeddedKafka;
 
     @Test
-    @DisplayName("publish(IncidentCreatedEvent) publishes straight to Kafka (envelope PUBLISHED); the record is "
-            + "delivered to tnt.incident.created with the raw event JSON and incident-id key")
-    void publishCreatedPublishesToKafka() throws Exception {
-        ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
-
-        UUID incidentId = UUID.randomUUID();
+    @DisplayName("lot L8: a reported incident goes out once, on tnt.incident.events (no legacy tnt.incident.created), "
+            + "masked, keyed by the incident id")
+    void reportedIncidentOnTheAggregateTopic() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
         UUID tenantId = UUID.randomUUID();
-        IncidentCreatedEvent event = IncidentCreatedEvent.builder()
-                .eventId(UUID.randomUUID())
-                .incidentId(incidentId)
-                .referenceCode("INC-2026-0001")
-                .tenantId(tenantId)
-                .agencyId(UUID.randomUUID())
-                .missionId(UUID.randomUUID())
-                .platform(PlatformType.AGENCY)
-                .category(IncidentCategory.VEHICLE)
-                .type(IncidentType.VEHICLE_ENGINE_FAILURE)
-                .description("Engine failure on N3")
-                .reportedByActorId(UUID.randomUUID())
-                .reportedByRole(ActorRole.AGENCY_DRIVER)
-                .affectedParcelIds(List.of(UUID.randomUUID()))
-                .occurredAt(Instant.now())
-                .build();
+        Incident reported = Incident.create(tenantId, UUID.randomUUID(), PlatformType.AGENCY, UUID.randomUUID(),
+                IncidentCategory.VEHICLE, IncidentType.VEHICLE_ENGINE_FAILURE, "Engine failure on N3",
+                UUID.randomUUID(), ActorRole.AGENCY_DRIVER, List.of(UUID.randomUUID()));
 
-        publisher.publish(event).block(Duration.ofSeconds(10));
+        publisher.publish(reported, reported).block(Duration.ofSeconds(10));
 
-        // 1. The envelope is persisted and already PUBLISHED: the event goes straight to Kafka (outbox decommissioned).
         StepVerifier.create(envelopeRepository.findByAggregateId(
-                        incidentId.toString(), "Incident", tenantId.toString()))
+                        reported.getId().toString(), "INCIDENT", tenantId.toString()))
                 .assertNext(envelope -> {
-                    assertThat(envelope.getKafkaTopic()).isEqualTo(CREATED_TOPIC);
+                    assertThat(envelope.getKafkaTopic()).isEqualTo(TntTopics.INCIDENT_EVENTS);
+                    assertThat(envelope.getEventType()).isEqualTo("IncidentReported");
                     assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED);
-                    assertThat(envelope.getCorrelationId()).isEqualTo(event.getEventId().toString());
                 })
                 .verifyComplete();
 
@@ -184,55 +156,45 @@ class IncidentKafkaEventPublisherOutboxIntegrationTest {
         consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
 
         try (Consumer<String, String> rawConsumer = new KafkaConsumer<>(consumerProps)) {
-            embeddedKafka.consumeFromAnEmbeddedTopic(rawConsumer, CREATED_TOPIC);
-
-            ConsumerRecord<String, String> received =
-                    getSingleRecord(rawConsumer, CREATED_TOPIC, Duration.ofSeconds(15));
-
-            assertThat(received.topic()).isEqualTo(CREATED_TOPIC);
-            assertThat(received.key()).isEqualTo(incidentId.toString());
-
-            // Wire format: the raw domain event JSON, unchanged from the pre-migration
-            // kafkaTemplate.send(topic, incidentId, objectMapper.writeValueAsString(event)).
-            JsonNode wirePayload = objectMapper.readTree(received.value());
-            assertThat(wirePayload.get("incidentId").asText()).isEqualTo(incidentId.toString());
-            assertThat(wirePayload.get("referenceCode").asText()).isEqualTo("INC-2026-0001");
-            assertThat(wirePayload.get("type").asText()).isEqualTo("VEHICLE_ENGINE_FAILURE");
+            embeddedKafka.consumeFromAnEmbeddedTopic(rawConsumer, TntTopics.INCIDENT_EVENTS);
+            // the other test of the class publishes on the same embedded topic: keep only this incident's records
+            List<ConsumerRecord<String, String>> mine = new java.util.ArrayList<>();
+            long deadline = System.currentTimeMillis() + 15_000;
+            while (mine.isEmpty() && System.currentTimeMillis() < deadline) {
+                rawConsumer.poll(Duration.ofMillis(500)).records(TntTopics.INCIDENT_EVENTS).forEach(r -> {
+                    if (reported.getId().toString().equals(r.key())) {
+                        mine.add(r);
+                    }
+                });
+            }
+            assertThat(mine).hasSize(1);
+            ConsumerRecord<String, String> received = mine.get(0);
+            JsonNode wire = objectMapper.readTree(received.value());
+            assertThat(wire.path("eventType").asText()).isEqualTo("IncidentReported");
+            assertThat(wire.path("schemaVersion").asInt()).isPositive();
+            assertThat(wire.path("payload").path("type").asText()).isEqualTo("VEHICLE_ENGINE_FAILURE");
+            assertThat(received.value()).doesNotContain("Engine failure on N3");
         }
-
-        // 2. The envelope stays PUBLISHED after the consumer has read the record.
-        StepVerifier.create(envelopeRepository.findByAggregateId(
-                        incidentId.toString(), "Incident", tenantId.toString()))
-                .assertNext(envelope -> assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED))
-                .verifyComplete();
     }
 
     @Test
-    @DisplayName("publish(IncidentStatusChangedEvent) routes to the status-changed topic through the outbox")
-    void publishStatusChangedRoutesToItsTopic() {
-        UUID incidentId = UUID.randomUUID();
+    @DisplayName("lot L8: report then acknowledgement go out as IncidentReported, IncidentAcknowledged on "
+            + "tnt.incident.events only (no legacy status topic)")
+    void transitionsOnTheAggregateTopic() {
         UUID tenantId = UUID.randomUUID();
-        IncidentStatusChangedEvent event = IncidentStatusChangedEvent.builder()
-                .eventId(UUID.randomUUID())
-                .incidentId(incidentId)
-                .tenantId(tenantId)
-                .missionId(UUID.randomUUID())
-                .agencyId(UUID.randomUUID())
-                .platform(PlatformType.AGENCY)
-                .previousStatus(IncidentStatus.DETECTED)
-                .newStatus(IncidentStatus.TRIAGED)
-                .occurredAt(Instant.now())
-                .build();
+        Incident reported = Incident.create(tenantId, UUID.randomUUID(), PlatformType.AGENCY, UUID.randomUUID(),
+                IncidentCategory.VEHICLE, IncidentType.VEHICLE_ENGINE_FAILURE, "x",
+                UUID.randomUUID(), ActorRole.AGENCY_DRIVER, List.of());
+        Incident acknowledged = reported.acknowledge();
 
-        publisher.publish(event).block(Duration.ofSeconds(10));
+        publisher.publish(acknowledged, acknowledged).block(Duration.ofSeconds(10));
 
-        StepVerifier.create(envelopeRepository.findByAggregateId(
-                        incidentId.toString(), "Incident", tenantId.toString()))
-                .assertNext(envelope -> {
-                    assertThat(envelope.getKafkaTopic()).isEqualTo(STATUS_CHANGED_TOPIC);
-                    assertThat(envelope.getStatus()).isEqualTo(EnvelopeStatus.PUBLISHED);
-                })
-                .verifyComplete();
+        List<com.yowyob.kernel.event.domain.model.DomainEventEnvelope> envelopes = envelopeRepository
+                .findByAggregateId(reported.getId().toString(), "INCIDENT", tenantId.toString())
+                .collectList().block(Duration.ofSeconds(10));
+        assertThat(envelopes).extracting(e -> e.getEventType())
+                .containsExactlyInAnyOrder("IncidentReported", "IncidentAcknowledged");
+        assertThat(envelopes).allSatisfy(e -> assertThat(e.getKafkaTopic()).isEqualTo(TntTopics.INCIDENT_EVENTS));
     }
 
     @Configuration
@@ -256,11 +218,6 @@ class IncidentKafkaEventPublisherOutboxIntegrationTest {
             return new ObjectMapper().registerModule(new JavaTimeModule());
         }
 
-        @Bean(name = "incidentObjectMapper")
-        ObjectMapper incidentObjectMapper() {
-            return new ObjectMapper().registerModule(new JavaTimeModule());
-        }
-
         @Bean(name = "tntKafkaTemplate")
         KafkaTemplate<String, String> tntKafkaTemplate(EmbeddedKafkaBroker broker) {
             Map<String, Object> configs = new HashMap<>();
@@ -272,10 +229,11 @@ class IncidentKafkaEventPublisherOutboxIntegrationTest {
         }
 
         @Bean
-        IncidentKafkaEventPublisher incidentKafkaEventPublisher(
-                PublishEventUseCase publishEventUseCase,
-                @Qualifier("incidentObjectMapper") ObjectMapper incidentObjectMapper) {
-            return new IncidentKafkaEventPublisher(publishEventUseCase, incidentObjectMapper);
+        IncidentAggregateEventOutboxPublisher incidentAggregateEventOutboxPublisher(
+                PublishEventBatchUseCase publishEventBatchUseCase) {
+            return new IncidentAggregateEventOutboxPublisher(publishEventBatchUseCase,
+                    new org.springframework.beans.factory.support.StaticListableBeanFactory()
+                            .getBeanProvider(TntEventMasking.class));
         }
     }
 }

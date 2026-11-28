@@ -1,0 +1,332 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:tnt:kafka:v1:announcement.payload",
+  "title": "Payload of tnt.announcement.events (spec §3.6), masked announcement state after the event",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "announcementId",
+    "kind",
+    "creatorId",
+    "creatorRole",
+    "parcelId",
+    "status",
+    "pricingMode",
+    "proposedPrice",
+    "currency",
+    "pickupAddress",
+    "deliveryAddress",
+    "relayHubId",
+    "pickupWindow",
+    "deliveryWindow",
+    "requestedStorageDays",
+    "responses",
+    "selectedResponseId",
+    "deliveryId",
+    "outcome",
+    "publishedAt",
+    "assignedAt",
+    "closedAt"
+  ],
+  "properties": {
+    "announcementId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "kind": {
+      "enum": [
+        "OUTBOUND",
+        "RETURN"
+      ]
+    },
+    "creatorId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "creatorRole": {
+      "enum": [
+        "CLIENT",
+        "RELAY",
+        null
+      ]
+    },
+    "parcelId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "status": {
+      "enum": [
+        "DRAFT",
+        "PUBLISHED",
+        "IN_NEGOTIATION",
+        "ASSIGNED",
+        "COMPLETED",
+        "CANCELLED"
+      ]
+    },
+    "pricingMode": {
+      "enum": [
+        "FIXED_PRICE",
+        "QUOTE_REQUEST",
+        null
+      ]
+    },
+    "proposedPrice": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "currency": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "pickupAddress": {
+      "$ref": "#/$defs/maskedAddress"
+    },
+    "deliveryAddress": {
+      "$ref": "#/$defs/maskedAddress"
+    },
+    "relayHubId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "pickupWindow": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "start",
+        "end"
+      ],
+      "properties": {
+        "start": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "end": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      }
+    },
+    "deliveryWindow": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "start",
+        "end"
+      ],
+      "properties": {
+        "start": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "end": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      }
+    },
+    "requestedStorageDays": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "responses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "responseId",
+          "courierId",
+          "price",
+          "status",
+          "createdAt"
+        ],
+        "properties": {
+          "responseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "courierId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "price": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "enum": [
+              "SENT",
+              "ACCEPTED",
+              "REJECTED",
+              "CANCELLED"
+            ]
+          },
+          "createdAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      }
+    },
+    "selectedResponseId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "deliveryId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "outcome": {
+      "enum": [
+        "DELIVERED",
+        "FAILED",
+        null
+      ]
+    },
+    "publishedAt": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "assignedAt": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "closedAt": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    }
+  },
+  "$defs": {
+    "maskedAddress": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Masked address (decision G.3): no street, landmark, postal code or exact position; coordinates rounded (QO-17). Copy of envelope.schema.json $defs/maskedAddress.",
+      "required": [
+        "district",
+        "city",
+        "country",
+        "approxLatitude",
+        "approxLongitude"
+      ],
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "street"
+            ]
+          },
+          {
+            "required": [
+              "landmark"
+            ]
+          },
+          {
+            "required": [
+              "postalCode"
+            ]
+          },
+          {
+            "required": [
+              "latitude"
+            ]
+          },
+          {
+            "required": [
+              "longitude"
+            ]
+          }
+        ]
+      },
+      "properties": {
+        "district": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "city": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "country": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "approxLatitude": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -90,
+          "maximum": 90
+        },
+        "approxLongitude": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -180,
+          "maximum": 180
+        }
+      }
+    }
+  }
+}

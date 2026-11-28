@@ -161,7 +161,7 @@ C3, C4, C5, C6, C7, C8) le rapport doit donner :
 Rappels sur ce que tu sais déjà et qui ne doit pas te surprendre :
 
 - Le rôle `FREELANCER` du **tenant système**
-  (`00000000-0000-0000-0000-000000000001`) n'a **pas** `freelancer:read` en base
+  (`<SYSTEM_TENANT_ID>`) n'a **pas** `freelancer:read` en base
   — je l'ai vérifié. Ton ajout dans `TntRoleDefinition` ne vaut que pour les
   **nouveaux** déploiements, parce que `TntRoleInitializationService.upsertIfAbsent()`
   ne met jamais à jour un rôle existant. Ce n'est **pas** un problème pour ce

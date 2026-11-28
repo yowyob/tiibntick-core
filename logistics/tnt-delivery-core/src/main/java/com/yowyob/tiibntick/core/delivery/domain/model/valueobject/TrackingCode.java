@@ -1,9 +1,10 @@
 package com.yowyob.tiibntick.core.delivery.domain.model.valueobject;
 
-import java.util.Random;
+import java.security.SecureRandom;
 
 /**
- * Unique immutable tracking code identifying a parcel across the entire TiiBnTick platform.
+ * Unique immutable tracking code identifying a parcel across the entire TiiBnTick platform (D-136: carried by the
+ * {@code Parcel}, kept across its outbound, return and redelivery deliveries).
  *
  * <p>Format: {@code TNT-YYYYMMDD-XXXXXXXX} where:
  * <ul>
@@ -17,7 +18,8 @@ import java.util.Random;
 public record TrackingCode(String value) {
 
     private static final String ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    private static final Random RANDOM = new Random();
+    /** D-137: codes are drawn from a cryptographically strong generator (they open the public tracking page). */
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     public TrackingCode {
         if (value == null || !value.matches("TNT-\\d{8}-[A-Z0-9]{8}")) {

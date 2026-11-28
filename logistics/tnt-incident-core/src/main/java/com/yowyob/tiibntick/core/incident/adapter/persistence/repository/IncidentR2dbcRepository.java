@@ -32,4 +32,13 @@ public interface IncidentR2dbcRepository extends ReactiveCrudRepository<Incident
     Flux<IncidentEntity> findEscalatedByTenantId(UUID tenantId);
     @Query("SELECT COUNT(*) FROM tnt_incidents WHERE agency_id = :agencyId AND status NOT IN ('CLOSED','CANCELLED','RESOLVED')")
     Mono<Long> countActiveByAgencyId(UUID agencyId);
+
+    /** Lot L3 (QO-14): resolutions proposed before {@code before}, all tenants (automatic confirmation job). */
+    @Query("SELECT * FROM tnt_incidents WHERE status = 'PENDING_CONFIRMATION' AND resolution_proposed_at < :before"
+            + " ORDER BY resolution_proposed_at LIMIT :limit")
+    Flux<IncidentEntity> findConfirmationExpired(Instant before, int limit);
+
+    /** Lot L3 (I15): incidents waiting for a hand-over, all tenants (hand-over timeout job). */
+    @Query("SELECT * FROM tnt_incidents WHERE status = 'AWAITING_HANDOVER' ORDER BY updated_at LIMIT :limit")
+    Flux<IncidentEntity> findAwaitingHandover(int limit);
 }

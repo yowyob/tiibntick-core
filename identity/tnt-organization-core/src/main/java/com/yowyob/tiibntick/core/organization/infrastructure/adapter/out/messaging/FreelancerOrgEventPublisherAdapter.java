@@ -52,9 +52,9 @@ public class FreelancerOrgEventPublisherAdapter implements FreelancerOrgEventPub
             LoggerFactory.getLogger(FreelancerOrgEventPublisherAdapter.class);
 
     /** Documented in the module Javadoc since inception; no TntTopics constant yet. */
-    static final String TOPIC_SUSPENDED    = "tnt.freelancer_org.suspended";
+    static final String TOPIC_SUSPENDED    = com.yowyob.tiibntick.common.kafka.TntTopics.FREELANCER_ORG_SUSPENDED;
     /** Documented in the module Javadoc since inception; no TntTopics constant yet. */
-    static final String TOPIC_KYC_UPGRADED = "tnt.freelancer_org.kyc.upgraded";
+    static final String TOPIC_KYC_UPGRADED = com.yowyob.tiibntick.common.kafka.TntTopics.FREELANCER_ORG_KYC_UPGRADED;
 
     private static final String AGGREGATE_TYPE = "FreelancerOrganization";
     private static final String SOLUTION_CODE = "TNT";

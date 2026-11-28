@@ -18,9 +18,16 @@ public record InvoicePaid(
         String paymentRef,
         Money amount,
         Instant occurredAt,
-        UUID tenantId
+        UUID tenantId,
+        String issuerOrgType,
+        String issuerOrgId
 ) {
     public InvoicePaid(UUID invoiceId, String paymentRef, Money amount, Instant occurredAt) {
         this(invoiceId, paymentRef, amount, occurredAt, null);
+    }
+
+    /** Without the issuer (lot L6 adds it: accounting books a paid invoice in the issuing organisation's book). */
+    public InvoicePaid(UUID invoiceId, String paymentRef, Money amount, Instant occurredAt, UUID tenantId) {
+        this(invoiceId, paymentRef, amount, occurredAt, tenantId, null, null);
     }
 }

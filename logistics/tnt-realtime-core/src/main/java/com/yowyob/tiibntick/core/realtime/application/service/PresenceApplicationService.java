@@ -49,12 +49,12 @@ public class PresenceApplicationService implements IGetPresenceUseCase, IUpdateP
     }
 
     @Override
-    public Mono<Void> assignMission(String userId, String tenantId, String missionId) {
-        return presenceDomainService.assignMission(userId, tenantId, missionId);
+    public Mono<Void> assignDelivery(String userId, String tenantId, String deliveryId) {
+        return presenceDomainService.assignDelivery(userId, tenantId, deliveryId);
     }
 
     @Override
-    public Mono<Void> clearMission(String userId, String tenantId) {
-        return presenceDomainService.clearMission(userId, tenantId);
+    public Mono<Void> clearDelivery(String userId, String tenantId) {
+        return presenceDomainService.clearDelivery(userId, tenantId);
     }
 }

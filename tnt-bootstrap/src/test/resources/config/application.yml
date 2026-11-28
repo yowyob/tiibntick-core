@@ -1,0 +1,23 @@
+# Test classpath only (classpath:/config/ outranks classpath:/application.yml): no test of tnt-bootstrap may reach
+# the production Kernel. Outside the prod profile, tnt.kernel.* and the JWKS URI would otherwise fall back to the
+# production defaults (kernel-core.yowyob.com). Port 9 (discard) on the loopback refuses every connection.
+# A test that needs a Kernel starts its own stub and overrides these with @DynamicPropertySource.
+tnt:
+  kernel:
+    base-url: http://127.0.0.1:9/kernel-api
+    api-key: test-no-kernel
+    client-id: test-no-kernel
+tiibntick:
+  kernel:
+    organization:
+      base-url: http://127.0.0.1:9/kernel-api/
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://127.0.0.1:9/kernel-api/.well-known/jwks.json
+# Same for the prod-profile tests: the prod document of application.yml reads these placeholders (URLs only, no
+# secret: the secret guards of TntProdSecretsGuardTest stay untouched).
+TNT_KERNEL_BASE_URL: http://127.0.0.1:9/kernel-api
+JWT_JWK_SET_URI: http://127.0.0.1:9/kernel-api/.well-known/jwks.json

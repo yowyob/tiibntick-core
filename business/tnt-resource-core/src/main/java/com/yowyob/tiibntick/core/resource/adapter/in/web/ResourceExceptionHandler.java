@@ -92,6 +92,13 @@ public class ResourceExceptionHandler {
         return Mono.just(pd);
     }
 
+    /** Business conflict (plate already registered, vehicle cap reached): 409. */
+    @ExceptionHandler(IllegalStateException.class)
+    public Mono<ProblemDetail> handleIllegalState(IllegalStateException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(org.springframework.http.HttpStatus.CONFLICT, ex.getMessage());
+        return Mono.just(pd);
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public Mono<ProblemDetail> handleIllegalArgument(IllegalArgumentException ex) {
         log.warn("Resource validation error: {}", ex.getMessage());

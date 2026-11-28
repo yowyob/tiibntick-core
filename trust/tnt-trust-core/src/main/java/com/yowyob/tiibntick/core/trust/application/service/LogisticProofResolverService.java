@@ -12,7 +12,10 @@ import com.yowyob.tiibntick.core.trust.domain.model.valueobject.DIDDocument;
 import com.yowyob.tiibntick.core.trust.domain.policy.LogisticEventCatalog;
 import com.yowyob.tiibntick.core.trust.domain.model.valueobject.ParcelCustodyChain;
 import com.yowyob.tiibntick.core.trust.domain.model.valueobject.ParcelDigitalTwin;
-import com.yowyob.tiibntick.core.trust.domain.model.enums.ParcelLifecycleState;
+import com.yowyob.tiibntick.core.delivery.application.port.in.ParcelUseCase;
+import com.yowyob.tiibntick.core.delivery.domain.model.aggregate.Parcel;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.ParcelStatus;
+import org.springframework.beans.factory.ObjectProvider;
 import com.yowyob.tiibntick.core.trust.application.port.in.GetCustodyChainUseCase;
 import com.yowyob.tiibntick.core.trust.application.port.out.CustodyTransferCacheRepository;
 import com.yowyob.tiibntick.core.trust.application.port.out.DeliveryProofCacheRepository;
@@ -62,13 +65,17 @@ public class LogisticProofResolverService {
     private final DIDRepository didRepository;
     private final TrustProofQueryPort trustProofQueryPort;
     private final GetCustodyChainUseCase getCustodyChainUseCase;
+    /** Lot evt-l2: the parcel state is delivery-core's ({@link ParcelStatus}), no second state machine here. */
+    private final ObjectProvider<ParcelUseCase> parcels;
 
     public LogisticProofResolverService(
             final DeliveryProofCacheRepository proofCacheRepository,
             final CustodyTransferCacheRepository custodyCacheRepository,
             final DIDRepository didRepository,
             final TrustProofQueryPort trustProofQueryPort,
-            final GetCustodyChainUseCase getCustodyChainUseCase) {
+            final GetCustodyChainUseCase getCustodyChainUseCase,
+            final ObjectProvider<ParcelUseCase> parcels) {
+        this.parcels = parcels;
         this.proofCacheRepository = proofCacheRepository;
         this.custodyCacheRepository = custodyCacheRepository;
         this.didRepository = didRepository;
@@ -189,32 +196,47 @@ public class LogisticProofResolverService {
         log.debug("Resolving digital twin for packageId={}", packageId);
 
         return getCustodyChainUseCase.getByPackageId(packageId, tenantId)
-                .map(chain -> {
-                    final ParcelLifecycleState state = inferState(chain);
-                    return new ParcelDigitalTwin(
-                            packageId,
-                            chain.trackingCode(),
-                            tenantId,
-                            state,
-                            chain,
-                            null,
-                            chain.chainIntact(),
-                            chain.transferCount(),
-                            chain.lastTransferAt(),
-                            LocalDateTime.now()
-                    );
-                });
+                .flatMap(chain -> coreParcel(packageId)
+                        .map(java.util.Optional::of)
+                        .defaultIfEmpty(java.util.Optional.empty())
+                        .map(parcel -> new ParcelDigitalTwin(
+                                packageId,
+                                // D-136: the tracking code is the parcel's
+                                parcel.map(Parcel::getTrackingCode).orElse(chain.trackingCode()),
+                                tenantId,
+                                parcel.map(Parcel::getStatus).orElseGet(() -> inferState(chain)),
+                                chain,
+                                null,
+                                chain.chainIntact(),
+                                chain.transferCount(),
+                                chain.lastTransferAt(),
+                                LocalDateTime.now())));
     }
 
-    private static ParcelLifecycleState inferState(final ParcelCustodyChain chain) {
+    /** The parcel as delivery-core holds it, empty when the id is not one of its parcels. */
+    private Mono<Parcel> coreParcel(final String packageId) {
+        ParcelUseCase useCase = parcels.getIfAvailable();
+        if (useCase == null) {
+            return Mono.empty();
+        }
+        try {
+            return useCase.findParcelById(java.util.UUID.fromString(packageId))
+                    .onErrorResume(e -> Mono.empty());
+        } catch (IllegalArgumentException notAUuid) {
+            return Mono.empty();
+        }
+    }
+
+    /** Fallback for a parcel delivery-core does not know: the state implied by the last custody transfer. */
+    static ParcelStatus inferState(final ParcelCustodyChain chain) {
         final CustodyTransferType type = chain.currentCustodyType();
-        if (type == null) return ParcelLifecycleState.CREATED;
+        if (type == null) return ParcelStatus.CREATED;
         return switch (type) {
-            case PICKUP_FROM_SENDER -> ParcelLifecycleState.PICKED_UP;
-            case TRANSFER_TO_HUB   -> ParcelLifecycleState.AT_RELAY_HUB;
-            case PICKUP_FROM_HUB   -> ParcelLifecycleState.IN_TRANSIT;
-            case TRANSFER_TO_RECIPIENT -> ParcelLifecycleState.DELIVERED;
-            case RETURN_TO_SENDER  -> ParcelLifecycleState.RETURNED;
+            case PICKUP_FROM_SENDER -> ParcelStatus.PICKED_UP;
+            case TRANSFER_TO_HUB   -> ParcelStatus.AT_RELAY_HUB;
+            case PICKUP_FROM_HUB   -> ParcelStatus.IN_TRANSIT;
+            case TRANSFER_TO_RECIPIENT -> ParcelStatus.DELIVERED;
+            case RETURN_TO_SENDER  -> ParcelStatus.RETURNED;
         };
     }
 }

@@ -1,6 +1,6 @@
 # Kernel API — Schemas Reference
 
-Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name from `endpoints.md` (request/response bodies).
+Auto-generated from `openapi.json`. 1548 component schemas. Referenced by name from `endpoints.md` (request/response bodies).
 
 **Do not edit by hand** — see regeneration instructions in `endpoints.md`.
 
@@ -218,6 +218,21 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 | `value` | `string` | no |
 | `updatedAt` | `string(date-time)` | no |
 
+## AchatResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `status` | `string` | no |
+| `merchantName` | `string` | no |
+| `merchantAgencyName` | `string` | no |
+| `items` | `CheckoutItem[]` | no |
+| `amount` | `number` | no |
+| `currency` | `string` | no |
+| `reference` | `string` | no |
+| `returnUrl` | `string` | no |
+| `expiresAt` | `string(date-time)` | no |
+
 ## ActorResponse
 
 | Field | Type | Required |
@@ -319,6 +334,13 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 |---|---|---|
 | `description` | `string` | no |
 | `poids` | `number` | no |
+
+## AddPayoutNumberRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `phoneNumber` | `string` | no |
+| `method` | `string` | no |
 
 ## AddVariantRequest
 
@@ -669,6 +691,18 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 | `montantAvance` | `number` | no |
 | `centreCout` | `string` | no |
 
+## AmendTransferRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `quantity` | `number` | yes |
+
+## AmountRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `amount` | `number` | no |
+
 ## AnchorDocumentRequest
 
 | Field | Type | Required |
@@ -743,6 +777,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `AccountingPeriodResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseAchatResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `AchatResponse` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -1127,6 +1171,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseBundleDiscountView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `BundleDiscountView` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseBundleView
 
 | Field | Type | Required |
@@ -1183,6 +1237,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `CaptchaVerificationResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseCashCollectionResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `CashCollectionResponse` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -1247,6 +1311,26 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseChallengeResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `ChallengeResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseChallengeView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `ChallengeView` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseChangeRequestResponse
 
 | Field | Type | Required |
@@ -1293,6 +1377,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `CheckbookStats` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseClientApplicationOwnershipClaimResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `ClientApplicationOwnershipClaimResponse` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -1377,6 +1471,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseCompensationResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `CompensationResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseCompteResultatDto
 
 | Field | Type | Required |
@@ -1423,6 +1527,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `CountView` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseCreatedResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `CreatedResponse` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -1533,6 +1647,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `DiscoverSignUpContextsResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseDisputeResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `DisputeResponse` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -1697,6 +1821,36 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseEscrowResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `EscrowResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseEtatDesManques
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `EtatDesManques` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseEvidenceResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `EvidenceResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseExecutionView
 
 | Field | Type | Required |
@@ -1763,6 +1917,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `ForgotPasswordResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseFundResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `FundResponse` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -1913,6 +2077,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `InvoiceSettlementResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseIssueResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `IssueResponse` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -2307,6 +2481,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseListBundleDiscountView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `BundleDiscountView[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseListBusinessActorResponse
 
 | Field | Type | Required |
@@ -2333,6 +2517,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `CampaignResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListCashCollectionResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `CashCollectionResponse[]` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -2413,6 +2607,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `CheckbookResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListClientApplicationOwnershipClaimResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `ClientApplicationOwnershipClaimResponse[]` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -2527,6 +2731,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseListDisputeResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `DisputeResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseListDocumentLinkView
 
 | Field | Type | Required |
@@ -2627,6 +2841,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseListEvidenceResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `EvidenceResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseListExpenseLineResponse
 
 | Field | Type | Required |
@@ -2693,6 +2917,26 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `GrandLivreDto[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListHistoryResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `HistoryResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListInputView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `InputView[]` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -3017,6 +3261,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseListMessageResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `MessageResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseListMissionOrderResponse
 
 | Field | Type | Required |
@@ -3083,6 +3337,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `OperationTemplateResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListOperationView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `OperationView[]` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -3167,6 +3431,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseListOutputView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `OutputView[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseListPayElementResponse
 
 | Field | Type | Required |
@@ -3193,6 +3467,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `PaymentOrderResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListPayoutNumberResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `PayoutNumberResponse[]` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -3233,6 +3517,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `PayslipLineResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListPendingReviewView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `PendingReviewView[]` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -3537,6 +3831,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseListServicePriceView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `ServicePriceView[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseListSkillResponse
 
 | Field | Type | Required |
@@ -3827,6 +4131,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseListVisibleWalletResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `VisibleWalletResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseListWalletRechargeResponse
 
 | Field | Type | Required |
@@ -3843,6 +4157,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `WalletResponse[]` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseListWalletWithdrawal
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `WalletWithdrawal[]` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -4117,6 +4441,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseMessageResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `MessageResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseMissionOrderResponse
 
 | Field | Type | Required |
@@ -4217,6 +4551,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseOperationView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `OperationView` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseOperationalComplianceOverview
 
 | Field | Type | Required |
@@ -4273,6 +4617,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `OperationalSiteView` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseOptionsView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `OptionsView` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -4367,6 +4721,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponsePaiementResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `PaiementResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponsePayElementResponse
 
 | Field | Type | Required |
@@ -4407,6 +4771,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponsePayoutNumberResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `PayoutNumberResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponsePayrollEmployeeResponse
 
 | Field | Type | Required |
@@ -4433,6 +4807,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `PayrollRunResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponsePendingPageView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `PendingPageView` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -4557,6 +4941,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseProfileStatusView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `ProfileStatusView` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseProposedActivityResponse
 
 | Field | Type | Required |
@@ -4593,6 +4987,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `ReceiptResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseReceiveCodeResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `ReceiveCodeResponse` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -4837,6 +5241,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseServicePriceView
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `ServicePriceView` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseServiceView
 
 | Field | Type | Required |
@@ -4853,6 +5267,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `ServiceWorkspaceView` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseSessionResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `SessionResponse` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -5227,6 +5651,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
 
+## ApiResponseViewResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `ViewResponse` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
 ## ApiResponseVirtualCreditProductDetails
 
 | Field | Type | Required |
@@ -5243,6 +5677,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `?` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseWalletCheckoutChallengeResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `WalletCheckoutChallengeResponse` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -5293,6 +5737,16 @@ Auto-generated from `openapi.json`. 1423 component schemas. Referenced by name f
 |---|---|---|
 | `success` | `boolean` | no |
 | `data` | `WarehouseView` | no |
+| `message` | `string` | no |
+| `errorCode` | `string` | no |
+| `timestamp` | `string(date-time)` | no |
+
+## ApiResponseWithdrawalAvailabilityResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `success` | `boolean` | no |
+| `data` | `WithdrawalAvailabilityResponse` | no |
 | `message` | `string` | no |
 | `errorCode` | `string` | no |
 | `timestamp` | `string(date-time)` | no |
@@ -5492,6 +5946,13 @@ Type: `object`
 | Field | Type | Required |
 |---|---|---|
 | `cashierId` | `string(uuid)` | yes |
+
+## AssignClientApplicationOwnerRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `ownerUserId` | `string(uuid)` | no |
+| `ownerTenantId` | `string(uuid)` | no |
 
 ## AssignManagerRequest
 
@@ -5949,6 +6410,10 @@ Type: `object`
 | `outputProductId` | `string(uuid)` | no |
 | `outputQuantity` | `number` | no |
 | `status` | `string` | no |
+| `version` | `integer(int32)` | no |
+| `rootBomId` | `string(uuid)` | no |
+| `derivedFromBomId` | `string(uuid)` | no |
+| `engaged` | `boolean` | no |
 | `components` | `Component[]` | no |
 
 ## BracketLine
@@ -6043,6 +6508,26 @@ Type: `object`
 | `budgeted` | `number` | no |
 | `realised` | `number` | no |
 | `variance` | `number` | no |
+
+## BundleDiscountRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `minServices` | `integer(int32)` | no |
+| `discountPercent` | `number` | no |
+| `active` | `boolean` | no |
+| `challengeToken` | `string` | no |
+| `code` | `string` | no |
+
+## BundleDiscountView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `minServices` | `integer(int32)` | no |
+| `discountPercent` | `number` | no |
+| `active` | `boolean` | no |
+| `updatedAt` | `string(date-time)` | no |
 
 ## BundleView
 
@@ -6215,6 +6700,34 @@ Type: `object`
 | `targetId` | `string(uuid)` | no |
 | `details` | `string` | no |
 | `createdAt` | `string(date-time)` | no |
+
+## CashCollectionRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `subjectType` | `string` | no |
+| `subjectId` | `string(uuid)` | no |
+| `courierWalletId` | `string(uuid)` | no |
+| `currency` | `string` | no |
+| `shares` | `ShareDto[]` | no |
+
+## CashCollectionResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `subjectType` | `string` | no |
+| `subjectId` | `string(uuid)` | no |
+| `courierWalletId` | `string(uuid)` | no |
+| `expectedAmount` | `number` | no |
+| `collectedAmount` | `number` | no |
+| `amountToRemit` | `number` | no |
+| `currency` | `string` | no |
+| `status` | `string` | no |
+| `shares` | `ShareDto[]` | no |
+| `createdAt` | `string(date-time)` | no |
+| `collectedAt` | `string(date-time)` | no |
+| `remittedAt` | `string(date-time)` | no |
 
 ## CashDashboardView
 
@@ -6468,6 +6981,12 @@ Type: `object`
 | `nom` | `string` | no |
 | `description` | `string` | no |
 
+## CategorizeProductRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `categoryId` | `string(uuid)` | no |
+
 ## CategoryCreateDTO
 
 | Field | Type | Required |
@@ -6493,6 +7012,7 @@ Type: `object`
 | Field | Type | Required |
 |---|---|---|
 | `parentId` | `string(uuid)` | no |
+| `organizationId` | `string(uuid)` | no |
 | `code` | `string` | yes |
 | `name` | `string` | yes |
 
@@ -6548,6 +7068,28 @@ Type: `object`
 | `checkedTransactions` | `integer(int64)` | no |
 | `latestHash` | `string` | no |
 | `errors` | `string[]` | no |
+
+## ChallengeRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `walletId` | `string(uuid)` | no |
+
+## ChallengeResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `challengeToken` | `string` | no |
+| `expiresInSeconds` | `integer(int64)` | no |
+| `codePreview` | `string` | no |
+
+## ChallengeView
+
+| Field | Type | Required |
+|---|---|---|
+| `challengeToken` | `string` | no |
+| `expiresInSeconds` | `integer(int64)` | no |
+| `codePreview` | `string` | no |
 
 ## ChangePasswordRequest
 
@@ -6674,6 +7216,36 @@ Type: `object`
 | `mandatory` | `boolean` | no |
 | `present` | `boolean` | no |
 
+## CheckoutItem
+
+| Field | Type | Required |
+|---|---|---|
+| `label` | `string` | no |
+| `description` | `string` | no |
+| `quantity` | `integer(int32)` | no |
+| `unitAmount` | `number` | no |
+
+## ClaimClientApplicationOwnershipRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `clientId` | `string` | no |
+| `clientSecret` | `string` | no |
+
+## ClientApplicationOwnershipClaimResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `clientApplicationId` | `string(uuid)` | no |
+| `requesterUserId` | `string(uuid)` | no |
+| `requesterTenantId` | `string(uuid)` | no |
+| `requestedAt` | `string(date-time)` | no |
+| `status` | `string` | no |
+| `resolvedAt` | `string(date-time)` | no |
+| `resolvedBy` | `string(uuid)` | no |
+| `note` | `string` | no |
+
 ## ClientApplicationPlanResponse
 
 | Field | Type | Required |
@@ -6695,6 +7267,11 @@ Type: `object`
 | `status` | `string` | no |
 | `systemManaged` | `boolean` | no |
 | `allowedServices` | `string[]` | no |
+| `pendingServices` | `string[]` | no |
+| `ownerUserId` | `string(uuid)` | no |
+| `reviewRequestedAt` | `string(date-time)` | no |
+| `reviewedAt` | `string(date-time)` | no |
+| `reviewNote` | `string` | no |
 | `createdAt` | `string(date-time)` | no |
 | `updatedAt` | `string(date-time)` | no |
 | `lastAuthenticatedAt` | `string(date-time)` | no |
@@ -7008,6 +7585,25 @@ DTO représentant une réponse à un commentaire.
 | `defaultPhysicalSpaceId` | `string(uuid)` | no |
 | `readinessNotes` | `string` | no |
 
+## CompensationRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `beneficiaryWalletId` | `string(uuid)` | no |
+| `amount` | `number` | no |
+| `reference` | `string` | no |
+
+## CompensationResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `reference` | `string` | no |
+| `fundWalletId` | `string(uuid)` | no |
+| `beneficiaryWalletId` | `string(uuid)` | no |
+| `amount` | `number` | no |
+| `createdAt` | `string(date-time)` | no |
+
 ## CompleteEnrollmentRequest
 
 | Field | Type | Required |
@@ -7099,6 +7695,14 @@ DTO représentant une réponse à un commentaire.
 |---|---|---|
 | `challengeToken` | `string` | yes |
 | `code` | `string` | yes |
+
+## ConfirmRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `walletId` | `string(uuid)` | no |
+| `challengeToken` | `string` | no |
+| `code` | `string` | no |
 
 ## ConnectorFieldResponse
 
@@ -7611,6 +8215,7 @@ DTO représentant une réponse à un commentaire.
 | `allowedServices` | `string[]` | no |
 | `requestQuotaLimit` | `integer(int64)` | no |
 | `requestQuotaWindowSeconds` | `integer(int64)` | no |
+| `ownerUserId` | `string(uuid)` | no |
 
 ## CreateCommercialDocumentRequest
 
@@ -7881,6 +8486,7 @@ DTO représentant une réponse à un commentaire.
 | `productId` | `string(uuid)` | yes |
 | `referenceNumber` | `string` | no |
 | `countedQuantity` | `number` | yes |
+| `note` | `string` | no |
 
 ## CreateInvoiceAccountingRequest
 
@@ -8358,6 +8964,7 @@ DTO représentant une réponse à un commentaire.
 | `specificationType` | `string` | yes |
 | `standardBatchSize` | `number` | yes |
 | `batchUomId` | `string(uuid)` | yes |
+| `bomId` | `string(uuid)` | no |
 
 ## CreateStatementLineRequest
 
@@ -8503,7 +9110,14 @@ DTO représentant une réponse à un commentaire.
 | Field | Type | Required |
 |---|---|---|
 | `type` | `string` | yes |
-| `payload` | `JsonNode` | no |
+| `payload` | `?` | no |
+
+## CreatedResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `session` | `SessionResponse` | no |
+| `checkoutUrl` | `string` | no |
 
 ## CrmAction
 
@@ -8633,6 +9247,18 @@ Type: `object`
 |---|---|---|
 | `decision` | `string` | yes |
 
+## DecisionResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `outcome` | `string` | no |
+| `refundAmount` | `number` | no |
+| `chargedParty` | `string` | no |
+| `motivation` | `string` | no |
+| `decidedBy` | `string(uuid)` | no |
+| `decidedAt` | `string(date-time)` | no |
+| `compensationAmount` | `number` | no |
+
 ## DeclarationResponse
 
 | Field | Type | Required |
@@ -8645,6 +9271,13 @@ Type: `object`
 | `totalEmployer` | `number` | no |
 | `grandTotal` | `number` | no |
 | `items` | `LineResponse[]` | no |
+
+## DeclareSolutionPermissionsRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `solutionCode` | `string` | yes |
+| `permissions` | `PermissionDeclaration[]` | yes |
 
 ## DeclineMissionOrderRequest
 
@@ -8661,6 +9294,7 @@ Type: `object`
 | `nature` | `string` | yes |
 | `articleKind` | `string` | no |
 | `defaultUomId` | `string(uuid)` | yes |
+| `shortDescription` | `string` | no |
 
 ## DeleteAssignmentRequest
 
@@ -8743,6 +9377,23 @@ Type: `object`
 |---|---|---|
 | `months` | `integer(int32)` | yes |
 
+## DeriveBomRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `code` | `string` | yes |
+| `name` | `string` | no |
+| `outputProductId` | `string(uuid)` | no |
+| `outputQuantity` | `number` | no |
+| `uomId` | `string(uuid)` | no |
+| `components` | `BomComponentRequest[]` | no |
+
+## DescribeProductRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `shortDescription` | `string` | no |
+
 ## DigitalDetailsRequest
 
 | Field | Type | Required |
@@ -8802,6 +9453,8 @@ Type: `object`
 | `tenantId` | `string(uuid)` | no |
 | `userId` | `string(uuid)` | no |
 | `actorId` | `string(uuid)` | no |
+| `label` | `string` | no |
+| `kind` | `string` | no |
 | `organizations` | `UserOrganizationAccessResponse[]` | no |
 
 ## DiscussionGroup
@@ -8822,6 +9475,30 @@ Type: `object`
 | `tenantId` | `string(uuid)` | no |
 | `organizationId` | `string(uuid)` | no |
 | `parentCommunityId` | `string(uuid)` | no |
+
+## DisputeResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `subjectType` | `string` | no |
+| `subjectId` | `string(uuid)` | no |
+| `escrowId` | `string(uuid)` | no |
+| `escrowFrozen` | `boolean` | no |
+| `reason` | `string` | no |
+| `description` | `string` | no |
+| `claimedAmount` | `number` | no |
+| `openedBy` | `string(uuid)` | no |
+| `openerRole` | `string` | no |
+| `status` | `string` | no |
+| `escalatedFrom` | `string` | no |
+| `assignedAgentId` | `string(uuid)` | no |
+| `appealed` | `boolean` | no |
+| `dueAt` | `string(date-time)` | no |
+| `decision` | `DecisionResponse` | no |
+| `createdAt` | `string(date-time)` | no |
+| `updatedAt` | `string(date-time)` | no |
+| `closedAt` | `string(date-time)` | no |
 
 ## DocumentAnalysisResponse
 
@@ -9266,12 +9943,86 @@ Type: `object`
 | `displayOrder` | `integer(int32)` | no |
 | `publicationStatus` | `string` | no |
 
+## EscrowHoldRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `subjectType` | `string` | no |
+| `subjectId` | `string(uuid)` | no |
+| `payerWalletId` | `string(uuid)` | no |
+| `currency` | `string` | no |
+| `shares` | `ShareDto[]` | no |
+| `challengeToken` | `string` | no |
+| `code` | `string` | no |
+| `orderId` | `string(uuid)` | no |
+
+## EscrowResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `subjectType` | `string` | no |
+| `subjectId` | `string(uuid)` | no |
+| `payerWalletId` | `string(uuid)` | no |
+| `orderId` | `string(uuid)` | no |
+| `amount` | `number` | no |
+| `refundedAmount` | `number` | no |
+| `currency` | `string` | no |
+| `status` | `string` | no |
+| `statusReason` | `string` | no |
+| `shares` | `ShareDto[]` | no |
+| `createdAt` | `string(date-time)` | no |
+| `updatedAt` | `string(date-time)` | no |
+| `settledAt` | `string(date-time)` | no |
+
+## EtapeBloquee
+
+| Field | Type | Required |
+|---|---|---|
+| `stepId` | `string(uuid)` | no |
+| `label` | `string` | no |
+| `productId` | `string(uuid)` | no |
+| `required` | `number` | no |
+| `available` | `number` | no |
+
+## EtatDesManques
+
+| Field | Type | Required |
+|---|---|---|
+| `blockedSteps` | `EtapeBloquee[]` | no |
+| `toFinish` | `Manque[]` | no |
+
 ## EvaluateObjectiveRequest
 
 | Field | Type | Required |
 |---|---|---|
 | `noteAtteinte` | `number` | no |
 | `commentaire` | `string` | no |
+
+## EvidenceRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `kind` | `string` | no |
+| `fileId` | `string(uuid)` | no |
+| `reference` | `string` | no |
+| `description` | `string` | no |
+| `sha256` | `string` | no |
+
+## EvidenceResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `submittedBy` | `string(uuid)` | no |
+| `submitterRole` | `string` | no |
+| `kind` | `string` | no |
+| `fileId` | `string(uuid)` | no |
+| `reference` | `string` | no |
+| `description` | `string` | no |
+| `sha256` | `string` | no |
+| `system` | `boolean` | no |
+| `createdAt` | `string(date-time)` | no |
 
 ## ExchangeRate
 
@@ -9462,6 +10213,18 @@ Type: `object`
 | `freeTags` | `string[]` | no |
 | `publishedAt` | `string(date-time)` | no |
 
+## FieldStatus
+
+| Field | Type | Required |
+|---|---|---|
+| `reviewId` | `string(uuid)` | no |
+| `key` | `string` | no |
+| `label` | `string` | no |
+| `required` | `boolean` | no |
+| `value` | `string` | no |
+| `status` | `string` | no |
+| `reason` | `string` | no |
+
 ## FinalSettlementResponse
 
 | Field | Type | Required |
@@ -9563,6 +10326,14 @@ Type: `object`
 | `selectionTokenExpiresInSeconds` | `integer(int64)` | no |
 | `contexts` | `PasswordResetContextResponse[]` | no |
 
+## FreeActivationRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `enabled` | `boolean` | no |
+| `challengeToken` | `string` | no |
+| `code` | `string` | no |
+
 ## FulfillFundRequestRequest
 
 | Field | Type | Required |
@@ -9581,6 +10352,13 @@ Type: `object`
 | `status` | `string` | no |
 | `reason` | `string` | no |
 | `createdAt` | `string(date-time)` | no |
+
+## FundResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `walletId` | `string(uuid)` | no |
+| `balance` | `number` | no |
 
 ## GarnishmentResponse
 
@@ -9803,6 +10581,17 @@ Type: `object`
 | `soldeCloture` | `number` | no |
 | `lignes` | `LigneGrandLivreDto[]` | no |
 
+## HistoryResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `fromStatus` | `string` | no |
+| `toStatus` | `string` | no |
+| `actorId` | `string(uuid)` | no |
+| `actorRole` | `string` | no |
+| `note` | `string` | no |
+| `createdAt` | `string(date-time)` | no |
+
 ## HumanRequest
 
 | Field | Type | Required |
@@ -9885,6 +10674,18 @@ Type: `object`
 | `uomId` | `string(uuid)` | yes |
 | `quantityBasis` | `string` | yes |
 
+## InputView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `sequenceNumber` | `integer(int32)` | no |
+| `inputOrganizationProductId` | `string(uuid)` | no |
+| `inputRole` | `string` | no |
+| `requiredQuantity` | `number` | no |
+| `uomId` | `string(uuid)` | no |
+| `quantityBasis` | `string` | no |
+
 ## InspectionRequest
 
 | Field | Type | Required |
@@ -9961,6 +10762,12 @@ Type: `object`
 | `referenceNumber` | `string` | no |
 | `countedQuantity` | `number` | no |
 | `status` | `string` | no |
+| `countedByUserId` | `string(uuid)` | no |
+| `countedByName` | `string` | no |
+| `reason` | `string` | no |
+| `note` | `string` | no |
+| `theoreticalQuantity` | `number` | no |
+| `variance` | `number` | no |
 
 ## InviteEmployeeRequest
 
@@ -10083,6 +10890,15 @@ Type: `object`
 | `selectionToken` | `string` | yes |
 | `contextId` | `string` | yes |
 
+## IssueResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `sessionId` | `string(uuid)` | no |
+| `status` | `string` | no |
+| `amount` | `number` | no |
+| `currency` | `string` | no |
+
 ## IssueToCustomerRequest
 
 | Field | Type | Required |
@@ -10111,7 +10927,7 @@ Type: `object`
 |---|---|---|
 | `organizationId` | `string(uuid)` | yes |
 | `agencyId` | `string(uuid)` | yes |
-| `payload` | `JsonNode` | yes |
+| `payload` | `?` | yes |
 
 ## ItemResponse
 
@@ -10121,7 +10937,7 @@ Type: `object`
 | `organizationId` | `string(uuid)` | no |
 | `agencyId` | `string(uuid)` | no |
 | `type` | `string` | no |
-| `payload` | `JsonNode` | no |
+| `payload` | `?` | no |
 | `version` | `integer(int64)` | no |
 | `createdAt` | `string(date-time)` | no |
 | `updatedAt` | `string(date-time)` | no |
@@ -10207,10 +11023,6 @@ Type: `object`
 | `active` | `boolean` | no |
 | `createdAt` | `string(date-time)` | no |
 | `updatedAt` | `string(date-time)` | no |
-
-## JsonNode
-
-Type: `object`
 
 ## JustifyReconciliationRequest
 
@@ -10486,6 +11298,12 @@ Type: `object`
 | `organizationId` | `string(uuid)` | yes |
 | `domainId` | `string(uuid)` | yes |
 
+## LinkBomRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `bomId` | `string(uuid)` | yes |
+
 ## LinkOrganizationActorRequest
 
 | Field | Type | Required |
@@ -10649,6 +11467,14 @@ Type: `object`
 |---|---|---|
 | `managerUserId` | `string(uuid)` | no |
 | `assignedByUserId` | `string(uuid)` | no |
+
+## Manque
+
+| Field | Type | Required |
+|---|---|---|
+| `productId` | `string(uuid)` | no |
+| `required` | `number` | no |
+| `available` | `number` | no |
 
 ## ManualMatchRequest
 
@@ -10867,6 +11693,12 @@ Type: `object`
 | `quantity` | `number` | no |
 | `referenceNumber` | `string` | no |
 | `status` | `string` | no |
+| `createdAt` | `string(date-time)` | no |
+| `updatedAt` | `string(date-time)` | no |
+| `createdByUserId` | `string(uuid)` | no |
+| `createdByName` | `string` | no |
+| `receivedQuantity` | `number` | no |
+| `discrepancyNote` | `string` | no |
 
 ## MaterialStockTransformationResponse
 
@@ -10974,6 +11806,24 @@ Type: `object`
 | `restrictions` | `string` | no |
 | `prochaineEcheance` | `string(date)` | no |
 | `certificatFileId` | `string(uuid)` | no |
+
+## MessageRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `body` | `string` | no |
+| `internal` | `boolean` | no |
+
+## MessageResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `authorId` | `string(uuid)` | no |
+| `authorRole` | `string` | no |
+| `body` | `string` | no |
+| `internal` | `boolean` | no |
+| `createdAt` | `string(date-time)` | no |
 
 ## MfaExemptionRequest
 
@@ -11194,6 +12044,7 @@ Type: `object`
 | `sentAt` | `string(date-time)` | no |
 | `attempts` | `integer(int32)` | no |
 | `lastAttemptAt` | `string(date-time)` | no |
+| `readAt` | `string(date-time)` | no |
 
 ## NotificationPreference
 
@@ -11207,6 +12058,8 @@ Type: `object`
 | `enabled` | `boolean` | no |
 | `locale` | `string` | no |
 | `updatedAt` | `string(date-time)` | no |
+| `application` | `string` | no |
+| `frequencyMinutes` | `integer(int32)` | no |
 
 ## NotificationProvider
 
@@ -11339,6 +12192,17 @@ Type: `object`
 | `paymentStatus` | `string` | no |
 | `direction` | `string` | no |
 
+## OpenDisputeRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `subjectType` | `string` | no |
+| `subjectId` | `string(uuid)` | no |
+| `reason` | `string` | no |
+| `description` | `string` | no |
+| `claimedAmount` | `number` | no |
+| `openerRole` | `string` | no |
+
 ## OpenItemSummaryView
 
 | Field | Type | Required |
@@ -11426,6 +12290,27 @@ Type: `object`
 | `closesAt` | `string` | no |
 | `closed` | `boolean` | no |
 
+## OperationRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `sequenceNumber` | `integer(int32)` | no |
+| `operationCode` | `string` | yes |
+| `name` | `string` | yes |
+| `operationType` | `string` | yes |
+| `workCenterId` | `string(uuid)` | no |
+| `setupDurationSeconds` | `integer(int64)` | no |
+| `runDurationPerUnitSeconds` | `integer(int64)` | no |
+| `durationMode` | `string` | no |
+| `runCapacity` | `number` | no |
+| `queueDurationSeconds` | `integer(int64)` | no |
+| `qualityGateRequired` | `boolean` | no |
+| `instructions` | `string` | no |
+| `predecessorSequences` | `integer(int32)[]` | no |
+| `consumedInputSequences` | `integer(int32)[]` | no |
+| `consumedInputPercentages` | `number[]` | no |
+| `producedOutputSequence` | `integer(int32)` | no |
+
 ## OperationTemplateResponse
 
 | Field | Type | Required |
@@ -11434,6 +12319,28 @@ Type: `object`
 | `code` | `string` | no |
 | `label` | `string` | no |
 | `operationType` | `string` | no |
+
+## OperationView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `sequenceNumber` | `integer(int32)` | no |
+| `operationCode` | `string` | no |
+| `name` | `string` | no |
+| `operationType` | `string` | no |
+| `workCenterId` | `string(uuid)` | no |
+| `setupDurationSeconds` | `integer(int64)` | no |
+| `runDurationPerUnitSeconds` | `integer(int64)` | no |
+| `durationMode` | `string` | no |
+| `runCapacity` | `number` | no |
+| `queueDurationSeconds` | `integer(int64)` | no |
+| `qualityGateRequired` | `boolean` | no |
+| `instructions` | `string` | no |
+| `predecessorSequences` | `integer(int32)[]` | no |
+| `consumedInputSequences` | `integer(int32)[]` | no |
+| `consumedInputPercentages` | `number[]` | no |
+| `producedOutputSequence` | `integer(int32)` | no |
 
 ## OperationalComplianceOverview
 
@@ -11602,6 +12509,14 @@ Type: `object`
 | `documents` | `SiteDocumentSnapshot` | no |
 | `inventory` | `GeneralizedInventoryViewSnapshot` | no |
 | `capabilities` | `string[]` | no |
+
+## OptionsView
+
+| Field | Type | Required |
+|---|---|---|
+| `freeServiceActivation` | `boolean` | no |
+| `updatedByUserId` | `string(uuid)` | no |
+| `updatedAt` | `string(date-time)` | no |
 
 ## OrgProductView
 
@@ -11839,6 +12754,17 @@ Type: `object`
 | `expectedQuantity` | `number` | yes |
 | `uomId` | `string(uuid)` | yes |
 
+## OutputView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `sequenceNumber` | `integer(int32)` | no |
+| `outputOrganizationProductId` | `string(uuid)` | no |
+| `outputRole` | `string` | no |
+| `expectedQuantity` | `number` | no |
+| `uomId` | `string(uuid)` | no |
+
 ## P2PTransferRequest
 
 | Field | Type | Required |
@@ -11847,6 +12773,16 @@ Type: `object`
 | `toCustomerId` | `string(uuid)` | yes |
 | `amount` | `number` | yes |
 | `reference` | `string` | yes |
+
+## PaiementResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `paymentUrl` | `string` | no |
+| `qrCode` | `string` | no |
+| `status` | `string` | no |
+| `amount` | `number` | no |
+| `currency` | `string` | no |
 
 ## PartyRef
 
@@ -11915,6 +12851,13 @@ Type: `object`
 | `advances` | `number` | no |
 | `workedDaysOverride` | `integer(int32)` | no |
 | `locked` | `boolean` | no |
+
+## PayerRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `phone` | `string` | no |
+| `email` | `string` | no |
 
 ## PaymentChallengeRequest
 
@@ -11990,6 +12933,33 @@ Type: `object`
 | `linkedDocumentType` | `string` | no |
 | `linkedDocumentId` | `string(uuid)` | no |
 | `paidAt` | `string(date-time)` | no |
+
+## PayoutNumberChallengeRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `amount` | `number` | no |
+
+## PayoutNumberResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `maskedPhone` | `string` | no |
+| `operator` | `string` | no |
+| `status` | `string` | no |
+| `codeExpiresAt` | `string(date-time)` | no |
+| `verifiedAt` | `string(date-time)` | no |
+| `createdAt` | `string(date-time)` | no |
+
+## PayoutNumberWithdrawalRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `amount` | `number` | no |
+| `currency` | `string` | no |
+| `challengeToken` | `string` | no |
+| `code` | `string` | no |
 
 ## PayrollEmployeeResponse
 
@@ -12084,6 +13054,39 @@ Type: `object`
 | `taux` | `number` | no |
 | `montant` | `number` | no |
 | `ordreAffichage` | `integer(int32)` | no |
+
+## PendingPageView
+
+| Field | Type | Required |
+|---|---|---|
+| `items` | `PendingReviewView[]` | no |
+| `totalProfiles` | `integer(int32)` | no |
+| `totalReviews` | `integer(int32)` | no |
+| `page` | `integer(int32)` | no |
+| `size` | `integer(int32)` | no |
+
+## PendingReviewView
+
+| Field | Type | Required |
+|---|---|---|
+| `reviewId` | `string(uuid)` | no |
+| `subjectType` | `string` | no |
+| `subjectId` | `string(uuid)` | no |
+| `subjectName` | `string` | no |
+| `fieldKey` | `string` | no |
+| `fieldLabel` | `string` | no |
+| `value` | `string` | no |
+| `submittedAt` | `string(date-time)` | no |
+
+## PermissionDeclaration
+
+| Field | Type | Required |
+|---|---|---|
+| `code` | `string` | yes |
+| `name` | `string` | yes |
+| `description` | `string` | no |
+| `module` | `string` | no |
+| `scope` | `string` | no |
 
 ## PermissionDescriptor
 
@@ -12194,6 +13197,13 @@ Type: `object`
 | `scopeType` | `string` | yes |
 | `scheduledAt` | `string(date-time)` | yes |
 | `notes` | `string` | no |
+
+## PlanMfaRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `challengeToken` | `string` | no |
+| `mfaCode` | `string` | no |
 
 ## PlanRequest
 
@@ -12457,9 +13467,15 @@ Type: `object`
 | `id` | `string(uuid)` | no |
 | `globalCode` | `string` | no |
 | `name` | `string` | no |
+| `shortDescription` | `string` | no |
+| `longDescription` | `string` | no |
 | `nature` | `string` | no |
 | `articleKind` | `string` | no |
 | `lifecycleStatus` | `string` | no |
+| `defaultUomId` | `string(uuid)` | no |
+| `categoryId` | `string(uuid)` | no |
+| `launchDate` | `string(date)` | no |
+| `discontinueDate` | `string(date)` | no |
 
 ## ProductionCapacity
 
@@ -12511,6 +13527,24 @@ Type: `object`
 | `conversionCost` | `number` | no |
 | `totalCost` | `number` | no |
 | `outputUnitCost` | `number` | no |
+| `createdAt` | `string(date-time)` | no |
+| `updatedAt` | `string(date-time)` | no |
+
+## ProfileStatusView
+
+| Field | Type | Required |
+|---|---|---|
+| `subjectType` | `string` | no |
+| `subjectId` | `string(uuid)` | no |
+| `tenantId` | `string(uuid)` | no |
+| `displayName` | `string` | no |
+| `ownerActorId` | `string(uuid)` | no |
+| `fields` | `FieldStatus[]` | no |
+| `complete` | `boolean` | no |
+| `missingRequired` | `string[]` | no |
+| `rejected` | `string[]` | no |
+| `deadlineAt` | `string(date-time)` | no |
+| `blocked` | `boolean` | no |
 
 ## ProposedActivityResponse
 
@@ -12635,6 +13669,8 @@ Type: `object`
 | Field | Type | Required |
 |---|---|---|
 | `organizationId` | `string(uuid)` | no |
+| `challengeToken` | `string` | no |
+| `mfaCode` | `string` | no |
 
 ## QuestionRequest
 
@@ -12688,6 +13724,20 @@ Type: `object`
 | `note` | `string` | no |
 | `lines` | `LineItemResponse[]` | no |
 
+## ReceiveCodeRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `validitySeconds` | `integer(int32)` | no |
+
+## ReceiveCodeResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `code` | `string` | no |
+| `expiresAt` | `string(date-time)` | no |
+| `expiresInSeconds` | `integer(int64)` | no |
+
 ## ReceiveFromSupplierRequest
 
 | Field | Type | Required |
@@ -12702,6 +13752,14 @@ Type: `object`
 | `referenceType` | `string` | no |
 | `referenceId` | `string(uuid)` | no |
 | `referenceNumber` | `string` | yes |
+| `expiresAt` | `string(date-time)` | no |
+
+## ReceiveTransferRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `countedQuantity` | `number` | no |
+| `note` | `string` | no |
 
 ## ReconciliationMatchResponse
 
@@ -13122,6 +14180,12 @@ Type: `object`
 |---|---|---|
 | `reason` | `string` | no |
 
+## RejectRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `reason` | `string` | no |
+
 ## RejectRunRequest
 
 | Field | Type | Required |
@@ -13181,11 +14245,12 @@ Type: `object`
 | `organizationId` | `string(uuid)` | no |
 | `organizationName` | `string` | no |
 
-## RenameProductRequest
+## RemitRequest
 
 | Field | Type | Required |
 |---|---|---|
-| `name` | `string` | yes |
+| `challengeToken` | `string` | no |
+| `code` | `string` | no |
 
 ## RenewContractRequest
 
@@ -13226,6 +14291,12 @@ Type: `object`
 | `activated` | `integer(int32)` | no |
 | `failed` | `integer(int32)` | no |
 | `skipped` | `integer(int32)` | no |
+
+## ReorderRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `sortOrder` | `integer(int32)` | no |
 
 ## ReplaceRolePermissionsRequest
 
@@ -13281,6 +14352,15 @@ Type: `object`
 | `nbEcheances` | `integer(int32)` | no |
 | `motif` | `string` | no |
 
+## RequestOwnClientApplicationRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `clientId` | `string` | no |
+| `name` | `string` | no |
+| `description` | `string` | no |
+| `services` | `string[]` | no |
+
 ## RequestTransferRequest
 
 | Field | Type | Required |
@@ -13290,7 +14370,7 @@ Type: `object`
 | `targetAgencyId` | `string(uuid)` | yes |
 | `productId` | `string(uuid)` | yes |
 | `quantity` | `number` | yes |
-| `referenceNumber` | `string` | yes |
+| `referenceNumber` | `string` | no |
 
 ## RequiredMaterial
 
@@ -13327,6 +14407,14 @@ Type: `object`
 |---|---|---|
 | `resetToken` | `string` | yes |
 | `newPassword` | `string` | yes |
+
+## ResolveInternalCounterpartyRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `organizationId` | `string(uuid)` | yes |
+| `partyType` | `string` | yes |
+| `partyId` | `string(uuid)` | yes |
 
 ## ResolveRequest
 
@@ -13436,6 +14524,12 @@ Type: `object`
 | `deltaNet` | `number` | no |
 | `status` | `string` | no |
 
+## ReviewClientApplicationRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `note` | `string` | no |
+
 ## ReviewDocumentRequest
 
 | Field | Type | Required |
@@ -13518,6 +14612,7 @@ Type: `object`
 | `name` | `string` | no |
 | `scopeType` | `string` | no |
 | `permissions` | `string[]` | no |
+| `organizationId` | `string(uuid)` | no |
 
 ## RoleTemplate
 
@@ -13688,6 +14783,8 @@ Type: `object`
 | `periodDays` | `integer(int32)` | no |
 | `serviceCodes` | `string[]` | no |
 | `active` | `boolean` | no |
+| `challengeToken` | `string` | no |
+| `mfaCode` | `string` | no |
 
 ## SavePreferenceRequest
 
@@ -13697,6 +14794,8 @@ Type: `object`
 | `channel` | `string` | yes |
 | `enabled` | `boolean` | no |
 | `locale` | `string` | no |
+| `application` | `string` | no |
+| `frequencyMinutes` | `integer(int32)` | no |
 
 ## SaveProviderRequest
 
@@ -13832,6 +14931,7 @@ Type: `object`
 | `body` | `string` | yes |
 | `variables` | `object` | no |
 | `metadata` | `object` | no |
+| `application` | `string` | no |
 
 ## ServiceBundleCheckoutRequest
 
@@ -13887,6 +14987,9 @@ Type: `object`
 |---|---|---|
 | `billingPeriod` | `string` | no |
 | `lines` | `ServicePriceResponse[]` | no |
+| `subtotal` | `number` | no |
+| `discountPercent` | `number` | no |
+| `discountAmount` | `number` | no |
 | `total` | `number` | no |
 | `currency` | `string` | no |
 
@@ -13898,6 +15001,18 @@ Type: `object`
 | `displayName` | `string` | no |
 | `description` | `string` | no |
 
+## ServicePriceRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `serviceCode` | `string` | no |
+| `billingPeriod` | `string` | no |
+| `amount` | `number` | no |
+| `currency` | `string` | no |
+| `active` | `boolean` | no |
+| `challengeToken` | `string` | no |
+| `code` | `string` | no |
+
 ## ServicePriceResponse
 
 | Field | Type | Required |
@@ -13906,6 +15021,18 @@ Type: `object`
 | `billingPeriod` | `string` | no |
 | `amount` | `number` | no |
 | `currency` | `string` | no |
+
+## ServicePriceView
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `serviceCode` | `string` | no |
+| `billingPeriod` | `string` | no |
+| `amount` | `number` | no |
+| `currency` | `string` | no |
+| `active` | `boolean` | no |
+| `updatedAt` | `string(date-time)` | no |
 
 ## ServiceView
 
@@ -13980,6 +15107,14 @@ Type: `object`
 |---|---|---|
 | `allowedSaleSizes` | `string[]` | no |
 | `vatApplicable` | `boolean` | no |
+
+## ShareDto
+
+| Field | Type | Required |
+|---|---|---|
+| `role` | `string` | no |
+| `walletId` | `string(uuid)` | no |
+| `amount` | `number` | no |
 
 ## SharedSsoSessionResponse
 
@@ -14066,7 +15201,11 @@ Type: `object`
 | `id` | `string(uuid)` | no |
 | `code` | `string` | no |
 | `name` | `string` | no |
+| `specificationType` | `string` | no |
 | `status` | `string` | no |
+| `standardBatchSize` | `number` | no |
+| `revisionNumber` | `integer(int32)` | no |
+| `bomId` | `string(uuid)` | no |
 
 ## StartClosingRunRequest
 
@@ -14130,6 +15269,14 @@ Type: `object`
 | `linesImported` | `integer(int32)` | no |
 | `lines` | `StatementLineResponse[]` | no |
 
+## StepMaterial
+
+| Field | Type | Required |
+|---|---|---|
+| `productId` | `string(uuid)` | no |
+| `plannedQuantity` | `number` | no |
+| `percentage` | `number` | no |
+
 ## StepRequest
 
 | Field | Type | Required |
@@ -14150,6 +15297,16 @@ Type: `object`
 | `plannedEnd` | `string(date-time)` | no |
 | `resourceId` | `string(uuid)` | no |
 | `status` | `string` | no |
+| `predecessorStepIds` | `string(uuid)[]` | no |
+| `startedAt` | `string(date-time)` | no |
+| `pausedAt` | `string(date-time)` | no |
+| `accumulatedPauseSeconds` | `integer(int64)` | no |
+| `activeElapsedSeconds` | `integer(int64)` | no |
+| `progressPercent` | `integer(int32)` | no |
+| `pausedByOrder` | `boolean` | no |
+| `outputProductId` | `string(uuid)` | no |
+| `plannedOutputQuantity` | `number` | no |
+| `materials` | `StepMaterial[]` | no |
 
 ## StockBalanceResponse
 
@@ -14201,6 +15358,7 @@ Type: `object`
 | `referenceId` | `string(uuid)` | no |
 | `referenceNumber` | `string` | no |
 | `occurredAt` | `string(date-time)` | no |
+| `expiresAt` | `string(date-time)` | no |
 
 ## StockReservationResponse
 
@@ -14231,6 +15389,12 @@ Type: `object`
 | `quantity` | `number` | no |
 | `referenceNumber` | `string` | no |
 | `status` | `string` | no |
+| `createdAt` | `string(date-time)` | no |
+| `updatedAt` | `string(date-time)` | no |
+| `createdByUserId` | `string(uuid)` | no |
+| `createdByName` | `string` | no |
+| `receivedQuantity` | `number` | no |
+| `discrepancyNote` | `string` | no |
 
 ## StockTransformationResponse
 
@@ -14583,6 +15747,12 @@ Type: `object`
 |---|---|---|
 | `terminationDate` | `string(date)` | no |
 | `reason` | `string` | no |
+
+## TextRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `text` | `string` | no |
 
 ## ThirdParty
 
@@ -15017,7 +16187,7 @@ Type: `object`
 
 | Field | Type | Required |
 |---|---|---|
-| `targetWalletId` | `string(uuid)` | no |
+| `recipientCode` | `string` | no |
 | `amount` | `number` | no |
 | `reference` | `string` | no |
 
@@ -15025,7 +16195,7 @@ Type: `object`
 
 | Field | Type | Required |
 |---|---|---|
-| `targetWalletId` | `string(uuid)` | no |
+| `recipientCode` | `string` | no |
 | `amount` | `number` | no |
 | `reference` | `string` | no |
 | `challengeToken` | `string` | no |
@@ -15143,6 +16313,12 @@ Type: `object`
 | `settingsPreferences` | `boolean` | no |
 | `createdAt` | `string(date-time)` | no |
 | `updatedAt` | `string(date-time)` | no |
+
+## UnassignMaterialResourceRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `assigneeType` | `string` | no |
 
 ## UnitCourse
 
@@ -15343,6 +16519,16 @@ Type: `object`
 | `name` | `string` | yes |
 | `active` | `boolean` | no |
 
+## UpdateBomRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `name` | `string` | no |
+| `outputProductId` | `string(uuid)` | no |
+| `outputQuantity` | `number` | no |
+| `uomId` | `string(uuid)` | no |
+| `components` | `BomComponentRequest[]` | yes |
+
 ## UpdateCashRegisterRequest
 
 | Field | Type | Required |
@@ -15368,6 +16554,13 @@ Type: `object`
 | Field | Type | Required |
 |---|---|---|
 | `categorieIds` | `string(uuid)[]` | yes |
+
+## UpdateCategoryRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `name` | `string` | yes |
+| `description` | `string` | no |
 
 ## UpdateClientApplicationRequest
 
@@ -15479,6 +16672,27 @@ Type: `object`
 | `step` | `integer(int32)` | no |
 | `status` | `string` | no |
 
+## UpdateOperationRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `sequenceNumber` | `integer(int32)` | no |
+| `operationCode` | `string` | no |
+| `name` | `string` | no |
+| `operationType` | `string` | no |
+| `workCenterId` | `string(uuid)` | no |
+| `setupDurationSeconds` | `integer(int64)` | no |
+| `runDurationPerUnitSeconds` | `integer(int64)` | no |
+| `durationMode` | `string` | no |
+| `runCapacity` | `number` | no |
+| `queueDurationSeconds` | `integer(int64)` | no |
+| `qualityGateRequired` | `boolean` | no |
+| `instructions` | `string` | no |
+| `predecessorSequences` | `integer(int32)[]` | no |
+| `consumedInputSequences` | `integer(int32)[]` | no |
+| `consumedInputPercentages` | `number[]` | no |
+| `producedOutputSequence` | `integer(int32)` | no |
+
 ## UpdateOrganizationRequest
 
 | Field | Type | Required |
@@ -15512,6 +16726,12 @@ Type: `object`
 | `requestQuotaLimit` | `integer(int64)` | yes |
 | `requestQuotaWindowSeconds` | `integer(int64)` | yes |
 
+## UpdateOwnClientApplicationServicesRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `services` | `string[]` | no |
+
 ## UpdatePaymentRequest
 
 | Field | Type | Required |
@@ -15531,6 +16751,18 @@ Type: `object`
 | Field | Type | Required |
 |---|---|---|
 | `plan` | `string` | yes |
+
+## UpdateProductRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `name` | `string` | yes |
+| `globalCode` | `string` | no |
+| `shortDescription` | `string` | no |
+| `longDescription` | `string` | no |
+| `defaultUomId` | `string(uuid)` | no |
+| `launchDate` | `string(date)` | no |
+| `discontinueDate` | `string(date)` | no |
 
 ## UpdateSalesPointRequest
 
@@ -15566,6 +16798,14 @@ Type: `object`
 | Field | Type | Required |
 |---|---|---|
 | `status` | `string` | yes |
+
+## UpdateStepRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `label` | `string` | no |
+| `plannedStart` | `string(date-time)` | no |
+| `plannedEnd` | `string(date-time)` | no |
 
 ## UpdateThirdPartyRequest
 
@@ -15911,6 +17151,12 @@ Type: `object`
 | `code` | `string` | yes |
 | `username` | `string` | yes |
 
+## ValidateInventorySessionRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `reason` | `string` | no |
+
 ## VariantView
 
 | Field | Type | Required |
@@ -15936,6 +17182,27 @@ Type: `object`
 | `code` | `string` | yes |
 | `purpose` | `string` | no |
 
+## VerifyPayoutNumberRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `code` | `string` | no |
+
+## ViewResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `status` | `string` | no |
+| `merchantName` | `string` | no |
+| `merchantAgencyName` | `string` | no |
+| `items` | `CheckoutItem[]` | no |
+| `amount` | `number` | no |
+| `currency` | `string` | no |
+| `reference` | `string` | no |
+| `returnUrl` | `string` | no |
+| `expiresAt` | `string(date-time)` | no |
+
 ## VirtualCreditDetailsRequest
 
 | Field | Type | Required |
@@ -15958,6 +17225,36 @@ Type: `object`
 | `transferable` | `boolean` | no |
 | `divisible` | `boolean` | no |
 | `expiryPolicy` | `string` | no |
+
+## VisibleWalletResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `scope` | `string` | no |
+| `agencyId` | `string(uuid)` | no |
+| `agencyName` | `string` | no |
+| `wallet` | `WalletResponse` | no |
+
+## WalletCheckoutChallengeResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `checkoutId` | `string(uuid)` | no |
+| `amount` | `number` | no |
+| `currency` | `string` | no |
+| `challengeToken` | `string` | no |
+| `expiresInSeconds` | `integer(int64)` | no |
+| `codePreview` | `string` | no |
+
+## WalletCheckoutConfirmRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `checkoutId` | `string(uuid)` | no |
+| `services` | `string[]` | no |
+| `billingPeriod` | `string` | no |
+| `challengeToken` | `string` | no |
+| `code` | `string` | no |
 
 ## WalletRechargeRequest
 
@@ -15999,6 +17296,24 @@ Type: `object`
 | `createdAt` | `string(date-time)` | no |
 | `updatedAt` | `string(date-time)` | no |
 
+## WalletWithdrawal
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | `string(uuid)` | no |
+| `tenantId` | `string(uuid)` | no |
+| `walletId` | `string(uuid)` | no |
+| `amount` | `number` | no |
+| `currency` | `string` | no |
+| `operator` | `string` | no |
+| `maskedPhone` | `string` | no |
+| `status` | `string` | no |
+| `providerReference` | `string` | no |
+| `message` | `string` | no |
+| `debitTransactionId` | `string(uuid)` | no |
+| `createdAt` | `string(date-time)` | no |
+| `updatedAt` | `string(date-time)` | no |
+
 ## WarehouseLayoutRequest
 
 | Field | Type | Required |
@@ -16007,7 +17322,7 @@ Type: `object`
 | `type` | `string` | yes |
 | `width` | `integer(int32)` | no |
 | `height` | `integer(int32)` | no |
-| `layout` | `JsonNode` | no |
+| `layout` | `?` | no |
 
 ## WarehouseLayoutResponse
 
@@ -16017,7 +17332,7 @@ Type: `object`
 | `type` | `string` | no |
 | `width` | `integer(int32)` | no |
 | `height` | `integer(int32)` | no |
-| `layout` | `JsonNode` | no |
+| `layout` | `?` | no |
 
 ## WarehouseScopedResourceRequest
 
@@ -16079,6 +17394,12 @@ Type: `object`
 | `registerId` | `string(uuid)` | no |
 | `counterpartyActorId` | `string(uuid)` | no |
 | `counterpartyThirdPartyId` | `string(uuid)` | no |
+
+## WithdrawalAvailabilityResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `available` | `boolean` | no |
 
 ## WithdrawalChallengeRequest
 

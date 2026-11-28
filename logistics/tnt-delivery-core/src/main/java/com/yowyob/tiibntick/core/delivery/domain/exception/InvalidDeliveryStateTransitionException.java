@@ -3,7 +3,8 @@ package com.yowyob.tiibntick.core.delivery.domain.exception;
 import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryStatus;
 
 /**
- * Thrown when an illegal state transition is attempted on a {@code Delivery} aggregate.
+ * Thrown when a pair of delivery states, or a guard of a row, is refused by
+ * {@code DeliveryStateMachine.TABLE} (spec §1.1: "toute paire absente de cette table est refusée", HTTP 409).
  *
  * @author MANFOUO Braun
  */
@@ -14,6 +15,12 @@ public class InvalidDeliveryStateTransitionException extends DeliveryDomainExcep
 
     public InvalidDeliveryStateTransitionException(DeliveryStatus from, DeliveryStatus to) {
         super(String.format("Cannot transition delivery from [%s] to [%s]", from, to));
+        this.from = from;
+        this.to = to;
+    }
+
+    public InvalidDeliveryStateTransitionException(DeliveryStatus from, DeliveryStatus to, String guard) {
+        super(String.format("Cannot transition delivery from [%s] to [%s]: %s", from, to, guard));
         this.from = from;
         this.to = to;
     }

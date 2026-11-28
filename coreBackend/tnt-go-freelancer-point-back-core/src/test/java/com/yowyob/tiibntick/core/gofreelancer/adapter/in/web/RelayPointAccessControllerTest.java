@@ -127,11 +127,26 @@ class RelayPointAccessControllerTest {
                 .authenticated(true).roles(Set.of(roles)).build();
         RelayPointAccessGuard guard = new RelayPointAccessGuard(relayPoints, freelancers);
         RelayPointDirectoryService directory = new RelayPointDirectoryService(addresses, needs, deposits, announcements);
+        // the real permission aspect and role registry (D-142: PATCH .../status requires gofp-admin:manage)
+        org.springframework.aop.aspectj.annotation.AspectJProxyFactory factory =
+                new org.springframework.aop.aspectj.annotation.AspectJProxyFactory(
+                        new GofpRelayPointProfileController(useCase, guard, directory));
+        factory.setProxyTargetClass(true);
+        factory.addAspect(new com.yowyob.tiibntick.core.roles.adapter.in.web.TntPermissionAspect(
+                new com.yowyob.tiibntick.core.roles.application.service.TntPermissionEvaluator(
+                        mock(com.yowyob.tiibntick.core.roles.application.port.out.ReactivePermissionResolver.class),
+                        new com.yowyob.tiibntick.core.roles.application.service.TntRoleDefinitionRegistry())));
+        var auth = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                userId.toString(), "n/a", java.util.Arrays.stream(roles)
+                        .map(org.springframework.security.core.authority.SimpleGrantedAuthority::new).toList());
         return WebTestClient.bindToController(
-                        new GofpRelayPointProfileController(useCase, guard, directory),
+                        (GofpRelayPointProfileController) factory.getProxy(),
                         new RelayDepositController(depositUseCase, guard))
-                .controllerAdvice(new GlobalExceptionHandler())
+                .controllerAdvice(new GlobalExceptionHandler(),
+                        new com.yowyob.tiibntick.core.roles.adapter.in.web.TntRoleExceptionHandler())
                 .argumentResolvers(cfg -> cfg.addCustomResolver(new FixedContextResolver(ctx)))
+                .webFilter((exchange, chain) -> chain.filter(exchange).contextWrite(
+                        org.springframework.security.core.context.ReactiveSecurityContextHolder.withAuthentication(auth)))
                 .httpMessageCodecs(c -> {
                     c.defaultCodecs().jackson2JsonEncoder(new Jackson2JsonEncoder(PROD_MAPPER));
                     c.defaultCodecs().jackson2JsonDecoder(new Jackson2JsonDecoder(PROD_MAPPER));
@@ -170,8 +185,10 @@ class RelayPointAccessControllerTest {
     }
 
     @Test
-    @DisplayName("approval and deletion are staff-only, even for the owner")
+    @DisplayName("approval needs gofp-admin:manage (D-142), deletion is staff-only, even for the owner")
     void approvalAndDeletionAreStaffOnly() {
+        as(STAFF_USER, "ROLE_SUPPORT_AGENT").patch().uri(RP_PATH + "/{id}/status?status=APPROVED", RP)
+                .exchange().expectStatus().isForbidden();
         as(STRANGER_USER, "ROLE_FREELANCER").patch().uri(RP_PATH + "/{id}/status?status=APPROVED", RP)
                 .exchange().expectStatus().isForbidden();
         as(OWNER_USER, "ROLE_FREELANCER").patch().uri(RP_PATH + "/{id}/status?status=APPROVED", RP)

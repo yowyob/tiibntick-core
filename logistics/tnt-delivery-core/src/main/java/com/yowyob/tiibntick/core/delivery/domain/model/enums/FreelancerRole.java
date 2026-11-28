@@ -12,7 +12,7 @@ package com.yowyob.tiibntick.core.delivery.domain.model.enums;
  * <p>This role is used in:
  * <ul>
  *   <li>{@code Delivery.assignedFreelancerRole} — tracks which role is executing.</li>
- *   <li>{@code MissionStatusChangedEvent.freelancerRole} — for tnt-incident-core SLA monitoring.</li>
+ *   <li>{@code details.role} of {@code DeliveryFreelancerOrgAssigned} ({@code tnt.delivery.events}).</li>
  *   <li>{@code tnt-billing-wallet} commission split (OWNER gets org revenue, SUB_DELIVERER gets commission).</li>
  * </ul>
  *

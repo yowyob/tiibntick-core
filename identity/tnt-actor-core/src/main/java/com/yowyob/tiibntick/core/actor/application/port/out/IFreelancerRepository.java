@@ -52,7 +52,7 @@ public interface IFreelancerRepository {
 
     /**
      * Atomically increments the {@code incident_history_count} for this freelancer.
-     * Called by {@code IncidentEventConsumer} on {@code tnt.incident.closed}.
+     * Called by {@code IncidentEventConsumer} on {@code IncidentClosed} ({@code tnt.incident.events}).
      *
      * @param actorId  the actor UUID of the freelancer
      * @param tenantId the tenant scope

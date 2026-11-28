@@ -33,29 +33,29 @@ String platform;        // GO | FREELANCER | POINT | AGENCY
 List<UUID> parcelIds;
 ```
 
-#### b) Implémentation de `IMissionStatusPort`
+#### b) Implémentation de `IDeliveryStatusPort`
 
-`tnt-delivery-core` doit fournir une implémentation du port `IMissionStatusPort` (défini dans `tnt-incident-core`) lors de l'assemblage :
+`tnt-delivery-core` doit fournir une implémentation du port `IDeliveryStatusPort` (défini dans `tnt-incident-core`) lors de l'assemblage :
 
 ```java
 // À créer dans tnt-delivery-core — adapter/incident/
 @Component
-public class MissionStatusPortAdapter implements IMissionStatusPort {
+public class DeliveryStatusPortAdapter implements IDeliveryStatusPort {
 
     @Override
-    public Mono<Void> pauseMission(UUID missionId, UUID incidentId) {
+    public Mono<Void> pauseDelivery(UUID missionId, UUID incidentId) {
         // → changer le statut Mission à PAUSED_BY_INCIDENT
         // → persister l'incidentId dans Mission pour traçabilité
     }
 
     @Override
-    public Mono<Void> resumeMission(UUID missionId, UUID newDriverId, UUID newVehicleId) {
+    public Mono<Void> resumeDelivery(UUID missionId, UUID newDriverId, UUID newVehicleId) {
         // → réassigner le driver et vehicle dans Mission
         // → changer le statut de PAUSED_BY_INCIDENT à IN_TRANSIT
     }
 
     @Override
-    public Mono<MissionSnapshot> getMissionSnapshot(UUID missionId) {
+    public Mono<DeliverySnapshot> getDeliverySnapshot(UUID missionId) {
         // → lire Mission et retourner les champs requis
     }
 }

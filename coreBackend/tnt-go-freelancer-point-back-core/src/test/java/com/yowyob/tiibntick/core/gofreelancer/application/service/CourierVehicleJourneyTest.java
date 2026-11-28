@@ -31,11 +31,10 @@ import com.yowyob.tiibntick.core.gofreelancer.domain.model.Announcement;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.DeliveryNeed;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.FreelancerVehicle;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpFreelancer;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.announcement.AnnouncementStatus;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.AnnouncementStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.r2dbc.core.DatabaseClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -135,10 +134,8 @@ class CourierVehicleJourneyTest {
         // real billing engine, no personal policy: every price comes from the platform grids
         IBillingPolicyUseCase billing = mock(IBillingPolicyUseCase.class);
         when(billing.findByOwnerActorId(anyString())).thenReturn(Flux.empty());
-        FreelancerPricingRepository legacy = mock(FreelancerPricingRepository.class);
-        when(legacy.findByDeliveryPersonId(any())).thenReturn(Mono.empty());
         FreelancerPriceQuoteService quotes = new FreelancerPriceQuoteService(billing, new PricingEngineService(null,
-                new DslCompilerService(new DslLexer(), new DslParser()), new DslEvaluator()), legacy);
+                new DslCompilerService(new DslLexer(), new DslParser()), new DslEvaluator()));
 
         // real matching + TOPSIS
         IFreelancerProviderPort provider = mock(IFreelancerProviderPort.class);
@@ -146,7 +143,7 @@ class CourierVehicleJourneyTest {
                 .thenAnswer(i -> Mono.just(near.stream().map(this::candidate).toList()));
         MatchingUseCase matching = new MatchingUseCase(new TopsisRankingUseCase(), port,
                 mock(IGeolocationPort.class), vehicleRepo, deliveryRepo,
-                new FreelancerVehicleApplicationService(null, null), freelancerRepo, provider,
+                new FreelancerVehicleApplicationService(), freelancerRepo, provider,
                 mock(IEventPublisherPort.class), mock(NotificationService.class), new ObjectMapper());
         matching.setCourierCards(cards);
 
@@ -162,23 +159,21 @@ class CourierVehicleJourneyTest {
 
         needService = new DeliveryNeedApplicationService(needRepo, mock(AdminRelayPointUseCase.class),
                 mock(PushNotificationPort.class), matching, addresses, users, freelancerRepo, quotes,
-                eligibility, mock(DatabaseClient.class));
+                eligibility);
         needService.setCourierCards(cards);
         needService.setDeliveries(deliveryRepo);
         IAnnouncementRepository mirrorRepo = mock(IAnnouncementRepository.class);
         when(mirrorRepo.findById(any(UUID.class))).thenAnswer(i -> Mono.justOrEmpty(mirror.get(i.<UUID>getArgument(0))));
         needService.setLocalAnnouncements(mirrorRepo);
 
-        AnnouncementSubscriptionRepository subscriptionRepo = mock(AnnouncementSubscriptionRepository.class);
-        when(subscriptionRepo.findAllByAnnouncementId(any())).thenReturn(Flux.empty());
         TenantContextHolder tenant = mock(TenantContextHolder.class);
         when(tenant.currentTenantId()).thenReturn(Mono.just(tenantId));
         when(port.findById(eq(tenantId), eq(announcementId))).thenAnswer(i -> Mono.just(snapshot()));
         when(port.findOpenAnnouncementsNear(eq(tenantId), any())).thenAnswer(i -> Flux.just(snapshot()));
         announcementService = new AnnouncementApplicationService(port, tenant, mock(FreelancerQuotaService.class),
-                mock(INegotiationChatPort.class), mirrorRepo, subscriptionRepo,
+                mock(INegotiationChatPort.class),
                 freelancerRepo, users, deliveryRepo, mock(DeliveryOtpService.class),
-                mock(GofpDeliveryOtpProperties.class));
+                mock(GofpDeliveryOtpProperties.class), com.yowyob.tiibntick.core.gofreelancer.TestDeliveries.termsRecorder());
         announcementService.setCourierCards(cards);
     }
 
@@ -220,7 +215,10 @@ class CourierVehicleJourneyTest {
                         .coordinates(GeoCoordinates.of(PICKUP_LAT, PICKUP_LON)).build(),
                 Address.builder().street("rue").city("Douala").country("CM").build(), 0.0,
                 null, null, null, null, null, null, null, null,
-                "Destinataire", "+237600000000", null, null, null, responses);
+                "Destinataire", "+237600000000", null, null, null, responses,
+                new com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.AnnouncementExtras(
+                        null, null, null, null, null, announcedVehicle, null, null,
+                        java.math.BigDecimal.TEN, null, null, null, null, "DELIVERY_NEED", needId));
     }
 
     private void announcement(String requiredVehicle) {
@@ -240,7 +238,7 @@ class CourierVehicleJourneyTest {
     // ── A2 — platform grid of the courier's vehicle ─────────────────────
 
     @Test
-    @DisplayName("same parcel, 10 km: the moto courier costs 1500 XAF (500 + 10 × 100), the taxi 3000 (1000 + 10 × 200)")
+    @DisplayName("same parcel, 10 km: the moto courier costs 1600 XAF (600 + 10 × 100), the taxi 3000 (1000 + 10 × 200)")
     void motoAndTaxiGetTheirOwnGrid() {
         need(null);
         near.add(moto);
@@ -249,7 +247,7 @@ class CourierVehicleJourneyTest {
         Map<UUID, Double> prices = new HashMap<>();
         candidates().forEach(c -> prices.put(c.getFreelancerId(), c.getEstimatedPrice()));
 
-        assertThat(prices).containsEntry(moto, 1500.0).containsEntry(taxi, 3000.0);
+        assertThat(prices).containsEntry(moto, 1600.0).containsEntry(taxi, 3000.0);
     }
 
     // ── A3 — required vehicle ───────────────────────────────────────────
@@ -347,7 +345,7 @@ class CourierVehicleJourneyTest {
         announcement(null);
         assertThat(needService.platformPriceForCourier(announcementId, taxiUser).block().totalPrice()).isEqualTo(3000.0);
         var forMoto = needService.platformPriceForCourier(announcementId, motoUser).block();
-        assertThat(forMoto.totalPrice()).isEqualTo(1500.0);
+        assertThat(forMoto.totalPrice()).isEqualTo(1600.0);
         assertThat(forMoto.vehicleCategory()).isEqualTo("moto");
     }
 }

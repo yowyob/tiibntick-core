@@ -40,8 +40,21 @@ public record OpenDisputeCommand(
         /**
          * Whether a SUB_DELIVERER is involved in this dispute.
          */
-        Boolean subDelivererInvolved
+        Boolean subDelivererInvolved,
+        /** Incident escalated into this dispute (automatic opening LT1), {@code null} otherwise (lot L4). */
+        String incidentId
 ) {
+    /** Opening not linked to an incident. */
+    public OpenDisputeCommand(String tenantId, String claimantId, ClaimantType claimantType, String respondentId,
+                              RespondentType respondentType, DisputeCause cause, DisputeCategory category,
+                              DisputePriority priority, String missionId, String packageId, String trackingCode,
+                              String description, String respondentOrgId, String impliedSubDelivererId,
+                              Boolean subDelivererInvolved) {
+        this(tenantId, claimantId, claimantType, respondentId, respondentType, cause, category, priority, missionId,
+                packageId, trackingCode, description, respondentOrgId, impliedSubDelivererId, subDelivererInvolved,
+                null);
+    }
+
     public OpenDisputeCommand {
         Objects.requireNonNull(tenantId, "tenantId is required");
         Objects.requireNonNull(claimantId, "claimantId is required");

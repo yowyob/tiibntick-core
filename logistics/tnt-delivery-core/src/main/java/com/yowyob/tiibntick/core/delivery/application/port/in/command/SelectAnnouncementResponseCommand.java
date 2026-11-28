@@ -13,5 +13,11 @@ public record SelectAnnouncementResponseCommand(
         @NotNull UUID tenantId,
         @NotNull UUID announcementId,
         @NotNull UUID clientId,
-        @NotNull UUID responseId
-) {}
+        @NotNull UUID responseId,
+        /** Lot L5: id of the delivery to create, chosen when the escrow was held; {@code null} → random. */
+        UUID deliveryId
+) {
+    public SelectAnnouncementResponseCommand(UUID tenantId, UUID announcementId, UUID clientId, UUID responseId) {
+        this(tenantId, announcementId, clientId, responseId, null);
+    }
+}

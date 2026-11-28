@@ -69,6 +69,17 @@
             <artifactId>jackson-annotations</artifactId>
         </dependency>
 
+        <!-- JACKSON DATABIND — EventPayloads (tolerant reader of Kafka event envelopes). -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <!-- JACKSON JSR-310 — TntAggregateEvent.occurredAt (Instant) written as ISO-8601 UTC (lot L0). -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+
         <!-- ══════════════════════════════════════════════════════════════
              SLF4J — logging facade used directly via Lombok's @Slf4j.
              ══════════════════════════════════════════════════════════════ -->
@@ -124,6 +135,12 @@
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Validation of the aggregate-event envelope against kafka/schemas/v1 (lot L0, spec §3.6). -->
+        <dependency>
+            <groupId>com.networknt</groupId>
+            <artifactId>json-schema-validator</artifactId>
             <scope>test</scope>
         </dependency>
 

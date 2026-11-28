@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.Collection;
 import java.util.UUID;
 
 /**
@@ -29,18 +30,19 @@ public class DeliveryAnnouncementRepositoryAdapter implements DeliveryAnnounceme
     private final R2dbcAnnouncementRepository announcementRepo;
     private final R2dbcAnnouncementResponseRepository responseRepo;
     private final R2dbcParcelRepository parcelRepo;
+    private final ParcelWriter parcelWriter;
 
     @Override
     public Mono<DeliveryAnnouncement> save(DeliveryAnnouncement announcement) {
-        var parcelEntity = ParcelPersistenceMapper.toEntity(announcement.getParcel());
+        // Lazy: the entity is built at subscription, after any save chained before it (versions up to date).
+        return Mono.defer(() -> doSave(announcement));
+    }
+
+    private Mono<DeliveryAnnouncement> doSave(DeliveryAnnouncement announcement) {
         var entity = AnnouncementPersistenceMapper.toEntity(announcement);
 
-        // Save parcel first, then announcement, then all responses
-        return parcelRepo.existsById(parcelEntity.getId())
-                .flatMap(parcelExists -> {
-                    parcelEntity.setNew(!parcelExists);
-                    return parcelRepo.save(parcelEntity);
-                })
+        // Save parcel first (single write path, version copied back), then announcement, then all responses
+        return parcelWriter.saveIfPending(announcement.getParcel())
                 .then(announcementRepo.existsById(entity.getId()))
                 .flatMap(annExists -> {
                     entity.setNew(!annExists);
@@ -61,7 +63,11 @@ public class DeliveryAnnouncementRepositoryAdapter implements DeliveryAnnounceme
                                     }))
                             .then(Mono.just(saved));
                 })
-                .map(saved -> hydrate(saved, parcelEntity, announcement));
+                .map(saved -> {
+                    // lot evt-l2: return the same aggregate (its recorded events are kept for publication)
+                    announcement.markPersisted(saved.getVersion());
+                    return announcement;
+                });
     }
 
     @Override
@@ -85,6 +91,25 @@ public class DeliveryAnnouncementRepositoryAdapter implements DeliveryAnnounceme
     public Mono<Boolean> hasResponse(UUID announcementId, UUID freelancerId) {
         return responseRepo.existsByAnnouncementIdAndDeliveryPersonId(announcementId, freelancerId)
                 .defaultIfEmpty(false);
+    }
+
+    @Override
+    public Mono<DeliveryAnnouncement> findByOrigin(UUID tenantId, String originType, UUID originId) {
+        return announcementRepo.findByOrigin(tenantId, originType, originId)
+                .flatMap(this::hydrateFromEntity);
+    }
+
+    @Override
+    public Flux<DeliveryAnnouncement> findByOrigins(UUID tenantId, String originType,
+                                                    Collection<UUID> originIds) {
+        return announcementRepo.findByOrigins(tenantId, originType, originIds)
+                .flatMap(this::hydrateFromEntity);
+    }
+
+    @Override
+    public Flux<DeliveryAnnouncement> findRespondedBy(UUID tenantId, Collection<UUID> deliveryPersonIds) {
+        return announcementRepo.findRespondedBy(tenantId, deliveryPersonIds)
+                .concatMap(this::hydrateFromEntity);
     }
 
     @Override
@@ -132,14 +157,5 @@ public class DeliveryAnnouncementRepositoryAdapter implements DeliveryAnnounceme
                                 responses.stream()
                                         .map(AnnouncementPersistenceMapper::responseToDomain)
                                         .toList())));
-    }
-
-    private DeliveryAnnouncement hydrate(
-            DeliveryAnnouncementEntity saved,
-            ParcelEntity parcelEntity,
-            DeliveryAnnouncement announcement) {
-        return AnnouncementPersistenceMapper.toDomain(saved,
-                ParcelPersistenceMapper.toDomain(parcelEntity),
-                announcement.getResponses());
     }
 }

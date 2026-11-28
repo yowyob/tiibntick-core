@@ -22,7 +22,7 @@ import com.yowyob.tiibntick.core.realtime.domain.model.GeoCoordinates;
  */
 public class GpsPositionUpdatedEvent extends RealtimeDomainEvent {
 
-    private static final String TOPIC = "tnt.realtime.gps.position.updated";
+    private static final String TOPIC = com.yowyob.tiibntick.common.kafka.TntTopics.REALTIME_GPS_POSITION_UPDATED;
 
     private final String delivererId;
     private final String missionId;

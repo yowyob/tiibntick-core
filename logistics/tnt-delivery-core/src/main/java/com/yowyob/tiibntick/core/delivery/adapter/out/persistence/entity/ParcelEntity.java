@@ -50,8 +50,49 @@ public class ParcelEntity implements Persistable<UUID> {
     @Column("description")
     private String description;
 
+    @Column("designation")
+    private String designation;
+
+    @Column("thickness_cm")
+    private Double thicknessCm;
+
     @Column("photo_url")
     private String photoUrl;
+
+    // ── lot evt-l2: state, custody, tracking code (spec §1.2, D-136) ──────────────────────────
+    @Column("tracking_code")
+    private String trackingCode;
+    @Column("status")
+    private String status;
+    @Column("status_changed_at")
+    private Instant statusChangedAt;
+    @Column("previous_status_before_dispute")
+    private String previousStatusBeforeDispute;
+    @Column("open_dispute_id")
+    private UUID openDisputeId;
+    @Column("dispute_freezes_delivery")
+    private Boolean disputeFreezesDelivery;
+    @Column("current_delivery_id")
+    private UUID currentDeliveryId;
+    /** JSON array of the delivery ids of the parcel, in creation order. */
+    @Column("delivery_ids")
+    private String deliveryIds;
+    @Column("custody_holder_type")
+    private String custodyHolderType;
+    @Column("custody_holder_id")
+    private UUID custodyHolderId;
+    @Column("custody_hub_id")
+    private UUID custodyHubId;
+    @Column("custody_hub_package_entry_id")
+    private UUID custodyHubPackageEntryId;
+    @Column("return_cause")
+    private String returnCause;
+    @Column("return_cost_payer")
+    private String returnCostPayer;
+    @Column("closed_reason")
+    private String closedReason;
+    @Column("failed_return_count")
+    private Integer failedReturnCount;
 
     @Column("created_at")
     private Instant createdAt;

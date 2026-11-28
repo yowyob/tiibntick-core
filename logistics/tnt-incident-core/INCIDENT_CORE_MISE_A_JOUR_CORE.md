@@ -28,7 +28,7 @@
 
 ### 1.1 — Ajouter `tnt-incident-core` comme dépendance Maven (`provided`/`api` scope)
 
-> Non — ne pas ajouter `tnt-incident-core` comme dépendance. Le port `IMissionStatusPort` est **défini dans `tnt-incident-core`** et implémenté dans `tnt-delivery-core`. Le couplage se fait uniquement via `tnt-bootstrap`.
+> Non — ne pas ajouter `tnt-incident-core` comme dépendance. Le port `IDeliveryStatusPort` est **défini dans `tnt-incident-core`** et implémenté dans `tnt-delivery-core`. Le couplage se fait uniquement via `tnt-bootstrap`.
 
 Le bon pattern : dans `tnt-bootstrap`, `tnt-delivery-core` dépend de `tnt-incident-core` à travers le contexte Spring. `tnt-delivery-core` implémente les ports définis dans `tnt-incident-core` mais **ne l'importe pas dans son pom.xml**.
 
@@ -76,13 +76,13 @@ PAUSED_BY_INCIDENT,  // bloqué par un incident en cours
 ```java
 @Component
 @RequiredArgsConstructor
-public class MissionIncidentAdapter implements IMissionStatusPort {
+public class MissionIncidentAdapter implements IDeliveryStatusPort {
 
     private final IMissionRepository missionRepository;
     private final IDeliveryEventPublisher eventPublisher;
 
     @Override
-    public Mono<Void> pauseMission(UUID missionId, UUID incidentId) {
+    public Mono<Void> pauseDelivery(UUID missionId, UUID incidentId) {
         return missionRepository.findById(missionId)
                 .map(mission -> mission.pauseForIncident(incidentId))
                 .flatMap(missionRepository::save)
@@ -90,7 +90,7 @@ public class MissionIncidentAdapter implements IMissionStatusPort {
     }
 
     @Override
-    public Mono<Void> resumeMission(UUID missionId, UUID newDriverId, UUID newVehicleId) {
+    public Mono<Void> resumeDelivery(UUID missionId, UUID newDriverId, UUID newVehicleId) {
         return missionRepository.findById(missionId)
                 .map(mission -> mission.resumeAfterIncident(newDriverId, newVehicleId))
                 .flatMap(missionRepository::save)
@@ -98,9 +98,9 @@ public class MissionIncidentAdapter implements IMissionStatusPort {
     }
 
     @Override
-    public Mono<MissionSnapshot> getMissionSnapshot(UUID missionId) {
+    public Mono<DeliverySnapshot> getDeliverySnapshot(UUID missionId) {
         return missionRepository.findById(missionId)
-                .map(m -> new MissionSnapshot(
+                .map(m -> new DeliverySnapshot(
                         m.getId(), m.getAssignedDriverId(), m.getVehicleId(),
                         m.getAgencyId(), m.getStatus().name(), m.getSlaDeadline(),
                         m.getParcelIds()
@@ -651,7 +651,7 @@ public class TntIncidentPortsConfig {
     // Remplacer les no-op de IncidentCoreConfig par les vraies implémentations
     @Bean
     @Primary
-    public IMissionStatusPort realMissionStatusPort(MissionIncidentAdapter adapter) {
+    public IDeliveryStatusPort realMissionStatusPort(MissionIncidentAdapter adapter) {
         return adapter;
     }
 

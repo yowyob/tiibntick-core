@@ -39,12 +39,15 @@ class GofpFreelancerStatusTransitionTest {
 
     @Mock private GofpFreelancerRepository freelancerRepository;
     @Mock private GofpUserRepository userRepository;
+    @Mock private com.yowyob.tiibntick.core.delivery.application.port.out.DeliveryPersonRepository deliveryPersons;
+    @Mock private TenantContextHolder tenantContextHolder;
+    private static final UUID TENANT = UUID.randomUUID();
 
     private GofpFreelancerService service;
 
     @BeforeEach
     void setUp() {
-        service = new GofpFreelancerService(freelancerRepository, userRepository);
+        service = new GofpFreelancerService(freelancerRepository, userRepository, deliveryPersons, tenantContextHolder);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────
@@ -59,6 +62,16 @@ class GofpFreelancerStatusTransitionTest {
 
     private void stubFind(UUID id, GofpFreelancer f) {
         when(freelancerRepository.findById(id)).thenReturn(Mono.just(f));
+    }
+
+    /** The delivery-core delivery person (same id) that owns the status (lot L3). */
+    private com.yowyob.tiibntick.core.delivery.domain.model.aggregate.DeliveryPerson stubCore(UUID id, FreelancerStatus status) {
+        var dp = com.yowyob.tiibntick.core.delivery.domain.model.aggregate.DeliveryPerson.builder()
+                .id(id).tenantId(TENANT).status(status.toCore()).build();
+        when(tenantContextHolder.currentTenantId()).thenReturn(Mono.just(TENANT));
+        when(deliveryPersons.findById(TENANT, id)).thenReturn(Mono.just(dp));
+        when(deliveryPersons.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        return dp;
     }
 
     private void stubSave() {
@@ -103,12 +116,16 @@ class GofpFreelancerStatusTransitionTest {
         stubFind(id, f);
         stubSave();
         stubNoUser(f.getCoreUserId());
+        var dp = stubCore(id, from);
 
         StepVerifier.create(service.updateStatus(id, to))
                 .expectNextMatches(saved -> saved.getStatus() == to)
                 .verifyComplete();
 
         verify(freelancerRepository).save(any());
+        // the status is written in delivery-core, not in gofp_freelancers
+        verify(deliveryPersons).save(dp);
+        org.assertj.core.api.Assertions.assertThat(dp.getStatus()).isEqualTo(to.toCore());
     }
 
     // ── Invalid transitions → 409 (InvalidFreelancerStatusTransitionException) ──
@@ -133,6 +150,20 @@ class GofpFreelancerStatusTransitionTest {
                         && e.getMessage().contains(to.name()))
                 .verify();
 
+        verify(freelancerRepository, never()).save(any());
+        verify(deliveryPersons, never()).save(any());
+    }
+
+    @Test
+    void updateStatus_withoutDeliveryPersonInTheCore_isNotFound() {
+        UUID id = UUID.randomUUID();
+        stubFind(id, freelancer(id, FreelancerStatus.PENDING));
+        when(tenantContextHolder.currentTenantId()).thenReturn(Mono.just(TENANT));
+        when(deliveryPersons.findById(TENANT, id)).thenReturn(Mono.empty());
+
+        StepVerifier.create(service.updateStatus(id, FreelancerStatus.APPROVED))
+                .expectError(FreelancerNotFoundException.class)
+                .verify();
         verify(freelancerRepository, never()).save(any());
     }
 
@@ -178,6 +209,7 @@ class GofpFreelancerStatusTransitionTest {
         stubFind(id, f);
         stubSave();
         stubNoUser(f.getCoreUserId());
+        stubCore(id, FreelancerStatus.APPROVED);
 
         StepVerifier.create(service.updateStatus(id, FreelancerStatus.SUSPENDED))
                 .expectNextMatches(saved -> !saved.getIsActive())

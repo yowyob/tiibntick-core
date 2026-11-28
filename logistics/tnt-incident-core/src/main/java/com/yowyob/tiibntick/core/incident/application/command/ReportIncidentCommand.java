@@ -34,7 +34,7 @@ public class ReportIncidentCommand {
     /**
      * UUID of the FreelancerOrg responsible for this mission.
      * Null for Agency-dispatched missions.
-     * Referenced from tnt-delivery-core's MissionStatusChangedEvent.
+     * Read from the delivery of tnt-delivery-core.
      */
     String responsibleOrgId;
 
@@ -46,7 +46,10 @@ public class ReportIncidentCommand {
 
     /**
      * Tracking code of the delivery this incident blocks (format TNT-YYYYMMDD-XXXXXXXX).
-     * Extracted from tnt-delivery-core's MissionStatusChangedEvent. Null if unavailable.
+     * Read from the delivery's parcel (tnt-delivery-core). Null if unavailable.
      */
     String trackingCode;
+
+    /** "I cannot go on": the courier forces the incident as blocking (QO-2). */
+    boolean blockingForced;
 }

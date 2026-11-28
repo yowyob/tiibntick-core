@@ -50,60 +50,61 @@ class DeliveryEventNotifierTest {
         Delivery d = new Delivery();
         d.setId(deliveryId);
         d.setAnnouncementId(announcementId);
-        d.setFreelancerId(driverProfile);
+        com.yowyob.tiibntick.core.gofreelancer.TestDeliveries.driver(d, driverProfile);
         when(deliveryRepository.findById(deliveryId)).thenReturn(Mono.just(d));
         Announcement a = new Announcement();
         a.setClientId(clientActor);
         when(announcementRepository.findById(announcementId)).thenReturn(Mono.just(a));
         when(deliveryQueryUseCase.resolveActorIdForDeliveryPerson(tenant, driverProfile)).thenReturn(Mono.just(driverActor));
-        when(push.sendPushNotification(any(), any(), any(), any())).thenReturn(Mono.empty());
+        when(push.sendLocalized(any(), any(), any(), any())).thenReturn(Mono.empty());
     }
 
     @Test
     @DisplayName("PICKED_UP tells the client only, in their tenant, quoting the tracking code")
     void pickedUp_clientOnly() {
-        StepVerifier.create(notifier.onMissionStatusChanged(UUID.randomUUID(), deliveryId, tenant, "PICKED_UP", "TNT-42"))
+        StepVerifier.create(notifier.onDeliveryStatusChanged(UUID.randomUUID(), deliveryId, tenant, "PICKED_UP", "TNT-42"))
                 .expectNext(1).verifyComplete();
-        verify(push).sendPushNotification(eq(tenant), eq(clientActor), eq("Colis récupéré"), contains("TNT-42"));
-        verify(push, never()).sendPushNotification(any(), eq(driverActor), any(), any());
+        verify(push).sendLocalized(eq(tenant), eq(clientActor), eq("notify.gofp.delivery.picked_up"),
+                eq(java.util.Map.of("ref", " TNT-42")));
+        verify(push, never()).sendLocalized(any(), eq(driverActor), any(), any());
     }
 
     @Test
     @DisplayName("an incident pause tells both the client and the livreur")
     void incidentPause_bothParties() {
-        StepVerifier.create(notifier.onMissionStatusChanged(UUID.randomUUID(), deliveryId, tenant, "PAUSED_BY_INCIDENT", "TNT-42"))
+        StepVerifier.create(notifier.onDeliveryStatusChanged(UUID.randomUUID(), deliveryId, tenant, "PAUSED_BY_INCIDENT", "TNT-42"))
                 .expectNext(2).verifyComplete();
-        verify(push).sendPushNotification(eq(tenant), eq(clientActor), eq("Livraison suspendue"), any());
-        verify(push).sendPushNotification(eq(tenant), eq(driverActor), eq("Livraison suspendue"), any());
+        verify(push).sendLocalized(eq(tenant), eq(clientActor), eq("notify.gofp.delivery.paused"), any());
+        verify(push).sendLocalized(eq(tenant), eq(driverActor), eq("notify.gofp.delivery.paused"), any());
     }
 
     @Test
     @DisplayName("the same event delivered twice notifies once")
     void replay_isIgnored() {
         UUID event = UUID.randomUUID();
-        notifier.onMissionStatusChanged(event, deliveryId, tenant, "DELIVERED", null).block();
-        StepVerifier.create(notifier.onMissionStatusChanged(event, deliveryId, tenant, "DELIVERED", null))
+        notifier.onDeliveryStatusChanged(event, deliveryId, tenant, "DELIVERED", null).block();
+        StepVerifier.create(notifier.onDeliveryStatusChanged(event, deliveryId, tenant, "DELIVERED", null))
                 .expectNext(0).verifyComplete();
-        verify(push, org.mockito.Mockito.times(1)).sendPushNotification(any(), any(), any(), any());
+        verify(push, org.mockito.Mockito.times(1)).sendLocalized(any(), any(), any(), any());
     }
 
     @Test
     @DisplayName("a status that is not worth a notification, or an unknown delivery, sends nothing")
     void irrelevantOrUnknown() {
-        StepVerifier.create(notifier.onMissionStatusChanged(UUID.randomUUID(), deliveryId, tenant, "CREATED", null))
+        StepVerifier.create(notifier.onDeliveryStatusChanged(UUID.randomUUID(), deliveryId, tenant, "CREATED", null))
                 .expectNext(0).verifyComplete();
         UUID other = UUID.randomUUID();
         when(deliveryRepository.findById(other)).thenReturn(Mono.empty());
-        StepVerifier.create(notifier.onMissionStatusChanged(UUID.randomUUID(), other, tenant, "DELIVERED", null))
+        StepVerifier.create(notifier.onDeliveryStatusChanged(UUID.randomUUID(), other, tenant, "DELIVERED", null))
                 .expectNext(0).verifyComplete();
-        verify(push, never()).sendPushNotification(any(), any(), any(), any());
+        verify(push, never()).sendLocalized(any(), any(), any(), any());
     }
 
     @Test
     @DisplayName("a failing notification does not break the event handling")
     void pushFailure_isTolerated() {
-        when(push.sendPushNotification(any(), any(), any(), any())).thenReturn(Mono.error(new IllegalStateException("kernel down")));
-        StepVerifier.create(notifier.onMissionStatusChanged(UUID.randomUUID(), deliveryId, tenant, "DELIVERED", null))
+        when(push.sendLocalized(any(), any(), any(), any())).thenReturn(Mono.error(new IllegalStateException("kernel down")));
+        StepVerifier.create(notifier.onDeliveryStatusChanged(UUID.randomUUID(), deliveryId, tenant, "DELIVERED", null))
                 .expectNext(1).verifyComplete();
     }
 
@@ -112,8 +113,8 @@ class DeliveryEventNotifierTest {
     void unresolvedDriver_isSkipped() {
         when(deliveryQueryUseCase.resolveActorIdForDeliveryPerson(tenant, driverProfile))
                 .thenReturn(Mono.error(new IllegalStateException("no actor")));
-        StepVerifier.create(notifier.onMissionStatusChanged(UUID.randomUUID(), deliveryId, tenant, "CANCELLED", null))
+        StepVerifier.create(notifier.onDeliveryStatusChanged(UUID.randomUUID(), deliveryId, tenant, "CANCELLED", null))
                 .expectNext(1).verifyComplete();
-        verify(push).sendPushNotification(eq(tenant), eq(clientActor), any(), any());
+        verify(push).sendLocalized(eq(tenant), eq(clientActor), any(), any());
     }
 }

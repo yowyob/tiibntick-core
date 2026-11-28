@@ -7,6 +7,13 @@ import com.yowyob.tiibntick.core.gofreelancer.application.port.out.FileStoragePo
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.FreelancerVehicle;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpFreelancer;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.vehicle.VehicleCategory;
+import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.vehicle.VehicleType;
+import com.yowyob.tiibntick.core.resource.application.port.in.AddPersonalVehicleCommand;
+import com.yowyob.tiibntick.core.resource.application.port.in.AddPersonalVehicleUseCase;
+import com.yowyob.tiibntick.core.resource.application.port.in.GetFreelancerVehicleUseCase;
+import com.yowyob.tiibntick.core.resource.application.port.in.UpdateFreelancerVehicleCommand;
+import com.yowyob.tiibntick.core.resource.application.port.in.UpdateFreelancerVehicleUseCase;
+import com.yowyob.tiibntick.core.resource.domain.exception.FreelancerVehicleNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.buffer.DataBufferLimitException;
@@ -29,6 +36,10 @@ import java.util.regex.Pattern;
  * (JPEG/PNG, bounded size). Everything is kept on the {@code gofreelancer_vehicles} row keyed by the
  * courier's {@code gofp_freelancers.id} — the id the matching reads it with.
  *
+ * <p>Lot L3: the vehicle itself (type, plate, mandatory maximum capacity) is owned by tnt-resource-core as the
+ * courier's personal vehicle (owner = his actor id), written synchronously on every {@code PUT /me/vehicle}; the
+ * local row keeps its {@code core_vehicle_id}, the photos and a read copy of the type and plate for the matching.
+ *
  * <p>Guard: the profile is always resolved from the token ({@code /me}); the older path-id routes go
  * through {@link #requireSelfOrStaff} — another courier gets a 403.
  */
@@ -43,23 +54,33 @@ public class CourierVehicleService {
     private final FreelancerVehicleRepository vehicles;
     private final FileStoragePort storage;
     private final int maxPhotoBytes;
+    private final AddPersonalVehicleUseCase addCoreVehicle;
+    private final UpdateFreelancerVehicleUseCase updateCoreVehicle;
+    private final GetFreelancerVehicleUseCase getCoreVehicle;
 
     public CourierVehicleService(GofpFreelancerRepository freelancers,
                                  FreelancerVehicleRepository vehicles,
                                  FileStoragePort storage,
-                                 @Value("${tnt.gofp.vehicle.max-photo-bytes:5242880}") int maxPhotoBytes) {
+                                 @Value("${tnt.gofp.vehicle.max-photo-bytes:5242880}") int maxPhotoBytes,
+                                 AddPersonalVehicleUseCase addCoreVehicle,
+                                 UpdateFreelancerVehicleUseCase updateCoreVehicle,
+                                 GetFreelancerVehicleUseCase getCoreVehicle) {
         this.freelancers = freelancers;
         this.vehicles = vehicles;
         this.storage = storage;
         this.maxPhotoBytes = maxPhotoBytes;
+        this.addCoreVehicle = addCoreVehicle;
+        this.updateCoreVehicle = updateCoreVehicle;
+        this.getCoreVehicle = getCoreVehicle;
     }
 
-    /** What the courier sees of his own vehicle. */
-    public record VehicleView(String vehicleType, String category, String plateNumber, List<String> photoUrls) {
-        static VehicleView of(FreelancerVehicle v) {
+    /** What the courier sees of his own vehicle ({@code maxCapacityKg} read from tnt-resource-core). */
+    public record VehicleView(String vehicleType, String category, String plateNumber, Double maxCapacityKg,
+                              List<String> photoUrls) {
+        static VehicleView of(FreelancerVehicle v, Double maxCapacityKg) {
             VehicleCategory c = VehicleCategory.parse(v.getVehicleType());
             return new VehicleView(v.getVehicleType(), c == null ? null : c.appWord(), v.getPlateNumber(),
-                    v.photoUrlList());
+                    maxCapacityKg, v.photoUrlList());
         }
     }
 
@@ -68,12 +89,16 @@ public class CourierVehicleService {
     public Mono<VehicleView> myVehicle(TntSecurityContext ctx) {
         return myProfile(ctx)
                 .flatMap(this::vehicleOf)
-                .map(VehicleView::of)
-                .defaultIfEmpty(new VehicleView(null, null, null, List.of()));
+                .flatMap(this::withCapacity)
+                .defaultIfEmpty(new VehicleView(null, null, null, null, List.of()));
     }
 
-    /** Type (either vocabulary) and plate of the caller's vehicle. */
-    public Mono<VehicleView> saveMyVehicle(TntSecurityContext ctx, String type, String plate) {
+    /**
+     * Type (either vocabulary), plate and maximum capacity in kg (mandatory, {@code > 0}) of the caller's vehicle.
+     * Written first to tnt-resource-core (personal vehicle of the caller's actor: created, or updated when it
+     * already exists), then to the local row. A plate registered on another vehicle gives a 409.
+     */
+    public Mono<VehicleView> saveMyVehicle(TntSecurityContext ctx, String type, String plate, Double maxCapacityKg) {
         String canonical = VehicleCategory.canonicalName(type);
         if (canonical == null) {
             return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST,
@@ -84,14 +109,83 @@ public class CourierVehicleService {
             return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "plateNumber must be 3 to 20 letters, digits, spaces or dashes"));
         }
+        if (maxCapacityKg == null || !(maxCapacityKg > 0) || maxCapacityKg.isInfinite()) {
+            return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "maxCapacityKg is required and must be greater than 0"));
+        }
+        var coreType = coreType(type, canonical);
         return myProfile(ctx)
                 .flatMap(this::loadOrCreate)
-                .flatMap(v -> {
-                    v.setVehicleType(canonical);
-                    v.setPlateNumber(normalizedPlate);
-                    return vehicles.save(v);
-                })
-                .map(VehicleView::of);
+                .flatMap(v -> saveCoreVehicle(ctx.userId(), v.getCoreVehicleId(), coreType, normalizedPlate,
+                        maxCapacityKg)
+                        .flatMap(core -> {
+                            v.setCoreVehicleId(core.vehicleId());
+                            v.setVehicleType(canonical);
+                            v.setPlateNumber(normalizedPlate);
+                            return vehicles.save(v).map(saved -> VehicleView.of(saved, core.maxCapacityKg()));
+                        }));
+    }
+
+    /**
+     * The caller's core vehicle: the one the local row points to when it is his, else his personal vehicle with
+     * this plate (a previous call that wrote the core but not the local row), else a new one.
+     */
+    private Mono<com.yowyob.tiibntick.core.resource.domain.model.FreelancerVehicle> saveCoreVehicle(
+            UUID actorId, UUID coreVehicleId, com.yowyob.tiibntick.core.resource.domain.model.VehicleType type,
+            String plate, double maxCapacityKg) {
+        Mono<com.yowyob.tiibntick.core.resource.domain.model.FreelancerVehicle> referenced = coreVehicleId == null
+                ? Mono.empty()
+                : getCoreVehicle.getVehicle(coreVehicleId)
+                        .onErrorResume(FreelancerVehicleNotFoundException.class, e -> Mono.empty())
+                        .filter(core -> actorId.equals(core.ownerActorId()));
+        Mono<com.yowyob.tiibntick.core.resource.domain.model.FreelancerVehicle> samePlate = addCoreVehicle
+                .getPersonalVehicles(actorId)
+                .filter(core -> plate.equals(core.plateNumber()))
+                .next();
+        return referenced.switchIfEmpty(samePlate)
+                .flatMap(core -> updateCoreVehicle.updateVehicle(new UpdateFreelancerVehicleCommand(core.vehicleId(),
+                        type, core.brand(), core.model(), plate, maxCapacityKg, core.volumeM3(), core.fuelType(),
+                        core.fuelConsumptionLPer100km())))
+                .switchIfEmpty(Mono.defer(() -> addCoreVehicle.addPersonalVehicle(new AddPersonalVehicleCommand(
+                        null, actorId, type, null, null, plate, maxCapacityKg, null, null, null, null, null))))
+                .onErrorMap(IllegalStateException.class,
+                        e -> new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage()))
+                .onErrorMap(IllegalArgumentException.class,
+                        e -> new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage()));
+    }
+
+    /**
+     * Core type of the declared vehicle: the precise Go type when the caller sent one (SCOOTER, VAN...), else the
+     * category's canonical type.
+     */
+    static com.yowyob.tiibntick.core.resource.domain.model.VehicleType coreType(String raw, String canonical) {
+        VehicleType go = VehicleType.valueOf(canonical);
+        for (VehicleType t : VehicleType.values()) {
+            if (raw != null && t.name().equalsIgnoreCase(raw.trim())) {
+                go = t;
+            }
+        }
+        return switch (go) {
+            case MOTORBIKE -> com.yowyob.tiibntick.core.resource.domain.model.VehicleType.MOTORCYCLE;
+            case SCOOTER -> com.yowyob.tiibntick.core.resource.domain.model.VehicleType.SCOOTER;
+            case BIKE -> com.yowyob.tiibntick.core.resource.domain.model.VehicleType.BICYCLE;
+            case TRICYCLE -> com.yowyob.tiibntick.core.resource.domain.model.VehicleType.TRICYCLE;
+            case CAR -> com.yowyob.tiibntick.core.resource.domain.model.VehicleType.CAR;
+            case TRUCK -> com.yowyob.tiibntick.core.resource.domain.model.VehicleType.TRUCK;
+            case VAN -> com.yowyob.tiibntick.core.resource.domain.model.VehicleType.VAN;
+            case BUS -> com.yowyob.tiibntick.core.resource.domain.model.VehicleType.BUS;
+        };
+    }
+
+    /** The view with the maximum capacity read from tnt-resource-core ({@code null} while not delegated yet). */
+    private Mono<VehicleView> withCapacity(FreelancerVehicle v) {
+        if (v.getCoreVehicleId() == null) {
+            return Mono.just(VehicleView.of(v, null));
+        }
+        return getCoreVehicle.getVehicle(v.getCoreVehicleId())
+                .map(core -> VehicleView.of(v, core.maxCapacityKg()))
+                .onErrorResume(FreelancerVehicleNotFoundException.class, e -> Mono.empty())
+                .defaultIfEmpty(VehicleView.of(v, null));
     }
 
     /**
@@ -126,7 +220,7 @@ public class CourierVehicleService {
                                 return vehicles.save(v);
                             });
                 })
-                .map(VehicleView::of);
+                .flatMap(this::withCapacity);
     }
 
     // ── guards & lookups shared with the other services ─────────────────

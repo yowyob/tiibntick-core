@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:tnt:kafka:v1:details:DeliveryCancelled",
+  "title": "details of DeliveryCancelled",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "reason",
+    "cancelledBy"
+  ],
+  "properties": {
+    "reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "cancelledBy": {
+      "type": "string"
+    }
+  }
+}

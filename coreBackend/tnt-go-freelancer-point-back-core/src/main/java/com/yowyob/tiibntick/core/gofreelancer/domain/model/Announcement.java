@@ -1,28 +1,21 @@
 package com.yowyob.tiibntick.core.gofreelancer.domain.model;
 
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.announcement.AnnouncementStatus;
-import jakarta.validation.constraints.NotNull;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.AnnouncementStatus;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.annotation.Transient;
-import org.springframework.data.domain.Persistable;
-import com.yowyob.tiibntick.common.persistence.TntPersistableEntity;
-import org.springframework.data.relational.core.mapping.Column;
-import org.springframework.data.relational.core.mapping.Table;
 
 /**
- * Represents a delivery announcement published by a client.
+ * Read-only view of an announcement as {@code tnt-delivery-core} holds it, in the shape the
+ * Go-Freelancer services historically read. It is NOT persisted: the former local mirror table
+ * {@code announcements} is no longer written or read; every field comes from the core announcement
+ * (see {@code CoreAnnouncementReadAdapter}).
  *
- * <p>Enriched with the fields that were missing from the initial core version:
- * {@code clientId}, {@code packetId}, addresses, {@code title}, {@code description},
- * {@code status}, {@code amount}, and timestamps.
- * {@code recipientId} and {@code shipperId} are intentionally excluded — contacts
- * are managed through the GofpUser/DeliveryNeed structures.
+ * <p>Names are folded the way the core stores them: the core keeps one sender name and one recipient
+ * name, so first/last names are the first word and the rest of that name.
  *
  * @author François-Charles ATANGA
  */
@@ -30,126 +23,46 @@ import org.springframework.data.relational.core.mapping.Table;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Table("announcements")
-public class Announcement implements Persistable<UUID>, TntPersistableEntity {
-    @Transient @Builder.Default private boolean isNew = true;
+public class Announcement {
 
-    @Override
-    public boolean isNew() { return isNew; }
-
-    @Override
-    public void markNotNew() { this.isNew = false; }
-
-
-    @Id
-    @Column("id")
     private UUID id;
 
-    // ── Ownership & linked entities ───────────────────────────────────────────
-
-    /** FK → clients.id — the client who published this announcement. */
-    @Column("client_id")
+    /** The client who published this announcement. */
     private UUID clientId;
 
-    /** FK → packets.id — the parcel to be delivered. */
-    @Column("packet_id")
-    private UUID packetId;
-
-    /** FK → addresses.id — where the parcel is picked up. */
-    @NotNull
-    @Column("pickup_address_id")
-    private UUID pickupAddressId;
-
-    /** FK → addresses.id — where the parcel must be delivered. */
-    @NotNull
-    @Column("delivery_address_id")
-    private UUID deliveryAddressId;
-
-    // ── Content ───────────────────────────────────────────────────────────────
-
-    @NotNull
-    @Column("title")
     private String title;
-
-    @Column("description")
     private String description;
-
-    @NotNull
-    @Column("status")
     private AnnouncementStatus status;
 
-    // ── Logistics ─────────────────────────────────────────────────────────────
-
-    @Column("duration")
     private Integer duration;
-
-    @Column("distance")
     private Double distance;
-
-    @Column("transport_method")
     private String transportMethod;
-
-    @Column("required_vehicle_type")
     private String requiredVehicleType;
 
-    @Column("assigned_freelancer_id")
+    /** The delivery person whose response was selected, once assigned. */
     private UUID assignedFreelancerId;
 
-    /** Besoin de livraison Go dont cette annonce est la publication (ou {@code null}). */
-    @Column("delivery_need_id")
+    /** Besoin de livraison Go dont cette annonce est la publication (or {@code null}). */
     private UUID deliveryNeedId;
 
-    @Column("destination_relay_point_id")
     private UUID destinationRelayPointId;
 
-    // ── Contacts (Sender / Recipient) ─────────────────────────────────────────
-
-    @Column("shipper_first_name")
     private String shipperFirstName;
-
-    @Column("shipper_last_name")
     private String shipperLastName;
-
-    @Column("shipper_email")
     private String shipperEmail;
-
-    @Column("shipper_phone")
     private String shipperPhone;
 
-    @Column("recipient_first_name")
     private String recipientFirstName;
-
-    @Column("recipient_last_name")
     private String recipientLastName;
-
-    @Column("recipient_email")
     private String recipientEmail;
-
-    @Column("recipient_phone")
     private String recipientPhone;
 
-    // ── Financials ────────────────────────────────────────────────────────────
-
-    @Column("amount")
     private Double amount;
-
-    @Column("currency")
     private String currency;
-
-    @Column("logistics_price")
     private Double logisticsPrice;
-
-    @Column("payment_method")
     private String paymentMethod;
-
-    @Column("signature_url")
     private String signatureUrl;
 
-    // ── Timestamps ────────────────────────────────────────────────────────────
-
-    @Column("created_at")
     private Instant createdAt;
-
-    @Column("updated_at")
     private Instant updatedAt;
 }

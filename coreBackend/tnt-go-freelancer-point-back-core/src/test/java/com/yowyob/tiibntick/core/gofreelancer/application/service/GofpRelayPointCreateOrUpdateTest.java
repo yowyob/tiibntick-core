@@ -33,7 +33,9 @@ class GofpRelayPointCreateOrUpdateTest {
 
     @BeforeEach
     void setUp() {
-        service = new GofpRelayPointService(relayPointRepository, freelancerRepository);
+        service = new GofpRelayPointService(relayPointRepository, freelancerRepository,
+                org.mockito.Mockito.mock(
+                        com.yowyob.tiibntick.core.administration.application.port.in.ManageDeliveryThresholdsUseCase.class));
     }
 
     @Test
@@ -66,5 +68,76 @@ class GofpRelayPointCreateOrUpdateTest {
                 .as("entity passed to save() must have isNew=false (UPDATE, not INSERT)")
                 .isFalse();
         assertThat(captor.getValue().getId()).isEqualTo(existingPk);
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("D-138/D-139: the staff status change goes through the approval machine, never a raw write")
+    void updateStatusIsRoutedThroughTheMachine() {
+        com.yowyob.tiibntick.core.gofreelancer.application.port.in.AdminRelayPointUseCase admin =
+                org.mockito.Mockito.mock(com.yowyob.tiibntick.core.gofreelancer.application.port.in.AdminRelayPointUseCase.class);
+        service.setAdminRelayPoints(admin);
+        GofpRelayPoint rp = new GofpRelayPoint();
+        rp.setId(UUID.randomUUID());
+        rp.setStatus(com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.relaypoint.RelayPointStatus.PENDING);
+        when(relayPointRepository.findById(rp.getId())).thenReturn(Mono.just(rp));
+        when(admin.changeStatus(rp.getId(),
+                com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.relaypoint.RelayPointStatus.REVOKED, null, null))
+                .thenReturn(Mono.error(new IllegalArgumentException("a revocation needs a reason")));
+        when(admin.changeStatus(rp.getId(),
+                com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.relaypoint.RelayPointStatus.APPROVED, null, null))
+                .thenReturn(Mono.empty());
+
+        StepVerifier.create(service.updateStatus(rp.getId(),
+                        com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.relaypoint.RelayPointStatus.REVOKED))
+                .expectError(IllegalArgumentException.class).verify();
+        StepVerifier.create(service.updateStatus(rp.getId(),
+                        com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.relaypoint.RelayPointStatus.APPROVED))
+                .expectNext(rp).verifyComplete();
+        org.mockito.Mockito.verify(relayPointRepository, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("D-144/D-146: the suggestion lists keep only relay points whose core hub is approved, open and not full")
+    void suggestionsLeaveOutHubsThatCannotTakeAParcel() {
+        com.yowyob.tiibntick.core.gofreelancer.application.port.out.IRelayHubPort hubs =
+                org.mockito.Mockito.mock(com.yowyob.tiibntick.core.gofreelancer.application.port.out.IRelayHubPort.class);
+        service.setRelayHubs(hubs);
+        GofpRelayPoint open = suggested(hubs, com.yowyob.tiibntick.core.geo.domain.model.HubApprovalStatus.APPROVED,
+                com.yowyob.tiibntick.core.geo.domain.model.HubStatus.ACTIVE, 3);
+        GofpRelayPoint full = suggested(hubs, com.yowyob.tiibntick.core.geo.domain.model.HubApprovalStatus.APPROVED,
+                com.yowyob.tiibntick.core.geo.domain.model.HubStatus.FULL, 4);
+        GofpRelayPoint noSlot = suggested(hubs, com.yowyob.tiibntick.core.geo.domain.model.HubApprovalStatus.APPROVED,
+                com.yowyob.tiibntick.core.geo.domain.model.HubStatus.ACTIVE, 4);
+        GofpRelayPoint suspended = suggested(hubs, com.yowyob.tiibntick.core.geo.domain.model.HubApprovalStatus.SUSPENDED,
+                com.yowyob.tiibntick.core.geo.domain.model.HubStatus.ACTIVE, 0);
+        GofpRelayPoint closed = suggested(hubs, com.yowyob.tiibntick.core.geo.domain.model.HubApprovalStatus.APPROVED,
+                com.yowyob.tiibntick.core.geo.domain.model.HubStatus.TEMPORARILY_CLOSED, 0);
+        GofpRelayPoint noHub = new GofpRelayPoint();
+        noHub.setId(UUID.randomUUID());
+        noHub.setCoreRelayPointId(UUID.randomUUID());
+        when(hubs.findHub(noHub.getCoreRelayPointId(), null)).thenReturn(Mono.error(
+                new com.yowyob.tiibntick.core.geo.domain.exception.GeoNotFoundException("RelayHub", "x")));
+
+        when(relayPointRepository.findAllActiveApproved())
+                .thenReturn(reactor.core.publisher.Flux.just(open, full, noSlot, suspended, closed, noHub));
+        when(relayPointRepository.findAllWithSufficientCapacity(0.027))
+                .thenReturn(reactor.core.publisher.Flux.just(full, open, noHub));
+
+        StepVerifier.create(service.findActiveApproved()).expectNext(open).verifyComplete();
+        StepVerifier.create(service.findWithSufficientCapacity(0.027)).expectNext(open).verifyComplete();
+    }
+
+    private static GofpRelayPoint suggested(com.yowyob.tiibntick.core.gofreelancer.application.port.out.IRelayHubPort hubs,
+                                            com.yowyob.tiibntick.core.geo.domain.model.HubApprovalStatus approval,
+                                            com.yowyob.tiibntick.core.geo.domain.model.HubStatus status, int occupancy) {
+        GofpRelayPoint rp = new GofpRelayPoint();
+        rp.setId(UUID.randomUUID());
+        rp.setCoreRelayPointId(UUID.randomUUID());
+        java.time.Instant t = java.time.Instant.now();
+        when(hubs.findHub(rp.getCoreRelayPointId(), null)).thenReturn(Mono.just(
+                com.yowyob.tiibntick.core.geo.domain.model.RelayHub.rehydrate(rp.getCoreRelayPointId(), UUID.randomUUID(),
+                        null, com.yowyob.tiibntick.core.geo.domain.model.RoadNodeId.generate(), 4, occupancy, "op",
+                        status, approval, t, t, null, null, null)));
+        return rp;
     }
 }

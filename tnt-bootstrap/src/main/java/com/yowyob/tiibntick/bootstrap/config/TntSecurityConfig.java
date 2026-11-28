@@ -24,10 +24,14 @@ import org.springframework.security.web.server.util.matcher.ServerWebExchangeMat
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
+import com.yowyob.tiibntick.core.roles.domain.model.PlatformAdminAuthorities;
+import com.yowyob.tiibntick.core.roles.domain.model.ScopedTokenRoles;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Reactive Security configuration for TiiBnTick Core.
@@ -113,10 +117,29 @@ public class TntSecurityConfig {
     @Value("${tnt.auth.dev-actor-id:709f0069-c5ed-4d50-8ad0-b6c67a9eb630}")
     private String devActorId;
 
-    // Same property/default as tnt-roles-core's TntRolesProperties#systemTenantId — kept in
-    // sync manually since this class lives in tnt-bootstrap and must not depend on tnt-roles-core.
-    @Value("${tnt.roles.system-tenant-id:00000000-0000-0000-0000-000000000001}")
+    // Same property as tnt-roles-core's TntRolesProperties#systemTenantId (SystemTenantConsistencyCheck fails the
+    // start-up if they ever disagree).
+    @Value("${tnt.roles.system-tenant-id}")
     private String systemTenantId;
+
+    /**
+     * Registry of the platform administrators (decisions D-159 to D-175). Optional so that a slice without
+     * tnt-roles-core's auto-configuration still builds the converter: TNT_ADMIN then only comes from the owner rule.
+     */
+    @Autowired(required = false)
+    private com.yowyob.tiibntick.core.roles.application.port.in.ManagePlatformAdminsUseCase platformAdmins;
+
+    void setPlatformAdmins(com.yowyob.tiibntick.core.roles.application.port.in.ManagePlatformAdminsUseCase admins) {
+        this.platformAdmins = admins;
+    }
+
+    /** Decision D-176: confirms the agency/organisation roles of a token against the Core's assignments. */
+    @Autowired(required = false)
+    private com.yowyob.tiibntick.core.roles.application.port.in.ConfirmScopedRolesUseCase scopedRoles;
+
+    void setScopedRoles(com.yowyob.tiibntick.core.roles.application.port.in.ConfirmScopedRolesUseCase scopedRoles) {
+        this.scopedRoles = scopedRoles;
+    }
 
     @Autowired
     private ApplicationProfile applicationProfile;
@@ -319,27 +342,33 @@ public class TntSecurityConfig {
 
         converter.setJwtGrantedAuthoritiesConverter(jwt -> {
             List<GrantedAuthority> authorities = new ArrayList<>();
+            // Decision D-176: agency/organisation roles of the token wait for the Core's confirmation (step 5)
+            List<String> scopedRoleClaims = new ArrayList<>();
 
-            // 1. Extract TiiBnTick roles → ROLE_* prefixed authorities
+            // 1. Extract TiiBnTick roles → ROLE_* prefixed authorities. Decision D-162: a claim never brings
+            //    TNT_ADMIN (a tenant owner can create that code in their own Kernel tenant).
             Object rolesClaim = jwt.getClaim("roles");
             if (rolesClaim instanceof List<?> roleList) {
                 roleList.stream()
                         .filter(String.class::isInstance)
                         .map(String.class::cast)
+                        .filter(r -> !PlatformAdminAuthorities.isForgeableAdminClaim(r))
                         .map(role -> role.startsWith("ROLE_") ? role : "ROLE_" + role)
-                        .map(SimpleGrantedAuthority::new)
-                        .forEach(authorities::add);
+                        .forEach(role -> keepOrHold(role, authorities, scopedRoleClaims));
             }
 
             // 2. Extract fine-grained permissions → resource:action[#scope] format
             // These are consumed by TntPermissionEvaluator (tnt-roles-core) fast-path.
+            //    Decision D-162: entries that would make the holder a platform administrator (ROLE_TNT_ADMIN…,
+            //    "*", a permission only TNT_ADMIN holds or a wildcard covering one) are dropped.
             Object permClaim = jwt.getClaim("permissions");
+            boolean ownerOfSystemTenant = false;
             if (permClaim instanceof List<?> permList) {
                 permList.stream()
                         .filter(String.class::isInstance)
                         .map(String.class::cast)
-                        .map(SimpleGrantedAuthority::new)
-                        .forEach(authorities::add);
+                        .filter(p -> !PlatformAdminAuthorities.isForgeableAdminClaim(p))
+                        .forEach(p -> keepOrHold(p, authorities, scopedRoleClaims));
 
                 // Self-service personas granted by the Kernel (ROLE_CLIENT, ROLE_FREELANCER#TENANT:<id>…)
                 // become plain ROLE_<CODE> authorities so @PreAuthorize("hasRole(..)") works.
@@ -362,22 +391,7 @@ public class TntSecurityConfig {
                         .map(String.class::cast)
                         .anyMatch(p -> p.startsWith("ROLE_OWNER") || p.equals("tenant:admin"));
                 boolean ownsSystemTenant = systemTenantId.equals(jwt.getClaimAsString("tid"));
-                if (isKernelOwner && ownsSystemTenant) {
-                    // TiiBnTick business roles (checked via hasRole / @PreAuthorize)
-                    List.of("ROLE_TNT_ADMIN", "ROLE_AGENCY_MANAGER", "ROLE_BRANCH_MANAGER",
-                            "ROLE_ORG_ADMIN", "ROLE_SUPPORT_AGENT", "ROLE_MEDIATOR",
-                            "ROLE_PERMANENT_DELIVERER", "ROLE_FREELANCER", "ROLE_CLIENT",
-                            "ROLE_RELAY_OPERATOR", "ROLE_FREELANCER_OWNER", "ROLE_FREELANCER_SUB")
-                            .forEach(r -> authorities.add(new SimpleGrantedAuthority(r)));
-                    // Fine-grained authority strings (checked via hasAuthority / @PreAuthorize)
-                    List.of("accounting:read", "accounting:write", "accounting:admin",
-                            "sales:read", "sales:write",
-                            "administration:permissions:read",
-                            "administration:roles:read", "administration:roles:write",
-                            "administration:settings:read", "administration:settings:write",
-                            "tnt:platform:admin")
-                            .forEach(a -> authorities.add(new SimpleGrantedAuthority(a)));
-                }
+                ownerOfSystemTenant = isKernelOwner && ownsSystemTenant;
             }
 
             // 3. Synthetic authorities for tnt-auth-core TntSecurityContext enrichment
@@ -393,7 +407,54 @@ public class TntSecurityConfig {
             if (agencyId != null) authorities.add(new SimpleGrantedAuthority("AGENCY_" + agencyId));
             if (orgId    != null) authorities.add(new SimpleGrantedAuthority("ORG_"    + orgId));
 
-            return Flux.fromIterable(authorities);
+            // 4. Platform administrator (decisions D-159 to D-175): the Kernel owner of the system tenant, or an
+            //    account holding an active grant in the Core registry — whatever the tenant of this login. Both
+            //    receive the same set (D-167); the owner's protected SYSTEM_OWNER grant is recorded on the way
+            //    (D-161), so that a later login in another tenant still finds it.
+            final boolean owner = ownerOfSystemTenant;
+            UUID subject = uuidOrNull(jwt.getSubject());
+            Mono<Boolean> admin;
+            if (owner) {
+                authorities.add(new SimpleGrantedAuthority(PlatformAdminAuthorities.SYSTEM_TENANT_OWNER_MARKER));
+                admin = platformAdmins == null || subject == null ? Mono.just(true)
+                        : platformAdmins.ensureSystemOwner(subject).thenReturn(true)
+                                .onErrorResume(e -> {
+                                    log.warn("SYSTEM_OWNER grant of {} not recorded: {}", subject, e.getMessage());
+                                    return Mono.just(true);
+                                });
+            } else {
+                admin = platformAdmins == null || subject == null ? Mono.just(false)
+                        : platformAdmins.isPlatformAdmin(subject)
+                                .onErrorResume(e -> {
+                                    // fail closed: no administrator rights when the registry cannot answer
+                                    log.warn("Platform admin registry unavailable for {}: {}", subject, e.getMessage());
+                                    return Mono.just(false);
+                                });
+            }
+            // 5. Decision D-176: an agency/organisation role of the token is kept only when the Core's own assignments
+            //    confirm it for this account in this tenant (fail closed: none when they cannot be read).
+            Mono<java.util.Set<String>> confirmed = scopedRoleClaims.isEmpty() || scopedRoles == null
+                    || subject == null || uuidOrNull(tenantId) == null
+                    ? Mono.just(java.util.Set.<String>of())
+                    : scopedRoles.confirmedScopedRoles(uuidOrNull(tenantId), subject)
+                            .defaultIfEmpty(java.util.Set.of())
+                            .onErrorResume(e -> {
+                                log.warn("Scoped roles of {} not confirmed ({}): dropped", subject, e.getMessage());
+                                return Mono.just(java.util.Set.of());
+                            });
+            return admin.defaultIfEmpty(owner).zipWith(confirmed).flatMapMany(t -> {
+                if (t.getT1()) {
+                    PlatformAdminAuthorities.AUTHORITIES.stream()
+                            .map(SimpleGrantedAuthority::new)
+                            .forEach(authorities::add);
+                }
+                scopedRoleClaims.stream()
+                        .filter(claim -> ScopedTokenRoles.confirmed(claim, t.getT2()))
+                        .distinct()
+                        .map(SimpleGrantedAuthority::new)
+                        .forEach(authorities::add);
+                return Flux.fromIterable(authorities);
+            });
         });
 
         return converter;
@@ -405,6 +466,23 @@ public class TntSecurityConfig {
      * role codes in their own Kernel tenant, so privileged codes (TNT_ADMIN, AGENCY_MANAGER…)
      * must never be derived from the token alone — they keep the system-tenant check above.
      */
+    /** Plain entries become authorities now; agency/organisation roles wait for the confirmation (D-176). */
+    private static void keepOrHold(String entry, List<GrantedAuthority> authorities, List<String> held) {
+        if (ScopedTokenRoles.entryOf(entry).isPresent()) {
+            held.add(entry);
+        } else {
+            authorities.add(new SimpleGrantedAuthority(entry));
+        }
+    }
+
+    private static UUID uuidOrNull(String s) {
+        try {
+            return s == null ? null : UUID.fromString(s);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
     static final java.util.Set<String> SELF_SERVICE_ROLES = java.util.Set.of("CLIENT", "FREELANCER");
 
     /**

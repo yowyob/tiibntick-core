@@ -77,28 +77,28 @@ public class AnnouncementResponse {
     /**
      * Marks this response as the selected one.
      */
+    /** R2: the response is selected. */
     public void accept() {
-        this.status = ResponseStatus.ACCEPTED;
-        this.updatedAt = Instant.now();
+        move("R2", ResponseStatus.ACCEPTED);
     }
 
-    /**
-     * Marks this response as rejected.
-     */
+    /** R3: another response was selected. */
     public void reject() {
-        this.status = ResponseStatus.REJECTED;
-        this.updatedAt = Instant.now();
+        move("R3", ResponseStatus.REJECTED);
     }
 
-    /**
-     * Delivery person withdraws their offer.
-     */
+    /** R4: the courier withdraws the response. */
     public void cancel() {
-        if (this.status != ResponseStatus.SENT) {
-            throw new DeliveryDomainException(
-                "Only SENT responses can be cancelled, current: " + status);
+        move("R4", ResponseStatus.CANCELLED);
+    }
+
+    private void move(String row, ResponseStatus target) {
+        if (!com.yowyob.tiibntick.core.delivery.domain.statemachine.AnnouncementStateMachine.RESPONSE_TABLE
+                .rowsFor(status, target).stream().anyMatch(r -> r.id().equals(row))) {
+            throw new com.yowyob.tiibntick.core.delivery.domain.exception.InvalidStateTransitionException(
+                    "announcement response", status, target, "row " + row);
         }
-        this.status = ResponseStatus.CANCELLED;
+        this.status = target;
         this.updatedAt = Instant.now();
     }
 }

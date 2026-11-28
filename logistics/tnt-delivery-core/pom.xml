@@ -79,6 +79,22 @@
             <groupId>com.yowyob.tiibntick.core</groupId>
             <artifactId>tnt-route-core</artifactId>
         </dependency>
+        <!-- Delivery thresholds (max attempts, relay storage, reminder, failed returns) — lot evt-l2, spec §5.
+             administration-core is L2: depending down from L3 respects the layering rule. -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-administration-core</artifactId>
+        </dependency>
+        <!-- RelayStorageScheduler (spec §5.2): one instance at a time; LockProvider in tnt-bootstrap -->
+        <dependency>
+            <groupId>net.javacrumbs.shedlock</groupId>
+            <artifactId>shedlock-spring</artifactId>
+        </dependency>
+        <!-- 60 s cache of the resolved thresholds, invalidated by DeliveryThresholdsChanged (spec §5.1) -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
 
         <!-- ── Spring WebFlux + R2DBC ── -->
         <dependency>
@@ -189,6 +205,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.networknt</groupId>
+            <artifactId>json-schema-validator</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

@@ -30,7 +30,9 @@ final class KernelChannelMapper {
             case "SMS" -> NotificationChannel.SMS_LOCAL;
             case "WHATSAPP" -> NotificationChannel.WHATSAPP;
             case "PUSH" -> NotificationChannel.PUSH_FCM;
-            case "WEBSOCKET" -> NotificationChannel.IN_APP_WEBSOCKET;
+            // The Kernel has two in-app channels: WEBSOCKET (live) and IN_APP (the persistent inbox). The Core
+            // sends on WEBSOCKET only, but both appear in lists it reads back and must not break them.
+            case "WEBSOCKET", "IN_APP" -> NotificationChannel.IN_APP_WEBSOCKET;
             default -> throw new IllegalArgumentException("Unknown Kernel notification channel: " + kernelChannel);
         };
     }

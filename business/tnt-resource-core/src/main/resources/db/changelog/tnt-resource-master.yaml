@@ -10,3 +10,6 @@ databaseChangeLog:
   - include:
       file: db/changelog/003_freelancer_resources.sql
       relativeToChangelogFile: false
+  - include:
+      file: db/changelog/gdd-l3-resource.yaml
+      relativeToChangelogFile: false

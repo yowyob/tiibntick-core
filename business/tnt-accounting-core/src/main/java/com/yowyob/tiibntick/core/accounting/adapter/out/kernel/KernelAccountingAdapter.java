@@ -77,7 +77,8 @@ public class KernelAccountingAdapter implements KernelAccountingPort {
     @Override
     public Mono<KernelJournalEntryDto> findJournalEntryById(UUID kernelJournalEntryId) {
         return kernelWebClient.get()
-                .uri("/accounting/journal-entries/{id}", kernelJournalEntryId)
+                // lot L6: the Kernel accounting entry resource (was the non-existent /accounting/journal-entries)
+                .uri("/api/accounting-service/entries/{id}", kernelJournalEntryId)
                 .retrieve()
                 .bodyToMono(KernelJournalEntryDto.class)
                 .onErrorResume(WebClientResponseException.NotFound.class, ex -> {

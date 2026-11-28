@@ -13,6 +13,9 @@ import com.yowyob.tiibntick.core.notify.domain.vo.NotificationId;
 import com.yowyob.tiibntick.core.notify.domain.vo.NotificationModel;
 import reactor.core.publisher.Mono;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 /**
  * Hands a business notification over to the Kernel notification engine.
  *
@@ -64,7 +67,8 @@ public class NotificationService implements ISendNotificationUseCase {
             NotificationChannel channel) {
         return languagePort.languageOf(recipientId, model.targetLanguage())
                 .defaultIfEmpty(model.targetLanguage() != null ? model.targetLanguage() : "fr")
-                .map(language -> new NotificationModel(model.templateKey(), language, model.parameters(),
+                .map(language -> new NotificationModel(model.templateKey(), language,
+                        withRecipientContext(model.parameters(), recipientId, targetDestination, language),
                         model.priority()))
                 .flatMap(localized -> translationPort.translate(localized, channel)
                         .flatMap(body -> translationPort.translateSubject(localized, channel)
@@ -78,6 +82,29 @@ public class NotificationService implements ISendNotificationUseCase {
                                                 channel, body, localized, receipt))
                                         .onErrorResume(e -> onRefused(tenantId, organizationId, recipientId,
                                                 channel, body, localized, e)))));
+    }
+
+    /**
+     * Every template can use the facts the service knows about the recipient without the caller repeating them:
+     * {@code {{recipientId}}}, {@code {{recipientAddress}}} (e-mail, phone... when there is one) and
+     * {@code {{recipientLanguage}}}. A value the caller passed under the same name always wins.
+     */
+    static Map<String, Object> withRecipientContext(Map<String, Object> given, String recipientId,
+            String destination, String language) {
+        Map<String, Object> enriched = new LinkedHashMap<>();
+        if (recipientId != null && !recipientId.isBlank()) {
+            enriched.put("recipientId", recipientId);
+        }
+        if (destination != null && !destination.isBlank()) {
+            enriched.put("recipientAddress", destination);
+        }
+        if (language != null && !language.isBlank()) {
+            enriched.put("recipientLanguage", language);
+        }
+        if (given != null) {
+            enriched.putAll(given);
+        }
+        return enriched;
     }
 
     private Mono<Notification> onAccepted(String tenantId, String organizationId, String recipientId,

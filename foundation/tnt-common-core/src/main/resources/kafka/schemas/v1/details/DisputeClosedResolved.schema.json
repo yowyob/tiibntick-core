@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:tnt:kafka:v1:details:DisputeClosedResolved",
+  "title": "details of DisputeClosedResolved",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["resolutionType", "closureType"],
+  "properties": {"resolutionType": {"type": ["string", "null"]}, "closureType": {"enum": ["ADMINISTRATIVE_CLOSURE", null]}}
+}

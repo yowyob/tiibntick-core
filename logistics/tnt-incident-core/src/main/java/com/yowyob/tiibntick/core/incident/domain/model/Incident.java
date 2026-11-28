@@ -1,12 +1,20 @@
 package com.yowyob.tiibntick.core.incident.domain.model;
 
+import com.yowyob.tiibntick.common.kafka.TntEventActor;
 import com.yowyob.tiibntick.core.incident.domain.enums.*;
 import com.yowyob.tiibntick.core.incident.domain.valueobject.*;
 import lombok.*;
 
+import java.security.SecureRandom;
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -94,12 +102,34 @@ public class Incident {
 
     /**
      * Public-facing tracking code of the delivery this incident is blocking (format
-     * {@code TNT-YYYYMMDD-XXXXXXXX}). Threaded from {@code tnt-delivery-core}'s
-     * {@code MissionStatusChangedEvent} so it can be re-exposed to {@code tnt-dispute-core}
+     * {@code TNT-YYYYMMDD-XXXXXXXX}). Threaded from the delivery of {@code tnt-delivery-core}
+     * so it can be re-exposed to {@code tnt-dispute-core}
      * when an incident escalates into an automated dispute. Null for incidents reported
      * before this field existed or where the source mission has no tracking code.
      */
     private String trackingCode;
+
+    // ── lot L3 (spec §1.3) ───────────────────────────────────────────────────
+
+    /** Blocks the delivery (QO-2: type/severity rule, or forced by the courier "I cannot go on"). */
+    private boolean blocking;
+    /** Forced by the declaring courier at declaration ("I cannot go on"). */
+    private boolean blockingForcedByCourier;
+    /** What the resolution does to the delivery; set on every move to RESOLVED (or proposed in PENDING_CONFIRMATION). */
+    private IncidentDeliveryOutcome deliveryOutcome;
+    /** Party held responsible, sets the payer of a return [B.6]; may be {@code null}. */
+    private IncidentResponsibleParty responsibleParty;
+    /** Manager's note of the resolution (proposal, "transferred to dispute"…). */
+    private String resolutionNote;
+    /** When the resolution was proposed (QO-14: confirmed automatically after the configured delay). */
+    private Instant resolutionProposedAt;
+
+    /** Number of events published for this incident: the {@code aggregateVersion} of the last one (lot L3). */
+    private long eventSequence;
+
+    /** Changes waiting to be published on {@code tnt.incident.events} by the repository (not persisted). */
+    @Builder.Default
+    private List<IncidentTransition> pendingTransitions = new ArrayList<>();
 
     public static Incident create(
             UUID tenantId, UUID agencyId, PlatformType platform,
@@ -111,7 +141,7 @@ public class Incident {
     }
 
     /**
-     * Creates an incident with FreelancerOrg responsibility context ().
+     * Row I1: the assigned courier declares an incident ({@code REPORTED}; lot L3, [D.1]).
      *
      * @param responsibleOrgId   UUID of the FreelancerOrg responsible, or null for Agency
      * @param responsibleOrgType "FREELANCER_ORG" or "AGENCY", or null
@@ -126,9 +156,9 @@ public class Incident {
 
         UUID id = UUID.randomUUID();
         Instant now = Instant.now();
-        return Incident.builder()
+        Incident incident = Incident.builder()
                 .id(id)
-                .referenceCode(generateReferenceCode())
+                .referenceCode(generateReferenceCode(now))
                 .tenantId(tenantId)
                 .agencyId(agencyId)
                 .sourcePlatform(platform)
@@ -136,52 +166,53 @@ public class Incident {
                 .category(category)
                 .type(type)
                 .severity(IncidentSeverity.MEDIUM)
-                .status(IncidentStatus.DETECTED)
+                .status(IncidentStatus.REPORTED)
                 .description(description)
                 .reportedByActorId(reportedBy)
                 .reportedByRole(reportedByRole)
                 .affectedParcelIds(affectedParcelIds != null ? new ArrayList<>(affectedParcelIds) : new ArrayList<>())
                 .multiParcelIncident(affectedParcelIds != null && affectedParcelIds.size() > 1)
                 .reportedAt(now)
-                .detectedAt(now)
                 .lastEscalationLevel(0)
                 .autoResolutionAttempts(0)
                 .interAgencyInvolved(false)
                 .version(0L)
+                .eventSequence(1L)
                 .responsibleOrgId(responsibleOrgId)
                 .responsibleOrgType(responsibleOrgType)
                 .trackingCode(trackingCode)
                 .build();
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("type", type == null ? null : type.name());
+        incident.pendingTransitions.add(new IncidentTransition(null, IncidentStatus.REPORTED, null, "REPORT_INCIDENT",
+                actorOf(reportedByRole, reportedBy), details, now));
+        return incident;
     }
 
-    /**
-     * Transitions the incident from any non-terminal state to {@code ACKNOWLEDGED}.
-     *
-     * @return updated incident with {@code ACKNOWLEDGED} status and acknowledgement timestamp
-     * @throws IllegalStateException if the incident is already in a terminal state
-     */
+    /** The courier forces the incident as blocking at declaration ("I cannot go on", QO-2). */
+    public Incident forceBlockingByCourier() {
+        return toBuilder().blockingForcedByCourier(true).build();
+    }
+
+    /** Row I2: automatic acknowledgement. */
     public Incident acknowledge() {
-        validateTransition(IncidentStatus.ACKNOWLEDGED);
-        return toBuilder().status(IncidentStatus.ACKNOWLEDGED).acknowledgedAt(Instant.now()).build();
+        return moveTo(IncidentStatus.ACKNOWLEDGED, "AUTO_ACKNOWLEDGE", TntEventActor.system(), null,
+                b -> b.acknowledgedAt(Instant.now()));
     }
 
     /**
-     * Applies triage results: assigns severity, geo-snapshot and SLA impact.
+     * Row I3: triage — severity, geo-snapshot, SLA impact and {@code blocking} (QO-2).
      *
-     * @param severity    computed severity level
-     * @param geoSnapshot geographic coordinates at incident time
-     * @param slaImpact   SLA delay assessment
-     * @return updated incident in {@code TRIAGED} status
+     * @param blocking whether the incident blocks the delivery (see {@code IncidentBlockingPolicy})
      */
-    public Incident triage(IncidentSeverity severity, IncidentGeoSnapshot geoSnapshot, IncidentSlaImpact slaImpact) {
-        validateTransition(IncidentStatus.TRIAGED);
-        return toBuilder()
-                .status(IncidentStatus.TRIAGED)
-                .severity(severity)
-                .geoSnapshot(geoSnapshot)
-                .slaImpact(slaImpact)
-                .triagedAt(Instant.now())
-                .build();
+    public Incident triage(IncidentSeverity severity, IncidentGeoSnapshot geoSnapshot, IncidentSlaImpact slaImpact,
+                           boolean blocking) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("severity", severity == null ? null : severity.name());
+        details.put("blocking", blocking);
+        return moveTo(IncidentStatus.TRIAGED, "TRIAGE", TntEventActor.system(), details,
+                b -> b.severity(severity).geoSnapshot(geoSnapshot).slaImpact(slaImpact).blocking(blocking)
+                        .triagedAt(Instant.now()));
     }
 
     /**
@@ -194,100 +225,174 @@ public class Incident {
         return toBuilder().riskScore(riskScore).build();
     }
 
-    /**
-     * Transitions to {@code AUTO_RESOLVING} and increments the auto-resolution attempt counter.
-     *
-     * @return updated incident
-     */
+    /** Rows I4: automatic resolution of a blocking incident without agency. */
     public Incident startAutoResolution() {
-        return toBuilder()
-                .status(IncidentStatus.AUTO_RESOLVING)
-                .autoResolutionAttempts(this.autoResolutionAttempts + 1)
-                .build();
+        return moveTo(IncidentStatus.AUTO_RESOLVING, "START_AUTO_RESOLUTION", TntEventActor.system(), null,
+                b -> b.autoResolutionAttempts(this.autoResolutionAttempts + 1));
     }
 
+    /** Rows I7 (from AUTO_RESOLVING) and I15 (hand-over aborted). */
     public Incident startReassigningDriver() {
-        return toBuilder().status(IncidentStatus.REASSIGNING_DRIVER).build();
+        String trigger = status == IncidentStatus.AWAITING_HANDOVER ? "HANDOVER_ABORTED" : "REASSIGN_DRIVER";
+        return moveTo(IncidentStatus.REASSIGNING_DRIVER, trigger, TntEventActor.system(), null, b -> { });
     }
 
+    /** Rows I12 (a replacement accepts) and I13 (the agency designates one of its couriers). */
     public Incident startAwaitingHandover() {
-        return toBuilder().status(IncidentStatus.AWAITING_HANDOVER).build();
+        return moveTo(IncidentStatus.AWAITING_HANDOVER, "REPLACEMENT_ASSIGNED", TntEventActor.system(), null, b -> { });
     }
 
+    /** Row I8. */
     public Incident startRerouting() {
-        return toBuilder().status(IncidentStatus.REROUTING).build();
+        return moveTo(IncidentStatus.REROUTING, "REROUTE", TntEventActor.system(), null, b -> { });
     }
 
+    /** Row I9 (QO-13). */
     public Incident startTransferringToHub() {
-        return toBuilder().status(IncidentStatus.TRANSFERRING_TO_HUB).build();
+        return moveTo(IncidentStatus.TRANSFERRING_TO_HUB, "TRANSFER_TO_HUB", TntEventActor.system(), null, b -> { });
     }
 
+    /** Row I10. */
     public Incident markAutoResolutionFailed() {
-        return toBuilder().status(IncidentStatus.AUTO_RESOLUTION_FAILED).build();
+        return moveTo(IncidentStatus.AUTO_RESOLUTION_FAILED, "AUTO_RESOLUTION_FAILED", TntEventActor.system(), null,
+                b -> { });
     }
 
+    /** Rows I5 (blocking agency incident) and I11 (after a failed automatic resolution). */
     public Incident pendingAgencyAssignment() {
-        return toBuilder().status(IncidentStatus.PENDING_AGENCY_ASSIGNMENT).build();
+        return moveTo(IncidentStatus.PENDING_AGENCY_ASSIGNMENT, "AWAIT_MANAGER", TntEventActor.system(), null, b -> { });
     }
 
+    /** Rows I18, I21 (cooperation refused or failed), I25 (resolution contested) and I28 (taken back after escalation). */
     public Incident startAgencyHandling() {
-        return toBuilder().status(IncidentStatus.AGENCY_HANDLING).build();
+        return startAgencyHandling(managerActor(null), "START_HANDLING");
     }
 
+    public Incident startAgencyHandling(TntEventActor actor, String trigger) {
+        return moveTo(IncidentStatus.AGENCY_HANDLING, trigger, actor, null, b -> { });
+    }
+
+    /** Row I19. */
     public Incident waitForInterAgency() {
-        return toBuilder().status(IncidentStatus.WAITING_INTERAGENCY).interAgencyInvolved(true).build();
+        return moveTo(IncidentStatus.WAITING_INTERAGENCY, "REQUEST_COOPERATION", managerActor(null), null,
+                b -> b.interAgencyInvolved(true));
     }
 
+    /** Row I20. */
     public Incident startInterAgencyCooperation() {
-        return toBuilder().status(IncidentStatus.INTERAGENCY_IN_PROGRESS).build();
+        return moveTo(IncidentStatus.INTERAGENCY_IN_PROGRESS, "COOPERATION_ACCEPTED", managerActor(null), null, b -> { });
     }
 
+    /** Row I27: escalation, level + 1 (from ESCALATED too). */
     public Incident escalate(int level, ActorRole toRole) {
-        return toBuilder()
-                .status(IncidentStatus.ESCALATED)
-                .lastEscalationLevel(level)
-                .build();
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("level", level);
+        details.put("toRole", toRole == null ? null : toRole.name());
+        return moveTo(IncidentStatus.ESCALATED, "ESCALATE", TntEventActor.system(), details,
+                b -> b.lastEscalationLevel(level));
     }
 
-    /**
-     * Marks the incident as {@code RESOLVED} with the chosen resolution mode.
-     *
-     * @param mode the resolution strategy used
-     * @return updated incident with resolution timestamp
-     * @throws IllegalStateException if the incident is already in a terminal state
-     */
+    /** Legacy resolution (handover I14, rerouting I17): the delivery goes on. */
     public Incident resolve(ResolutionMode mode) {
-        validateIsNotTerminal();
-        return toBuilder()
-                .status(IncidentStatus.RESOLVED)
-                .resolutionMode(mode)
-                .resolvedAt(Instant.now())
-                .build();
+        return resolve(mode, IncidentDeliveryOutcome.RESUMED, null, null, "RESOLVE", TntEventActor.system());
     }
 
     /**
-     * Transitions a {@code RESOLVED} incident to {@code CLOSED}, triggering evidence archival
-     * and blockchain chain tail linkage for multi-parcel incidents.
+     * Rows I6, I14, I16, I17, I22, I24, I26, I29: {@code RESOLVED}, with its delivery outcome (mandatory).
      *
-     * @return updated incident in {@code CLOSED} status
-     * @throws IllegalStateException if the incident is not yet RESOLVED
+     * @throws IllegalArgumentException when {@code outcome} is missing
      */
+    public Incident resolve(ResolutionMode mode, IncidentDeliveryOutcome outcome, IncidentResponsibleParty responsible,
+                            String note, String trigger, TntEventActor actor) {
+        if (outcome == null) {
+            throw new IllegalArgumentException("deliveryOutcome is mandatory to resolve incident " + id);
+        }
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("deliveryOutcome", outcome.name());
+        details.put("responsibleParty", responsible == null ? null : responsible.name());
+        details.put("resolutionMode", mode == null ? null : mode.name());
+        return moveTo(IncidentStatus.RESOLVED, trigger, actor, details,
+                b -> b.resolutionMode(mode).deliveryOutcome(outcome).responsibleParty(responsible)
+                        .resolutionNote(note != null ? note : resolutionNote).resolvedAt(Instant.now()));
+    }
+
+    /** Row I23 (QO-14): the manager proposes a resolution, the declaring courier confirms or contests it. */
+    public Incident proposeResolution(IncidentDeliveryOutcome outcome, IncidentResponsibleParty responsible,
+                                      String note, TntEventActor actor) {
+        if (outcome == null) {
+            throw new IllegalArgumentException("deliveryOutcome is mandatory to propose a resolution of " + id);
+        }
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("deliveryOutcome", outcome.name());
+        details.put("responsibleParty", responsible == null ? null : responsible.name());
+        return moveTo(IncidentStatus.PENDING_CONFIRMATION, "PROPOSE_RESOLUTION", actor, details,
+                b -> b.deliveryOutcome(outcome).responsibleParty(responsible).resolutionNote(note)
+                        .resolutionProposedAt(Instant.now()));
+    }
+
+    /** Row I24: the declaring courier confirms (or the delay expired: {@code automatic}). */
+    public Incident confirmResolution(TntEventActor actor, boolean automatic) {
+        requireStatus(IncidentStatus.PENDING_CONFIRMATION);
+        return resolve(ResolutionMode.MANUAL_AGENCY, deliveryOutcome, responsibleParty, resolutionNote,
+                automatic ? "CONFIRMATION_TIMED_OUT" : "CONFIRM_RESOLUTION", automatic ? TntEventActor.system() : actor);
+    }
+
+    /** Row I25: the declaring courier contests; back to the manager. */
+    public Incident contestResolution(String reason, TntEventActor actor) {
+        requireStatus(IncidentStatus.PENDING_CONFIRMATION);
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("reason", reason);
+        return moveTo(IncidentStatus.AGENCY_HANDLING, "CONTEST_RESOLUTION", actor, details,
+                b -> b.deliveryOutcome(null).responsibleParty(null).resolutionProposedAt(null));
+    }
+
+    /** Row I30. */
     public Incident close() {
         if (this.status != IncidentStatus.RESOLVED) {
             throw new IllegalStateException("Incident must be RESOLVED before CLOSED. Current: " + status);
         }
-        return toBuilder().status(IncidentStatus.CLOSED).closedAt(Instant.now()).build();
+        return moveTo(IncidentStatus.CLOSED, "CLOSE", TntEventActor.system(), null, b -> b.closedAt(Instant.now()));
+    }
+
+    /** Row I31: erroneous declaration. */
+    public Incident cancel(String reason) {
+        return cancel(reason, TntEventActor.system());
+    }
+
+    public Incident cancel(String reason, TntEventActor actor) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("reason", reason);
+        return moveTo(IncidentStatus.CANCELLED, "CANCEL_INCIDENT", actor, details, b -> b.closedAt(Instant.now()));
+    }
+
+    /** {@code IncidentEscalatedToDispute} (change without transition, spec §3.5). */
+    public Incident recordEscalatedToDispute(String reason) {
+        return recordEscalatedToDispute(reason, null);
     }
 
     /**
-     * Cancels an incident that no longer requires resolution.
-     *
-     * @param reason human-readable cancellation reason
-     * @return updated incident in {@code CANCELLED} status
+     * {@code IncidentEscalatedToDispute} with the evidence of the escalation ({@code details.fraudReason}, lot L8:
+     * dispute-core opens the dispute from this event only).
      */
-    public Incident cancel(String reason) {
-        validateIsNotTerminal();
-        return toBuilder().status(IncidentStatus.CANCELLED).closedAt(Instant.now()).build();
+    public Incident recordEscalatedToDispute(String reason, String fraudReason) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("reason", reason);
+        details.put("fraudReason", fraudReason);
+        return change("ESCALATED_TO_DISPUTE", "ESCALATE_TO_DISPUTE", TntEventActor.system(), details);
+    }
+
+    /** {@code IncidentHandoverConfirmed}: one side of the hand-over confirmed (spec §1.3). */
+    public Incident recordHandoverConfirmed(String side, TntEventActor actor) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("side", side);
+        return change("HANDOVER_CONFIRMED", "CONFIRM_HANDOVER", actor, details);
+    }
+
+    /** {@code IncidentHandlerAssigned}: the agency or a support agent takes the incident. */
+    public Incident recordHandlerAssigned(UUID handlerId, TntEventActor actor) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("handlerId", handlerId == null ? null : handlerId.toString());
+        return change("HANDLER_ASSIGNED", "ASSIGN_HANDLER", actor, details);
     }
 
     public Incident assignBlockchainChain(String chainId) {
@@ -298,13 +403,17 @@ public class Incident {
         return toBuilder().compensationImpact(impact).build();
     }
 
+    /** @return the changes waiting to be published (read-only) */
+    public List<IncidentTransition> getPendingTransitions() {
+        return Collections.unmodifiableList(pendingTransitions);
+    }
+
     /**
-     * Returns {@code true} when this incident is currently blocking its associated delivery mission.
-     *
-     * @return {@code true} if the incident is active and beyond the initial DETECTED state
+     * Returns {@code true} when this incident blocks its delivery (spec §1.3): {@code blocking} and still open
+     * (neither RESOLVED nor terminal).
      */
     public boolean isBlockingMission() {
-        return !status.isTerminal() && status != IncidentStatus.DETECTED;
+        return status.isResolvable() && blocking;
     }
 
     /**
@@ -342,20 +451,75 @@ public class Incident {
                 .build();
     }
 
-    private void validateTransition(IncidentStatus target) {
+    /** The courier's actor of a role (COURIER for drivers, AGENCY / SUPPORT for managers, SYSTEM otherwise). */
+    public static TntEventActor actorOf(ActorRole role, UUID actorId) {
+        if (role == null) {
+            return TntEventActor.system();
+        }
+        return switch (role) {
+            case GO_BIKER, FREELANCER_DRIVER, PERMANENT_DRIVER, AGENCY_DRIVER ->
+                    TntEventActor.of(TntEventActor.Type.COURIER, actorId);
+            case AGENCY_MANAGER, BRANCH_MANAGER, DISPATCHER -> TntEventActor.of(TntEventActor.Type.AGENCY, actorId);
+            case SUPPORT_AGENT, ADMIN_TIIBNTICK -> TntEventActor.of(TntEventActor.Type.SUPPORT, actorId);
+            case RELAY_POINT_OPERATOR -> TntEventActor.of(TntEventActor.Type.RELAY_OP, actorId);
+            case CLIENT -> TntEventActor.of(TntEventActor.Type.SENDER, actorId);
+            case RECIPIENT -> TntEventActor.of(TntEventActor.Type.RECIPIENT, actorId);
+            case SYSTEM -> TntEventActor.system();
+        };
+    }
+
+    /** The manager: the delivery's agency, else the TiiBnTick support. */
+    public TntEventActor managerActor(UUID actorId) {
+        return TntEventActor.of(agencyId != null ? TntEventActor.Type.AGENCY : TntEventActor.Type.SUPPORT, actorId);
+    }
+
+    // ── internals ────────────────────────────────────────────────────────────
+
+    /**
+     * The only way to change the state: checks row I1–I31 ({@link IncidentStatus#canTransitionTo}), applies the
+     * changes and records the event to publish.
+     */
+    private Incident moveTo(IncidentStatus target, String trigger, TntEventActor actor, Map<String, Object> details,
+                            java.util.function.Consumer<IncidentBuilder> changes) {
+        if (!status.canTransitionTo(target)) {
+            throw new IllegalStateException("Incident " + id + ": transition " + status + " -> " + target
+                    + " is not allowed (spec §1.3)");
+        }
+        IncidentBuilder b = toBuilder().status(target).eventSequence(eventSequence + 1);
+        changes.accept(b);
+        Incident next = b.build();
+        next.pendingTransitions.add(new IncidentTransition(status, target, null, trigger,
+                actor != null ? actor : TntEventActor.system(), details, Instant.now()));
+        return next;
+    }
+
+    private Incident change(String changeKind, String trigger, TntEventActor actor, Map<String, Object> details) {
         if (status.isTerminal()) {
-            throw new IllegalStateException("Cannot transition terminal incident " + id + " to " + target);
+            throw new IllegalStateException("Incident " + id + " is terminal: " + status);
+        }
+        Incident next = toBuilder().eventSequence(eventSequence + 1).build();
+        next.pendingTransitions.add(new IncidentTransition(status, status, changeKind, trigger,
+                actor != null ? actor : TntEventActor.system(), details, Instant.now()));
+        return next;
+    }
+
+    private void requireStatus(IncidentStatus expected) {
+        if (status != expected) {
+            throw new IllegalStateException("Incident " + id + " must be " + expected + ", is " + status);
         }
     }
 
-    private void validateIsNotTerminal() {
-        if (status.isTerminal()) {
-            throw new IllegalStateException("Incident " + id + " is already terminal: " + status);
-        }
-    }
+    private static final SecureRandom RANDOM = new SecureRandom();
+    private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("yyMMdd").withZone(ZoneOffset.UTC);
 
-    private static String generateReferenceCode() {
-        return "TNT-INC-" + String.format("%06d", (int)(Math.random() * 999999));
+    /**
+     * {@code TNT-INC-<yyMMdd>-<10 hex>}: 40 random bits per day. The former {@code TNT-INC-<6 digits>} drew from one
+     * million values under a UNIQUE constraint and collided (insert failure) after about a thousand incidents.
+     */
+    static String generateReferenceCode(Instant now) {
+        byte[] bytes = new byte[5];
+        RANDOM.nextBytes(bytes);
+        return "TNT-INC-" + DAY.format(now) + "-" + HexFormat.of().withUpperCase().formatHex(bytes);
     }
 
     public IncidentBuilder toBuilder() {
@@ -375,6 +539,11 @@ public class Incident {
                 .geoSnapshot(geoSnapshot).slaImpact(slaImpact).riskScore(riskScore)
                 .compensationImpact(compensationImpact).version(version)
                 .responsibleOrgId(responsibleOrgId).responsibleOrgType(responsibleOrgType)
-                .trackingCode(trackingCode);
+                .trackingCode(trackingCode)
+                .blocking(blocking).blockingForcedByCourier(blockingForcedByCourier)
+                .deliveryOutcome(deliveryOutcome).responsibleParty(responsibleParty)
+                .resolutionNote(resolutionNote).resolutionProposedAt(resolutionProposedAt)
+                .eventSequence(eventSequence)
+                .pendingTransitions(new ArrayList<>(pendingTransitions));
     }
 }

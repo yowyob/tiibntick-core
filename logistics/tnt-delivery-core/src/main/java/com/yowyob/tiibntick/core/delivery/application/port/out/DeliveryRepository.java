@@ -18,7 +18,26 @@ public interface DeliveryRepository {
 
     Mono<Delivery> findById(UUID tenantId, UUID deliveryId);
 
+    /**
+     * D-136: the delivery shown for a tracking code — the current (non-terminal) delivery of the parcel carrying the
+     * code, else its latest delivery; for a code printed before D-136, the delivery that carried it.
+     */
     Mono<Delivery> findByTrackingCode(String trackingCode);
+
+    /** D-136: every delivery of the parcel carrying the code (outbound, return, redelivery), oldest first. */
+    Flux<Delivery> findHistoryByTrackingCode(String trackingCode);
+
+    /** Deliveries at their destination relay whose storage ended (spec §5.2), at most {@code limit}. */
+    Flux<Delivery> findRelayStorageExpired(java.time.Instant now, int limit);
+
+    /** Deliveries at their destination relay whose storage reminder is due (spec §5.2), at most {@code limit}. */
+    Flux<Delivery> findRelayStorageReminderDue(java.time.Instant now, int limit);
+
+    /** Deliveries the alert watch evaluates (lot L3: courier responsible, parcel not at a relay), at most {@code limit}. */
+    Flux<Delivery> findWatchCandidates(int limit);
+
+    /** Deliveries whose parcel is held at the relay hub (D-129: relay revoked). */
+    Flux<Delivery> findAtRelayHub(UUID hubId);
 
     Flux<Delivery> findBySenderId(UUID tenantId, UUID senderId);
 
@@ -40,17 +59,37 @@ public interface DeliveryRepository {
      */
     Mono<Long> countNonTerminalByDeliveryPersonId(UUID tenantId, UUID deliveryPersonId);
 
+    /**
+     * Counts deliveries assigned to a delivery person that are in the given status, without loading them.
+     */
+    Mono<Long> countByDeliveryPersonIdAndStatus(UUID tenantId, UUID deliveryPersonId, DeliveryStatus status);
+
     Mono<Void> delete(UUID tenantId, UUID deliveryId);
 
     /**
      * Finds a delivery by ID without tenant scoping.
-     * Used by {@code MissionStatusPortAdapter} which receives only the deliveryId
+     * Used by {@code DeliveryStatusPortAdapter} which receives only the deliveryId
      * from tnt-incident-core (no tenant context available in the port signature).
      *
      * @param deliveryId the delivery UUID (globally unique)
      * @return the delivery if found, empty otherwise
      */
     Mono<Delivery> findByIdNoTenant(UUID deliveryId);
+
+    /**
+     * The deliveries carrying this parcel, whatever their tenant, most recent first.
+     * <p><b>Reserved</b> for the retrieval of a parcel deposited at a relay point (a deposit is keyed on the
+     * parcel id and has no tenant context). It crosses tenants: do not call it from anywhere else
+     * ({@code ParcelLookupCallersArchitectureTest} fails the build otherwise).
+     */
+    Flux<Delivery> findByParcelIdNoTenant(UUID parcelId);
+
+    /**
+     * The deliveries carrying this parcel in one tenant, most recent first. A {@code null} tenant, or a delivery
+     * without tenant, does not filter (tenantless parcel, decision D-150). Used by the dispute outcome, which knows the
+     * dispute's tenant: unlike {@link #findByParcelIdNoTenant(UUID)}, it never crosses tenants.
+     */
+    Flux<Delivery> findByParcelId(UUID parcelId, UUID tenantId);
 
     /**
      * Lists all deliveries currently paused by a specific incident.

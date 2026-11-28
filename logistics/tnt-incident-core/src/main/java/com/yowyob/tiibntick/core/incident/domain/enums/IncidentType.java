@@ -166,5 +166,36 @@ public enum IncidentType {
     AGENCY_MASS_MAINTENANCE,
     AGENCY_FUEL_SHORTAGE,
     AGENCY_INTERNAL_STRIKE,
-    AGENCY_SYSTEM_DOWN
+    AGENCY_SYSTEM_DOWN;
+
+    /** Prefixes a courier may declare (spec §1.3, [D.1][D.3]): himself, vehicle, client, parcel, route, relay, rules, human. */
+    private static final java.util.List<String> COURIER_PREFIXES = java.util.List.of(
+            "DRIVER_", "VEHICLE_", "CLIENT_", "PARCEL_", "GEO_", "RELAY_", "REGULATORY_", "HUMAN_");
+
+    /**
+     * Types of an allowed prefix a courier may still not declare (QO-12): detections, or self-accusations.
+     */
+    private static final java.util.Set<IncidentType> NOT_DECLARABLE_BY_COURIER = java.util.EnumSet.of(
+            DRIVER_GPS_SPOOFING, DRIVER_MULTI_ACCOUNT_FRAUD, DRIVER_COLLUSION_FRAUD, DRIVER_PHANTOM_DELIVERY,
+            DRIVER_PARCEL_THEFT_ATTEMPT, DRIVER_TRAJECTORY_DEVIATION, DRIVER_PROLONGED_STOP_SUSPECT,
+            DRIVER_VEHICLE_CHANGE_UNDECLARED, DRIVER_SUBSTITUTION_UNDECLARED, DRIVER_NON_RESPONSE_REPEATED,
+            DRIVER_DECEASED, HUMAN_DRIVER_DECEASED);
+
+    /**
+     * Whether the assigned courier may declare this type (lot L3). {@code SYSTEM_*}/{@code AUTOMATION_*} are reserved
+     * to alerts and the support; {@code SLA_*}, {@code AGENCY_*}, {@code GO_*}, {@code FREELANCER_*} are outside the
+     * decided categories; QO-12 excludes detections and self-accusations within the allowed prefixes.
+     */
+    public boolean isDeclarableByCourier() {
+        if (NOT_DECLARABLE_BY_COURIER.contains(this)) {
+            return false;
+        }
+        String n = name();
+        return COURIER_PREFIXES.stream().anyMatch(n::startsWith);
+    }
+
+    /** @return the types a courier may declare, in declaration order ({@code GET /api/v1/incidents/declarable-types}) */
+    public static java.util.List<IncidentType> declarableByCourier() {
+        return java.util.Arrays.stream(values()).filter(IncidentType::isDeclarableByCourier).toList();
+    }
 }

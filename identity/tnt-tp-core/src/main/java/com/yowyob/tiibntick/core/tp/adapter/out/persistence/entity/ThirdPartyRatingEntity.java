@@ -29,6 +29,8 @@ public class ThirdPartyRatingEntity implements Persistable<UUID> {
     @Column("score") private double score;
     @Column("comment") private String comment;
     @Column("created_at") private Instant createdAt;
+    @Column("rating_context") private String ratingContext;
+    @Column("subject_kind") private String subjectKind;
 
     public ThirdPartyRatingEntity() {}
 
@@ -50,4 +52,8 @@ public class ThirdPartyRatingEntity implements Persistable<UUID> {
     public void setComment(String comment) { this.comment = comment; }
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+    public String getRatingContext() { return ratingContext; }
+    public void setRatingContext(String ratingContext) { this.ratingContext = ratingContext; }
+    public String getSubjectKind() { return subjectKind; }
+    public void setSubjectKind(String subjectKind) { this.subjectKind = subjectKind; }
 }

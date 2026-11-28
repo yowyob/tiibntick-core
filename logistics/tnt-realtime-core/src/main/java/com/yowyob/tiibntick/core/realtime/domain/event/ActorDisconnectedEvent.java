@@ -9,7 +9,7 @@ package com.yowyob.tiibntick.core.realtime.domain.event;
  */
 public class ActorDisconnectedEvent extends RealtimeDomainEvent {
 
-    private static final String TOPIC = "tnt.realtime.actor.disconnected";
+    private static final String TOPIC = com.yowyob.tiibntick.common.kafka.TntTopics.REALTIME_ACTOR_DISCONNECTED;
 
     private final String sessionId;
     private final String userId;

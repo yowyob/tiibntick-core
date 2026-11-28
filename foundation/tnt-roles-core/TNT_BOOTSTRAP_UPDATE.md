@@ -57,7 +57,7 @@ tnt:
     actor-resolution-enabled: true
 
   roles:
-    system-tenant-id: 00000000-0000-0000-0000-000000000001
+    system-tenant-id: ${TNT_SYSTEM_TENANT_ID}
     provision-on-startup: true
     permission-cache-ttl-seconds: 300
     aop-enabled: true
@@ -72,7 +72,7 @@ tnt:
     # Stable UUID identifying the TiiBnTick system tenant.
     # Must be the same across all environments and all deployments.
     # Used to seed global/system-scoped role definitions in the Kernel DB.
-    system-tenant-id: ${TNT_SYSTEM_TENANT_ID:00000000-0000-0000-0000-000000000001}
+    system-tenant-id: ${TNT_SYSTEM_TENANT_ID}
 
     # Provision TiiBnTick role definitions at startup (idempotent — always safe).
     provision-on-startup: true
@@ -91,7 +91,7 @@ tnt:
 # application-test.yml
 tnt:
   roles:
-    system-tenant-id: 00000000-0000-0000-0000-000000000001
+    system-tenant-id: ${TNT_SYSTEM_TENANT_ID}
     provision-on-startup: false    # skip DB seeding in unit/integration tests
     aop-enabled: false             # disable AOP in test slices (use @MockBean instead)
     permission-cache-ttl-seconds: 0

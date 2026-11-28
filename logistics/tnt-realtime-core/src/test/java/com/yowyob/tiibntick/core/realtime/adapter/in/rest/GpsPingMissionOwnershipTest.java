@@ -2,7 +2,7 @@ package com.yowyob.tiibntick.core.realtime.adapter.in.rest;
 
 import com.yowyob.tiibntick.core.auth.domain.model.TntUserIdentity;
 import com.yowyob.tiibntick.core.realtime.application.port.in.IProcessGpsPingUseCase;
-import com.yowyob.tiibntick.core.realtime.application.port.out.IMissionAssignmentPort;
+import com.yowyob.tiibntick.core.realtime.application.port.out.IDeliveryAssignmentPort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -24,7 +24,7 @@ import static org.mockito.Mockito.when;
 class GpsPingMissionOwnershipTest {
 
     private final IProcessGpsPingUseCase process = mock(IProcessGpsPingUseCase.class);
-    private final IMissionAssignmentPort assignment = mock(IMissionAssignmentPort.class);
+    private final IDeliveryAssignmentPort assignment = mock(IDeliveryAssignmentPort.class);
     private final GpsPingRestController controller = new GpsPingRestController(process, assignment);
     private final UUID user = UUID.randomUUID();
     private final UUID tenant = UUID.randomUUID();
@@ -41,7 +41,7 @@ class GpsPingMissionOwnershipTest {
     @Test
     @DisplayName("a ping for a mission the caller carries is processed")
     void ownMission() {
-        when(assignment.isMissionAssignedTo(tenant, mission, user)).thenReturn(Mono.just(true));
+        when(assignment.isDeliveryAssignedTo(tenant, mission, user)).thenReturn(Mono.just(true));
         when(process.processGpsPing(any())).thenReturn(Mono.empty());
         StepVerifier.create(controller.ping(me(), ping(mission.toString())))
                 .expectNextMatches(r -> r.getStatusCode() == HttpStatus.NO_CONTENT).verifyComplete();
@@ -51,7 +51,7 @@ class GpsPingMissionOwnershipTest {
     @Test
     @DisplayName("a ping into somebody else's mission is refused with 403 and never processed")
     void foreignMission() {
-        when(assignment.isMissionAssignedTo(tenant, mission, user)).thenReturn(Mono.just(false));
+        when(assignment.isDeliveryAssignedTo(tenant, mission, user)).thenReturn(Mono.just(false));
         StepVerifier.create(controller.ping(me(), ping(mission.toString())))
                 .expectErrorSatisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode())
                         .isEqualTo(HttpStatus.FORBIDDEN)).verify();
@@ -72,6 +72,6 @@ class GpsPingMissionOwnershipTest {
         when(process.processGpsPing(any())).thenReturn(Mono.empty());
         StepVerifier.create(controller.ping(me(), ping(null)))
                 .expectNextMatches(r -> r.getStatusCode() == HttpStatus.NO_CONTENT).verifyComplete();
-        verify(assignment, never()).isMissionAssignedTo(any(), any(), any());
+        verify(assignment, never()).isDeliveryAssignedTo(any(), any(), any());
     }
 }

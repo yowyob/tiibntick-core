@@ -5,7 +5,7 @@ import com.yowyob.tiibntick.core.auth.domain.model.TntSecurityContext;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.DeliveryResponseDTO;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.DeliveryUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.application.service.DeliveryStatusApplicationService;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryStatus;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

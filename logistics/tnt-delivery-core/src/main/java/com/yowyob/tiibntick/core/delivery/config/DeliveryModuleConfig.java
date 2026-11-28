@@ -27,6 +27,7 @@ import java.util.Map;
  */
 @Configuration
 @EnableAspectJAutoProxy(proxyTargetClass = true)
+@org.springframework.boot.context.properties.EnableConfigurationProperties(DeliveryAlertProperties.class)
 @ComponentScan(basePackages = {
         "com.yowyob.tiibntick.delivery",
         "com.yowyob.tiibntick.core.delivery"

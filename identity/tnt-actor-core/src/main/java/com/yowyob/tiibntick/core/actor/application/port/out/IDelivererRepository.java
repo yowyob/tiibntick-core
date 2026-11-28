@@ -77,7 +77,7 @@ public interface IDelivererRepository {
     /**
      * Atomically increments the {@code incident_history_count} column for
      * the deliverer identified by the given actorId.
-     * Called by {@code IncidentEventConsumer} when {@code tnt.incident.closed}
+     * Called by {@code IncidentEventConsumer} when {@code IncidentClosed}
      * is received and this deliverer was the primary driver.
      *
      * @param actorId  the actor UUID of the deliverer

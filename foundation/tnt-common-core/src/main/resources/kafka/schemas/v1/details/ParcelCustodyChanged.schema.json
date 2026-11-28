@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:tnt:kafka:v1:details:ParcelCustodyChanged",
+  "title": "details of ParcelCustodyChanged",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "from",
+    "to",
+    "movement"
+  ],
+  "properties": {
+    "from": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "holderType",
+        "holderId",
+        "hubId",
+        "hubPackageEntryId"
+      ],
+      "properties": {
+        "holderType": {
+          "enum": [
+            "SENDER",
+            "COURIER",
+            "RELAY",
+            "RECIPIENT",
+            "NONE"
+          ]
+        },
+        "holderId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid"
+        },
+        "hubId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid"
+        },
+        "hubPackageEntryId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid"
+        }
+      }
+    },
+    "to": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "holderType",
+        "holderId",
+        "hubId",
+        "hubPackageEntryId"
+      ],
+      "properties": {
+        "holderType": {
+          "enum": [
+            "SENDER",
+            "COURIER",
+            "RELAY",
+            "RECIPIENT",
+            "NONE"
+          ]
+        },
+        "holderId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid"
+        },
+        "hubId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid"
+        },
+        "hubPackageEntryId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid"
+        }
+      }
+    },
+    "movement": {
+      "type": "string"
+    }
+  }
+}

@@ -25,6 +25,9 @@ public interface IMarketOrderRepository {
 
     Flux<MarketOrder> findByListingId(MarketListingId listingId);
 
+    /** Lot L8: the orders dispatched with this core delivery ({@code mission_id}). */
+    Flux<MarketOrder> findByDeliveryId(UUID deliveryId, String tenantId);
+
     /** Total order count for the tenant (stats overview). */
     Mono<Long> countByTenantId(String tenantId);
 

@@ -97,8 +97,11 @@ public class GofpFreelancer implements Persistable<UUID>, TntPersistableEntity {
 
     // ── Status & activation ───────────────────────────────────────────────
 
-    @NotNull
-    @Column("status")
+    /**
+     * Vetting status, read from delivery-core {@code tnt_delivery_persons.status} (lot L3): not persisted here.
+     * The {@code gofp_freelancers.status} column is no longer read nor written (dropped at closure).
+     */
+    @Transient
     @Builder.Default
     private FreelancerStatus status = FreelancerStatus.PENDING;
 
@@ -115,8 +118,11 @@ public class GofpFreelancer implements Persistable<UUID>, TntPersistableEntity {
 
     // ── Performance metrics ───────────────────────────────────────────────
 
-    /** Average rating across all evaluations. */
-    @Column("rating")
+    /**
+     * Average rating, read from the actor-core freelancer profile ({@code ActorRating}) (lot L3): not persisted here.
+     * {@code null} while the freelancer has no rating.
+     */
+    @Transient
     private Double rating;
 
     /** Total number of successfully completed deliveries. */

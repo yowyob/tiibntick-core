@@ -139,11 +139,11 @@ public class VehicleApplicationService implements
                         .flatMap(saved -> {
                             ResourceAllocation allocation = ResourceAllocation.allocate(
                                     saved.tenantId(), saved.agencyId(), saved.id(),
-                                    ResourceType.VEHICLE, cmd.delivererId(), cmd.missionId());
+                                    ResourceType.VEHICLE, cmd.delivererId(), cmd.deliveryId());
                             return allocationRepository.save(allocation)
                                     .then(eventPublisher.publish(VehicleAssignedEvent.of(
                                             saved.id(), saved.tenantId(), saved.agencyId(),
-                                            cmd.delivererId(), cmd.missionId())))
+                                            cmd.delivererId(), cmd.deliveryId())))
                                     .thenReturn(saved);
                         }));
     }

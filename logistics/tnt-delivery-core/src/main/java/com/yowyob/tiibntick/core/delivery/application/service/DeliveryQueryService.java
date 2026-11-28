@@ -44,9 +44,24 @@ public class DeliveryQueryService implements DeliveryQueryUseCase {
     }
 
     @Override
+    public Mono<Delivery> findDeliveryByIdAnyTenant(UUID deliveryId) {
+        return deliveryRepository.findByIdNoTenant(deliveryId);
+    }
+
+    @Override
+    public Flux<Delivery> findDeliveriesByParcelIdAnyTenant(UUID parcelId) {
+        return parcelId == null ? Flux.empty() : deliveryRepository.findByParcelIdNoTenant(parcelId);
+    }
+
+    @Override
     public Mono<Delivery> findByTrackingCode(String trackingCode) {
         return deliveryRepository.findByTrackingCode(trackingCode)
                 .switchIfEmpty(Mono.error(new DeliveryNotFoundException(trackingCode)));
+    }
+
+    @Override
+    public reactor.core.publisher.Flux<Delivery> findHistoryByTrackingCode(String trackingCode) {
+        return deliveryRepository.findHistoryByTrackingCode(trackingCode);
     }
 
     @Override
@@ -67,6 +82,12 @@ public class DeliveryQueryService implements DeliveryQueryUseCase {
     @Override
     public Mono<Long> countNonTerminalDeliveriesByDeliveryPerson(UUID tenantId, UUID deliveryPersonId) {
         return deliveryRepository.countNonTerminalByDeliveryPersonId(tenantId, deliveryPersonId);
+    }
+
+    @Override
+    public Mono<Long> countDeliveriesByDeliveryPersonAndStatus(UUID tenantId, UUID deliveryPersonId,
+                                                                DeliveryStatus status) {
+        return deliveryRepository.countByDeliveryPersonIdAndStatus(tenantId, deliveryPersonId, status);
     }
 
     @Override

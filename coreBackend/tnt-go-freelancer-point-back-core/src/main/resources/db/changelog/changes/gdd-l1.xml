@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="
+           http://www.liquibase.org/xml/ns/dbchangelog
+           http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.23.xsd">
+
+    <!--
+      Lot L1 (delivery + parcel) of the Go-Freelancer de-duplication, gofp side. Numbers 103-199
+      (101, 102 and 110 are the tnt-delivery-core changesets of gdd-l1-delivery.yaml, which run first).
+      No column is removed here: the closure changeset gdd-final does it (H7).
+    -->
+
+    <changeSet id="gdd-l1-103-deliveries-extension-nullable-terms" author="gdd-l1" labels="gdd-l1">
+        <comment>The agreed windows live in tnt_deliveries: the gofp row no longer has to carry them.</comment>
+        <sqlFile path="db/changelog/20261125_gdd_l1_103_deliveries_extension_nullable_terms.sql"
+                 relativeToChangelogFile="false" splitStatements="true"/>
+    </changeSet>
+
+    <changeSet id="gdd-l1-104-packets-to-parcels" author="gdd-l1" labels="gdd-l1">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="packets"/>
+            <tableExists tableName="tnt_parcels"/>
+        </preConditions>
+        <comment>Legacy packets become tnt-delivery-core parcels with the same ids.</comment>
+        <sqlFile path="db/changelog/20261125_gdd_l1_104_packets_to_parcels.sql"
+                 relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="gdd-l1-105-drop-packet-foreign-keys" author="gdd-l1" labels="gdd-l1">
+        <comment>delivery_needs.packet_id and relay_deposits.packet_id now hold parcel ids: no FK to packets.</comment>
+        <sqlFile path="db/changelog/20261125_gdd_l1_105_drop_packet_foreign_keys.sql"
+                 relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="gdd-l1-106-relay-deposits-parcel-id" author="gdd-l1" labels="gdd-l1">
+        <comment>Relay deposits keyed on a delivery need id are re-keyed on that need's parcel id.</comment>
+        <sqlFile path="db/changelog/20261125_gdd_l1_106_relay_deposits_parcel_id.sql"
+                 relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="gdd-l1-107-deliveries-agreed-terms-to-core" author="gdd-l1" labels="gdd-l1">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="tnt_deliveries" columnName="agreed_amount"/>
+        </preConditions>
+        <comment>Agreed price and windows of the gofp deliveries recorded on the core deliveries.</comment>
+        <sqlFile path="db/changelog/20261125_gdd_l1_107_deliveries_agreed_terms_to_core.sql"
+                 relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+</databaseChangeLog>

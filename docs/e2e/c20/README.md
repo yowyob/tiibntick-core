@@ -58,7 +58,7 @@ côté Kernel, ce qui casserait tout `@RequirePermission` pour tous les utilisat
 > Le backend TiiBnTick Core appelle `https://kernel-core.yowyob.com/kernel-api` avec les en-têtes
 > `X-Client-Id: tibntick-backend`, `X-Solution-Code: TNT` et sa clé d'API (déjà configurée, non jointe ici).
 >
-> 1. **Rôles canoniques.** `GET /api/roles` et `POST /api/roles` avec `X-Tenant-Id: 00000000-0000-0000-0000-000000000001`
+> 1. **Rôles canoniques.** `GET /api/roles` et `POST /api/roles` avec `X-Tenant-Id: <SYSTEM_TENANT_ID>`
 >    répondent **403 Forbidden** depuis le 2026-08-05 (10 tentatives par rôle, dernière erreur conservée).
 >    - Ce tenant `00000000-…-0001` est-il le bon tenant Kernel pour les rôles canoniques d'une solution,
 >      ou faut-il les créer dans un autre (lequel) ?

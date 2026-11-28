@@ -2,8 +2,7 @@ package com.yowyob.tiibntick.core.incident.application.service;
 
 import java.util.Map;
 import com.yowyob.tiibntick.core.incident.application.command.EscalateIncidentCommand;
-import com.yowyob.tiibntick.core.incident.domain.enums.ActorRole;
-import com.yowyob.tiibntick.core.incident.domain.event.IncidentDomainEvents.*;
+import com.yowyob.tiibntick.core.incident.domain.enums.*;
 import com.yowyob.tiibntick.core.incident.domain.model.Incident;
 import com.yowyob.tiibntick.core.incident.domain.model.IncidentEscalation;
 import com.yowyob.tiibntick.core.incident.domain.model.IncidentEventLog;
@@ -39,12 +38,12 @@ public class IncidentEscalationService implements IEscalateIncidentUseCase,
 
     private final IIncidentRepository incidentRepository;
     private final IIncidentEventLogRepository eventLogRepository;
-    private final IIncidentEventPublisher eventPublisher;
     private final INotificationPort notificationPort;
     private final IActorReputationPort actorReputationPort;
     private final IMediaStoragePort mediaStoragePort;
     private final IPaymentFreezePort paymentFreezePort;
     private final IBlockchainAuditPort blockchainAuditPort;
+    private final IncidentResolutionEffects resolutionEffects;
 
     /**
      * Escalates the incident, optionally triggering an automated dispute in tnt-dispute-core.
@@ -76,7 +75,8 @@ public class IncidentEscalationService implements IEscalateIncidentUseCase,
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Incident not found")))
                 .flatMap(incident -> {
                     int level = incident.getLastEscalationLevel() + 1;
-                    Incident escalated = incident.escalate(level, command.getTargetRole());
+                    Incident escalated = IncidentAgencyManagementService.transition(
+                            () -> incident.escalate(level, command.getTargetRole()));
 
                     IncidentEscalation escalation = IncidentEscalation.create(
                             incident.getId(), level,
@@ -88,12 +88,13 @@ public class IncidentEscalationService implements IEscalateIncidentUseCase,
                             .flatMap(saved -> logEscalation(saved, command))
                             .flatMap(saved -> {
                                 if (command.isTriggerDispute()) {
-                                    return flagFraudAndTriggerDispute(saved, command);
+                                    return flagFraudAndTriggerDispute(saved, command)
+                                            .flatMap(flagged -> resolveAsTransferredToDispute(flagged,
+                                                    command.getFraudEvidence()));
                                 }
                                 return notifyEscalation(saved, level, command.getTargetActorId())
                                         .thenReturn(saved);
-                            })
-                            .flatMap(saved -> publishEscalated(saved, level));
+                            });
                 });
     }
 
@@ -103,13 +104,12 @@ public class IncidentEscalationService implements IEscalateIncidentUseCase,
     public Mono<Incident> execute(UUID incidentId, UUID closedByActorId) {
         return incidentRepository.findById(incidentId)
                 .flatMap(incident -> {
-                    Incident closed = incident.close();
+                    Incident closed = IncidentAgencyManagementService.transition(incident::close);
                     return incidentRepository.save(closed)
                             .flatMap(saved -> logClosure(saved, closedByActorId))
                             .flatMap(saved -> writeBlockchainClosure(saved))
                             .flatMap(saved -> linkParcelChains(saved))
-                            .flatMap(saved -> archiveEvidence(saved))
-                            .flatMap(saved -> publishClosed(saved));
+                            .flatMap(saved -> archiveEvidence(saved));
                 });
     }
 
@@ -119,7 +119,10 @@ public class IncidentEscalationService implements IEscalateIncidentUseCase,
     public Mono<Incident> execute(UUID incidentId, UUID cancelledByActorId, String reason) {
         return incidentRepository.findById(incidentId)
                 .flatMap(incident -> {
-                    Incident cancelled = incident.cancel(reason);
+                    Incident cancelled = IncidentAgencyManagementService.transition(() -> incident.cancel(reason,
+                            cancelledByActorId != null && cancelledByActorId.equals(incident.getReportedByActorId())
+                                    ? Incident.actorOf(incident.getReportedByRole(), cancelledByActorId)
+                                    : incident.managerActor(cancelledByActorId)));
                     return incidentRepository.save(cancelled)
                             .flatMap(saved -> {
                                 IncidentEventLog log = IncidentEventLog.of(saved.getId(), "INCIDENT_CANCELLED",
@@ -127,30 +130,29 @@ public class IncidentEscalationService implements IEscalateIncidentUseCase,
                                         "{\"reason\":\"" + reason + "\"}");
                                 return eventLogRepository.save(log).thenReturn(saved);
                             })
-                            .flatMap(saved -> paymentFreezePort.unfreezePayment(saved.getMissionId(),
-                                    "Incident cancelled: " + reason).thenReturn(saved))
-                            .flatMap(saved -> publishCancelled(saved, reason));
+                            // D14/D16 back to the memorised state, unfreeze
+                            .flatMap(saved -> resolutionEffects.afterCancelled(saved, reason));
                 });
     }
 
     private Mono<Incident> flagFraudAndTriggerDispute(Incident incident, EscalateIncidentCommand cmd) {
         return actorReputationPort.flagForFraud(incident.getReportedByActorId(),
                 incident.getId(), cmd.getFraudEvidence())
-                .thenReturn(incident)
-                .flatMap(saved -> {
-                    var event = IncidentEscalatedToDisputeEvent.builder()
-                            .eventId(UUID.randomUUID())
-                            .incidentId(saved.getId())
-                            .tenantId(saved.getTenantId())
-                            .missionId(saved.getMissionId())
-                            .agencyId(saved.getAgencyId())
-                            .affectedParcelIds(saved.getAffectedParcelIds())
-                            .fraudReason(cmd.getFraudEvidence())
-                            .trackingCode(saved.getTrackingCode())
-                            .occurredAt(Instant.now())
-                            .build();
-                    return eventPublisher.publish(event).thenReturn(saved);
-                });
+                .thenReturn(incident);
+    }
+
+    /**
+     * QO-15: the dispute takes over; the incident is RESOLVED "transferred to dispute" (outcome DISPUTE: delivery and
+     * money are left to the dispute, nothing unfrozen).
+     */
+    private Mono<Incident> resolveAsTransferredToDispute(Incident escalated, String fraudReason) {
+        return incidentRepository.findById(escalated.getId())
+                .defaultIfEmpty(escalated)
+                .flatMap(current -> incidentRepository.save(current
+                        .recordEscalatedToDispute("transféré en litige", fraudReason)
+                        .resolve(ResolutionMode.MANUAL_ADMIN_OVERRIDE, IncidentDeliveryOutcome.DISPUTE, null,
+                                "transféré en litige", "TRANSFERRED_TO_DISPUTE",
+                                com.yowyob.tiibntick.common.kafka.TntEventActor.system())));
     }
 
     private Mono<Incident> logEscalation(Incident incident, EscalateIncidentCommand command) {
@@ -174,20 +176,6 @@ public class IncidentEscalationService implements IEscalateIncidentUseCase,
                 "Severity: " + incident.getSeverity(), "INCIDENT_ESCALATED", incident.getId(), params);
     }
 
-    private Mono<Incident> publishEscalated(Incident incident, int level) {
-        var event = IncidentEscalatedEvent.builder()
-                .eventId(UUID.randomUUID())
-                .incidentId(incident.getId())
-                .tenantId(incident.getTenantId())
-                .missionId(incident.getMissionId())
-                .agencyId(incident.getAgencyId())
-                .escalationLevel(level)
-                .escalatedToRole(ActorRole.AGENCY_MANAGER)
-                .severity(incident.getSeverity())
-                .occurredAt(Instant.now())
-                .build();
-        return eventPublisher.publish(event).thenReturn(incident);
-    }
 
     private Mono<Incident> logClosure(Incident incident, UUID closedBy) {
         IncidentEventLog log = IncidentEventLog.of(incident.getId(), "INCIDENT_CLOSED",
@@ -215,33 +203,5 @@ public class IncidentEscalationService implements IEscalateIncidentUseCase,
 
     private Mono<Incident> archiveEvidence(Incident incident) {
         return mediaStoragePort.archiveIncidentEvidence(incident.getTenantId(), incident.getId()).thenReturn(incident);
-    }
-
-    private Mono<Incident> publishClosed(Incident incident) {
-        var event = IncidentClosedEvent.builder()
-                .eventId(UUID.randomUUID())
-                .incidentId(incident.getId())
-                .tenantId(incident.getTenantId())
-                .missionId(incident.getMissionId())
-                .agencyId(incident.getAgencyId())
-                .platform(incident.getSourcePlatform())
-                .affectedParcelIds(incident.getAffectedParcelIds())
-                .multiParcel(incident.isMultiParcelIncident())
-                .incidentBlockchainChainId(incident.getOwnBlockchainChainId())
-                .occurredAt(Instant.now())
-                .build();
-        return eventPublisher.publish(event).thenReturn(incident);
-    }
-
-    private Mono<Incident> publishCancelled(Incident incident, String reason) {
-        var event = IncidentCancelledEvent.builder()
-                .eventId(UUID.randomUUID())
-                .incidentId(incident.getId())
-                .tenantId(incident.getTenantId())
-                .missionId(incident.getMissionId())
-                .reason(reason)
-                .occurredAt(Instant.now())
-                .build();
-        return eventPublisher.publish(event).thenReturn(incident);
     }
 }

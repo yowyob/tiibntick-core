@@ -50,4 +50,9 @@ public class LoyaltyAccountRepositoryAdapter implements LoyaltyAccountRepository
     public Mono<Boolean> existsByThirdPartyId(UUID tenantId, UUID thirdPartyId) {
         return r2dbcRepo.existsByTenantIdAndThirdPartyId(tenantId, thirdPartyId);
     }
+
+    @Override
+    public Mono<Boolean> recordTransactionOnce(UUID accountId, int pointsDelta, String type, String externalRef) {
+        return r2dbcRepo.insertTransactionOnce(accountId, pointsDelta, type, externalRef).map(rows -> rows > 0);
+    }
 }

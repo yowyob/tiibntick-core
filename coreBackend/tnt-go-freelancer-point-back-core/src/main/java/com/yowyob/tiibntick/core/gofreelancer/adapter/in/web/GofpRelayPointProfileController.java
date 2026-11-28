@@ -151,17 +151,23 @@ public class GofpRelayPointProfileController {
 
     // ── Writes ────────────────────────────────────────────────────────────
 
-    /** Approval, rejection, suspension: staff only. */
+    /**
+     * Approval, rejection, suspension, reactivation: permission {@code gofp-admin:manage} like the admin routes
+     * {@code /suspend} and {@code /activate} (D-142), through the approval machine and the core hub (D-138, D-139).
+     * 200 with the relay point (also when it already has that status), 403 without the permission, 404 unknown relay
+     * point, 409 transition refused, 400 REVOKED (use the revoke route, which requires a reason).
+     */
     @PatchMapping("/{id}/status")
+    @com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission(resource = "gofp-admin", action = "manage")
     public Mono<ResponseEntity<GofpRelayPoint>> updateStatus(
             @PathVariable UUID id,
-            @RequestParam RelayPointStatus status,
-            @CurrentUser(required = false) TntSecurityContext ctx) {
-        return guard.requireStaff(ctx)
-                .then(Mono.defer(() -> relayPointUseCase.updateStatus(id, status)))
+            @RequestParam RelayPointStatus status) {
+        return Mono.defer(() -> relayPointUseCase.updateStatus(id, status))
                 .map(ResponseEntity::ok)
                 .onErrorResume(IllegalArgumentException.class,
-                        e -> Mono.just(ResponseEntity.notFound().build()));
+                        e -> Mono.just(e.getMessage() != null && e.getMessage().contains("not found")
+                                ? ResponseEntity.notFound().<GofpRelayPoint>build()
+                                : ResponseEntity.badRequest().<GofpRelayPoint>build()));
     }
 
     /** The owner may open or pause their relay point; it is listed to senders only once approved. */
@@ -223,6 +229,7 @@ public class GofpRelayPointProfileController {
                     if (request.getStorageWidth() != null)         rp.setStorageWidth(request.getStorageWidth());
                     if (request.getStorageHeight() != null)        rp.setStorageHeight(request.getStorageHeight());
                     if (request.getStorageDimensionUnit() != null) rp.setStorageDimensionUnit(request.getStorageDimensionUnit());
+                    if (request.getStorageDays() != null)          rp.setStorageDays(request.getStorageDays());
                     return relayPointUseCase.createOrUpdate(rp);
                 })
                 .map(ResponseEntity::ok)

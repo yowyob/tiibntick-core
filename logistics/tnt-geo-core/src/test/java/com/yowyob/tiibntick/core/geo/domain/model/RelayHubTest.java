@@ -23,6 +23,10 @@ class RelayHubTest {
         assertThat(hub.branchId()).isNull();
         assertThat(hub.capacitySlots()).isEqualTo(10);
         assertThat(hub.currentOccupancy()).isZero();
+        // D-138: a new hub waits for its approval before it is proposed
+        assertThat(hub.approvalStatus()).isEqualTo(HubApprovalStatus.PENDING);
+        assertThat(hub.isAvailable()).isFalse();
+        hub.approve();
         assertThat(hub.isAvailable()).isTrue();
     }
 

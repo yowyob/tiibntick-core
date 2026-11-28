@@ -1,15 +1,21 @@
 package com.yowyob.tiibntick.core.gofreelancer.application.service;
 
 import com.yowyob.tiibntick.core.actor.application.port.out.IRelayOperatorRepository;
+import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpNotificationTemplates;
 import com.yowyob.tiibntick.core.actor.domain.model.ActorType;
 import com.yowyob.tiibntick.core.actor.domain.model.KycStatus;
 import com.yowyob.tiibntick.core.actor.application.command.ValidateKycCommand;
 import com.yowyob.tiibntick.core.actor.application.port.in.IValidateKycUseCase;
+import com.yowyob.tiibntick.core.geo.application.port.in.IManageHubApprovalUseCase;
+import com.yowyob.tiibntick.core.geo.application.port.in.IRevokeRelayHubUseCase;
+import com.yowyob.tiibntick.core.geo.domain.exception.RelayHubStateException;
+import com.yowyob.tiibntick.core.geo.domain.model.RelayHub;
 import com.yowyob.tiibntick.core.geo.domain.exception.GeoNotFoundException;
 import com.yowyob.tiibntick.core.geo.domain.model.GeoPoint;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.response.RelayPointDetailsResponse;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.AddressUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.AdminRelayPointUseCase;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.in.RelayPointRevocation;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.EmailPort;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpRelayPointRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IRelayHubPort;
@@ -23,7 +29,9 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
 
 /**
  * Admin lifecycle for GOFP relay points — persists {@link GofpRelayPoint} status,
@@ -44,6 +52,9 @@ public class AdminRelayPointApplicationService implements AdminRelayPointUseCase
     private final FreelancerVehicleApplicationService vehicleApplicationService;
     private final IRelayHubPort relayHubPort;
     private final AddressUseCase addressUseCase;
+    private final IRevokeRelayHubUseCase revokeRelayHubUseCase;
+    private final GofpRelayRevocationApplier revocationApplier;
+    private final IManageHubApprovalUseCase hubApproval;
 
     private static final UUID DEFAULT_TENANT = TenantContextHolder.SYSTEM_TENANT;
 
@@ -68,6 +79,12 @@ public class AdminRelayPointApplicationService implements AdminRelayPointUseCase
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("GofpRelayPoint not found: " + id)));
     }
 
+    /**
+     * Approval (PENDING -> APPROVED) or rejection (PENDING -> REJECTED) of a relay point, same machine as the couriers'
+     * (D-138): asking for the current status again is a no-op, any other status is refused (409). On approval the
+     * core hub is provisioned when missing; with a core hub, the core decides (it is authoritative, D-138) and the
+     * relay point copies the result. An unknown relay point falls back to the legacy KYC by actor id.
+     */
     @Override
     public Mono<Void> validateRelayPoint(UUID id, boolean approved, String reason, String loginUrl) {
         KycStatus newStatus = approved ? KycStatus.VERIFIED : KycStatus.REJECTED;
@@ -76,29 +93,59 @@ public class AdminRelayPointApplicationService implements AdminRelayPointUseCase
                 DEFAULT_TENANT, id, ActorType.RELAY_OPERATOR, newStatus, "admin", reason);
 
         return resolveRelayPoint(id)
-                .flatMap(rp -> updateLocalStatus(rp, rpStatus, approved)
-                        .flatMap(saved -> (approved ? ensureHubProvisioned(saved) : Mono.just(saved)))
-                        .flatMap(saved -> validateKycUseCase.validateKyc(cmd)
-                                .onErrorResume(e -> {
-                                    log.error("KYC validate failed for relay point {} — local status already {}", id, rpStatus, e);
-                                    return Mono.empty();
-                                })
-                                .then(notifyStatusChange(saved, approved
-                                        ? "Compte Point Relais approuvé"
-                                        : "Compte Point Relais rejeté",
-                                        approved
-                                                ? "Votre point relais a été approuvé."
-                                                : "Votre point relais a été rejeté" + (reason != null ? " : " + reason : ""),
-                                        loginUrl,
-                                        approved ? NotifyKind.APPROVED : NotifyKind.REJECTED,
-                                        reason))))
-                .switchIfEmpty(Mono.defer(() ->
+                .map(Optional::of)
+                .defaultIfEmpty(Optional.empty())
+                .flatMap(found -> found.isEmpty()
                         // Fallback: actor-id only (legacy admin flows)
-                        validateKycUseCase.validateKyc(cmd)
+                        ? validateKycUseCase.validateKyc(cmd)
                                 .then(Mono.fromRunnable(() -> {
                                     if (approved) emailPort.sendAccountApproved(id.toString(), loginUrl);
                                     else emailPort.sendAccountRejected(id.toString(), reason, loginUrl);
-                                }))));
+                                }))
+                        : requireTransition(found.get(), RelayPointStatus.PENDING, rpStatus)
+                                .flatMap(rp -> approved
+                                        ? ensureHubProvisioned(rp).flatMap(p -> coreApproval(p,
+                                                hubId -> hubApproval.approve(null, hubId, null)))
+                                        : coreApproval(rp, hubId -> hubApproval.reject(null, hubId, reason, null)))
+                                .flatMap(rp -> updateLocalStatus(rp, rpStatus, approved))
+                                .flatMap(saved -> validateKycUseCase.validateKyc(cmd)
+                                        .onErrorResume(e -> {
+                                            log.error("KYC validate failed for relay point {} — local status already {}", id, rpStatus, e);
+                                            return Mono.empty();
+                                        })
+                                        .then(notifyStatusChange(saved, approved
+                                                ? GofpNotificationTemplates.RELAY_STATUS_APPROVED
+                                                : (reason != null ? GofpNotificationTemplates.RELAY_STATUS_REJECTED_REASON
+                                                        : GofpNotificationTemplates.RELAY_STATUS_REJECTED),
+                                                reason != null ? java.util.Map.<String, Object>of("reason", reason)
+                                                        : java.util.Map.<String, Object>of(),
+                                                loginUrl,
+                                                approved ? NotifyKind.APPROVED : NotifyKind.REJECTED,
+                                                reason)))
+                                .then());
+    }
+
+    /**
+     * D-138: the approval of the core hub is authoritative and the relay point copies it. With a core hub, the change
+     * is made there first; a refusal of the core machine is a 409 for the relay point too. A relay point whose hub is
+     * not (yet) known to the core follows its own machine alone.
+     */
+    private Mono<GofpRelayPoint> coreApproval(GofpRelayPoint rp, Function<UUID, Mono<RelayHub>> change) {
+        UUID hubId = rp.getCoreRelayPointId();
+        if (hubId == null) return Mono.just(rp);
+        return change.apply(hubId)
+                // this flow aligns the relay point itself: GofpRelayApprovalApplier must not do it again
+                .contextWrite(ctx -> ctx.put(GofpRelayApprovalApplier.FROM_GO_ROUTE, Boolean.TRUE))
+                .doOnNext(hub -> log.info("RelayPoint {}: core hub {} approval now {}", rp.getId(), hubId,
+                        hub.approvalStatus()))
+                .thenReturn(rp)
+                .onErrorResume(GeoNotFoundException.class, e -> {
+                    log.warn("RelayPoint {}: hub {} unknown to the core, approval kept on the relay point only",
+                            rp.getId(), hubId);
+                    return Mono.just(rp);
+                })
+                .onErrorMap(RelayHubStateException.class, e -> new RelayPointStatusException(
+                        "Relay point " + rp.getId() + ": the core hub refuses the change (" + e.getMessage() + ")"));
     }
 
     @Override
@@ -106,25 +153,113 @@ public class AdminRelayPointApplicationService implements AdminRelayPointUseCase
         log.info("Suspending RelayPoint {}", id);
         return resolveRelayPoint(id)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("GofpRelayPoint not found: " + id)))
+                .flatMap(rp -> requireTransition(rp, RelayPointStatus.APPROVED, RelayPointStatus.SUSPENDED))
+                .flatMap(rp -> coreApproval(rp, hubId -> hubApproval.suspend(null, hubId, null, null)))
                 .flatMap(rp -> updateLocalStatus(rp, RelayPointStatus.SUSPENDED, false)
                         .flatMap(saved -> syncOperatorStatus(saved.getCoreRelayPointId(), OperatorAction.SUSPEND)
                                 .then(notifyStatusChange(saved,
-                                        "Point Relais suspendu",
-                                        "Votre point relais a été suspendu.",
+                                        GofpNotificationTemplates.RELAY_STATUS_SUSPENDED, java.util.Map.of(),
                                         loginUrl, NotifyKind.SUSPENDED, null))));
     }
 
+    /**
+     * Definitive revocation (decision D-129). With a core hub, the core revokes it ({@link IRevokeRelayHubUseCase}:
+     * status, reason, parcels in custody) and tells its listeners, among which {@link GofpRelayRevocationApplier}
+     * aligns this relay point and notifies its operator. Without a core hub (never provisioned), the relay point is
+     * revoked locally with the same effects; its parcels in custody are then unknown.
+     */
     @Override
-    public Mono<Void> revokeRelayPoint(UUID id, String loginUrl) {
-        log.info("Revoking RelayPoint {}", id);
+    public Mono<RelayPointRevocation> revokeRelayPoint(UUID id, String reason, UUID adminActorId, String loginUrl) {
+        if (reason == null || reason.isBlank()) {
+            return Mono.error(new IllegalArgumentException("a revocation reason is mandatory"));
+        }
+        if (adminActorId == null) {
+            return Mono.error(new IllegalArgumentException("the administrator is mandatory"));
+        }
+        String trimmed = reason.strip();
+        log.info("Revoking RelayPoint {} by {}", id, adminActorId);
         return resolveRelayPoint(id)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("GofpRelayPoint not found: " + id)))
-                .flatMap(rp -> updateLocalStatus(rp, RelayPointStatus.REVOKED, false)
-                        .flatMap(saved -> syncOperatorStatus(saved.getCoreRelayPointId(), OperatorAction.REVOKE)
-                                .then(notifyStatusChange(saved,
-                                        "Point Relais révoqué",
-                                        "Votre point relais a été révoqué.",
-                                        loginUrl, NotifyKind.REVOKED, null))));
+                .flatMap(this::requireRevocable)
+                .flatMap(rp -> {
+                    UUID hubId = rp.getCoreRelayPointId();
+                    Mono<RelayPointRevocation> local = Mono.defer(() -> revocationApplier
+                            .apply(rp, DEFAULT_TENANT, trimmed, loginUrl)
+                            .map(saved -> new RelayPointRevocation(saved.getId(), hubId,
+                                    RelayPointStatus.REVOKED.name(), trimmed, Instant.now(), false, false,
+                                    java.util.List.of())));
+                    if (hubId == null) {
+                        return local;
+                    }
+                    return revokeRelayHubUseCase.revoke(null, hubId, trimmed, adminActorId)
+                            .contextWrite(ctx -> loginUrl == null ? ctx
+                                    : ctx.put(GofpRelayRevocationApplier.LOGIN_URL_CONTEXT_KEY, loginUrl))
+                            .map(r -> new RelayPointRevocation(rp.getId(), hubId, RelayPointStatus.REVOKED.name(),
+                                    r.hub().revocationReason(), r.hub().revokedAt(), true, r.custodyKnown(),
+                                    r.parcelsInCustody()))
+                            .onErrorResume(GeoNotFoundException.class, e -> {
+                                log.warn("RelayPoint {}: hub {} unknown to the core, revoked locally", id, hubId);
+                                return local;
+                            })
+                            .onErrorResume(RelayHubStateException.class, e -> relayHubPort.findHub(hubId, null)
+                                    .flatMap(hub -> {
+                                        if (hub.isRevoked()) {
+                                            // the core hub is already revoked (definitive): align this relay point
+                                            log.warn("RelayPoint {}: hub {} already revoked in the core, aligned locally",
+                                                    id, hubId);
+                                            return local;
+                                        }
+                                        // D-138: the core is authoritative, its refusal stands (409)
+                                        return Mono.<RelayPointRevocation>error(new RelayPointStatusException(
+                                                "Relay point " + id + ": the core hub is " + hub.approvalStatus()
+                                                        + ", it cannot be revoked (D-135)"));
+                                    }));
+                });
+    }
+
+    /**
+     * Same machine as the couriers' (decision D-135, {@code DeliveryPersonStatus}): only an APPROVED or SUSPENDED
+     * relay point can be revoked; a PENDING one is rejected instead; REJECTED and REVOKED are final.
+     */
+    private Mono<GofpRelayPoint> requireRevocable(GofpRelayPoint rp) {
+        if (rp.getStatus() == RelayPointStatus.REVOKED) return Mono.error(new RelayPointRevokedException(rp.getId()));
+        if (rp.getStatus() != RelayPointStatus.APPROVED && rp.getStatus() != RelayPointStatus.SUSPENDED) {
+            return Mono.error(new RelayPointStatusException("Relay point " + rp.getId() + " is " + rp.getStatus()
+                    + ": only an APPROVED or SUSPENDED relay point can be revoked (a PENDING one is rejected, D-135)"));
+        }
+        return Mono.just(rp);
+    }
+
+    /**
+     * Suspension and reactivation follow the couriers' machine ({@code DeliveryPersonStatus}): APPROVED -> SUSPENDED
+     * and SUSPENDED -> APPROVED only. Asking for the current status again is a no-op (empty: nothing written, nobody
+     * notified); any other status is refused (409) — a PENDING relay point is validated, not activated.
+     */
+    private Mono<GofpRelayPoint> requireTransition(GofpRelayPoint rp, RelayPointStatus from, RelayPointStatus to) {
+        if (rp.getStatus() == RelayPointStatus.REVOKED) return Mono.error(new RelayPointRevokedException(rp.getId()));
+        if (rp.getStatus() == to) {
+            log.info("RelayPoint {} already {}: nothing to do", rp.getId(), to);
+            return Mono.empty();
+        }
+        if (rp.getStatus() != from) {
+            return Mono.error(new RelayPointStatusException("Relay point " + rp.getId() + " is " + rp.getStatus()
+                    + ": only a " + from + " relay point can become " + to));
+        }
+        return Mono.just(rp);
+    }
+
+    /** An admin transition refused by the relay point's status (409). */
+    public static class RelayPointStatusException extends IllegalStateException {
+        public RelayPointStatusException(String message) {
+            super(message);
+        }
+    }
+
+    /** A change requested on a revoked relay point (409). */
+    public static class RelayPointRevokedException extends RelayPointStatusException {
+        public RelayPointRevokedException(UUID id) {
+            super("Relay point " + id + " is revoked: the revocation is definitive");
+        }
     }
 
     @Override
@@ -132,12 +267,33 @@ public class AdminRelayPointApplicationService implements AdminRelayPointUseCase
         log.info("Activating RelayPoint {}", id);
         return resolveRelayPoint(id)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("GofpRelayPoint not found: " + id)))
+                .flatMap(rp -> requireTransition(rp, RelayPointStatus.SUSPENDED, RelayPointStatus.APPROVED))
+                .flatMap(rp -> coreApproval(rp, hubId -> hubApproval.reactivate(null, hubId, null)))
                 .flatMap(rp -> updateLocalStatus(rp, RelayPointStatus.APPROVED, true)
                         .flatMap(saved -> syncOperatorStatus(saved.getCoreRelayPointId(), OperatorAction.ACTIVATE)
                                 .then(notifyStatusChange(saved,
-                                        "Point Relais activé",
-                                        "Votre point relais est à nouveau actif.",
+                                        GofpNotificationTemplates.RELAY_STATUS_REACTIVATED, java.util.Map.of(),
                                         loginUrl, NotifyKind.APPROVED, null))));
+    }
+
+    @Override
+    public Mono<Void> changeStatus(UUID id, RelayPointStatus target, String reason, String loginUrl) {
+        if (target == null) return Mono.error(new IllegalArgumentException("a target status is mandatory"));
+        return switch (target) {
+            case APPROVED -> resolveRelayPoint(id)
+                    .switchIfEmpty(Mono.error(new IllegalArgumentException("GofpRelayPoint not found: " + id)))
+                    .flatMap(rp -> rp.getStatus() == RelayPointStatus.SUSPENDED
+                            ? activateRelayPoint(id, loginUrl)
+                            : validateRelayPoint(id, true, null, loginUrl));
+            case REJECTED -> resolveRelayPoint(id)
+                    .switchIfEmpty(Mono.error(new IllegalArgumentException("GofpRelayPoint not found: " + id)))
+                    .flatMap(rp -> validateRelayPoint(id, false, reason, loginUrl));
+            case SUSPENDED -> suspendRelayPoint(id, loginUrl);
+            case PENDING -> Mono.error(new RelayPointStatusException(
+                    "Relay point " + id + ": no transition leads back to PENDING"));
+            case REVOKED -> Mono.error(new IllegalArgumentException(
+                    "a revocation needs a reason: PUT /api/v1/admin/tnt-go-freelancer/relay-points/{id}/revoke"));
+        };
     }
 
     // ── helpers ────────────────────────────────────────────────────────────
@@ -146,13 +302,17 @@ public class AdminRelayPointApplicationService implements AdminRelayPointUseCase
      * The approval path of {@link #validateRelayPoint} for a relay point registered by its owner
      * while manual approval is suspended ({@code tnt.gofp.relay.auto-approve}): APPROVED and active,
      * geo hub provisioned, KYC VERIFIED. No e-mail or push: nothing to announce, and a failed
-     * notification must never block a registration. Hub and KYC are best-effort, as on approval.
+     * notification must never block a registration. KYC is best-effort, as on approval.
+     * <p>Same machine as a staff approval (D-138): the core hub is approved first (it is authoritative and
+     * the relay point copies it), so that the relay is a proposable destination at once (D-144).
      */
     public Mono<GofpRelayPoint> approveOnRegistration(GofpRelayPoint rp) {
         ValidateKycCommand cmd = new ValidateKycCommand(DEFAULT_TENANT, rp.getId(), ActorType.RELAY_OPERATOR,
                 KycStatus.VERIFIED, "auto-approve", "manual approval suspended until the admin platform exists");
-        return updateLocalStatus(rp, RelayPointStatus.APPROVED, true)
-                .flatMap(saved -> ensureHubProvisioned(saved).defaultIfEmpty(saved))
+        return requireTransition(rp, RelayPointStatus.PENDING, RelayPointStatus.APPROVED)
+                .flatMap(pending -> ensureHubProvisioned(pending).defaultIfEmpty(pending))
+                .flatMap(p -> coreApproval(p, hubId -> hubApproval.approve(null, hubId, null)))
+                .flatMap(p -> updateLocalStatus(p, RelayPointStatus.APPROVED, true))
                 .flatMap(saved -> validateKycUseCase.validateKyc(cmd)
                         .onErrorResume(e -> {
                             log.warn("KYC auto-validation failed for relay point {} — relay point already APPROVED: {}",
@@ -218,11 +378,12 @@ public class AdminRelayPointApplicationService implements AdminRelayPointUseCase
                     String cityCode = address.getCity() != null ? address.getCity() : "UNKNOWN";
                     int capacity = rp.getMaxDeposits() != null && rp.getMaxDeposits() > 0
                             ? rp.getMaxDeposits() : 10;
-                    String operatorActorId = rp.getCoreFreelancerId() != null
-                            ? rp.getCoreFreelancerId().toString() : null;
-
-                    return relayHubPort.provisionHub(DEFAULT_TENANT, point, rp.getName(), cityCode,
-                                    capacity, operatorActorId)
+                    // H1: the hub's operator is the owner's actor (freelancer's core user), never a profile id.
+                    return revocationApplier.operatorActor(DEFAULT_TENANT, rp)
+                            .map(UUID::toString)
+                            .defaultIfEmpty("")
+                            .flatMap(operatorActorId -> relayHubPort.provisionHub(DEFAULT_TENANT, point, rp.getName(),
+                                    cityCode, capacity, operatorActorId.isEmpty() ? null : operatorActorId))
                             .flatMap(hub -> {
                                 rp.setCoreRelayPointId(hub.id());
                                 rp.setUpdatedAt(Instant.now());
@@ -267,7 +428,8 @@ public class AdminRelayPointApplicationService implements AdminRelayPointUseCase
 
     private enum NotifyKind { APPROVED, REJECTED, SUSPENDED, REVOKED }
 
-    private Mono<Void> notifyStatusChange(GofpRelayPoint rp, String title, String message,
+    private Mono<Void> notifyStatusChange(GofpRelayPoint rp, String pushTemplateKey,
+                                          java.util.Map<String, Object> pushParams,
                                           String loginUrl, NotifyKind kind, String reason) {
         String email = rp.getOwnerEmail() != null ? rp.getOwnerEmail() : rp.getId().toString();
         Mono<Void> emailMono = Mono.fromRunnable(() -> {
@@ -279,12 +441,15 @@ public class AdminRelayPointApplicationService implements AdminRelayPointUseCase
             }
         });
 
-        Mono<Void> pushMono = Mono.empty();
-        if (rp.getCoreFreelancerId() != null) {
-            pushMono = pushNotificationPort.sendPushNotification(rp.getCoreFreelancerId(), title, message)
-                    .doOnError(e -> log.error("Push notify failed for relay point {}", rp.getId(), e))
-                    .onErrorResume(e -> Mono.empty());
-        }
+        // H1: the in-app notification goes to the operator's actor (relay operator profile, else the owner
+        // freelancer's core user), never to the freelancer profile id.
+        Mono<Void> pushMono = revocationApplier.operatorActor(DEFAULT_TENANT, rp)
+                .flatMap(actor -> pushNotificationPort.sendLocalized(actor, pushTemplateKey, pushParams))
+                .switchIfEmpty(Mono.fromRunnable(() ->
+                        log.warn("Relay point {}: no operator actor found, in-app notification not sent", rp.getId())))
+                .doOnError(e -> log.error("Push notify failed for relay point {}", rp.getId(), e))
+                .onErrorResume(e -> Mono.empty())
+                .then();
         return Mono.when(emailMono, pushMono);
     }
 

@@ -3,9 +3,12 @@ package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web;
 import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpFreelancerRepository;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.kafka.consumer.MatchingNotificationConsumer;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.kafka.event.MatchingNotificationEvent;
+import com.yowyob.tiibntick.core.gofreelancer.adapter.out.notification.InMemoryUserNotificationBus;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.notification.NotificationStreamAdapter;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.buffer.DataBuffer;
@@ -61,7 +64,11 @@ class NotificationStreamControllerSseContractTest {
     }
 
     private static String streamOneEvent(boolean appCodecs) {
-        NotificationStreamAdapter stream = new NotificationStreamAdapter();
+        InMemoryUserNotificationBus bus = new InMemoryUserNotificationBus();
+        GofpFreelancerRepository freelancers = org.mockito.Mockito.mock(GofpFreelancerRepository.class);
+        org.mockito.Mockito.when(freelancers.findById(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(reactor.core.publisher.Mono.empty());
+        NotificationStreamAdapter stream = new NotificationStreamAdapter(bus, bus, freelancers, new ObjectMapper());
         MatchingNotificationConsumer consumer = new MatchingNotificationConsumer(stream);
         NotificationStreamController controller = new NotificationStreamController(stream, ALLOW_ALL);
 

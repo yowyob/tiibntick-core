@@ -10,5 +10,5 @@ import java.util.UUID;
  * @author MANFOUO Braun
  */
 public interface ReleaseFreelancerVehicleFromMissionUseCase {
-    Mono<FreelancerVehicle> releaseFromMission(UUID vehicleId, String missionId);
+    Mono<FreelancerVehicle> releaseFromDelivery(UUID vehicleId, String deliveryId);
 }

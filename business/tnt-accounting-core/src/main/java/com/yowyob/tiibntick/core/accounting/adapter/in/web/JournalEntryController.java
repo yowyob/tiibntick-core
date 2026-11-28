@@ -41,17 +41,11 @@ public class JournalEntryController {
             @RequestHeader("X-Organization-Id") UUID organizationId,
             @RequestHeader("X-User-Id") String userId,
             @Valid @RequestBody PostJournalEntryRequest req) {
-        List<JournalEntryLineCommand> lines = req.lines().stream()
-                .map(l -> new JournalEntryLineCommand(l.accountId(), l.accountCode(), l.label(),
-                        l.debitAmount() != null ? l.debitAmount() : java.math.BigDecimal.ZERO,
-                        l.creditAmount() != null ? l.creditAmount() : java.math.BigDecimal.ZERO,
-                        l.currency()))
-                .toList();
-        PostJournalEntryCommand cmd = new PostJournalEntryCommand(
-                currentUser.tenantId(), organizationId, req.type(), req.referenceType(), req.referenceId(),
-                lines, req.description(), userId);
-        return service.postJournalEntry(cmd)
-                .map(e -> ResponseEntity.status(HttpStatus.CREATED).body(JournalEntryResponse.from(e)));
+        // lot L6 (QO-21): the local journal is read-only; the books are written in the Kernel accounting service
+        // (/api/accounting-service/entries) — the tables are dropped later, after the maintainer's explicit approval
+        return Mono.error(new org.springframework.web.server.ResponseStatusException(HttpStatus.GONE,
+                "ACCOUNTING_JOURNAL_READ_ONLY: the local journal is no longer written; entries are booked in the "
+                        + "Kernel accounting service"));
     }
 
     @GetMapping("/{journalEntryId}")

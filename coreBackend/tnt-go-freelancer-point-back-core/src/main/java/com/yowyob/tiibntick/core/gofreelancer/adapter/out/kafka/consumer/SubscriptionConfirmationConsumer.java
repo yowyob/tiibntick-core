@@ -1,6 +1,7 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.out.kafka.consumer;
 
 import com.yowyob.tiibntick.common.kafka.TntTopics;
+import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpNotificationTemplates;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.out.kafka.event.SubscriptionAttemptEvent;
 import com.yowyob.tiibntick.core.gofreelancer.application.service.FreelancerQuotaService;
 import com.yowyob.tiibntick.core.gofreelancer.application.service.FreelancerVehicleApplicationService;
@@ -9,7 +10,7 @@ import com.yowyob.tiibntick.core.gofreelancer.application.usecase.TopsisRankingU
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.AnnouncementSubscription;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.FreelancerVehicle;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpFreelancer;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.announcement.AnnouncementStatus;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.AnnouncementStatus;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IAnnouncementRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.AnnouncementSubscriptionRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepository;
@@ -19,6 +20,7 @@ import com.yowyob.tiibntick.core.gofreelancer.adapter.out.persistence.repository
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
+import com.yowyob.tiibntick.common.kafka.ReactiveListenerSupport;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
@@ -57,18 +59,19 @@ public class SubscriptionConfirmationConsumer {
     private final FreelancerQuotaService quotaService;
     private final TopsisRankingUseCase topsisRankingUseCase;
     private final PushNotificationPort pushNotificationPort;
+    private final ReactiveListenerSupport listenerSupport;
 
     // ── Kafka consumer ────────────────────────────────────────────────────────
 
-    @KafkaListener(topics = TntTopics.GOFP_SUBSCRIPTION_ATTEMPTS, groupId = "tnt-go-freelancer-core-subscription-group")
+    @KafkaListener(topics = TntTopics.GOFP_SUBSCRIPTION_ATTEMPTS, groupId = "tnt-go-freelancer-core-subscription-group",
+            containerFactory = "gofpJsonKafkaListenerContainerFactory")
     public void consumeSubscriptionAttempt(SubscriptionAttemptEvent event) {
         log.info("[SubConfirm] Subscription attempt — announcementId={} freelancerId={}",
                 event.getAnnouncementId(), event.getFreelancerId());
 
-        process(event)
-                .doOnError(e -> log.error("[SubConfirm] Error processing subscription attempt for announcement {}: {}",
-                        event.getAnnouncementId(), e.getMessage(), e))
-                .subscribe();
+        // Lot L7 (spec §3.10): awaited on the container thread; a failure reaches the container (retries, then
+        // tnt.dlq) instead of being lost in a detached subscription.
+        listenerSupport.await(process(event));
     }
 
     // ── Processing pipeline ───────────────────────────────────────────────────
@@ -118,10 +121,8 @@ public class SubscriptionConfirmationConsumer {
                                                     .doOnSuccess(saved -> log.info(
                                                             "[SubConfirm] Subscription REGISTERED — freelancer {} → announcement {}",
                                                             freelancerId, announcementId))
-                                                    .onErrorResume(DuplicateKeyException.class, e -> {
-                                                        log.info("[SubConfirm] Duplicate subscription (race condition) — ignoring");
-                                                        return Mono.empty();
-                                                    })
+                                                    .onErrorResume(DuplicateKeyException.class,
+                                                            e -> alreadyRegistered(announcementId, freelancerId))
                                                     // 5. Re-rank all subscribers and notify client
                                                     .flatMap(saved -> rerankAndNotifyClient(
                                                             announcementId,
@@ -179,25 +180,25 @@ public class SubscriptionConfirmationConsumer {
                                         .reduce((a, b) -> a + ", " + b)
                                         .orElse("none");
 
-                                String typeInfo = requiredVehicleType != null
-                                        ? " (filtre véhicule : " + requiredVehicleType + ")" : "";
-
-                                String message = ranked.size()
-                                        + " livreur(s) ont candidaté pour votre annonce"
-                                        + typeInfo
-                                        + ". Classement actuel (meilleur en premier) : "
-                                        + rankedIds
-                                        + ". Consultez la liste pour choisir.";
+                                int candidateCount = ranked.size();
 
                                 if (clientId == null) {
                                     log.warn("[SubConfirm] Announcement {} has no clientId — cannot notify", announcementId);
                                     return Mono.empty();
                                 }
 
-                                return pushNotificationPort.sendPushNotification(
+                                java.util.Map<String, Object> params = new java.util.HashMap<>();
+                                params.put("count", candidateCount);
+                                params.put("ranking", rankedIds);
+                                if (requiredVehicleType != null) {
+                                    params.put("vehicleType", String.valueOf(requiredVehicleType));
+                                }
+                                return pushNotificationPort.sendLocalized(
                                         clientId,
-                                        "Nouveau candidat pour votre annonce",
-                                        message);
+                                        requiredVehicleType != null
+                                                ? GofpNotificationTemplates.ANNOUNCEMENT_NEW_CANDIDATES_FILTERED
+                                                : GofpNotificationTemplates.ANNOUNCEMENT_NEW_CANDIDATES,
+                                        params);
                             });
                 });
     }
@@ -262,10 +263,17 @@ public class SubscriptionConfirmationConsumer {
                             .vehicleType(null) // resolved when tnt-resource-core client is wired
                             .availableTrunkVolumeM3(available)
                             .build();
-                })
-                .onErrorResume(e -> {
-                    log.warn("[SubConfirm] Could not build candidate for freelancer {}: {}", freelancerId, e.getMessage());
-                    return Mono.empty();
                 });
+    }
+
+    /**
+     * A concurrent attempt registered the same (announcement, freelancer) pair first (unique key): the subscription
+     * exists, which is the intended outcome, and that attempt re-ranks the candidates. Only this typed duplicate is
+     * absorbed; every other error reaches the listener container.
+     */
+    private Mono<AnnouncementSubscription> alreadyRegistered(UUID announcementId, UUID freelancerId) {
+        log.info("[SubConfirm] Duplicate subscription (race condition) freelancer {} -> announcement {} — ignored",
+                freelancerId, announcementId);
+        return Mono.empty();
     }
 }

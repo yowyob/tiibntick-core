@@ -45,6 +45,16 @@
             <groupId>com.yowyob.tiibntick.core</groupId>
             <artifactId>tnt-common-core</artifactId>
         </dependency>
+        <!-- tnt-auth-core: @CurrentUser (administrator of a hub revocation, D-129) -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-auth-core</artifactId>
+        </dependency>
+        <!-- tnt-roles-core: @RequirePermission relay:revoke (D-129) -->
+        <dependency>
+            <groupId>com.yowyob.tiibntick.core</groupId>
+            <artifactId>tnt-roles-core</artifactId>
+        </dependency>
 
         <!-- Reactive web + WebClient (for Nominatim / OpenMeteo) -->
         <dependency>

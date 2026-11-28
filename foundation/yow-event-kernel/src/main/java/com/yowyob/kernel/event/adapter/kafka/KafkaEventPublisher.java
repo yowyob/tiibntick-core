@@ -28,6 +28,8 @@ import java.util.concurrent.CompletableFuture;
  *
  * <p><strong>Headers injected:</strong>
  * <ul>
+ *   <li>{@code X-Yow-Event-Id} — event identifier (= envelope id, {@link DomainEventEnvelope#getEventId()}),
+ *       copied in the {@code eventId} field of an aggregate event body</li>
  *   <li>{@code X-Yow-Envelope-Id} — unique envelope identifier</li>
  *   <li>{@code X-Yow-Correlation-Id} — business correlation ID</li>
  *   <li>{@code X-Yow-Solution-Code} — originating solution (e.g. {@code TNT})</li>
@@ -45,6 +47,7 @@ public class KafkaEventPublisher implements KafkaPublisherPort {
     private static final Logger log = LoggerFactory.getLogger(KafkaEventPublisher.class);
 
     // Header name constants — kept as package-private for use in tests
+    static final String HEADER_EVENT_ID         = "X-Yow-Event-Id";
     static final String HEADER_ENVELOPE_ID      = "X-Yow-Envelope-Id";
     static final String HEADER_CORRELATION_ID   = "X-Yow-Correlation-Id";
     static final String HEADER_SOLUTION_CODE    = "X-Yow-Solution-Code";
@@ -106,6 +109,7 @@ public class KafkaEventPublisher implements KafkaPublisherPort {
         RecordHeaders headers = new RecordHeaders();
 
         // Standard Yowyob headers
+        addHeader(headers, HEADER_EVENT_ID,       envelope.getEventId());
         addHeader(headers, HEADER_ENVELOPE_ID,    envelope.getId().value());
         addHeader(headers, HEADER_CORRELATION_ID, envelope.getCorrelationId());
         addHeader(headers, HEADER_SOLUTION_CODE,  envelope.getSolutionCode());

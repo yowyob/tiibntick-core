@@ -19,14 +19,14 @@ public class ResourceCoreProperties {
     public void setMaintenance(Maintenance maintenance) { this.maintenance = maintenance; }
 
     public static class Kafka {
-        private String vehicleRegisteredTopic = "tnt.resource.vehicle.registered";
-        private String vehicleAssignedTopic = "tnt.resource.vehicle.assigned";
-        private String vehicleUnassignedTopic = "tnt.resource.vehicle.unassigned";
-        private String vehicleMaintenanceTopic = "tnt.resource.vehicle.maintenance";
-        private String vehicleRetiredTopic = "tnt.resource.vehicle.retired";
-        private String vehicleLocationTopic = "tnt.resource.vehicle.location";
-        private String maintenanceAlertTopic = "tnt.resource.maintenance.alert";
-        private String equipmentAssignedTopic = "tnt.resource.equipment.assigned";
+        private String vehicleRegisteredTopic = com.yowyob.tiibntick.common.kafka.TntTopics.RESOURCE_VEHICLE_REGISTERED;
+        private String vehicleAssignedTopic = com.yowyob.tiibntick.common.kafka.TntTopics.RESOURCE_VEHICLE_ASSIGNED;
+        private String vehicleUnassignedTopic = com.yowyob.tiibntick.common.kafka.TntTopics.RESOURCE_VEHICLE_UNASSIGNED;
+        private String vehicleMaintenanceTopic = com.yowyob.tiibntick.common.kafka.TntTopics.RESOURCE_VEHICLE_MAINTENANCE;
+        private String vehicleRetiredTopic = com.yowyob.tiibntick.common.kafka.TntTopics.RESOURCE_VEHICLE_RETIRED;
+        private String vehicleLocationTopic = com.yowyob.tiibntick.common.kafka.TntTopics.RESOURCE_VEHICLE_LOCATION;
+        private String maintenanceAlertTopic = com.yowyob.tiibntick.common.kafka.TntTopics.RESOURCE_MAINTENANCE_ALERT;
+        private String equipmentAssignedTopic = com.yowyob.tiibntick.common.kafka.TntTopics.RESOURCE_EQUIPMENT_ASSIGNED;
 
         public String getVehicleRegisteredTopic() { return vehicleRegisteredTopic; }
         public void setVehicleRegisteredTopic(String vehicleRegisteredTopic) { this.vehicleRegisteredTopic = vehicleRegisteredTopic; }

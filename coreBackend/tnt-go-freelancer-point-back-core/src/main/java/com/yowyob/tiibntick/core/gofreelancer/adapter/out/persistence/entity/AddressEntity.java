@@ -1,71 +1,38 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.out.persistence.entity;
 
-import org.springframework.data.annotation.Id;
-import org.springframework.data.annotation.Transient;
-import org.springframework.data.domain.Persistable;
-import com.yowyob.tiibntick.common.persistence.TntPersistableEntity;
-import org.springframework.data.relational.core.mapping.Column;
-import org.springframework.data.relational.core.mapping.Table;
-import lombok.Data;
-import lombok.Builder;
-import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.util.UUID;
 
 /**
- * Entité de persistance pour les adresses physiques.
- * Mappe le Value Object Address du Core vers la table 'addresses'.
+ * Address as the Go-Freelancer services read it: a plain read model of the core address
+ * ({@code tnt-geo-core}, {@code IManageAddressUseCase}). It is <strong>not</strong> persisted by this module any
+ * more (the former {@code addresses} table was migrated to {@code tnt_geography.tnt_addresses} with the same ids);
+ * the name is kept so that the services that read addresses by id keep compiling unchanged.
+ *
+ * <p>{@code landmark} is the core's landmark, {@code quarter} the core's district.
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Table("addresses")
-public class AddressEntity implements Persistable<UUID>, TntPersistableEntity {
-    @Transient @Builder.Default private boolean isNew = true;
+public class AddressEntity {
 
-    @Override
-    public boolean isNew() { return isNew; }
-
-    @Override
-    public void markNotNew() { this.isNew = false; }
-
-
-    @Id
-    @Column("id")
     private UUID id;
 
-    // Le type peut être null si c'est une adresse générique,
-    // ou "HOME", "WORK" etc. si défini par l'utilisateur.
-    @Column("type")
+    /** Usage label of the address ("PRIMARY", "HOME"...): the label of its link, not a property of the address. */
     private String type;
 
-    @Column("street")
     private String street;
-
-    /** Mapped to legacy {@code description} column (human landmark / free text). */
-    @Column("description")
     private String landmark;
-
-    /** Mapped to legacy {@code district} column (quarter / neighborhood). */
-    @Column("district")
     private String quarter;
-
-    @Column("city")
     private String city;
-
-    @Column("region")
     private String region;
-
-    @Column("country")
     private String country;
-
-    @Column("postal_code")
     private String postalCode;
-
-    @Column("latitude")
     private Double latitude;
-
-    @Column("longitude")
     private Double longitude;
 }

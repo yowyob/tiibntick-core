@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="
+           http://www.liquibase.org/xml/ns/dbchangelog
+           http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.23.xsd">
+
+    <changeSet id="gdd-l4-410-addresses-to-core" author="gdd-l4" labels="gdd-l4">
+        <comment>Copy addresses to the core address book, same ids.</comment>
+        <sqlFile path="db/changelog/20261124_gdd_l4_410_addresses_to_core.sql" relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="gdd-l4-411-address-links-to-core" author="gdd-l4" labels="gdd-l4">
+        <comment>Copy person_addresses to the core address links.</comment>
+        <sqlFile path="db/changelog/20261124_gdd_l4_411_address_links_to_core.sql" relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="gdd-l4-412-relay-deposits-to-inventory" author="gdd-l4" labels="gdd-l4">
+        <comment>Relay deposits become inventory hub package entries (owner, fees, same id when copied).</comment>
+        <sqlFile path="db/changelog/20261125_gdd_l4_412_relay_deposits_to_inventory.sql" relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="gdd-l4-413-relay-hub-occupancy" author="gdd-l4" labels="gdd-l4">
+        <comment>Recompute the occupancy of the Go-Freelancer relay hubs from their active inventory entries.</comment>
+        <sqlFile path="db/changelog/20261125_gdd_l4_413_relay_hub_occupancy.sql" relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="gdd-l4-414-payments-to-settlements" author="gdd-l4" labels="gdd-l4">
+        <comment>Copy the PAID rows of the legacy payments table, if any, to billing settlements.</comment>
+        <sqlFile path="db/changelog/20261125_gdd_l4_414_payments_to_settlements.sql" relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="gdd-l4-415-drop-address-foreign-keys" author="gdd-l4" labels="gdd-l4">
+        <comment>Drop every foreign key to the legacy addresses table: address ids now live in the core address book.</comment>
+        <sqlFile path="db/changelog/20261125_gdd_l4_415_drop_address_foreign_keys.sql" relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="gdd-l4-416-startup-jobs" author="gdd-l4" labels="gdd-l4">
+        <comment>Run-once registry of the startup jobs (legacy pricing backfill).</comment>
+        <sqlFile path="db/changelog/20261125_gdd_l4_416_startup_jobs.sql" relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
+    <!-- Correction after the integration of lots L3/L4, maintainer decision D-128 (2026-11-26): 411 and 412 stay as
+         published; this changeset converts their legacy owner ids to core actor ids. -->
+    <changeSet id="gdd-l4-417-legacy-owners-to-actor-ids" author="gdd-l4" labels="gdd-l4,gdd-l4-owners">
+        <comment>Owners of the migrated address links and relay deposits converted from the legacy Go ids to core actor ids (D-128); rows without correspondence counted, left as is.</comment>
+        <sqlFile path="db/changelog/20261126_gdd_l4_417_legacy_owners_to_actor_ids.sql" relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
+    <!-- Maintainer decision D-134 (2026-11-26, "Orphelins D-128 -> Supprimer"): DESTRUCTIVE, explicitly decided.
+         The address links copied from person_addresses that gdd-l4-417 could not attach safely to an actor are
+         deleted. Relay deposit entries still on a legacy id are only counted. Labelled gdd-l4-owners too, so that a
+         "!gdd-l4-owners" upgrade never runs it before gdd-l4-417. -->
+    <changeSet id="gdd-l4-420-delete-orphan-address-links" author="gdd-l4" labels="gdd-l4,gdd-l4-owners,gdd-l4-orphans">
+        <comment>Delete the migrated address links without a safe actor owner (D-134, destructive, decided); orphan relay deposit entries counted, kept.</comment>
+        <sqlFile path="db/changelog/20261126_gdd_l4_420_delete_orphan_address_links.sql" relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
+    <!-- Maintainer decision D-138 (2026-11-26): the hub approval lives in geo-core (gdd-l4-421, which runs before this
+         changelog); the hubs already backing a Go relay point take the relay point's status. -->
+    <changeSet id="gdd-l4-422-relay-hub-approval-from-relay-points" author="gdd-l4" labels="gdd-l4,gdd-l4-approval">
+        <comment>Initial approval of the hubs backing a Go relay point copied from its status (D-138); ambiguous hubs and relay points without hub counted.</comment>
+        <sqlFile path="db/changelog/20261126_gdd_l4_422_relay_hub_approval_from_relay_points.sql" relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+
+</databaseChangeLog>

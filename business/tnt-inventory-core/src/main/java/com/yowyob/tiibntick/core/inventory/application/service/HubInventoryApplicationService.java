@@ -2,15 +2,15 @@ package com.yowyob.tiibntick.core.inventory.application.service;
 
 import com.yowyob.tiibntick.core.inventory.application.port.in.DepositHubPackageCommand;
 import com.yowyob.tiibntick.core.inventory.application.port.in.DepositHubPackageUseCase;
+import com.yowyob.tiibntick.core.inventory.application.port.in.FindHubPackagesUseCase;
 import com.yowyob.tiibntick.core.inventory.application.port.in.FindOverduePackagesUseCase;
 import com.yowyob.tiibntick.core.inventory.application.port.in.GetHubOccupancyUseCase;
 import com.yowyob.tiibntick.core.inventory.application.port.in.PickupHubPackageUseCase;
 import com.yowyob.tiibntick.core.inventory.application.port.out.HubPackageEntryRepository;
-import com.yowyob.tiibntick.core.inventory.application.port.out.InventoryEventPublisherPort;
-import com.yowyob.tiibntick.core.inventory.domain.event.PackageDepositedEvent;
-import com.yowyob.tiibntick.core.inventory.domain.event.PackagePickedUpEvent;
 import com.yowyob.tiibntick.core.inventory.domain.exception.HubPackageNotFoundException;
 import com.yowyob.tiibntick.core.inventory.domain.model.HubPackageEntry;
+import com.yowyob.tiibntick.core.geo.application.port.in.ICheckHubAcceptsDepositsUseCase;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
@@ -23,7 +23,8 @@ import java.util.UUID;
  *
  * Manages the full lifecycle of packages deposited at relay hubs:
  * deposit, pickup confirmation, overdue detection, and occupancy monitoring.
- * All major operations emit Kafka events for TiiBnTick Trust blockchain anchoring.
+ * Lot L8: no Kafka event of its own any more — the parcel's entry into and exit from a relay hub are its
+ * {@code tnt.parcel.events} transitions (delivery-core).
  *
  * @author MANFOUO Braun.
  */
@@ -32,41 +33,57 @@ public class HubInventoryApplicationService implements
         DepositHubPackageUseCase,
         PickupHubPackageUseCase,
         GetHubOccupancyUseCase,
-        FindOverduePackagesUseCase {
+        FindOverduePackagesUseCase,
+        FindHubPackagesUseCase {
 
     private final HubPackageEntryRepository hubPackageRepository;
-    private final InventoryEventPublisherPort eventPublisher;
 
-    public HubInventoryApplicationService(HubPackageEntryRepository hubPackageRepository,
-                                           InventoryEventPublisherPort eventPublisher) {
+    /**
+     * Approval of the hub in geo-core (D-140): a hub that is not APPROVED refuses every new deposit. Optional so the
+     * service still builds without geo-core (tests, other assemblies); a hub unknown to geo-core is not governed.
+     */
+    private ICheckHubAcceptsDepositsUseCase hubDepositGuard;
+
+    public HubInventoryApplicationService(HubPackageEntryRepository hubPackageRepository) {
         this.hubPackageRepository = hubPackageRepository;
-        this.eventPublisher = eventPublisher;
     }
 
+    @Autowired(required = false)
+    public void setHubDepositGuard(ICheckHubAcceptsDepositsUseCase hubDepositGuard) {
+        this.hubDepositGuard = hubDepositGuard;
+    }
+
+    /**
+     * Records a new deposit, refused (409, {@code RelayHubStateException}) when the hub is pending, suspended,
+     * rejected or revoked (D-140). Pick-ups are never refused: parcels already held leave until the end of their
+     * storage period. Their return at the end of that period is row D12 of delivery-core
+     * ({@code RelayStorageService.expireStorage}), the only return path; {@link #findOverduePackages} only reads.
+     */
     @Transactional
     @Override
     public Mono<HubPackageEntry> depositPackage(DepositHubPackageCommand cmd) {
+        Mono<Void> guard = hubDepositGuard == null ? Mono.empty() : hubDepositGuard.requireAcceptsDeposits(cmd.hubId());
+        return guard.then(Mono.defer(() -> save(cmd)));
+    }
+
+    private Mono<HubPackageEntry> save(DepositHubPackageCommand cmd) {
         HubPackageEntry entry = HubPackageEntry.deposit(
                 cmd.tenantId(), cmd.hubId(), cmd.packageId(), cmd.trackingCode(),
-                cmd.storageLocation(), cmd.depositedByActorId(), cmd.recipientPhone());
-        return hubPackageRepository.save(entry)
-                .flatMap(saved -> eventPublisher.publishPackageDeposited(
-                        PackageDepositedEvent.of(saved.id(), saved.hubId(), saved.packageId(),
-                                saved.trackingCode(), saved.tenantId()))
-                        .thenReturn(saved));
+                cmd.storageLocation(), cmd.depositedByActorId(), cmd.recipientPhone(),
+                cmd.ownerActorId(), cmd.storageFee(), cmd.feeCurrency());
+        return hubPackageRepository.save(entry);
     }
 
     @Transactional
     @Override
     public Mono<Void> pickupPackage(String trackingCode, UUID pickedUpByActorId) {
-        return hubPackageRepository.findByTrackingCode(trackingCode)
+        // Tracking codes are stored upper-cased (HubPackageEntry): look them up the same way.
+        String normalized = trackingCode == null ? null : trackingCode.strip().toUpperCase();
+        return hubPackageRepository.findByTrackingCode(normalized)
                 .switchIfEmpty(Mono.error(new HubPackageNotFoundException(trackingCode)))
                 .flatMap(entry -> {
                     HubPackageEntry updated = entry.markPickedUp(pickedUpByActorId);
-                    return hubPackageRepository.save(updated)
-                            .flatMap(saved -> eventPublisher.publishPackagePickedUp(
-                                    PackagePickedUpEvent.of(saved.id(), saved.hubId(),
-                                            saved.trackingCode(), saved.tenantId())));
+                    return hubPackageRepository.save(updated);
                 })
                 .then();
     }
@@ -87,7 +104,9 @@ public class HubInventoryApplicationService implements
     }
 
     /**
-     * Finds packages that have been in the hub longer than maxHours without pickup.
+     * Finds packages that have been in the hub longer than maxHours without pickup. Read-only: it never starts a
+     * return — the end of the relay storage is handled by delivery-core (row D12, {@code RelayStorageService}, lot
+     * evt-l2), the single return path.
      *
      * @param hubId    hub to scan
      * @param maxHours allowed storage duration in hours before overdue
@@ -97,5 +116,20 @@ public class HubInventoryApplicationService implements
     public Flux<HubPackageEntry> findOverduePackages(UUID hubId, long maxHours) {
         return hubPackageRepository.findActiveByHub(hubId)
                 .filter(entry -> entry.isOverdue(maxHours));
+    }
+
+    @Override
+    public Mono<HubPackageEntry> findEntry(UUID entryId) {
+        return hubPackageRepository.findById(entryId);
+    }
+
+    @Override
+    public Flux<HubPackageEntry> findEntriesOfHub(UUID hubId) {
+        return hubPackageRepository.findAllByHub(hubId);
+    }
+
+    @Override
+    public Flux<HubPackageEntry> findEntriesOfOwner(UUID ownerActorId) {
+        return hubPackageRepository.findAllByOwner(ownerActorId);
     }
 }

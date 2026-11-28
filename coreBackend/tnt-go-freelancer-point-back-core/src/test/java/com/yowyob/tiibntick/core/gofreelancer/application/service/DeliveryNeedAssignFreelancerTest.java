@@ -20,7 +20,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.r2dbc.core.DatabaseClient;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
@@ -33,8 +32,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Prouve que assignFreelancer() écrit dans assigned_freelancer_id (pas delivery_id),
- * laisse delivery_id à null et positionne le statut à ASSIGNED.
+ * Lot L2 — le statut, la livraison et le livreur d'un besoin sont dérivés de son annonce core : un
+ * besoin jamais publié (sans annonce) ne peut plus être « assigné » en écrivant le besoin. L'ancien
+ * chemin direct répond 409 et n'écrit rien (architecture-cible 3.4 (g) : un besoin sans annonce
+ * reste PENDING).
  */
 @ExtendWith(MockitoExtension.class)
 class DeliveryNeedAssignFreelancerTest {
@@ -54,7 +55,6 @@ class DeliveryNeedAssignFreelancerTest {
     @Mock private GofpFreelancerRepository gofpFreelancerRepository;
     @Mock private FreelancerPriceQuoteUseCase freelancerPriceQuoteUseCase;
     @Mock private FreelancerEligibilityUseCase freelancerEligibilityUseCase;
-    @Mock private DatabaseClient databaseClient;
 
     private DeliveryNeedApplicationService service;
 
@@ -63,18 +63,17 @@ class DeliveryNeedAssignFreelancerTest {
         service = new DeliveryNeedApplicationService(
                 deliveryNeedRepository, adminRelayPointUseCase, pushNotificationPort,
                 matchingUseCase, addressUseCase, gofpUserRepository,
-                gofpFreelancerRepository, freelancerPriceQuoteUseCase, freelancerEligibilityUseCase, databaseClient);
+                gofpFreelancerRepository, freelancerPriceQuoteUseCase, freelancerEligibilityUseCase);
     }
 
     @Test
-    void assignFreelancer_setsAssignedFreelancerIdNotDeliveryId() {
+    void assignFreelancer_unpublishedNeed_isRefusedAndWritesNothing() {
         DeliveryNeed pendingNeed = DeliveryNeed.builder()
                 .id(NEED_ID)
                 .userId(USER_ID)
                 .pickupAddressId(PICKUP_ID)
                 .deliveryAddressId(DROPOFF_ID)
                 .title("Colis Douala → Yaoundé")
-                .status(DeliveryNeedStatus.PENDING)
                 .createdAt(Instant.now())
                 .build();
 
@@ -87,31 +86,14 @@ class DeliveryNeedAssignFreelancerTest {
         when(deliveryNeedRepository.findById(NEED_ID)).thenReturn(Mono.just(pendingNeed));
         when(gofpFreelancerRepository.findById(FREELANCER_ID)).thenReturn(Mono.just(approvedFreelancer));
 
-        ArgumentCaptor<DeliveryNeed> savedCaptor = ArgumentCaptor.forClass(DeliveryNeed.class);
-        when(deliveryNeedRepository.save(savedCaptor.capture()))
-                .thenAnswer(inv -> Mono.just(inv.getArgument(0)));
-
-        when(addressUseCase.getAddressById(any())).thenReturn(Mono.error(new RuntimeException("not found")));
-
-        // USER_ID is the owner — ownership guard is inactive (ownershipGuardEnabled defaults
-        // to false in unit tests since @Value is not processed without a Spring context)
-        // Lot C-52: a client may only elect a courier who applied; this legacy path (no announcement)
-        // stays open to staff, which is what is exercised here.
+        // Lot C-52: a client may only elect a courier who applied; the staff path is exercised here.
         Mono<DeliveryNeedResponseDTO> result = service.assignFreelancer(NEED_ID, FREELANCER_ID, USER_ID, true);
 
         StepVerifier.create(result)
-                .assertNext(dto -> {
-                    assertThat(dto.getStatus()).isEqualTo(DeliveryNeedStatus.ASSIGNED);
-                    assertThat(dto.getAssignedFreelancerId()).isEqualTo(FREELANCER_ID);
-                    assertThat(dto.getDeliveryId()).isNull();
-                })
-                .verifyComplete();
+                .expectErrorMatches(e -> e instanceof org.springframework.web.server.ResponseStatusException r
+                        && r.getStatusCode().value() == 409)
+                .verify();
 
-        DeliveryNeed saved = savedCaptor.getValue();
-        assertThat(saved.getAssignedFreelancerId()).isEqualTo(FREELANCER_ID);
-        assertThat(saved.getDeliveryId()).isNull();
-        assertThat(saved.getStatus()).isEqualTo(DeliveryNeedStatus.ASSIGNED);
-
-        verify(deliveryNeedRepository).save(any());
+        verify(deliveryNeedRepository, org.mockito.Mockito.never()).save(any());
     }
 }

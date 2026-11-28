@@ -26,7 +26,7 @@ public interface InvoiceRepository {
 
     Mono<Invoice> findByNumber(String invoiceNumber);
 
-    Flux<Invoice> findByMissionId(String missionId);
+    Flux<Invoice> findByDeliveryId(String deliveryId);
 
     Flux<Invoice> findByClientId(UUID tenantId, String clientId);
 
@@ -38,5 +38,5 @@ public interface InvoiceRepository {
     /** Finds invoices past their due date still in payable states. */
     Flux<Invoice> findOverdue(LocalDateTime now);
 
-    Mono<Boolean> existsByMissionId(String missionId);
+    Mono<Boolean> existsByDeliveryId(String deliveryId);
 }

@@ -17,7 +17,7 @@ public interface IKalmanEtaUpdater {
      * GPS position and returns the recomputed ETA.
      *
      * @param delivererId the deliverer's identifier
-     * @param missionId   the active mission identifier
+     * @param deliveryId   the active mission identifier
      * @param tenantId    the tenant context
      * @param coordinates    the latest GPS coordinates
      * @param speedKmh       the measured speed in km/h
@@ -25,7 +25,7 @@ public interface IKalmanEtaUpdater {
      * @param accuracyMetres the GPS fix accuracy in metres
      * @return Mono with the updated ETA, or empty if no route is active
      */
-    Mono<LiveETAUpdate> update(String delivererId, String missionId, String tenantId,
+    Mono<LiveETAUpdate> update(String delivererId, String deliveryId, String tenantId,
                                GeoCoordinates coordinates, double speedKmh, double bearing,
                                double accuracyMetres);
 }

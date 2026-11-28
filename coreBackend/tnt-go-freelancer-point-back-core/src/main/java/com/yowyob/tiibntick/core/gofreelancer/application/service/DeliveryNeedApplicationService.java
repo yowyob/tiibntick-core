@@ -1,15 +1,17 @@
 package com.yowyob.tiibntick.core.gofreelancer.application.service;
 
 import com.yowyob.tiibntick.common.vo.Address;
+import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpNotificationTemplates;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.AddressDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.DeliveryNeedRequestDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request.PacketDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.response.DeliveryNeedResponseDTO;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.response.FreelancerCandidateDTO;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryNeedRepository;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.ParcelPort;
+import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.ParcelDetails;
 import com.yowyob.tiibntick.core.gofreelancer.application.usecase.TopsisRankingUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.DeliveryNeed;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.deliveryNeed.DeliveryNeedStatus;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.AddressUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.AdminRelayPointUseCase;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.in.DeliveryNeedUseCase;
@@ -25,7 +27,6 @@ import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.freelancer.Free
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -56,7 +57,92 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
     private final GofpFreelancerRepository gofpFreelancerRepository;
     private final FreelancerPriceQuoteUseCase freelancerPriceQuoteUseCase;
     private final FreelancerEligibilityUseCase freelancerEligibilityUseCase;
-    private final DatabaseClient databaseClient;
+
+    /**
+     * Colis du besoin, enregistrés dans {@code tnt-delivery-core}. Injection optionnelle (setter) : absent,
+     * un besoin sans colis fonctionne comme avant et un colis soumis est refusé.
+     */
+    private ParcelPort parcels;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setParcels(ParcelPort parcels) {
+        this.parcels = parcels;
+    }
+
+    /**
+     * Relay points, to check the destination the sender chose (D-140). Injection optionnelle (setter) : absente, la
+     * destination n'est pas vérifiée (comme avant).
+     */
+    private com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpRelayPointRepository relayPoints;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setRelayPoints(com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpRelayPointRepository relayPoints) {
+        this.relayPoints = relayPoints;
+    }
+
+    /**
+     * The core hub registry (D-144). Injection optionnelle (setter) : absente, la destination n'est pas vérifiée.
+     */
+    private com.yowyob.tiibntick.core.gofreelancer.application.port.out.IRelayHubPort relayHubs;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setRelayHubs(com.yowyob.tiibntick.core.gofreelancer.application.port.out.IRelayHubPort relayHubs) {
+        this.relayHubs = relayHubs;
+    }
+
+    /**
+     * D-140, D-144: the relay destination chosen by the sender is checked in the core hub registry. The target is a
+     * Go relay point id or a core hub id. Unknown to the core (no hub behind the relay point included) → 404. A hub
+     * that is not APPROVED (pending, suspended, rejected, revoked) or that is closed (temporarily or permanently) →
+     * 409; so is a Go relay point that is not APPROVED or that its owner paused (D-145) and a full hub (D-146: no
+     * slot left; the deposit is checked again when the parcel arrives).
+     */
+    Mono<Void> requireProposableTarget(UUID target) {
+        if (target == null || relayHubs == null) return Mono.empty();
+        Mono<java.util.Optional<com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpRelayPoint>> relayPoint =
+                relayPoints == null ? Mono.just(java.util.Optional.empty())
+                        : relayPoints.findById(target)
+                                .switchIfEmpty(Mono.defer(() -> relayPoints.findByCoreRelayPointId(target)))
+                                .map(java.util.Optional::of)
+                                .defaultIfEmpty(java.util.Optional.empty());
+        return relayPoint.flatMap(rp -> {
+            UUID hubId = rp.map(com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpRelayPoint::getCoreRelayPointId)
+                    .orElse(target);
+            if (rp.isPresent() && (rp.get().getStatus()
+                    != com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.relaypoint.RelayPointStatus.APPROVED
+                    || !Boolean.TRUE.equals(rp.get().getIsActive()))) {
+                return Mono.<Void>error(refusedTarget("relay point " + rp.get().getStatus()
+                        + (Boolean.TRUE.equals(rp.get().getIsActive()) ? "" : ", paused")));
+            }
+            if (hubId == null) {
+                return Mono.<Void>error(unknownTarget(target));
+            }
+            return relayHubs.findHub(hubId, null)
+                    .onErrorMap(com.yowyob.tiibntick.core.geo.domain.exception.GeoNotFoundException.class,
+                            e -> unknownTarget(target))
+                    .switchIfEmpty(Mono.error(() -> unknownTarget(target)))
+                    .flatMap(hub -> {
+                        boolean closed = hub.status() == com.yowyob.tiibntick.core.geo.domain.model.HubStatus.TEMPORARILY_CLOSED
+                                || hub.status() == com.yowyob.tiibntick.core.geo.domain.model.HubStatus.PERMANENTLY_CLOSED;
+                        boolean full = hub.status() == com.yowyob.tiibntick.core.geo.domain.model.HubStatus.FULL
+                                || hub.availableSlots() <= 0;
+                        if (!hub.acceptsDeposits() || closed || full) {
+                            return Mono.<Void>error(refusedTarget("hub " + hub.approvalStatus() + "/" + hub.status()));
+                        }
+                        return Mono.<Void>empty();
+                    });
+        });
+    }
+
+    private static org.springframework.web.server.ResponseStatusException unknownTarget(UUID target) {
+        return new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND,
+                "Relay destination " + target + " is unknown to the relay hub registry");
+    }
+
+    private static org.springframework.web.server.ResponseStatusException refusedTarget(String why) {
+        return new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT,
+                "This relay point does not accept new parcels (" + why + ")");
+    }
 
     /**
      * Publication du besoin en annonce. Injection optionnelle (setter) : absente, le
@@ -284,7 +370,7 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
         Mono<AddressDTO> pickupMono = addressUseCase.createAddress(request.getPickupAddress());
         Mono<AddressDTO> deliveryMono = addressUseCase.createAddress(request.getDeliveryAddress());
 
-        return ensureLegacyUser(request.getUserId())
+        return requireProposableTarget(request.getTargetRelayPointId())
                 .then(Mono.zip(pickupMono, deliveryMono))
                 .flatMap(addresses -> persistPacketIfPresent(request.getPacket())
                         .map(Optional::of)
@@ -297,7 +383,6 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
                                     .packetId(packetId.orElse(null))
                                     .title(request.getTitle().trim())
                                     .description(request.getDescription())
-                                    .status(DeliveryNeedStatus.PENDING)
                                     .pickupAddressId(addresses.getT1().getId())
                                     .deliveryAddressId(addresses.getT2().getId())
                                     .signatureUrl(request.getSignatureUrl())
@@ -324,20 +409,29 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
                             return deliveryNeedRepository.save(need)
                                     .flatMap(saved -> publishAnnouncement(
                                             saved, addresses.getT1(), addresses.getT2(), request.getPacket())
-                                            .thenReturn(saved))
+                                            .map(Optional::of)
+                                            .defaultIfEmpty(Optional.empty())
+                                            .flatMap(announcementId -> {
+                                                if (announcementId.isEmpty()) {
+                                                    return Mono.just(saved);
+                                                }
+                                                saved.markNotNew();
+                                                saved.setAnnouncementId(announcementId.get());
+                                                return deliveryNeedRepository.save(saved);
+                                            }))
                                     .flatMap(saved -> inApp(n -> n.relayChosen(saved)).thenReturn(saved));
                         }))
                 .flatMap(this::enrich);
     }
 
     /** Publie le besoin en annonce QUOTE_REQUEST (les erreurs remontent : un seul état). */
-    private Mono<Void> publishAnnouncement(DeliveryNeed need, AddressDTO pickup, AddressDTO delivery, PacketDTO packet) {
+    private Mono<UUID> publishAnnouncement(DeliveryNeed need, AddressDTO pickup, AddressDTO delivery, PacketDTO packet) {
         if (needAnnouncements == null) return Mono.empty();
         NeedAnnouncementService.ParcelSpec parcel = packet == null ? null : new NeedAnnouncementService.ParcelSpec(
                 packet.getWeight(), packet.getWidth(), packet.getHeight(), packet.getLength(),
                 packet.getFragile(), packet.getIsPerishable(),
                 packet.getDescription() != null ? packet.getDescription() : packet.getDesignation());
-        return needAnnouncements.publishFor(need, pickup.getAddress(), delivery.getAddress(), parcel).then();
+        return needAnnouncements.publishFor(need, pickup.getAddress(), delivery.getAddress(), parcel);
     }
 
     /** L'annonce du besoin n'est plus ouverte (besoin assigné directement, ou supprimé). */
@@ -346,94 +440,45 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
     }
 
     /**
-     * Persists the optional packet carried by the request into the legacy {@code packets}
-     * table and returns its generated id, so the caller can wire it onto
-     * {@code delivery_needs.packet_id} (nullable FK, {@code ON DELETE SET NULL}).
+     * Registers the optional packet carried by the request as a parcel in {@code tnt-delivery-core}
+     * (through {@link ParcelPort}) and returns the parcel id, so the caller can wire it onto
+     * {@code delivery_needs.parcel_id}: the parcel id is the id that follows the goods from the need to
+     * the announcement, the delivery and the relay deposit. There is no longer a {@code packets} table.
      *
-     * <p>There is no {@code Packet} entity/repository on the Java side, hence the raw
-     * {@link DatabaseClient} — same pattern as {@link #ensureLegacyUser(UUID)}.
-     *
-     * <p>{@code packets.announcement_id} is deliberately absent from the INSERT: changeset
-     * {@code 034-fix-packet-circular-dependency} dropped that column and no later changeset
-     * re-adds it.
-     *
-     * @return the new packet id, or an empty {@link Mono} when no packet was submitted.
+     * @return the parcel id, or an empty {@link Mono} when no packet was submitted.
      */
     private Mono<UUID> persistPacketIfPresent(PacketDTO packet) {
         if (packet == null) {
             return Mono.empty();
         }
-
-        UUID packetId = UUID.randomUUID();
-        String title = (packet.getDesignation() != null && !packet.getDesignation().isBlank())
-                ? packet.getDesignation().trim()
-                : "Colis";
-
-        DatabaseClient.GenericExecuteSpec spec = databaseClient.sql("""
-                        INSERT INTO packets (id, title, designation, description, weight, height,
-                                             width, length, thickness, is_fragile, is_perishable, photo_url)
-                        VALUES (:id, :title, :designation, :description, :weight, :height,
-                                :width, :length, :thickness, :isFragile, :isPerishable, :photoUrl)
-                        """)
-                .bind("id", packetId)
-                .bind("title", title);
-
-        spec = bindNullable(spec, "designation", packet.getDesignation(), String.class);
-        spec = bindNullable(spec, "description", packet.getDescription(), String.class);
-        spec = bindNullable(spec, "weight", packet.getWeight(), Double.class);
-        spec = bindNullable(spec, "height", packet.getHeight(), Double.class);
-        spec = bindNullable(spec, "width", packet.getWidth(), Double.class);
-        spec = bindNullable(spec, "length", packet.getLength(), Double.class);
-        spec = bindNullable(spec, "thickness", packet.getThickness(), Double.class);
-        spec = bindNullable(spec, "isFragile", packet.getFragile(), Boolean.class);
-        spec = bindNullable(spec, "isPerishable", packet.getIsPerishable(), Boolean.class);
-        spec = bindNullable(spec, "photoUrl", packet.getPhotoPacket(), String.class);
-
-        log.info("Persisting packet {} (title={})", packetId, title);
-
-        return spec.fetch().rowsUpdated().thenReturn(packetId);
+        if (parcels == null) {
+            return Mono.error(new IllegalStateException("No parcel port: cannot register the packet"));
+        }
+        log.info("Registering the packet as a core parcel (designation={})", packet.getDesignation());
+        return parcels.register(toParcelDetails(packet));
     }
 
-    /**
-     * {@code DatabaseClient#bind} throws on a {@code null} value — every optional column has
-     * to go through {@code bindNull} with its target type instead.
-     */
-    private static DatabaseClient.GenericExecuteSpec bindNullable(
-            DatabaseClient.GenericExecuteSpec spec, String name, Object value, Class<?> type) {
-        return value != null ? spec.bind(name, value) : spec.bindNull(name, type);
+    /** Packet as the customer described it: weight in kg, dimensions in cm. */
+    static ParcelDetails toParcelDetails(PacketDTO packet) {
+        return new ParcelDetails(null, packet.getDesignation(), packet.getDescription(), packet.getWeight(),
+                packet.getWidth(), packet.getHeight(), packet.getLength(), packet.getThickness(),
+                packet.getFragile(), packet.getIsPerishable(), packet.getPhotoPacket());
     }
 
-    /**
-     * {@code delivery_needs.user_id} FKs {@code users(id)}. Ensure a legacy row exists
-     * (from GofpUser when available, otherwise a placeholder).
-     *
-     * @author MANFOUO BRAUN
-     */
-    private Mono<Void> ensureLegacyUser(UUID userId) {
-        return databaseClient.sql("SELECT 1 FROM users WHERE id = :id")
-                .bind("id", userId)
-                .map((row, meta) -> 1)
-                .first()
-                .flatMap(exists -> Mono.<Void>empty())
-                .switchIfEmpty(Mono.defer(() ->
-                        gofpUserRepository.findByCoreUserId(userId)
-                                .defaultIfEmpty(com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpUser.builder()
-                                        .firstName("User")
-                                        .lastName(userId.toString().substring(0, 8))
-                                        .build())
-                                .flatMap(u -> databaseClient.sql("""
-                                                INSERT INTO users (id, first_name, last_name, password)
-                                                VALUES (:id, :fn, :ln, :pw)
-                                                ON CONFLICT (id) DO NOTHING
-                                                """)
-                                        .bind("id", userId)
-                                        .bind("fn", u.getFirstName() != null ? u.getFirstName() : "User")
-                                        .bind("ln", u.getLastName() != null ? u.getLastName() : "GOFP")
-                                        .bind("pw", "{noop}placeholder")
-                                        .fetch()
-                                        .rowsUpdated()
-                                        .then())
-                ));
+    /** The parcel as the API shows a packet (same fields as the DTO the customer sent). */
+    static PacketDTO toPacketDTO(ParcelDetails parcel) {
+        PacketDTO dto = new PacketDTO();
+        dto.setDesignation(parcel.designation());
+        dto.setDescription(parcel.description());
+        dto.setWeight(parcel.weightKg());
+        dto.setHeight(parcel.heightCm());
+        dto.setWidth(parcel.widthCm());
+        dto.setLength(parcel.lengthCm());
+        dto.setThickness(parcel.thicknessCm());
+        dto.setFragile(parcel.fragile());
+        dto.setIsPerishable(parcel.perishable());
+        dto.setPhotoPacket(parcel.photoUrl());
+        return dto;
     }
 
     @Override
@@ -572,7 +617,7 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
         Mono<Boolean> applied = needAnnouncements == null
                 ? Mono.just(false)
                 : needAnnouncements.openAnnouncementOf(need.getId())
-                        .flatMap(a -> needAnnouncements.hasResponseFrom(a.getId(), responderIds(freelancer)))
+                        .flatMap(a -> needAnnouncements.hasResponseFrom(a.id(), responderIds(freelancer)))
                         .defaultIfEmpty(false);
         return applied.flatMap(ok -> ok ? Mono.<Void>empty()
                 : Mono.error(new org.springframework.web.server.ResponseStatusException(
@@ -616,16 +661,16 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
         // Lot C-56 — l'élection lit l'annonce dans SON tenant : le livreur qui accepte une invitation
         // porte son propre `tid`, qui peut différer de celui de l'expéditeur (sinon 404).
         return needAnnouncements.openAnnouncementOf(need.getId())
-                .flatMap(announcement -> needAnnouncements.tenantOf(announcement.getId())
+                .flatMap(announcement -> needAnnouncements.tenantOf(announcement.id())
                         .map(java.util.Optional::of)
                         .defaultIfEmpty(java.util.Optional.empty())
                         .flatMap(tenant -> TenantContextHolder.underTenant(tenant.orElse(null),
                                 serverPrice(need, freelancer)
-                                        .flatMap(quote -> needAnnouncements.responseAt(announcement.getId(),
+                                        .flatMap(quote -> needAnnouncements.responseAt(announcement.id(),
                                                 responderId, java.math.BigDecimal.valueOf(quote.totalPrice()),
                                                 quote.currency()))
                                         .flatMap(responseId -> announcements.assignResponse(
-                                                announcement.getId(), need.getUserId(), responseId))))
+                                                announcement.id(), need.getUserId(), responseId))))
                         .then(deliveryNeedRepository.findById(need.getId())));
     }
 
@@ -655,14 +700,19 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
                         "The price of this courier cannot be computed now")));
     }
 
-    /** Ancien chemin, sans annonce ouverte : le besoin est assigné, l'annonce éventuelle retirée. */
+    /**
+     * Le besoin n'a pas d'annonce ouverte. Son statut étant dérivé de l'annonce et de la livraison du
+     * core, il n'y a plus d'état « assigné » à écrire sur le besoin : si une annonce existe déjà (besoin
+     * déjà assigné, rejeu de l'assignation) le besoin est rendu tel quel ; sinon (besoin jamais
+     * publié) l'assignation est refusée (409).
+     */
     private Mono<DeliveryNeed> assignWithoutAnnouncement(DeliveryNeed need, UUID freelancerId) {
-        need.setAssignedFreelancerId(freelancerId);
-        need.setStatus(DeliveryNeedStatus.ASSIGNED);
-        need.setUpdatedAt(Instant.now());
-        log.info("Assigning freelancer {} to DeliveryNeed {} (no open announcement)", freelancerId, need.getId());
-        return deliveryNeedRepository.save(need)
-                .flatMap(saved -> withdrawAnnouncement(saved.getId()).thenReturn(saved));
+        Mono<UUID> existing = needAnnouncements == null ? Mono.empty() : needAnnouncements.announcementIdOf(need.getId());
+        return existing
+                .flatMap(x -> deliveryNeedRepository.findById(need.getId()))
+                .switchIfEmpty(Mono.error(new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.CONFLICT,
+                        "This delivery need has no announcement: it cannot be assigned")));
     }
 
     private Mono<Void> notifyRelayPoint(DeliveryNeed need) {
@@ -670,12 +720,10 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
             return Mono.empty();
         }
         return adminRelayPointUseCase.getRelayPointDetails(need.getTargetRelayPointId())
-                .flatMap(relayPoint -> pushNotificationPort.sendPushNotification(
+                .flatMap(relayPoint -> pushNotificationPort.sendLocalized(
                         relayPoint.getFreelancerId(),
-                        "Nouvelle Livraison Prévue !",
-                        "Un livreur vient d'accepter une course à destination de votre point relais. " +
-                                "Préparez-vous à recevoir le colis."
-                ))
+                        GofpNotificationTemplates.RELAY_DELIVERY_EXPECTED,
+                        java.util.Map.of()))
                 .onErrorResume(e -> {
                     log.error("Failed to notify relay point owner upon assignment", e);
                     return Mono.empty();
@@ -724,8 +772,9 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
      *       produite par le matching ({@code FreelancerProviderAdapter#fromGofp});</li>
      *   <li>le nom se lit via {@code gofp_users.core_user_id} =
      *       {@code GofpFreelancer#getCoreUserId()};</li>
-     *   <li>le tarif se lit via {@code delivery_person_pricing.delivery_person_id}
-     *       (FK {@code delivery_persons(id)}) = {@code GofpFreelancer#getCoreFreelancerId()}.</li>
+     *   <li>le tarif se lit via la politique billing dont le propriétaire est
+     *       {@code GofpFreelancer#getCoreFreelancerId()} (lot L4 : la table héritée
+     *       {@code delivery_person_pricing} n'est plus lue).</li>
      * </ul>
      * On charge donc la ligne {@code gofp_freelancers} une seule fois pour traduire l'id fil
      * dans les deux autres espaces. Sans cette traduction, le nom retombe systématiquement sur
@@ -872,32 +921,20 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
     }
 
     /**
-     * Métriques du colis lues directement dans {@code packets} (aucune entité côté Java).
-     * Unités en base : {@code weight} en kg, {@code length/width/height} en cm — d'où la
-     * conversion en m³ par 1e6.
+     * Métriques du colis, lues dans {@code tnt-delivery-core} (via {@link ParcelPort}). Unités du
+     * cœur : {@code weightKg} en kg, dimensions en cm — d'où la conversion en m³ par 1e6.
      */
     private Mono<PacketMetrics> loadPacketMetrics(UUID packetId) {
-        if (packetId == null) {
+        if (packetId == null || parcels == null) {
             return Mono.just(PacketMetrics.EMPTY);
         }
-        return databaseClient.sql("""
-                        SELECT weight, length, width, height, is_fragile, is_perishable
-                        FROM packets WHERE id = :id
-                        """)
-                .bind("id", packetId)
-                .map((row, meta) -> {
-                    double weightKg = orDefault(row.get("weight", Double.class), 0.0);
-                    double lengthCm = orDefault(row.get("length", Double.class), 0.0);
-                    double widthCm = orDefault(row.get("width", Double.class), 0.0);
-                    double heightCm = orDefault(row.get("height", Double.class), 0.0);
-                    double volumeM3 = (lengthCm * widthCm * heightCm) / 1_000_000.0;
-                    return new PacketMetrics(
-                            weightKg,
-                            volumeM3,
-                            Boolean.TRUE.equals(row.get("is_fragile", Boolean.class)),
-                            Boolean.TRUE.equals(row.get("is_perishable", Boolean.class)));
-                })
-                .one()
+        return parcels.find(packetId)
+                .map(p -> new PacketMetrics(
+                        orDefault(p.weightKg(), 0.0),
+                        (orDefault(p.lengthCm(), 0.0) * orDefault(p.widthCm(), 0.0) * orDefault(p.heightCm(), 0.0))
+                                / 1_000_000.0,
+                        Boolean.TRUE.equals(p.fragile()),
+                        Boolean.TRUE.equals(p.perishable())))
                 .defaultIfEmpty(PacketMetrics.EMPTY)
                 .onErrorResume(e -> {
                     log.warn("Packet {} lookup failed — pricing without packet metrics", packetId, e);
@@ -964,7 +1001,7 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
     private Mono<DeliveryNeedResponseDTO> withAgreedPrice(DeliveryNeedResponseDTO dto) {
         Mono<DeliveryNeedResponseDTO> named = dto.getAssignedFreelancerId() == null ? Mono.just(dto)
                 : courierNameOf(dto.getAssignedFreelancerId()).doOnNext(dto::setAssignedCourierName).thenReturn(dto);
-        if (deliveries == null || dto.getAssignedFreelancerId() == null && dto.getStatus() == DeliveryNeedStatus.PENDING) {
+        if (deliveries == null || dto.getAssignedFreelancerId() == null && dto.getStatus() == com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.deliveryNeed.DeliveryNeedStatus.PENDING) {
             return named;
         }
         return named.then(deliveries.findByDeliveryNeedId(dto.getId()))
@@ -1006,40 +1043,17 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
     }
 
     /**
-     * Colis résolu directement dans {@code packets} : il n'existe ni entité ni dépôt Java pour
-     * cette table (même raison que {@link #loadPacketMetrics(UUID)} et
-     * {@link #persistPacketIfPresent(PacketDTO)}), et aucun endpoint {@code GET /api/packets/{id}}
-     * — sans cette lecture, le colis est invisible pour tout consommateur.
-     *
-     * <p>Les noms de colonnes suivent l'INSERT de {@link #persistPacketIfPresent(PacketDTO)} :
-     * {@code is_fragile}/{@code photo_url} en base, {@code fragile}/{@code photoPacket} dans le DTO.
+     * Colis résolu dans {@code tnt-delivery-core} (via {@link ParcelPort}) : il n'existe plus de table
+     * {@code packets} côté Go, et aucun endpoint {@code GET /api/packets/{id}} — sans cette lecture, le
+     * colis est invisible pour tout consommateur. Les noms du DTO sont ceux de l'API
+     * ({@code fragile}/{@code photoPacket}).
      */
     private Mono<Optional<PacketDTO>> loadPacket(UUID packetId) {
-        if (packetId == null) {
+        if (packetId == null || parcels == null) {
             return Mono.just(Optional.empty());
         }
-        return databaseClient.sql("""
-                        SELECT designation, description, weight, height, width, length,
-                               thickness, is_fragile, is_perishable, photo_url
-                        FROM packets WHERE id = :id
-                        """)
-                .bind("id", packetId)
-                .map((row, meta) -> {
-                    PacketDTO dto = new PacketDTO();
-                    dto.setDesignation(row.get("designation", String.class));
-                    dto.setDescription(row.get("description", String.class));
-                    dto.setWeight(row.get("weight", Double.class));
-                    dto.setHeight(row.get("height", Double.class));
-                    dto.setWidth(row.get("width", Double.class));
-                    dto.setLength(row.get("length", Double.class));
-                    dto.setThickness(row.get("thickness", Double.class));
-                    dto.setFragile(row.get("is_fragile", Boolean.class));
-                    dto.setIsPerishable(row.get("is_perishable", Boolean.class));
-                    dto.setPhotoPacket(row.get("photo_url", String.class));
-                    return dto;
-                })
-                .one()
-                .map(Optional::of)
+        return parcels.find(packetId)
+                .map(p -> Optional.of(toPacketDTO(p)))
                 .defaultIfEmpty(Optional.empty())
                 .onErrorResume(e -> {
                     log.warn("Packet {} lookup failed — response served without the full packet",
@@ -1058,6 +1072,7 @@ public class DeliveryNeedApplicationService implements DeliveryNeedUseCase {
                 .title(need.getTitle())
                 .description(need.getDescription())
                 .status(need.getStatus())
+                .outcome(need.getOutcome())
                 .duration(need.getDuration())
                 .signatureUrl(need.getSignatureUrl())
                 .paymentMethod(need.getPaymentMethod())

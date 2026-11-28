@@ -1,5 +1,8 @@
 package com.yowyob.tiibntick.core.dispute.infrastructure.adapter.in.rest;
 
+import com.yowyob.tiibntick.core.dispute.domain.enums.ClaimantType;
+import com.yowyob.tiibntick.core.dispute.application.command.OpenDisputeCommand;
+import com.yowyob.tiibntick.core.dispute.application.port.outbound.IDisputeParcelPort;
 import com.yowyob.tiibntick.core.auth.adapter.in.web.CurrentUser;
 import com.yowyob.tiibntick.core.auth.domain.model.TntUserIdentity;
 import com.yowyob.tiibntick.core.dispute.application.command.OpenDisputeAgainstFreelancerOrgCommand;
@@ -15,6 +18,7 @@ import com.yowyob.tiibntick.core.dispute.domain.model.DisputeId;
 import com.yowyob.tiibntick.core.dispute.infrastructure.adapter.in.rest.dto.request.DisputeRequests;
 import com.yowyob.tiibntick.core.dispute.infrastructure.adapter.in.rest.dto.response.DisputeResponses;
 import com.yowyob.tiibntick.core.dispute.infrastructure.adapter.in.rest.mapper.DisputeRestMapper;
+import com.yowyob.tiibntick.core.roles.adapter.in.web.RequirePermission;
 import com.yowyob.tiibntick.core.roles.domain.exception.TntRoleException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -64,6 +68,14 @@ public class DisputeController {
     /** Accepts everyone until a layer that knows the deliveries provides the real check. */
     private IDisputeParticipationPort participation = (tenant, mission, actor, org) -> Mono.just(true);
 
+    /** Parties of a core parcel (lot L4, [E]); absent → the mission-based participation check only. */
+    private IDisputeParcelPort parcels;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setParcels(IDisputeParcelPort parcels) {
+        this.parcels = parcels;
+    }
+
     public DisputeController(IDisputeCommandUseCase commandUseCase, IDisputeQueryUseCase queryUseCase) {
         this.commandUseCase = commandUseCase;
         this.queryUseCase = queryUseCase;
@@ -85,6 +97,48 @@ public class DisputeController {
         return participation.isParticipant(currentUser.tenantId().toString(), missionId,
                         currentUser.actorId().toString(), org)
                 .flatMap(ok -> ok ? action.get() : Mono.error(TntRoleException.forbidden("dispute", "create")));
+    }
+
+    /**
+     * Who may open a dispute (spec §1.4 [E], lot L4): the support ({@code dispute:resolve}) always; otherwise the caller
+     * must be, for the claimant type he declares, a party of the parcel — CLIENT = its sender, RECIPIENT = its
+     * recipient actor, FREELANCER/PERMANENT_DELIVERER = an assigned courier (or his organisation), HUB_OPERATOR = the
+     * organisation of the relay holding it or receiving it; AGENCY_MANAGER keeps the mission check; SYSTEM is the
+     * support's. A dispute not on a core parcel keeps the mission check.
+     */
+    <T> Mono<T> ifClaimantMayOpen(TntUserIdentity currentUser, ClaimantType claimantType, String packageId,
+                                  String missionId, java.util.function.Supplier<Mono<T>> action) {
+        if (isPrivileged(currentUser)) {
+            return action.get();
+        }
+        if (claimantType == null || claimantType == ClaimantType.SYSTEM) {
+            return Mono.error(TntRoleException.forbidden("dispute", "create"));
+        }
+        if (parcels == null || claimantType == ClaimantType.AGENCY_MANAGER) {
+            return ifParticipant(currentUser, missionId, action);
+        }
+        String tenant = currentUser.tenantId().toString();
+        String actor = currentUser.actorId() != null ? currentUser.actorId().toString() : null;
+        String org = currentUser.organizationId() != null ? currentUser.organizationId().toString() : null;
+        return parcels.resolveParcel(tenant, packageId, missionId)
+                .flatMap(parcelId -> parcels.parties(tenant, parcelId))
+                .map(parties -> java.util.Optional.of(isParty(parties, claimantType, actor, org)))
+                .defaultIfEmpty(java.util.Optional.empty())
+                .flatMap(verdict -> verdict.isEmpty() ? ifParticipant(currentUser, missionId, action)
+                        : verdict.get() ? action.get()
+                        : Mono.error(TntRoleException.forbidden("dispute", "create")));
+    }
+
+    static boolean isParty(IDisputeParcelPort.Parties p, ClaimantType type, String actorId, String orgId) {
+        String org = orgId != null ? orgId.toLowerCase() : null;
+        return switch (type) {
+            case CLIENT -> actorId != null && p.senderIds().contains(actorId);
+            case RECIPIENT -> actorId != null && p.recipientActorIds().contains(actorId);
+            case FREELANCER, PERMANENT_DELIVERER -> (actorId != null && p.courierActorIds().contains(actorId))
+                    || (org != null && p.courierOrgIds().contains(org));
+            case HUB_OPERATOR -> org != null && p.relayOrgIds().contains(org);
+            case AGENCY_MANAGER, SYSTEM -> false;
+        };
     }
 
     private boolean isPrivileged(TntUserIdentity currentUser) {
@@ -121,8 +175,9 @@ public class DisputeController {
             @RequestBody DisputeRequests.OpenDisputeRequest request) {
         assertActingAsSelf(currentUser, request.claimantId());
         String tenantId = currentUser.tenantId().toString();
-        return ifParticipant(currentUser, request.missionId(),
-                () -> commandUseCase.openDispute(DisputeRestMapper.toCommand(request, tenantId)))
+        OpenDisputeCommand command = DisputeRestMapper.toCommand(request, tenantId);
+        return ifClaimantMayOpen(currentUser, command.claimantType(), command.packageId(), command.missionId(),
+                () -> commandUseCase.openDispute(command))
                 .map(DisputeRestMapper::toOpenedResponse);
     }
 
@@ -313,6 +368,26 @@ public class DisputeController {
         return commandUseCase.processCompensation(DisputeRestMapper.toCommand(request, id, tenantId))
                 .map(d -> DisputeRestMapper.toDetailResponse(d, true));
     }
+
+    // =========================================================================
+    // PAY COMPENSATION — POST /api/v1/disputes/{id}/compensation/pay (lot L4, spec §4.3)
+    // =========================================================================
+
+    @PostMapping("/{id}/compensation/pay")
+    @RequirePermission(resource = "dispute", action = "resolve")
+    @Operation(summary = "Pay the compensation from the Kernel fund (retry after a failure)",
+            description = "PENDING_COMPENSATION → COMPENSATED (LT9). 503 COMPENSATION_UNAVAILABLE until the Kernel "
+                    + "fund is wired (lot L5); 409 COMPENSATION_FUND_INSUFFICIENT; the dispute stays pending.")
+    public Mono<DisputeResponses.DisputeDetailResponse> payCompensation(
+            @Parameter(hidden = true) @CurrentUser TntUserIdentity currentUser,
+            @PathVariable String id) {
+        if (!isPrivileged(currentUser)) {
+            throw TntRoleException.forbidden("dispute", "resolve");
+        }
+        String tenantId = currentUser.tenantId().toString();
+        return commandUseCase.payCompensation(DisputeId.of(id), tenantId)
+                .map(d -> DisputeRestMapper.toDetailResponse(d, true));
+    }
     // ── : FreelancerOrg dispute endpoints ─────────────────────────────────
 
     /**
@@ -333,7 +408,8 @@ public class DisputeController {
                 tenantId, cmd.claimantId(), cmd.claimantType(), cmd.freelancerOrgId(), cmd.freelancerOrgOwnerId(),
                 cmd.impliedSubDelivererId(), cmd.cause(), cmd.category(), cmd.priority(), cmd.missionId(),
                 cmd.packageId(), cmd.trackingCode(), cmd.description());
-        return ifParticipant(currentUser, cmd.missionId(), () -> commandUseCase.openAgainstFreelancerOrg(tenantSafeCmd))
+        return ifClaimantMayOpen(currentUser, cmd.claimantType(), cmd.packageId(), cmd.missionId(),
+                        () -> commandUseCase.openAgainstFreelancerOrg(tenantSafeCmd))
                 .map(DisputeRestMapper::toDetailResponse);
     }
 

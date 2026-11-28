@@ -63,7 +63,7 @@ class NegotiationChatServiceTest {
         when(users.findByCoreUserId(any())).thenReturn(Mono.empty());
         when(messages.save(any(NegotiationMessage.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
         when(messages.findByAnnouncementIdAndThreadUserIdOrderByCreatedAtAsc(any(), any())).thenReturn(Flux.empty());
-        when(push.sendPushNotification(any(), any(), any(), any())).thenReturn(Mono.empty());
+        when(push.sendLocalized(any(), any(), any(), any())).thenReturn(Mono.empty());
         when(messages.markRead(any(), any(), any(), any())).thenReturn(Mono.just(0L));
         when(messages.countUnread(any(), any(), any())).thenReturn(Mono.just(0L));
         when(messages.findFirstByAnnouncementIdAndThreadUserIdOrderByCreatedAtDesc(any(), any())).thenReturn(Mono.empty());
@@ -186,12 +186,14 @@ class NegotiationChatServiceTest {
     @DisplayName("the other party gets a push notification, and a push failure never fails the message")
     void postNotifiesTheOtherParty() {
         StepVerifier.create(service.post(announcementId, client, personA, "Bonjour")).expectNextCount(1).verifyComplete();
-        verify(push).sendPushNotification(any(), org.mockito.ArgumentMatchers.eq(actorA), any(), org.mockito.ArgumentMatchers.eq("Bonjour"));
+        verify(push).sendLocalized(any(), org.mockito.ArgumentMatchers.eq(actorA), any(),
+                org.mockito.ArgumentMatchers.argThat(p -> "Bonjour".equals(p.get("preview"))));
 
         StepVerifier.create(service.post(announcementId, actorA, null, "Ok")).expectNextCount(1).verifyComplete();
-        verify(push).sendPushNotification(any(), org.mockito.ArgumentMatchers.eq(client), any(), org.mockito.ArgumentMatchers.eq("Ok"));
+        verify(push).sendLocalized(any(), org.mockito.ArgumentMatchers.eq(client), any(),
+                org.mockito.ArgumentMatchers.argThat(p -> "Ok".equals(p.get("preview"))));
 
-        when(push.sendPushNotification(any(), any(), any(), any())).thenReturn(Mono.error(new IllegalStateException("push down")));
+        when(push.sendLocalized(any(), any(), any(), any())).thenReturn(Mono.error(new IllegalStateException("push down")));
         StepVerifier.create(service.post(announcementId, client, personA, "Encore")).expectNextCount(1).verifyComplete();
     }
 

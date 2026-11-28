@@ -11,8 +11,7 @@ import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryAnno
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.INegotiationChatPort;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.AnnouncementSnapshot;
 import com.yowyob.tiibntick.core.gofreelancer.config.GofpDeliveryOtpProperties;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.announcement.AnnouncementStatus;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.AnnouncementStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -47,8 +46,6 @@ class DeliveryOtpPreviewModeTest {
     @Mock private TenantContextHolder tenantContextHolder;
     @Mock private FreelancerQuotaService freelancerQuotaService;
     @Mock private INegotiationChatPort negotiationChatPort;
-    @Mock private IAnnouncementRepository announcementRepository;
-    @Mock private AnnouncementSubscriptionRepository subscriptionRepository;
     @Mock private GofpFreelancerRepository gofpFreelancerRepository;
     @Mock private GofpUserRepository gofpUserRepository;
     @Mock private DeliveryRepository deliveryRepository;
@@ -65,7 +62,6 @@ class DeliveryOtpPreviewModeTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(announcementRepository.findById(any())).thenReturn(Mono.empty());
         lenient().when(deliveryRepository.findById(any())).thenReturn(Mono.empty());
         lenient().when(gofpFreelancerRepository.findById(any())).thenReturn(Mono.empty());
         lenient().when(gofpFreelancerRepository.findByCoreFreelancerId(any())).thenReturn(Mono.empty());
@@ -118,9 +114,9 @@ class DeliveryOtpPreviewModeTest {
     private AnnouncementApplicationService buildService(GofpDeliveryOtpProperties props) {
         return new AnnouncementApplicationService(
                 deliveryAnnouncementPort, tenantContextHolder, freelancerQuotaService,
-                negotiationChatPort, announcementRepository, subscriptionRepository,
+                negotiationChatPort,
                 gofpFreelancerRepository, gofpUserRepository, deliveryRepository, deliveryOtpService,
-                props);
+                props, com.yowyob.tiibntick.core.gofreelancer.TestDeliveries.termsRecorder());
     }
 
     private void stubAssignPath(AnnouncementApplicationService svc) {
@@ -140,7 +136,6 @@ class DeliveryOtpPreviewModeTest {
                 .thenReturn(Mono.just(BigDecimal.ZERO));
         when(deliveryAnnouncementPort.selectResponse(tenantId, announcementId, clientId, respId))
                 .thenReturn(Mono.just(assigned));
-        when(announcementRepository.findById(announcementId)).thenReturn(Mono.empty());
         when(deliveryRepository.findById(deliveryId)).thenReturn(Mono.just(delivery));
         when(deliveryOtpService.initOtpIfAbsentWithCodes(any(Delivery.class))).thenReturn(Mono.just(otp));
     }

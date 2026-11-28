@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:tnt:kafka:v1:incident.payload",
+  "title": "Payload of tnt.incident.events (spec §3.6), full incident state after the event, masked (§3.4)",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "incidentId", "referenceCode", "deliveryId", "status", "type", "category", "severity", "blocking",
+    "deliveryOutcome", "responsibleParty", "escalationLevel", "reportedByActorId", "reportedByRole",
+    "affectedParcelIds", "reportedAt"
+  ],
+  "properties": {
+    "incidentId": {"type": "string", "format": "uuid"},
+    "referenceCode": {"type": "string"},
+    "deliveryId": {"type": ["string", "null"], "format": "uuid"},
+    "trackingCode": {"type": ["string", "null"]},
+    "agencyId": {"type": ["string", "null"], "format": "uuid"},
+    "platform": {"type": ["string", "null"]},
+    "status": {"enum": ["REPORTED", "ACKNOWLEDGED", "TRIAGED", "AUTO_RESOLVING", "REASSIGNING_DRIVER",
+      "AWAITING_HANDOVER", "REROUTING", "TRANSFERRING_TO_HUB", "AUTO_RESOLUTION_FAILED", "PENDING_AGENCY_ASSIGNMENT",
+      "AGENCY_HANDLING", "WAITING_INTERAGENCY", "INTERAGENCY_IN_PROGRESS", "ESCALATED", "PENDING_CONFIRMATION",
+      "RESOLVED", "CLOSED", "CANCELLED"]},
+    "type": {"type": "string"},
+    "category": {"type": ["string", "null"]},
+    "severity": {"type": ["string", "null"]},
+    "blocking": {"type": "boolean"},
+    "deliveryOutcome": {"enum": ["RESUMED", "FAILED", "DISPUTE", null]},
+    "responsibleParty": {"enum": ["SENDER", "RECIPIENT", "COURIER", "PLATFORM", "RELAY", "AGENCY", "NONE", null]},
+    "escalationLevel": {"type": "integer", "minimum": 0},
+    "reportedByActorId": {"type": ["string", "null"], "format": "uuid"},
+    "reportedByRole": {"type": ["string", "null"]},
+    "affectedParcelIds": {"type": "array", "items": {"type": "string", "format": "uuid"}},
+    "approxLatitude": {"type": ["number", "null"]},
+    "approxLongitude": {"type": ["number", "null"]},
+    "resolutionProposedAt": {"type": ["string", "null"], "format": "date-time"},
+    "reportedAt": {"type": ["string", "null"], "format": "date-time"},
+    "resolvedAt": {"type": ["string", "null"], "format": "date-time"},
+    "closedAt": {"type": ["string", "null"], "format": "date-time"}
+  },
+  "not": {"anyOf": [{"required": ["description"]}]}
+}

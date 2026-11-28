@@ -44,7 +44,8 @@ import java.util.UUID;
  *
  * @author MANFOUO Braun
  */
-public class LocalReactivePermissionResolver implements ReactivePermissionResolver {
+public class LocalReactivePermissionResolver implements ReactivePermissionResolver,
+        com.yowyob.tiibntick.core.roles.application.port.out.IScopedRoleAssignmentsPort {
 
     private static final Logger log = LoggerFactory.getLogger(LocalReactivePermissionResolver.class);
 
@@ -82,6 +83,31 @@ public class LocalReactivePermissionResolver implements ReactivePermissionResolv
                         tenantId, userId, perms.size()));
     }
 
+    /**
+     * Decision D-176: the agency/organisation roles this resolver's own assignments prove, as canonical entries
+     * ({@link com.yowyob.tiibntick.core.roles.domain.model.ScopedTokenRoles#provenBy}).
+     */
+    @Override
+    public Flux<String> scopedRoleEntries(UUID tenantId, UUID userId) {
+        return assignmentRepository.findByTenantIdAndUserId(tenantId, userId)
+                .filter(a -> a.scopeType() == com.yowyob.tiibntick.core.roles.domain.model.RoleScopeType.AGENCY
+                        || a.scopeType() == com.yowyob.tiibntick.core.roles.domain.model.RoleScopeType.ORGANIZATION)
+                .concatMap(a -> roleOf(tenantId, a)
+                        .flatMapIterable(role -> com.yowyob.tiibntick.core.roles.domain.model.ScopedTokenRoles
+                                .provenBy(role.code(), a.scopeType(), a.scopeId())))
+                .distinct();
+    }
+
+    private Mono<Role> roleOf(UUID tenantId, UserRoleAssignment assignment) {
+        return roleRepository.findById(tenantId, assignment.roleId())
+                .switchIfEmpty(Mono.defer(() -> systemTenantId == null || systemTenantId.equals(tenantId)
+                        ? Mono.empty()
+                        : roleRepository.findById(systemTenantId, assignment.roleId())
+                                .filter(role -> isCanonical(role, tenantId))))
+                .filter(role -> !com.yowyob.tiibntick.core.roles.domain.model.PlatformRoleGrant.TNT_ADMIN
+                        .equalsIgnoreCase(role.code()));
+    }
+
     private Flux<Set<String>> resolveAssignment(UUID tenantId, UserRoleAssignment assignment) {
         return roleRepository.findById(tenantId, assignment.roleId())
                 // Canonical roles live under the system tenant (see TntRoleAssignmentService#assignRole).
@@ -89,6 +115,10 @@ public class LocalReactivePermissionResolver implements ReactivePermissionResolv
                         ? Mono.empty()
                         : roleRepository.findById(systemTenantId, assignment.roleId())
                                 .filter(role -> isCanonical(role, tenantId))))
+                // Decision D-169: TNT_ADMIN lives in the platform-admin registry only; a former per-tenant
+                // TNT_ADMIN assignment grants nothing any more (no migration, D-169).
+                .filter(role -> !com.yowyob.tiibntick.core.roles.domain.model.PlatformRoleGrant.TNT_ADMIN
+                        .equalsIgnoreCase(role.code()))
                 .map(role -> scoped(permissionsOf(role), assignment))
                 .switchIfEmpty(Mono.fromSupplier(() -> {
                     log.debug("No Role found locally for roleId={} — nothing to resolve without a role code.",

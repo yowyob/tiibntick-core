@@ -99,10 +99,9 @@ class DisputePermissionEnforcementTest {
     private DisputeCommandService buildProxiedService(IDisputeRepository repository, IDisputeReferenceGenerator referenceGenerator) {
         DisputeCommandService realService = new DisputeCommandService(
                 repository,
-                mock(IDisputeEventPublisher.class, invocation -> Mono.empty()),
                 mock(IDisputeNotificationPort.class, invocation -> Mono.empty()),
-                mock(IDeliveryStatusPort.class, invocation -> Mono.empty()),
-                mock(IBillingCompensationPort.class),
+                mock(IDisputeParcelPort.class, invocation -> Mono.empty()),
+                mock(IDisputeCompensationPort.class),
                 mock(IBlockchainProofPort.class),
                 referenceGenerator);
 

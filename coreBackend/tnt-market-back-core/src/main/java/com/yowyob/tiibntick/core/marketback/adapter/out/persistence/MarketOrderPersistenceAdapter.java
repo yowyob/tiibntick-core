@@ -60,6 +60,11 @@ public class MarketOrderPersistenceAdapter implements IMarketOrderRepository {
     }
 
     @Override
+    public Flux<MarketOrder> findByDeliveryId(UUID missionId, String tenantId) {
+        return r2dbcRepository.findByMissionIdAndTenantId(missionId, tenantId).map(mapper::toDomain);
+    }
+
+    @Override
     public Flux<MarketOrder> findByListingId(MarketListingId listingId) {
         return r2dbcRepository.findByListingId(listingId.value()).map(mapper::toDomain);
     }

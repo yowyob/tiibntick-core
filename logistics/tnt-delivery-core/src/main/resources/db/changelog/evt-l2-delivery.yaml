@@ -1,0 +1,271 @@
+databaseChangeLog:
+  # ── Lot evt-l2 — states of parcel / delivery / announcement, tracking code on the parcel (D-136), thresholds ──
+  # Spec: docs/architecture/chantiers/cible-evenements-colis-livraison.md §1.1, §1.2, §1.5, §5;
+  # decisions: docs/architecture/chantiers/decisions-evenements-colis-livraison.md [B], [C], [C bis], [K], [L].
+
+  - changeSet:
+      id: evt-l2-001-parcel-state-columns
+      author: evt-l2
+      labels: evt-l2
+      comment: "Parcel state, custody, dispute memory, return cause and tracking code (spec §1.2, D-136). Additive."
+      changes:
+        - sql:
+            splitStatements: true
+            stripComments: true
+            sql: |
+              ALTER TABLE tnt_parcels ADD COLUMN IF NOT EXISTS tracking_code                 VARCHAR(30);
+              ALTER TABLE tnt_parcels ADD COLUMN IF NOT EXISTS status                        VARCHAR(30);
+              ALTER TABLE tnt_parcels ADD COLUMN IF NOT EXISTS status_changed_at             TIMESTAMPTZ;
+              ALTER TABLE tnt_parcels ADD COLUMN IF NOT EXISTS previous_status_before_dispute VARCHAR(30);
+              ALTER TABLE tnt_parcels ADD COLUMN IF NOT EXISTS open_dispute_id               UUID;
+              ALTER TABLE tnt_parcels ADD COLUMN IF NOT EXISTS dispute_freezes_delivery      BOOLEAN NOT NULL DEFAULT FALSE;
+              ALTER TABLE tnt_parcels ADD COLUMN IF NOT EXISTS current_delivery_id           UUID;
+              ALTER TABLE tnt_parcels ADD COLUMN IF NOT EXISTS delivery_ids                  TEXT NOT NULL DEFAULT '[]';
+              ALTER TABLE tnt_parcels ADD COLUMN IF NOT EXISTS custody_holder_type           VARCHAR(20);
+              ALTER TABLE tnt_parcels ADD COLUMN IF NOT EXISTS custody_holder_id             UUID;
+              ALTER TABLE tnt_parcels ADD COLUMN IF NOT EXISTS custody_hub_id                UUID;
+              ALTER TABLE tnt_parcels ADD COLUMN IF NOT EXISTS custody_hub_package_entry_id  UUID;
+              ALTER TABLE tnt_parcels ADD COLUMN IF NOT EXISTS return_cause                  VARCHAR(50);
+              ALTER TABLE tnt_parcels ADD COLUMN IF NOT EXISTS return_cost_payer             VARCHAR(20);
+              ALTER TABLE tnt_parcels ADD COLUMN IF NOT EXISTS closed_reason                 VARCHAR(50);
+              ALTER TABLE tnt_parcels ADD COLUMN IF NOT EXISTS failed_return_count           INTEGER NOT NULL DEFAULT 0;
+
+  - changeSet:
+      id: evt-l2-002-parcel-tracking-code-unique
+      author: evt-l2
+      labels: evt-l2
+      comment: "D-136: the tracking code is unique among parcels (nullable until the backfill gives every parcel one)."
+      changes:
+        - sql:
+            sql: |
+              CREATE UNIQUE INDEX IF NOT EXISTS uq_tnt_parcels_tracking_code
+                  ON tnt_parcels (tracking_code) WHERE tracking_code IS NOT NULL;
+              CREATE INDEX IF NOT EXISTS idx_tnt_parcels_status ON tnt_parcels (status);
+
+  - changeSet:
+      id: evt-l2-003-delivery-columns
+      author: evt-l2
+      labels: evt-l2
+      comment: "Delivery kind, attempts, failure/cancellation, relay storage, lateness (spec §1.1, §5). Additive."
+      changes:
+        - sql:
+            splitStatements: true
+            stripComments: true
+            sql: |
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS kind                     VARCHAR(20) NOT NULL DEFAULT 'OUTBOUND';
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS parent_delivery_id       UUID;
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS max_attempts             INTEGER;
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS failure_reason           VARCHAR(50);
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS last_attempt_reason      VARCHAR(50);
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS cancellation_reason      TEXT;
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS responsible_party        VARCHAR(20);
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS return_cost_payer        VARCHAR(20);
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS relay_hub_id             UUID;
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS destination_hub_id       UUID;
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS hub_package_entry_id     UUID;
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS relay_deposited_at       TIMESTAMPTZ;
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS requested_storage_days   INTEGER;
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS relay_storage_days       INTEGER;
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS relay_storage_expires_at TIMESTAMPTZ;
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS storage_reminder_at      TIMESTAMPTZ;
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS storage_reminder_sent_at TIMESTAMPTZ;
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS late                     BOOLEAN NOT NULL DEFAULT FALSE;
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS late_since               TIMESTAMPTZ;
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS last_alert_type          VARCHAR(40);
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS failed_at                TIMESTAMPTZ;
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS cancelled_at             TIMESTAMPTZ;
+              CREATE INDEX IF NOT EXISTS idx_tnt_del_relay_storage
+                  ON tnt_deliveries (relay_storage_expires_at) WHERE status = 'AT_RELAY_HUB';
+              CREATE INDEX IF NOT EXISTS idx_tnt_del_relay_hub
+                  ON tnt_deliveries (relay_hub_id) WHERE relay_hub_id IS NOT NULL;
+              CREATE INDEX IF NOT EXISTS idx_tnt_del_parcel ON tnt_deliveries (parcel_id);
+
+  - changeSet:
+      id: evt-l2-004-announcement-columns
+      author: evt-l2
+      labels: evt-l2
+      comment: "Announcement kind (OUTBOUND/RETURN), creator role, outcome and milestones (spec §1.5, QO-4, QO-9)."
+      changes:
+        - sql:
+            splitStatements: true
+            stripComments: true
+            sql: |
+              ALTER TABLE tnt_delivery_announcements ADD COLUMN IF NOT EXISTS kind         VARCHAR(20) NOT NULL DEFAULT 'OUTBOUND';
+              ALTER TABLE tnt_delivery_announcements ADD COLUMN IF NOT EXISTS creator_role VARCHAR(20) NOT NULL DEFAULT 'CLIENT';
+              ALTER TABLE tnt_delivery_announcements ADD COLUMN IF NOT EXISTS outcome      VARCHAR(20);
+              ALTER TABLE tnt_delivery_announcements ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ;
+              ALTER TABLE tnt_delivery_announcements ADD COLUMN IF NOT EXISTS assigned_at  TIMESTAMPTZ;
+              ALTER TABLE tnt_delivery_announcements ADD COLUMN IF NOT EXISTS closed_at    TIMESTAMPTZ;
+
+  - changeSet:
+      id: evt-l2-005-no-removed-delivery-states
+      author: evt-l2
+      labels: evt-l2
+      comment: >
+        Décision utilisateur du 2026-11-26, [C.3] de decisions-evenements-colis-livraison.md: TIMED_OUT and
+        SLA_BREACHED are no longer states (lateness is an alert). No safe target state can be derived for such a row
+        (the state before the timeout is not stored), so the migration stops if any exists: fix those rows by hand
+        (support decision) before upgrading.
+      preConditions:
+        - onFail: HALT
+        - onFailMessage: "tnt_deliveries still holds TIMED_OUT / SLA_BREACHED rows (removed states, decision [C.3]): resolve them before upgrading."
+        - sqlCheck:
+            expectedResult: 0
+            sql: SELECT COUNT(*) FROM tnt_deliveries WHERE status IN ('TIMED_OUT','SLA_BREACHED') OR previous_status_before_pause IN ('TIMED_OUT','SLA_BREACHED')
+      changes:
+        - sql:
+            sql: SELECT 1
+
+  - changeSet:
+      id: evt-l2-006-rename-at-relay-point
+      author: evt-l2
+      labels: evt-l2
+      comment: >
+        Décision utilisateur du 2026-11-26, [C bis] de decisions-evenements-colis-livraison.md (one name per notion,
+        spec §2.3): AT_RELAY_POINT is renamed AT_RELAY_HUB. Idempotent.
+      changes:
+        - sql:
+            sql: |
+              UPDATE tnt_deliveries SET status = 'AT_RELAY_HUB' WHERE status = 'AT_RELAY_POINT';
+              UPDATE tnt_deliveries SET previous_status_before_pause = 'AT_RELAY_HUB'
+                  WHERE previous_status_before_pause = 'AT_RELAY_POINT';
+
+  - changeSet:
+      id: evt-l2-007-assigned-state
+      author: evt-l2
+      labels: evt-l2
+      comment: >
+        Décision utilisateur du 2026-11-26, [C] de decisions-evenements-colis-livraison.md (row D2): a delivery with a
+        courier and not collected is ASSIGNED, no longer CREATED. Idempotent.
+      changes:
+        - sql:
+            sql: |
+              UPDATE tnt_deliveries SET status = 'ASSIGNED'
+                  WHERE status = 'CREATED' AND delivery_person_id IS NOT NULL;
+              UPDATE tnt_deliveries SET previous_status_before_pause = 'ASSIGNED'
+                  WHERE previous_status_before_pause = 'CREATED' AND delivery_person_id IS NOT NULL;
+
+  - changeSet:
+      id: evt-l2-008-attempt-counter
+      author: evt-l2
+      labels: evt-l2
+      comment: >
+        Décision utilisateur du 2026-11-26, [C.2] de decisions-evenements-colis-livraison.md: the attempt counter
+        counts FAILED hand-over attempts and starts at 0 (it used to start at 1 = "first attempt"). Runs once.
+      changes:
+        - sql:
+            sql: |
+              UPDATE tnt_deliveries SET delivery_attempt_number = GREATEST(delivery_attempt_number - 1, 0);
+              ALTER TABLE tnt_deliveries ALTER COLUMN delivery_attempt_number SET DEFAULT 0;
+
+  - changeSet:
+      id: evt-l2-009-parcel-tracking-code-backfill
+      author: evt-l2
+      labels: evt-l2
+      comment: >
+        D-136 (decision [K.1]): the tracking code moves to the parcel. A parcel whose deliveries carry exactly one
+        distinct code takes it; a parcel with several distinct codes is NOT overwritten (none is chosen silently): the
+        application backfill gives it a new code and logs how many there are; the old delivery codes keep resolving
+        (lookup falls back to tnt_deliveries.tracking_code). Idempotent.
+      changes:
+        - sql:
+            sql: |
+              UPDATE tnt_parcels p SET tracking_code = c.code
+              FROM (SELECT parcel_id, MIN(tracking_code) AS code
+                      FROM tnt_deliveries
+                     WHERE tracking_code IS NOT NULL
+                     GROUP BY parcel_id
+                    HAVING COUNT(DISTINCT tracking_code) = 1) c
+              WHERE p.id = c.parcel_id
+                AND p.tracking_code IS NULL
+                AND NOT EXISTS (SELECT 1 FROM tnt_parcels o WHERE o.tracking_code = c.code);
+
+  - changeSet:
+      id: evt-l2-010-parcel-state-backfill
+      author: evt-l2
+      labels: evt-l2
+      comment: >
+        Parcel state taken from its latest delivery through the delivery → parcel correspondence (spec §2.1): a
+        collected parcel of a FAILED or CANCELLED delivery waits for its return (P11), an uncollected one is free
+        again (P3 / QO-5); PAUSED_BY_INCIDENT uses the memorised state. Only rows without state are touched.
+      changes:
+        - sql:
+            sql: |
+              WITH latest AS (
+                SELECT DISTINCT ON (d.parcel_id)
+                       d.parcel_id, d.id, d.status, d.previous_status_before_pause, d.delivery_person_id,
+                       d.actual_pickup_time, d.updated_at
+                  FROM tnt_deliveries d
+                 ORDER BY d.parcel_id, d.created_at DESC, d.id DESC),
+              eff AS (
+                SELECT l.*, CASE WHEN l.status = 'PAUSED_BY_INCIDENT'
+                                 THEN COALESCE(l.previous_status_before_pause, 'PICKED_UP') ELSE l.status END AS op
+                  FROM latest l)
+              UPDATE tnt_parcels p SET
+                  status = CASE
+                      WHEN e.op IN ('CREATED','ASSIGNED','PICKED_UP','IN_TRANSIT','AT_RELAY_HUB','OUT_FOR_DELIVERY','DELIVERED') THEN e.op
+                      WHEN e.op = 'DELIVERY_ATTEMPT_FAILED' THEN 'DELIVERY_FAILED'
+                      WHEN e.op IN ('FAILED','CANCELLED') AND e.actual_pickup_time IS NOT NULL THEN 'RETURN_REQUESTED'
+                      ELSE 'CREATED' END,
+                  status_changed_at = e.updated_at,
+                  current_delivery_id = CASE WHEN e.status IN ('DELIVERED','FAILED','CANCELLED') THEN NULL ELSE e.id END,
+                  custody_holder_type = CASE
+                      WHEN e.op IN ('PICKED_UP','IN_TRANSIT','OUT_FOR_DELIVERY','DELIVERY_ATTEMPT_FAILED') THEN 'COURIER'
+                      WHEN e.op = 'AT_RELAY_HUB' THEN 'RELAY'
+                      WHEN e.op = 'DELIVERED' THEN 'RECIPIENT'
+                      WHEN e.op IN ('FAILED','CANCELLED') AND e.actual_pickup_time IS NOT NULL THEN 'NONE'
+                      ELSE 'SENDER' END,
+                  custody_holder_id = CASE
+                      WHEN e.op IN ('PICKED_UP','IN_TRANSIT','OUT_FOR_DELIVERY','DELIVERY_ATTEMPT_FAILED') THEN e.delivery_person_id
+                      ELSE NULL END
+              FROM eff e
+              WHERE p.id = e.parcel_id AND p.status IS NULL;
+              UPDATE tnt_parcels SET status = 'CREATED', status_changed_at = COALESCE(updated_at, created_at),
+                                     custody_holder_type = 'SENDER'
+               WHERE status IS NULL;
+              UPDATE tnt_parcels p SET delivery_ids = sub.ids
+              FROM (SELECT parcel_id, '[' || string_agg('"' || id::text || '"', ',' ORDER BY created_at, id) || ']' AS ids
+                      FROM tnt_deliveries GROUP BY parcel_id) sub
+              WHERE p.id = sub.parcel_id AND p.delivery_ids = '[]';
+
+  - changeSet:
+      id: evt-l2-011-delivery-max-attempts-default
+      author: evt-l2
+      labels: evt-l2
+      comment: "Existing deliveries get the platform default maximum (3, spec §5) until their next attempt reads it."
+      changes:
+        - sql:
+            sql: UPDATE tnt_deliveries SET max_attempts = 3 WHERE max_attempts IS NULL;
+
+  - changeSet:
+      id: evt-l2-012-return-draft-without-recipient
+      author: evt-l2
+      labels: evt-l2
+      comment: >
+        QO-4: a RETURN announcement is opened as a draft for its payer. When the delivery has no announcement (direct
+        creation), the sender contact is unknown and the draft has no recipient yet; the payer fills it in before
+        publishing (A2 still refuses an announcement without recipient). Relaxes the NOT NULL of the recipient
+        columns of the announcements; no data is changed. Idempotent.
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE tnt_delivery_announcements ALTER COLUMN recipient_name DROP NOT NULL;
+              ALTER TABLE tnt_delivery_announcements ALTER COLUMN recipient_phone DROP NOT NULL;
+
+  - changeSet:
+      id: evt-l2-013-delivery-return-guarantee
+      author: evt-l2
+      labels: evt-l2
+      comment: >
+        D-147, D-151: return guarantee of a delivery to a relay hub (extra freeze on the sender's wallet, released at
+        collection, debited at the end of the relay storage). Status HELD, RELEASED, CAPTURED, NOT_HANDLED or FAILED,
+        with a stable reason code; NULL when no guarantee is concerned. Partial index for the administrator's list of
+        cases not handled (admin spec §5.2.1). Additive and idempotent.
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS return_guarantee_status VARCHAR(20);
+              ALTER TABLE tnt_deliveries ADD COLUMN IF NOT EXISTS return_guarantee_reason VARCHAR(64);
+              CREATE INDEX IF NOT EXISTS idx_tnt_deliveries_return_guarantee_attention
+                  ON tnt_deliveries (return_guarantee_status, updated_at)
+                  WHERE return_guarantee_status IN ('NOT_HANDLED', 'FAILED');

@@ -1,7 +1,8 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request;
 
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryStatus;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryUrgency;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryStatus;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryUrgency;
 import java.time.Instant;
 import java.util.UUID;
 import com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.response.RelayPointPublicView;
@@ -20,6 +21,7 @@ public class DeliveryResponseDTO {
     private UUID deliveryNeedId;
     private UUID freelancerId;
     private DeliveryStatus status;
+    @JsonDeserialize(using = DeliveryUrgencyInputDeserializer.class)
     private DeliveryUrgency urgency;
     private Double tarif;
     private Double noteLivreur;

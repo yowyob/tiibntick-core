@@ -4,7 +4,6 @@ import com.yowyob.tiibntick.core.dispute.application.command.AddEvidenceCommand;
 import com.yowyob.tiibntick.core.dispute.application.command.RequestEvidenceCommand;
 import com.yowyob.tiibntick.core.dispute.application.port.inbound.IEvidenceUseCase;
 import com.yowyob.tiibntick.core.dispute.application.port.outbound.IBlockchainProofPort;
-import com.yowyob.tiibntick.core.dispute.application.port.outbound.IDisputeEventPublisher;
 import com.yowyob.tiibntick.core.dispute.application.port.outbound.IDisputeRepository;
 import com.yowyob.tiibntick.core.dispute.domain.enums.EvidenceType;
 import com.yowyob.tiibntick.core.dispute.domain.exception.DisputeNotFoundException;
@@ -33,15 +32,12 @@ public class EvidenceApplicationService implements IEvidenceUseCase {
     private static final Logger log = LoggerFactory.getLogger(EvidenceApplicationService.class);
 
     private final IDisputeRepository repository;
-    private final IDisputeEventPublisher eventPublisher;
     private final IBlockchainProofPort blockchainProofPort;
 
     public EvidenceApplicationService(
             final IDisputeRepository repository,
-            final IDisputeEventPublisher eventPublisher,
             final IBlockchainProofPort blockchainProofPort) {
         this.repository = Objects.requireNonNull(repository);
-        this.eventPublisher = Objects.requireNonNull(eventPublisher);
         this.blockchainProofPort = Objects.requireNonNull(blockchainProofPort);
     }
 
@@ -62,8 +58,7 @@ public class EvidenceApplicationService implements IEvidenceUseCase {
                     return anchorOnBlockchainIfNeeded(evidence, dispute)
                             .thenReturn(dispute);
                 })
-                .flatMap(repository::save)
-                .flatMap(saved -> eventPublisher.publishAll(saved).thenReturn(saved));
+                .flatMap(repository::save);
     }
 
     @Override

@@ -18,7 +18,7 @@ public interface ClaimEventPublisherPort {
     record ClaimSubmission(
             UUID tenantId,
             UUID agencyId,
-            UUID missionId,
+            UUID deliveryId,
             String claimType,
             String description,
             String contactEmail

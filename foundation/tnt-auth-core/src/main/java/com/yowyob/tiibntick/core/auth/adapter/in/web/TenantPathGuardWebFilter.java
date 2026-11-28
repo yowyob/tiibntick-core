@@ -29,8 +29,13 @@ import java.util.regex.Pattern;
  *
  * <p>The guard only rejects a <em>proven</em> mismatch: the caller is authenticated with a tenant
  * and the URL carries a different, well-formed tenant id. Callers holding the {@code *} permission
- * (platform administrators) may cross tenants. Requests that are not authenticated through a
- * human JWT (platform clients, anonymous routes) are left to their own security chain.
+ * may cross tenants. Requests that are not authenticated through a human JWT (platform clients,
+ * anonymous routes) are left to their own security chain.
+ *
+ * <p>Decision D-178: a platform administrator ({@code ROLE_TNT_ADMIN}, which only the Core's JWT
+ * converter grants, from its registry) may <b>read</b> any tenant ({@code GET}, {@code HEAD},
+ * {@code OPTIONS}) for support and audit; its writes stay limited to the tenant of its token. Every
+ * such cross-tenant read is written to the {@value #AUDIT_LOGGER} log.
  *
  * <p>It runs after Spring Security's chain (order {@code -100}) so the authentication is available.
  */
@@ -41,6 +46,12 @@ public class TenantPathGuardWebFilter implements WebFilter {
     public static final int ORDER = -50;
 
     private static final Logger log = LoggerFactory.getLogger(TenantPathGuardWebFilter.class);
+    /** Dedicated logger of the cross-tenant reads of platform administrators (D-178). */
+    public static final String AUDIT_LOGGER = "tnt.audit.cross-tenant";
+    private static final Logger audit = LoggerFactory.getLogger(AUDIT_LOGGER);
+    private static final java.util.Set<org.springframework.http.HttpMethod> READS = java.util.Set.of(
+            org.springframework.http.HttpMethod.GET, org.springframework.http.HttpMethod.HEAD,
+            org.springframework.http.HttpMethod.OPTIONS);
     private static final Pattern TENANT_PATH = Pattern.compile("^/api/v1/tenants/([^/]+)(?:/.*)?$");
 
     private final ResolveCurrentUserUseCase currentUser;
@@ -66,6 +77,13 @@ public class TenantPathGuardWebFilter implements WebFilter {
                 .flatMap(ctx -> {
                     if (!ctx.isFullyAuthenticated() || pathTenant.equals(ctx.tenantId())
                             || ctx.permissions().contains("*")) {
+                        return chain.filter(exchange);
+                    }
+                    if (ctx.hasRole(com.yowyob.tiibntick.core.roles.domain.model.PlatformAdminAuthorities.ROLE_TNT_ADMIN)
+                            && READS.contains(exchange.getRequest().getMethod())) {
+                        audit.info("TNT_ADMIN {} (token tenant {}) read tenant {}: {} {}", ctx.userId(),
+                                ctx.tenantId(), pathTenant, exchange.getRequest().getMethod(),
+                                exchange.getRequest().getPath());
                         return chain.filter(exchange);
                     }
                     log.warn("Tenant path guard: user {} of tenant {} asked for tenant {} on {}",

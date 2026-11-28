@@ -1,7 +1,5 @@
 package com.yowyob.tiibntick.delivery.domain;
 
-import com.yowyob.tiibntick.core.delivery.domain.event.AnnouncementPublishedEvent;
-import com.yowyob.tiibntick.core.delivery.domain.event.AnnouncementResponseSelectedEvent;
 import com.yowyob.tiibntick.core.delivery.domain.exception.DeliveryDomainException;
 import com.yowyob.tiibntick.core.delivery.domain.model.aggregate.DeliveryAnnouncement;
 import com.yowyob.tiibntick.core.delivery.domain.model.aggregate.Parcel;
@@ -53,7 +51,9 @@ class DeliveryAnnouncementTest {
     @DisplayName("Draft announcement should be in DRAFT status")
     void shouldCreateDraft() {
         assertThat(announcement.getStatus()).isEqualTo(AnnouncementStatus.DRAFT);
-        assertThat(announcement.getDomainEvents()).isEmpty();
+        assertThat(announcement.getDomainEvents()).singleElement()
+                .satisfies(e -> assertThat(((com.yowyob.tiibntick.core.delivery.domain.event.AggregateEvent) e)
+                        .eventType()).isEqualTo("AnnouncementDraft"));
     }
 
     @Test
@@ -62,8 +62,9 @@ class DeliveryAnnouncementTest {
         announcement.publish();
 
         assertThat(announcement.getStatus()).isEqualTo(AnnouncementStatus.PUBLISHED);
-        assertThat(announcement.getDomainEvents())
-                .anyMatch(e -> e instanceof AnnouncementPublishedEvent);
+        assertThat(announcement.getDomainEvents()).anyMatch(e -> e instanceof
+                com.yowyob.tiibntick.core.delivery.domain.event.AggregateEvent a
+                && "AnnouncementPublished".equals(a.eventType()));
     }
 
     @Test
@@ -98,8 +99,9 @@ class DeliveryAnnouncementTest {
         assertThat(announcement.getSelectedResponseId()).isEqualTo(resp1.getId());
         assertThat(resp1.getStatus()).isEqualTo(ResponseStatus.ACCEPTED);
         assertThat(resp2.getStatus()).isEqualTo(ResponseStatus.REJECTED);
-        assertThat(announcement.getDomainEvents())
-                .anyMatch(e -> e instanceof AnnouncementResponseSelectedEvent);
+        assertThat(announcement.getDomainEvents()).anyMatch(e -> e instanceof
+                com.yowyob.tiibntick.core.delivery.domain.event.AggregateEvent a
+                && "AnnouncementAssigned".equals(a.eventType()));
     }
 
     @Test
@@ -118,7 +120,7 @@ class DeliveryAnnouncementTest {
 
         assertThatThrownBy(announcement::publish)
                 .isInstanceOf(DeliveryDomainException.class)
-                .hasMessageContaining("DRAFT");
+                .hasMessageContaining("row A2");
     }
 
     @Test

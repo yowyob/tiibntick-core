@@ -9,7 +9,7 @@ import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.Announcem
 import com.yowyob.tiibntick.core.gofreelancer.config.GofpDeliveryOtpProperties;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.AnnouncementSnapshot;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.dto.PublishAnnouncementPortCommand;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.announcement.AnnouncementStatus;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.AnnouncementStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -45,13 +45,12 @@ class AnnouncementApplicationServiceTest {
     @Mock private TenantContextHolder tenantContextHolder;
     @Mock private FreelancerQuotaService freelancerQuotaService;
     @Mock private INegotiationChatPort negotiationChatPort;
-    @Mock private IAnnouncementRepository announcementRepository;
-    @Mock private AnnouncementSubscriptionRepository subscriptionRepository;
     @Mock private com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpFreelancerRepository gofpFreelancerRepository;
     @Mock private com.yowyob.tiibntick.core.gofreelancer.application.port.out.GofpUserRepository gofpUserRepository;
     @Mock private com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepository deliveryRepository;
     @Mock private DeliveryOtpService deliveryOtpService;
     @Mock private GofpDeliveryOtpProperties deliveryOtpProperties;
+    @Mock private com.yowyob.tiibntick.core.gofreelancer.application.port.out.IDeliveryLifecyclePort lifecycle;
 
     private AnnouncementApplicationService service;
 
@@ -64,10 +63,10 @@ class AnnouncementApplicationServiceTest {
     void setUp() {
         service = new AnnouncementApplicationService(
                 deliveryAnnouncementPort, tenantContextHolder, freelancerQuotaService,
-                negotiationChatPort, announcementRepository, subscriptionRepository,
+                negotiationChatPort,
                 gofpFreelancerRepository, gofpUserRepository, deliveryRepository, deliveryOtpService,
-                deliveryOtpProperties);
-        lenient().when(announcementRepository.findById(any())).thenReturn(Mono.empty());
+                deliveryOtpProperties, lifecycle);
+        com.yowyob.tiibntick.core.gofreelancer.TestDeliveries.acceptTerms(lifecycle);
         lenient().when(deliveryRepository.findById(any())).thenReturn(Mono.empty());
         lenient().when(gofpFreelancerRepository.findById(any())).thenReturn(Mono.empty());
         lenient().when(gofpFreelancerRepository.findByCoreFreelancerId(any())).thenReturn(Mono.empty());
@@ -87,7 +86,6 @@ class AnnouncementApplicationServiceTest {
         when(tenantContextHolder.currentTenantId()).thenReturn(Mono.just(tenantId));
         when(deliveryAnnouncementPort.publish(any(PublishAnnouncementPortCommand.class)))
                 .thenReturn(Mono.just(published));
-        when(announcementRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
 
         StepVerifier.create(service.createAnnouncement(request))
                 .expectNextMatches(dto -> announcementId.equals(dto.getId()))
@@ -107,7 +105,6 @@ class AnnouncementApplicationServiceTest {
         when(tenantContextHolder.currentTenantId()).thenReturn(Mono.just(tenantId));
         when(deliveryAnnouncementPort.publish(any(PublishAnnouncementPortCommand.class)))
                 .thenReturn(Mono.just(published));
-        when(announcementRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
 
         StepVerifier.create(service.createAnnouncement(request))
                 .expectNextCount(1)
@@ -128,7 +125,6 @@ class AnnouncementApplicationServiceTest {
         when(deliveryAnnouncementPort.findById(tenantId, announcementId)).thenReturn(Mono.just(before));
         when(deliveryAnnouncementPort.selectResponse(tenantId, announcementId, clientId, responseId))
                 .thenReturn(Mono.just(assigned));
-        when(announcementRepository.findById(announcementId)).thenReturn(Mono.empty());
 
         StepVerifier.create(service.assignResponse(announcementId, clientId, responseId))
                 .expectNextCount(1)
@@ -149,7 +145,6 @@ class AnnouncementApplicationServiceTest {
         when(deliveryAnnouncementPort.findById(tenantId, announcementId)).thenReturn(Mono.just(before));
         when(deliveryAnnouncementPort.selectResponse(tenantId, announcementId, clientId, responseId))
                 .thenReturn(Mono.just(assigned));
-        when(announcementRepository.findById(announcementId)).thenReturn(Mono.empty());
 
         StepVerifier.create(service.assignResponse(announcementId, clientId, responseId))
                 .expectNextCount(1)
@@ -237,6 +232,144 @@ class AnnouncementApplicationServiceTest {
         StepVerifier.create(service.respondToAnnouncement(announcementId, request))
                 .expectNextCount(1)
                 .verifyComplete();
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("M1: the price fails to be recorded, then selecting the same response again finishes the job without selecting twice")
+    void assignResponse_priceFailsThenRetrySucceeds() {
+        UUID deliveryId = UUID.randomUUID();
+        UUID responseId = UUID.randomUUID();
+        selectionCreates(deliveryId, responseId);
+        when(lifecycle.recordAgreedTerms(any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(Mono.error(new IllegalStateException("delivery-core unavailable")))
+                .thenAnswer(inv -> Mono.just(new com.yowyob.tiibntick.core.gofreelancer.application.port.out
+                        .IDeliveryLifecyclePort.CoreDeliveryState(deliveryId, "CREATED", null, null, null, null)));
+        when(deliveryRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(deliveryOtpService.initOtpIfAbsentWithCodes(any())).thenReturn(Mono.empty());
+
+        StepVerifier.create(service.assignResponse(announcementId, clientId, responseId))
+                .expectError(com.yowyob.tiibntick.core.gofreelancer.domain.exception.CodedStatusException.class)
+                .verify();
+        verify(deliveryRepository, never()).save(any());
+
+        // The core now reports the announcement as assigned to that response, with its delivery.
+        when(deliveryAnnouncementPort.findById(tenantId, announcementId)).thenReturn(Mono.just(assignedTo(deliveryId, responseId)));
+
+        StepVerifier.create(service.assignResponse(announcementId, clientId, responseId))
+                .expectNextCount(1).verifyComplete();
+
+        verify(deliveryAnnouncementPort, org.mockito.Mockito.times(1))
+                .selectResponse(tenantId, announcementId, clientId, responseId);
+        verify(lifecycle, org.mockito.Mockito.times(2))
+                .recordAgreedTerms(any(), any(), any(), any(), any(), any(), any(), any());
+        verify(deliveryRepository).save(any());
+        verify(deliveryOtpService).initOtpIfAbsentWithCodes(any());
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("M1: replay of a finished selection records nothing again (terms already in the core, gofp row present)")
+    void assignResponse_replayOfFinishedSelection_isIdempotent() {
+        UUID deliveryId = UUID.randomUUID();
+        UUID responseId = UUID.randomUUID();
+        when(tenantContextHolder.currentTenantId()).thenReturn(Mono.just(tenantId));
+        when(deliveryAnnouncementPort.findById(tenantId, announcementId)).thenReturn(Mono.just(assignedTo(deliveryId, responseId)));
+        when(lifecycle.findState(tenantId, deliveryId)).thenReturn(Mono.just(new com.yowyob.tiibntick.core.gofreelancer
+                .application.port.out.IDeliveryLifecyclePort.CoreDeliveryState(deliveryId, "CREATED", null, null, null,
+                null, BigDecimal.valueOf(5000), "XAF", Instant.now(), null, null, null, null, null, null)));
+        com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery row = new com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery();
+        row.setId(deliveryId);
+        when(deliveryRepository.findById(deliveryId)).thenReturn(Mono.just(row));
+        when(deliveryOtpService.initOtpIfAbsentWithCodes(any())).thenReturn(Mono.empty());
+
+        StepVerifier.create(service.assignResponse(announcementId, clientId, responseId))
+                .expectNextCount(1).verifyComplete();
+
+        verify(deliveryAnnouncementPort, never()).selectResponse(any(), any(), any(), any());
+        verify(lifecycle, never()).recordAgreedTerms(any(), any(), any(), any(), any(), any(), any(), any());
+        verify(deliveryRepository, never()).save(any());
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("M1: an announcement assigned to ANOTHER response is not treated as a replay")
+    void alreadySelected_onlyForTheSameResponse() {
+        UUID deliveryId = UUID.randomUUID();
+        UUID responseId = UUID.randomUUID();
+        assertThat(AnnouncementApplicationService.alreadySelected(assignedTo(deliveryId, responseId), responseId)).isTrue();
+        assertThat(AnnouncementApplicationService.alreadySelected(assignedTo(deliveryId, responseId), UUID.randomUUID())).isFalse();
+        assertThat(AnnouncementApplicationService.alreadySelected(assignedTo(null, responseId), responseId)).isFalse();
+        assertThat(AnnouncementApplicationService.alreadySelected(snapshot(
+                AnnouncementSnapshot.PRICING_MODE_FIXED_PRICE, BigDecimal.TEN, "XAF", List.of()), responseId)).isFalse();
+    }
+
+    /** The announcement as the core reports it once {@code responseId} is selected and its delivery created. */
+    private AnnouncementSnapshot assignedTo(UUID deliveryId, UUID responseId) {
+        AnnouncementResponseSnapshot response = new AnnouncementResponseSnapshot(
+                responseId, freelancerId, null, null, "ACCEPTED", Instant.now());
+        return new AnnouncementSnapshot(
+                announcementId, tenantId, clientId, "Delivery announcement", "desc",
+                AnnouncementStatus.ASSIGNED, Instant.now(), Instant.now(),
+                BigDecimal.valueOf(5000), "XAF", AnnouncementSnapshot.PRICING_MODE_FIXED_PRICE,
+                null, null, 0.0, null, null, null, null, null, null, null, null,
+                "Jean Dupont", "+237600000000", responseId, deliveryId, "TNT-1", List.of(response));
+    }
+
+    /** Selection of a fixed-price response that creates core delivery {@code deliveryId}. */
+    private void selectionCreates(UUID deliveryId, UUID responseId) {
+        AnnouncementResponseSnapshot response = new AnnouncementResponseSnapshot(
+                responseId, freelancerId, null, null, "SENT", Instant.now());
+        AnnouncementSnapshot before = snapshot(
+                AnnouncementSnapshot.PRICING_MODE_FIXED_PRICE, BigDecimal.valueOf(5000), "XAF", List.of(response));
+        AnnouncementSnapshot assigned = new AnnouncementSnapshot(
+                announcementId, tenantId, clientId, "Delivery announcement", "desc",
+                AnnouncementStatus.ASSIGNED, Instant.now(), Instant.now(),
+                BigDecimal.valueOf(5000), "XAF", AnnouncementSnapshot.PRICING_MODE_FIXED_PRICE,
+                null, null, 0.0, null, null, null, null, null, null, null, null,
+                "Jean Dupont", "+237600000000", responseId, deliveryId, "TNT-1", List.of(response));
+        when(tenantContextHolder.currentTenantId()).thenReturn(Mono.just(tenantId));
+        when(deliveryAnnouncementPort.findById(tenantId, announcementId)).thenReturn(Mono.just(before));
+        when(deliveryAnnouncementPort.selectResponse(tenantId, announcementId, clientId, responseId))
+                .thenReturn(Mono.just(assigned));
+        when(deliveryRepository.findById(deliveryId)).thenReturn(Mono.empty());
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("lot L1: the agreed price is recorded on the core delivery before the gofp row is written")
+    void assignResponse_recordsTheAgreedPriceInTheCore() {
+        UUID deliveryId = UUID.randomUUID();
+        UUID responseId = UUID.randomUUID();
+        selectionCreates(deliveryId, responseId);
+        when(deliveryRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(deliveryOtpService.initOtpIfAbsentWithCodes(any())).thenReturn(Mono.empty());
+
+        StepVerifier.create(service.assignResponse(announcementId, clientId, responseId))
+                .expectNextCount(1).verifyComplete();
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(lifecycle, deliveryRepository);
+        order.verify(lifecycle).recordAgreedTerms(org.mockito.ArgumentMatchers.eq(tenantId),
+                org.mockito.ArgumentMatchers.eq(deliveryId),
+                org.mockito.ArgumentMatchers.argThat(p -> p != null && p.compareTo(BigDecimal.valueOf(5000)) == 0),
+                org.mockito.ArgumentMatchers.eq("XAF"), any(), any(), any(), any());
+        order.verify(deliveryRepository).save(any());
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("lot L1: if the core cannot record the price, the selection fails and no gofp row is written")
+    void assignResponse_priceNotRecorded_failsTheSelection() {
+        UUID deliveryId = UUID.randomUUID();
+        UUID responseId = UUID.randomUUID();
+        selectionCreates(deliveryId, responseId);
+        when(lifecycle.recordAgreedTerms(any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(Mono.error(new IllegalStateException("delivery-core unavailable")));
+
+        StepVerifier.create(service.assignResponse(announcementId, clientId, responseId))
+                .expectErrorMatches(e -> e instanceof com.yowyob.tiibntick.core.gofreelancer.domain.exception.CodedStatusException c
+                        && c.getStatusCode().value() == 503
+                        && "AGREED_TERMS_NOT_RECORDED".equals(c.getCode())
+                        && c.getReason().contains("Select the same response again"))
+                .verify();
+
+        org.mockito.Mockito.verify(deliveryRepository, org.mockito.Mockito.never()).save(any());
+        org.mockito.Mockito.verify(deliveryOtpService, org.mockito.Mockito.never()).initOtpIfAbsentWithCodes(any());
     }
 
     private AnnouncementSnapshot snapshot(

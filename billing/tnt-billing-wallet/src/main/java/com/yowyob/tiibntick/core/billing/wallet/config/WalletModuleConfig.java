@@ -69,6 +69,32 @@ public class WalletModuleConfig {
     }
 
     /**
+     * Fallback platform-money Kernel WebClient, for this module run standalone (tests); in the app the bootstrap's
+     * {@code KernelBridgeConfig} bean carries the Core service account token, without transport retry.
+     */
+    @Bean("kernelSettlementWebClient")
+    @ConditionalOnMissingBean(name = "kernelSettlementWebClient")
+    public WebClient kernelSettlementWebClient() {
+        return WebClient.builder()
+                .baseUrl(kernelBaseUrl)
+                .defaultHeader("Content-Type", "application/json")
+                .build();
+    }
+
+    /**
+     * Kernel escrow, cash collections and compensation fund (lot L5, spec §4): the payer's or courier's code
+     * operations go through {@code kernelPaymentWebClient} (caller's bearer), platform operations through
+     * {@code kernelSettlementWebClient} (service account, never retried by the transport).
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public com.yowyob.tiibntick.core.billing.wallet.application.port.out.IKernelSettlementPort kernelSettlementPort(
+            @org.springframework.beans.factory.annotation.Qualifier("kernelPaymentWebClient") WebClient user,
+            @org.springframework.beans.factory.annotation.Qualifier("kernelSettlementWebClient") WebClient system) {
+        return new com.yowyob.tiibntick.core.billing.wallet.adapter.out.kernel.KernelSettlementAdapter(user, system);
+    }
+
+    /**
      * Gives every user a Kernel wallet as soon as the Core sees their session (login, refresh) or
      * their profile creation. Disable with {@code tnt.wallet.auto-provision.enabled=false}.
      */

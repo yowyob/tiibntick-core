@@ -2,7 +2,6 @@ package com.yowyob.tiibntick.core.dispute.domain;
 
 import com.yowyob.tiibntick.core.dispute.application.command.*;
 import com.yowyob.tiibntick.core.dispute.domain.enums.*;
-import com.yowyob.tiibntick.core.dispute.domain.event.*;
 import com.yowyob.tiibntick.core.dispute.domain.exception.DisputeStateException;
 import com.yowyob.tiibntick.core.dispute.domain.model.*;
 import org.junit.jupiter.api.DisplayName;
@@ -75,18 +74,16 @@ class DisputeTest {
         }
 
         @Test
-        @DisplayName("should emit DisputeOpened domain event")
-        void shouldEmitDisputeOpenedEvent() {
+        @DisplayName("should record the LT1 opening, published as DisputeOpen on tnt.dispute.events (lot L8)")
+        void shouldRecordTheOpening() {
             Dispute dispute = Dispute.open(buildOpenCmd(), DisputeReference.forSequence(1));
 
-            List<Object> events = dispute.getDomainEvents();
-            assertThat(events).hasSize(1);
-            assertThat(events.get(0)).isInstanceOf(DisputeOpened.class);
-
-            DisputeOpened opened = (DisputeOpened) events.get(0);
-            assertThat(opened.tenantId()).isEqualTo(TENANT);
-            assertThat(opened.cause()).isEqualTo(DisputeCause.PACKAGE_DAMAGED);
-            assertThat(opened.packageId()).isEqualTo(PACKAGE_ID);
+            List<DisputeTransition> pending = dispute.getPendingTransitions();
+            assertThat(pending).hasSize(1);
+            assertThat(pending.get(0).from()).isNull();
+            assertThat(pending.get(0).to()).isEqualTo(DisputeStatus.OPEN);
+            assertThat(dispute.getTenantId()).isEqualTo(TENANT);
+            assertThat(dispute.getPackageId()).isEqualTo(PACKAGE_ID);
         }
 
         @Test
@@ -125,14 +122,14 @@ class DisputeTest {
         @DisplayName("should transition to UNDER_INVESTIGATION when open")
         void shouldTransitionToUnderInvestigation() {
             Dispute dispute = Dispute.open(buildOpenCmd(), DisputeReference.forSequence(1));
-            dispute.clearDomainEvents();
+            dispute.clearPendingTransitions();
 
             dispute.assignMediator(MEDIATOR_ID);
 
             assertThat(dispute.getStatus()).isEqualTo(DisputeStatus.UNDER_INVESTIGATION);
             assertThat(dispute.getAssignedMediatorId()).isEqualTo(MEDIATOR_ID);
-            assertThat(dispute.getDomainEvents()).hasSize(1);
-            assertThat(dispute.getDomainEvents().get(0)).isInstanceOf(MediatorAssigned.class);
+            assertThat(dispute.getPendingTransitions()).singleElement()
+                    .satisfies(t -> assertThat(t.to()).isEqualTo(DisputeStatus.UNDER_INVESTIGATION));
         }
 
         @Test
@@ -153,11 +150,11 @@ class DisputeTest {
     class AddEvidenceTests {
 
         @Test
-        @DisplayName("should add evidence and emit EvidenceSubmitted event")
+        @DisplayName("should add evidence and record the EVIDENCE_ADDED change")
         void shouldAddEvidence() {
             Dispute dispute = Dispute.open(buildOpenCmd(), DisputeReference.forSequence(1));
             dispute.assignMediator(MEDIATOR_ID); // OPEN -> UNDER_INVESTIGATION
-            dispute.clearDomainEvents();
+            dispute.clearPendingTransitions();
 
             DisputeEvidence evidence = DisputeEvidence.create(
                     dispute.getId(), CLAIMANT_ID,
@@ -167,8 +164,8 @@ class DisputeTest {
             dispute.addEvidence(evidence);
 
             assertThat(dispute.getEvidences()).hasSize(1);
-            assertThat(dispute.getDomainEvents()).hasSize(1);
-            assertThat(dispute.getDomainEvents().get(0)).isInstanceOf(EvidenceSubmitted.class);
+            assertThat(dispute.getPendingTransitions()).singleElement()
+                    .satisfies(t -> assertThat(t.changeKind()).isEqualTo("EVIDENCE_ADDED"));
         }
     }
 
@@ -184,7 +181,7 @@ class DisputeTest {
         @DisplayName("should transition to PENDING_COMPENSATION when compensation required")
         void shouldTransitionToPendingCompensationWhenRequired() {
             Dispute dispute = buildDisputeUnderMediation();
-            dispute.clearDomainEvents();
+            dispute.clearPendingTransitions();
 
             CompensationDetails comp = CompensationDetails.approved(
                     new BigDecimal("15000"), "XAF",
@@ -206,7 +203,7 @@ class DisputeTest {
         @DisplayName("should transition to CLOSED_RESOLVED when no compensation required")
         void shouldCloseWhenNoCompensation() {
             Dispute dispute = buildDisputeUnderMediation();
-            dispute.clearDomainEvents();
+            dispute.clearPendingTransitions();
 
             RuleDisputeCommand cmd = new RuleDisputeCommand(
                     dispute.getId(), TENANT, MEDIATOR_ID,
@@ -231,7 +228,7 @@ class DisputeTest {
         @DisplayName("should close as CLOSED_WITHDRAWN when in withdrawable state")
         void shouldWithdraw() {
             Dispute dispute = Dispute.open(buildOpenCmd(), DisputeReference.forSequence(1));
-            dispute.clearDomainEvents();
+            dispute.clearPendingTransitions();
 
             dispute.withdraw(CLAIMANT_ID);
 
@@ -249,18 +246,18 @@ class DisputeTest {
     }
 
     // =========================================================================
-    // DOMAIN EVENTS — clearDomainEvents
+    // PENDING CHANGES — clearPendingTransitions
     // =========================================================================
 
     @Test
-    @DisplayName("clearDomainEvents() should remove all accumulated events")
-    void shouldClearDomainEvents() {
+    @DisplayName("clearPendingTransitions() should forget the published changes")
+    void shouldClearPendingTransitions() {
         Dispute dispute = Dispute.open(buildOpenCmd(), DisputeReference.forSequence(1));
-        assertThat(dispute.getDomainEvents()).isNotEmpty();
+        assertThat(dispute.getPendingTransitions()).isNotEmpty();
 
-        dispute.clearDomainEvents();
+        dispute.clearPendingTransitions();
 
-        assertThat(dispute.getDomainEvents()).isEmpty();
+        assertThat(dispute.getPendingTransitions()).isEmpty();
     }
 
     // =========================================================================
@@ -269,18 +266,18 @@ class DisputeTest {
 
     private Dispute buildDisputeUnderMediation() {
         Dispute dispute = Dispute.open(buildOpenCmd(), DisputeReference.forSequence(1));
-        dispute.clearDomainEvents();
+        dispute.clearPendingTransitions();
         dispute.assignMediator(MEDIATOR_ID);
-        dispute.clearDomainEvents();
+        dispute.clearPendingTransitions();
         dispute.startMediation();
-        dispute.clearDomainEvents();
+        dispute.clearPendingTransitions();
         return dispute;
     }
 
     private Dispute buildClosedDispute() {
         Dispute dispute = Dispute.open(buildOpenCmd(), DisputeReference.forSequence(1));
         dispute.withdraw(CLAIMANT_ID);
-        dispute.clearDomainEvents();
+        dispute.clearPendingTransitions();
         return dispute;
     }
 }

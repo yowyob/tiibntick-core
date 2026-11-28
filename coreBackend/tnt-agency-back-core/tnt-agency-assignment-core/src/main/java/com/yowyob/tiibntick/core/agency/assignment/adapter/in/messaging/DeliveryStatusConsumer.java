@@ -1,6 +1,5 @@
 package com.yowyob.tiibntick.core.agency.assignment.adapter.in.messaging;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yowyob.tiibntick.core.agency.assignment.application.service.MissionService;
 import com.yowyob.tiibntick.core.agency.assignment.application.service.MissionService.CoreMissionSyncHint;
@@ -11,11 +10,17 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
-import reactor.core.publisher.Mono;
 
-import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Keeps the agency mission projection in step with the core delivery (lot L8, spec §3.7): every status transition of
+ * {@code tnt.delivery.events} (creation included, status {@code CREATED}) is applied by
+ * {@link MissionService#syncFromCoreStatus}; the projection is created from the masked snapshot when missing
+ * (agency, district/city of the addresses, recipient display name, relay hub). Replaces the listeners of
+ * {@code tnt.delivery.mission.created / mission.status.changed / package.delivered}. Changes without a transition and
+ * legacy records are ignored. The work is awaited (lot L7 rule): a failure is retried, then dead-lettered.
+ */
 @Component
 @ConditionalOnProperty(name = "tnt.agency.kafka.consumers.enabled", havingValue = "true", matchIfMissing = true)
 public class DeliveryStatusConsumer {
@@ -31,101 +36,48 @@ public class DeliveryStatusConsumer {
     }
 
     @KafkaListener(
-            topics = "${tnt.kafka.topics.consumed.core-mission-status}",
+            topics = com.yowyob.tiibntick.common.kafka.TntTopics.DELIVERY_EVENTS,
             groupId = "${tnt.kafka.topics.groups.agency-erp-delivery:tnt-agency-erp-delivery-consumer}",
             containerFactory = "agencyAssignmentKafkaListenerFactory"
     )
-    public void onMissionStatusChanged(ConsumerRecord<String, String> record, Acknowledgment ack) {
-        handle(record, ack, "status-changed");
-    }
-
-    @KafkaListener(
-            topics = "${tnt.kafka.topics.consumed.core-mission-created}",
-            groupId = "${tnt.kafka.topics.groups.agency-erp-delivery:tnt-agency-erp-delivery-consumer}",
-            containerFactory = "agencyAssignmentKafkaListenerFactory"
-    )
-    public void onMissionCreated(ConsumerRecord<String, String> record, Acknowledgment ack) {
-        handle(record, ack, "created");
-    }
-
-    @KafkaListener(
-            topics = "${tnt.kafka.topics.consumed.core-package-delivered}",
-            groupId = "${tnt.kafka.topics.groups.agency-erp-delivery:tnt-agency-erp-delivery-consumer}",
-            containerFactory = "agencyAssignmentKafkaListenerFactory"
-    )
-    public void onPackageDelivered(ConsumerRecord<String, String> record, Acknowledgment ack) {
-        try {
-            Map<String, Object> payload = objectMapper.readValue(record.value(), new TypeReference<>() {});
-            String missionIdStr = stringVal(payload.get("missionId"), payload.get("coreMissionId"));
-            String tenantIdStr = stringVal(payload.get("tenantId"));
-            if (missionIdStr == null || tenantIdStr == null) {
-                ack.acknowledge();
-                return;
+    public void onDeliveryEvent(ConsumerRecord<String, String> record, Acknowledgment ack) throws Exception {
+        com.fasterxml.jackson.databind.JsonNode event = objectMapper.readTree(record.value());
+        com.fasterxml.jackson.databind.JsonNode p = event.path("payload");
+        String status = p.path("status").asText(null);
+        String previous = event.path("previousState").path("status").asText(null);
+        if (com.yowyob.tiibntick.common.kafka.TntAggregateEvent.isAggregateEvent(event) && status != null
+                && !status.equals(previous) && event.hasNonNull("tenantId")) {
+            UUID tenantId = UUID.fromString(event.path("tenantId").asText());
+            UUID deliveryId = UUID.fromString(event.path("aggregateId").asText());
+            var mission = com.yowyob.tiibntick.common.kafka.ReactiveListenerSupport.awaitBounded(
+                    missionService.syncFromCoreStatus(tenantId, deliveryId, status, hintFrom(p)),
+                    java.time.Duration.ofSeconds(30));
+            if (mission != null) {
+                log.debug("[DeliveryStatusConsumer] synced coreMissionId={} status={}", deliveryId, status);
             }
-            sync(UUID.fromString(tenantIdStr), UUID.fromString(missionIdStr), "DELIVERED",
-                    hintFrom(payload), ack);
-        } catch (Exception e) {
-            log.warn("[DeliveryStatusConsumer] package.delivered parse error: {}", e.getMessage());
-            ack.acknowledge();
         }
+        ack.acknowledge();
     }
 
-    private void handle(ConsumerRecord<String, String> record, Acknowledgment ack, String kind) {
-        try {
-            Map<String, Object> payload = objectMapper.readValue(record.value(), new TypeReference<>() {});
-            String missionIdStr = stringVal(payload.get("missionId"), payload.get("coreMissionId"));
-            String tenantIdStr = stringVal(payload.get("tenantId"));
-            if (missionIdStr == null || tenantIdStr == null) {
-                ack.acknowledge();
-                return;
-            }
-            String status = stringVal(payload.get("status"), payload.get("newStatus"));
-            if (status == null && "created".equals(kind)) {
-                status = "CREATED";
-            }
-            if (status == null) {
-                ack.acknowledge();
-                return;
-            }
-            sync(UUID.fromString(tenantIdStr), UUID.fromString(missionIdStr), status,
-                    hintFrom(payload), ack);
-        } catch (Exception e) {
-            log.warn("[DeliveryStatusConsumer] {} parse error: {}", kind, e.getMessage());
-            ack.acknowledge();
-        }
-    }
-
-    private void sync(UUID tenantId, UUID coreMissionId, String status,
-                      CoreMissionSyncHint hint, Acknowledgment ack) {
-        missionService.syncFromCoreStatus(tenantId, coreMissionId, status, hint)
-                .doOnSuccess(m -> {
-                    if (m != null) {
-                        log.debug("[DeliveryStatusConsumer] synced coreMissionId={} status={}",
-                                coreMissionId, status);
-                    }
-                })
-                .doOnError(e -> log.warn("[DeliveryStatusConsumer] sync failed coreMissionId={}: {}",
-                        coreMissionId, e.getMessage()))
-                .onErrorResume(e -> Mono.empty())
-                .doFinally(s -> ack.acknowledge())
-                .subscribe();
-    }
-
-    private static CoreMissionSyncHint hintFrom(Map<String, Object> payload) {
+    static CoreMissionSyncHint hintFrom(com.fasterxml.jackson.databind.JsonNode p) {
         return new CoreMissionSyncHint(
-                uuidVal(payload.get("agencyId"), payload.get("agency_id")),
-                uuidVal(payload.get("branchId"), payload.get("branch_id")),
-                stringVal(payload.get("pickupAddress"), payload.get("pickup_address")),
-                stringVal(payload.get("deliveryAddress"), payload.get("delivery_address")),
-                stringVal(payload.get("senderName"), payload.get("sender_name")),
-                stringVal(payload.get("recipientName"), payload.get("recipient_name")),
-                stringVal(payload.get("recipientPhone"), payload.get("recipient_phone")),
-                doubleVal(payload.get("weightKg"), payload.get("weight_kg")),
-                doubleVal(payload.get("distanceKm"), payload.get("distance_km")),
-                intVal(payload.get("packagesCount"), payload.get("packages_count")),
-                stringVal(payload.get("priority")),
-                uuidVal(payload.get("targetHubId"), payload.get("target_hub_id"), payload.get("relayPointId"))
-        );
+                uuidVal(text(p, "agencyId")), null,
+                place(p.path("pickupAddress")), place(p.path("deliveryAddress")),
+                null, text(p, "recipientDisplayName"), null,
+                null, null, null, null,
+                uuidVal(text(p, "relayHubId")));
+    }
+
+    /** "district, city" of a masked address (spec §3.4), null when absent. */
+    private static String place(com.fasterxml.jackson.databind.JsonNode address) {
+        String joined = java.util.stream.Stream.of(text(address, "district"), text(address, "city"))
+                .filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.joining(", "));
+        return joined.isBlank() ? null : joined;
+    }
+
+    private static String text(com.fasterxml.jackson.databind.JsonNode node, String field) {
+        com.fasterxml.jackson.databind.JsonNode value = node.path(field);
+        return value.isMissingNode() || value.isNull() || value.asText().isBlank() ? null : value.asText();
     }
 
     private static String stringVal(Object... candidates) {
@@ -152,35 +104,4 @@ public class DeliveryStatusConsumer {
         }
     }
 
-    private static Double doubleVal(Object... candidates) {
-        for (Object c : candidates) {
-            if (c instanceof Number n) {
-                return n.doubleValue();
-            }
-            if (c != null) {
-                try {
-                    return Double.parseDouble(c.toString());
-                } catch (NumberFormatException ignored) {
-                    // next
-                }
-            }
-        }
-        return null;
-    }
-
-    private static Integer intVal(Object... candidates) {
-        for (Object c : candidates) {
-            if (c instanceof Number n) {
-                return n.intValue();
-            }
-            if (c != null) {
-                try {
-                    return Integer.parseInt(c.toString());
-                } catch (NumberFormatException ignored) {
-                    // next
-                }
-            }
-        }
-        return null;
-    }
 }

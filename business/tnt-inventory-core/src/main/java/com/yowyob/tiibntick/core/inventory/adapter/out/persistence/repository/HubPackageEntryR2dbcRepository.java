@@ -10,4 +10,6 @@ public interface HubPackageEntryR2dbcRepository extends ReactiveCrudRepository<H
     @Query("SELECT * FROM tnt_hub_package_entries WHERE hub_id = :hubId AND picked_up_at IS NULL")
     Flux<HubPackageEntryEntity> findActiveByHubId(UUID hubId);
     Flux<HubPackageEntryEntity> findByHubId(UUID hubId);
+
+    Flux<HubPackageEntryEntity> findByOwnerActorId(UUID ownerActorId);
 }

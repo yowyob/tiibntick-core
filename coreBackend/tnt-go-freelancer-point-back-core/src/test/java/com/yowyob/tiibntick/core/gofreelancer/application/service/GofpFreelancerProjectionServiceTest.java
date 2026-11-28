@@ -100,7 +100,7 @@ class GofpFreelancerProjectionServiceTest {
         assertThat(savedFl.getId()).isEqualTo(PROFILE_ID);
         assertThat(savedFl.getCoreFreelancerId()).isEqualTo(PROFILE_ID);
         assertThat(savedFl.getCoreUserId()).isEqualTo(CORE_USER);
-        assertThat(savedFl.getStatus()).isEqualTo(FreelancerStatus.APPROVED);
+        assertThat(savedFl.getStatus()).isEqualTo(FreelancerStatus.PENDING);
         assertThat(savedFl.getIsActive()).isTrue();
         assertThat(savedFl.getRemainingDeliveries()).isEqualTo(DEFAULT_INITIAL_QUOTA);
 
@@ -111,7 +111,9 @@ class GofpFreelancerProjectionServiceTest {
         assertThat(savedDp.getId()).isEqualTo(PROFILE_ID);
         assertThat(savedDp.getActorId()).isEqualTo(CORE_USER);
         assertThat(savedDp.getTenantId()).isEqualTo(TENANT_ID);
-        assertThat(savedDp.getStatus()).isEqualTo(DeliveryPersonStatus.APPROVED);
+        assertThat(savedDp.getStatus())
+                .as("no auto-approval: an administrator approves the new delivery person")
+                .isEqualTo(DeliveryPersonStatus.PENDING);
     }
 
     // ── Test 2: idempotence — second call produces no writes ─────────────

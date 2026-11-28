@@ -44,6 +44,11 @@ public interface DisputeR2dbcRepository extends ReactiveCrudRepository<DisputeEn
             """)
     Mono<Boolean> existsActiveDisputeForPackage(String packageId, String tenantId);
 
+    /** Lot L4: the dispute an incident was escalated into (idempotent automatic opening). */
+    @Query("SELECT * FROM tnt_disputes WHERE incident_id = :incidentId AND tenant_id = :tenantId LIMIT 1")
+    Mono<com.yowyob.tiibntick.core.dispute.infrastructure.adapter.out.persistence.entity.DisputeEntity>
+            findFirstByIncidentId(String incidentId, String tenantId);
+
     @Query("""
             SELECT * FROM tnt_disputes
             WHERE tenant_id = :tenantId

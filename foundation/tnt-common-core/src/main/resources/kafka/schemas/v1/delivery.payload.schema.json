@@ -1,0 +1,491 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:tnt:kafka:v1:delivery.payload",
+  "title": "Payload of tnt.delivery.events (spec §3.6), full masked delivery state after the event",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "deliveryId",
+    "parcelId",
+    "kind",
+    "parentDeliveryId",
+    "status",
+    "previousStatusBeforeIncident",
+    "announcementId",
+    "agencyId",
+    "platform",
+    "senderId",
+    "senderDisplayName",
+    "recipientActorId",
+    "recipientDisplayName",
+    "courierId",
+    "vehicleId",
+    "freelancerOrgId",
+    "pickupAddress",
+    "deliveryAddress",
+    "relayHubId",
+    "pickupWindow",
+    "deliveryWindow",
+    "eta",
+    "attemptCount",
+    "maxAttempts",
+    "failureReason",
+    "lastAttemptReason",
+    "cancellationReason",
+    "returnCostPayer",
+    "late",
+    "lateSince",
+    "activeAlerts",
+    "openIncidentId",
+    "frozenByDispute",
+    "agreedAmount",
+    "currency",
+    "payment",
+    "relayStorageExpiresAt",
+    "createdAt",
+    "updatedAt",
+    "deliveredAt",
+    "failedAt",
+    "cancelledAt"
+  ],
+  "properties": {
+    "deliveryId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "parcelId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "kind": {
+      "enum": [
+        "OUTBOUND",
+        "RETURN",
+        "REDELIVERY"
+      ]
+    },
+    "parentDeliveryId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "status": {
+      "enum": [
+        "CREATED",
+        "ASSIGNED",
+        "PICKED_UP",
+        "IN_TRANSIT",
+        "AT_RELAY_HUB",
+        "OUT_FOR_DELIVERY",
+        "DELIVERY_ATTEMPT_FAILED",
+        "DELIVERED",
+        "FAILED",
+        "CANCELLED",
+        "INCIDENT_REPORTED",
+        "PAUSED_BY_INCIDENT",
+        "INCIDENT_HANDOVER"
+      ]
+    },
+    "previousStatusBeforeIncident": {
+      "enum": [
+        "CREATED",
+        "ASSIGNED",
+        "PICKED_UP",
+        "IN_TRANSIT",
+        "AT_RELAY_HUB",
+        "OUT_FOR_DELIVERY",
+        "DELIVERY_ATTEMPT_FAILED",
+        "DELIVERED",
+        "FAILED",
+        "CANCELLED",
+        "INCIDENT_REPORTED",
+        "PAUSED_BY_INCIDENT",
+        "INCIDENT_HANDOVER",
+        null
+      ]
+    },
+    "announcementId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "agencyId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "platform": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "senderId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "senderDisplayName": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "recipientActorId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "recipientDisplayName": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "courierId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "vehicleId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "freelancerOrgId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "pickupAddress": {
+      "$ref": "#/$defs/maskedAddress"
+    },
+    "deliveryAddress": {
+      "$ref": "#/$defs/maskedAddress"
+    },
+    "relayHubId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "pickupWindow": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "start",
+        "end"
+      ],
+      "properties": {
+        "start": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "end": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      }
+    },
+    "deliveryWindow": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "start",
+        "end"
+      ],
+      "properties": {
+        "start": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "end": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      }
+    },
+    "eta": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "attemptCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "maxAttempts": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "failureReason": {
+      "enum": [
+        "CLIENT_ABSENT_AT_DELIVERY",
+        "CLIENT_PHONE_UNREACHABLE",
+        "CLIENT_REFUSED_RECEPTION",
+        "CLIENT_REFUSED_OTP_VALIDATION",
+        "CLIENT_WRONG_ADDRESS",
+        "CLIENT_INCOMPLETE_ADDRESS",
+        "CLIENT_BUILDING_ACCESS_BLOCKED",
+        "MAX_ATTEMPTS_REACHED",
+        "NOT_COLLECTED_AT_RELAY",
+        "INCIDENT_UNRESOLVED",
+        "PARCEL_LOST",
+        "PARCEL_DAMAGED",
+        null
+      ]
+    },
+    "lastAttemptReason": {
+      "enum": [
+        "CLIENT_ABSENT_AT_DELIVERY",
+        "CLIENT_PHONE_UNREACHABLE",
+        "CLIENT_REFUSED_RECEPTION",
+        "CLIENT_REFUSED_OTP_VALIDATION",
+        "CLIENT_WRONG_ADDRESS",
+        "CLIENT_INCOMPLETE_ADDRESS",
+        "CLIENT_BUILDING_ACCESS_BLOCKED",
+        "MAX_ATTEMPTS_REACHED",
+        "NOT_COLLECTED_AT_RELAY",
+        "INCIDENT_UNRESOLVED",
+        "PARCEL_LOST",
+        "PARCEL_DAMAGED",
+        null
+      ]
+    },
+    "cancellationReason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "returnCostPayer": {
+      "enum": [
+        "SENDER",
+        "RECIPIENT",
+        "COURIER",
+        "PLATFORM",
+        "RELAY",
+        "AGENCY",
+        "NONE",
+        null
+      ]
+    },
+    "late": {
+      "type": "boolean"
+    },
+    "lateSince": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "activeAlerts": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "openIncidentId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "frozenByDispute": {
+      "type": "boolean"
+    },
+    "agreedAmount": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "currency": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "payment": {
+      "type": "object",
+      "required": [
+        "mode",
+        "status"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "ESCROW",
+            "CASH",
+            "NONE"
+          ]
+        },
+        "status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "relayStorageExpiresAt": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "createdAt": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "deliveredAt": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "failedAt": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "cancelledAt": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    }
+  },
+  "$defs": {
+    "maskedAddress": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Masked address (decision G.3): no street, landmark, postal code or exact position; coordinates rounded (QO-17). Copy of envelope.schema.json $defs/maskedAddress.",
+      "required": [
+        "district",
+        "city",
+        "country",
+        "approxLatitude",
+        "approxLongitude"
+      ],
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "street"
+            ]
+          },
+          {
+            "required": [
+              "landmark"
+            ]
+          },
+          {
+            "required": [
+              "postalCode"
+            ]
+          },
+          {
+            "required": [
+              "latitude"
+            ]
+          },
+          {
+            "required": [
+              "longitude"
+            ]
+          }
+        ]
+      },
+      "properties": {
+        "district": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "city": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "country": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "approxLatitude": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -90,
+          "maximum": 90
+        },
+        "approxLongitude": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -180,
+          "maximum": 180
+        }
+      }
+    }
+  }
+}

@@ -1,6 +1,6 @@
 package com.yowyob.tiibntick.core.gofreelancer.adapter.in.web.request;
 
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryStatus;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryStatus;
 import lombok.Builder;
 import lombok.Data;
 

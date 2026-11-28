@@ -260,6 +260,8 @@
         <r2dbc-h2.version>1.1.0.RELEASE</r2dbc-h2.version>
         <!-- ArchUnit : test reactor-wide anti-régression des couches Maven (Chantier E, Audit n1 reco P1) -->
         <archunit.version>1.3.0</archunit.version>
+        <!-- JSON Schema validation of the Kafka aggregate events (lot L0 evt-socle-evenements, spec §3.6) -->
+        <json-schema-validator.version>1.5.1</json-schema-validator.version>
 
         <!-- ── Plugins Maven ── -->
         <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
@@ -279,6 +281,10 @@
              so CI coverage reporting is unaffected. Run `mvn verify -Djacoco.skip=false` (or
              `-Pgitlab-ci`) locally when you actually want a coverage report. -->
         <jacoco.skip>true</jacoco.skip>
+
+        <!-- System tenant used ONLY by the test JVMs (surefire/failsafe). The application has no default
+             system tenant: production/dev must set TNT_SYSTEM_TENANT_ID (see SystemTenant). -->
+        <tnt.test.system-tenant-id>d3b07384-d9a0-4c9c-b7d1-5f2a1b6c0e91</tnt.test.system-tenant-id>
 
         <!-- ── GitLab CI — project ID pour le Package Registry ── -->
         <!-- Remplacer par les vrais IDs de projet GitLab après création -->
@@ -1196,6 +1202,12 @@
                 <version>${archunit.version}</version>
                 <scope>test</scope>
             </dependency>
+            <dependency>
+                <groupId>com.networknt</groupId>
+                <artifactId>json-schema-validator</artifactId>
+                <version>${json-schema-validator.version}</version>
+                <scope>test</scope>
+            </dependency>
 
         </dependencies>
     </dependencyManagement>
@@ -1326,6 +1338,9 @@
                             ${jacoco.agent.argLine}
                             -Djava.security.egd=file:/dev/./urandom
                         </argLine>
+                        <systemPropertyVariables>
+                            <tnt.roles.system-tenant-id>${tnt.test.system-tenant-id}</tnt.roles.system-tenant-id>
+                        </systemPropertyVariables>
                     </configuration>
                 </plugin>
 
@@ -1339,6 +1354,9 @@
                             <include>**/*IntegrationTest.java</include>
                             <include>**/*IT.java</include>
                         </includes>
+                        <systemPropertyVariables>
+                            <tnt.roles.system-tenant-id>${tnt.test.system-tenant-id}</tnt.roles.system-tenant-id>
+                        </systemPropertyVariables>
                     </configuration>
                     <executions>
                         <execution>

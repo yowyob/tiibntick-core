@@ -11,3 +11,6 @@ databaseChangeLog:
   - include:
       file: db/changelog/changes/004_index_tnt_role_sync_outbox_reads.sql
       relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/005_create_tnt_platform_role_grants_table.sql
+      relativeToChangelogFile: false

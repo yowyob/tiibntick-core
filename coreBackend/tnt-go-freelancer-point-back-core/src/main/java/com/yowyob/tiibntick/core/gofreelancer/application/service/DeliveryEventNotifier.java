@@ -4,6 +4,7 @@ import com.yowyob.tiibntick.core.delivery.application.port.in.DeliveryQueryUseCa
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.IAnnouncementRepository;
 import com.yowyob.tiibntick.core.gofreelancer.application.port.out.PushNotificationPort;
+import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpNotificationTemplates;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -48,29 +49,29 @@ public class DeliveryEventNotifier {
                 }
             }));
 
-    /** Who is told what, for a given new status. */
-    record Message(String title, String body, boolean client, boolean driver) {}
+    /** Who is told what, for a given new status: a catalog message (rendered in each recipient's language). */
+    record Message(String templateKey, Map<String, Object> params, boolean client, boolean driver) {}
+
+    /** Lot L8: whether a delivery entering this status is notified (the caller then resolves the tracking code). */
+    public static boolean isNotified(String newStatus) {
+        return newStatus != null && messageFor(newStatus, null).isPresent();
+    }
 
     static Optional<Message> messageFor(String newStatus, String trackingCode) {
-        String ref = trackingCode != null && !trackingCode.isBlank() ? " " + trackingCode : "";
+        // " TNT-42" so that the catalog text reads "Votre colis TNT-42 ..." or "Votre colis ..." without a code.
+        Map<String, Object> params = Map.of("ref", trackingCode != null && !trackingCode.isBlank()
+                ? " " + trackingCode : "");
         return switch (newStatus) {
-            case "PICKED_UP" -> Optional.of(new Message("Colis récupéré",
-                    "Votre colis" + ref + " a été récupéré par le livreur.", true, false));
-            case "IN_TRANSIT" -> Optional.of(new Message("Colis en route",
-                    "Votre colis" + ref + " est en cours de livraison.", true, false));
-            case "AT_RELAY_POINT" -> Optional.of(new Message("Colis au point relais",
-                    "Votre colis" + ref + " a été déposé dans un point relais.", true, false));
-            case "DELIVERED" -> Optional.of(new Message("Colis livré",
-                    "Votre colis" + ref + " a été livré.", true, false));
-            case "FAILED" -> Optional.of(new Message("Livraison échouée",
-                    "La livraison du colis" + ref + " n'a pas pu aboutir.", true, false));
-            case "CANCELLED" -> Optional.of(new Message("Livraison annulée",
-                    "La livraison du colis" + ref + " a été annulée.", true, true));
-            case "PAUSED_BY_INCIDENT" -> Optional.of(new Message("Livraison suspendue",
-                    "La livraison du colis" + ref + " est suspendue à cause d'un incident. "
-                            + "Nous revenons vers vous dès sa résolution.", true, true));
-            case "TIMED_OUT", "SLA_BREACHED" -> Optional.of(new Message("Livraison en retard",
-                    "La livraison du colis" + ref + " dépasse le délai prévu.", true, true));
+            case "PICKED_UP" -> Optional.of(new Message(GofpNotificationTemplates.DELIVERY_PICKED_UP, params, true, false));
+            case "IN_TRANSIT" -> Optional.of(new Message(GofpNotificationTemplates.DELIVERY_IN_TRANSIT, params, true, false));
+            // lot L8 (spec §2.3): AT_RELAY_POINT is gone — only aggregate events (AT_RELAY_HUB) reach this notifier
+            case "AT_RELAY_HUB" -> Optional.of(new Message(GofpNotificationTemplates.DELIVERY_AT_RELAY_HUB, params, true, false));
+            case "DELIVERED" -> Optional.of(new Message(GofpNotificationTemplates.DELIVERY_DELIVERED, params, true, false));
+            case "FAILED" -> Optional.of(new Message(GofpNotificationTemplates.DELIVERY_FAILED, params, true, false));
+            case "CANCELLED" -> Optional.of(new Message(GofpNotificationTemplates.DELIVERY_CANCELLED, params, true, true));
+            case "PAUSED_BY_INCIDENT" -> Optional.of(new Message(GofpNotificationTemplates.DELIVERY_PAUSED, params, true, true));
+            // TIMED_OUT / SLA_BREACHED are no longer states (decision [C.3]): lateness is the DeliveryAlertRaised event
+            // (alertType DELIVERY_LATE) of tnt.delivery.events, notified by onDeliveryLate (lot L3).
             default -> Optional.empty();
         };
     }
@@ -79,17 +80,33 @@ public class DeliveryEventNotifier {
      * @return the number of notifications handed to the notification module (0 when the event is a
      *         replay, concerns no gofp delivery, or the status is not worth a notification)
      */
-    public Mono<Integer> onMissionStatusChanged(UUID eventId, UUID deliveryId, UUID tenantId,
+    public Mono<Integer> onDeliveryStatusChanged(UUID eventId, UUID deliveryId, UUID tenantId,
                                                 String newStatus, String trackingCode) {
         Optional<Message> message = messageFor(newStatus, trackingCode);
         if (message.isEmpty()) {
             return Mono.just(0);
         }
+        return notify(eventId, deliveryId, tenantId, message.get());
+    }
+
+    /**
+     * {@code DeliveryAlertRaised(DELIVERY_LATE)} on {@code tnt.delivery.events} (lot L3, QO-18): the client and the
+     * courier are told that the delivery is late.
+     *
+     * @return the number of notifications handed to the notification module
+     */
+    public Mono<Integer> onDeliveryLate(UUID eventId, UUID deliveryId, UUID tenantId, String trackingCode) {
+        Map<String, Object> params = Map.of("ref", trackingCode != null && !trackingCode.isBlank()
+                ? " " + trackingCode : "");
+        return notify(eventId, deliveryId, tenantId,
+                new Message(GofpNotificationTemplates.DELIVERY_LATE, params, true, true));
+    }
+
+    private Mono<Integer> notify(UUID eventId, UUID deliveryId, UUID tenantId, Message m) {
         if (eventId != null && !handledEvents.add(eventId)) {
-            log.debug("Mission event {} already notified, skipping", eventId);
+            log.debug("Delivery event {} already notified, skipping", eventId);
             return Mono.just(0);
         }
-        Message m = message.get();
         return deliveryRepository.findById(deliveryId).flatMap(delivery -> {
             Mono<UUID> client = !m.client() || delivery.getAnnouncementId() == null ? Mono.empty()
                     : announcementRepository.findById(delivery.getAnnouncementId())
@@ -110,7 +127,7 @@ public class DeliveryEventNotifier {
                         return Mono.just(recipients);
                     })
                     .flatMap(recipients -> reactor.core.publisher.Flux.fromIterable(recipients)
-                            .flatMap(r -> pushNotificationPort.sendPushNotification(tenantId, r, m.title(), m.body())
+                            .flatMap(r -> pushNotificationPort.sendLocalized(tenantId, r, m.templateKey(), m.params())
                                     .onErrorResume(e -> {
                                         log.warn("Notification to {} for delivery {} failed: {}", r, deliveryId, e.getMessage());
                                         return Mono.empty();

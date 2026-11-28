@@ -44,7 +44,7 @@ public class GofpUserService implements GofpUserUseCase {
                     return userRepository.save(user);
                 })
                 .switchIfEmpty(Mono.defer(() -> {
-                    if (user.getId() == null) user.setId(UUID.randomUUID());
+                    user.setId(user.getCoreUserId()); // the row id is the actor id (lot L3, C1)
                     user.setCreatedAt(Instant.now());
                     user.setUpdatedAt(Instant.now());
                     log.info("Creating GofpUser for coreUserId={}", user.getCoreUserId());

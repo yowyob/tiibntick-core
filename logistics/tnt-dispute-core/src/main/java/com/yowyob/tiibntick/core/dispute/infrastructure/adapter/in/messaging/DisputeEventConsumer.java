@@ -1,10 +1,14 @@
 package com.yowyob.tiibntick.core.dispute.infrastructure.adapter.in.messaging;
 
+import com.yowyob.tiibntick.common.kafka.TntAggregateEvent;
+import com.yowyob.tiibntick.common.kafka.TntTopics;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yowyob.tiibntick.core.dispute.application.command.OpenDisputeCommand;
 import com.yowyob.tiibntick.core.dispute.application.command.ProcessCompensationCommand;
-import com.yowyob.tiibntick.core.dispute.application.port.inbound.IDisputeCommandUseCase;
+import com.yowyob.tiibntick.common.kafka.ReactiveListenerSupport;
+import com.yowyob.tiibntick.core.dispute.application.port.inbound.IDisputeSystemUseCase;
 import com.yowyob.tiibntick.core.dispute.domain.enums.ClaimantType;
 import com.yowyob.tiibntick.core.dispute.domain.enums.DisputeCategory;
 import com.yowyob.tiibntick.core.dispute.domain.enums.DisputeCause;
@@ -29,14 +33,15 @@ import java.time.Duration;
  *   <li>{@code tnt.billing.compensation.paid} — emitted by tnt-billing-wallet after
  *       a successful Mobile Money / wallet payout. Triggers {@code processCompensation}
  *       on the dispute aggregate to transition it to COMPENSATED state.</li>
- *   <li>{@code tnt.incident.escalated.to.dispute} — emitted by tnt-incident-core when
+ *   <li>{@code IncidentEscalatedToDispute} of {@code tnt.incident.events} (lot L8; formerly the dedicated topic
+ *       {@code tnt.incident.escalated.to.dispute}) — emitted by tnt-incident-core when
  *       an incident (fraud, package loss, confirmed damage) is escalated to a formal
  *       dispute. <b>Automatically creates a new Dispute aggregate</b> with the relevant
  *       cause, category, and linked incident context. This implements the
  *       incident → dispute escalation bridge.</li>
  * </ul>
  *
- * <h3>tnt.incident.escalated.to.dispute — Processing logic:</h3>
+ * <h3>IncidentEscalatedToDispute — Processing logic:</h3>
  * <p>When an incident is escalated to a dispute, the consumer:</p>
  * <ol>
  *   <li>Extracts the incident payload: {@code incidentId}, {@code missionId},
@@ -68,11 +73,11 @@ public class DisputeEventConsumer {
     private static final String AUTO_DISPUTE_DESCRIPTION_PREFIX =
             "[AUTO] Dispute automatically opened from incident escalation. ";
 
-    private final IDisputeCommandUseCase commandUseCase;
+    private final IDisputeSystemUseCase commandUseCase;
     private final ObjectMapper objectMapper;
 
     public DisputeEventConsumer(
-            IDisputeCommandUseCase commandUseCase,
+            IDisputeSystemUseCase commandUseCase,
             ObjectMapper objectMapper) {
         this.commandUseCase = commandUseCase;
         this.objectMapper = objectMapper;
@@ -84,38 +89,65 @@ public class DisputeEventConsumer {
      */
     @KafkaListener(
             topics = {
-                    "tnt.billing.compensation.paid",
-                    "tnt.incident.escalated.to.dispute"
+                    TntTopics.BILLING_COMPENSATION_PAID,
+                    // lot L8: IncidentEscalatedToDispute of the incident aggregate topic (was
+                    // tnt.incident.escalated.to.dispute, removed)
+                    TntTopics.INCIDENT_EVENTS
             },
             containerFactory = "disputeKafkaListenerContainerFactory"
     )
     public void listen(ConsumerRecord<String, String> record, Acknowledgment acknowledgment) {
+        log.debug("Received Kafka message: topic={} key={} partition={} offset={}",
+                record.topic(), record.key(), record.partition(), record.offset());
+
+        // Lot L4 (C15): an error is no longer swallowed — it goes back to the container, whose error handler retries the
+        // record and finally sends it to the DLQ (decision [G.8]); the offset is acknowledged only after success.
+        JsonNode json;
         try {
-            log.debug("Received Kafka message: topic={} key={} partition={} offset={}",
-                    record.topic(), record.key(), record.partition(), record.offset());
-
-            JsonNode json = objectMapper.readTree(record.value());
-            Mono<Void> processing = switch (record.topic()) {
-                case "tnt.billing.compensation.paid"     -> handleCompensationPaid(json);
-                case "tnt.incident.escalated.to.dispute" -> handleIncidentEscalatedToDispute(json);
-                default -> {
-                    log.debug("Ignoring unhandled topic: {}", record.topic());
-                    yield Mono.<Void>empty();
-                }
-            };
-
-            processing
-                    .doOnSuccess(v -> acknowledgment.acknowledge())
-                    .doOnError(e -> log.error("Failed to process record from topic={}: {}",
-                            record.topic(), e.getMessage()))
-                    .onErrorResume(e -> Mono.empty()) // skip unprocessable records without blocking
-                    .block(PROCESSING_TIMEOUT);
-
+            json = objectMapper.readTree(record.value());
         } catch (Exception e) {
-            log.error("Error parsing or processing Kafka record from topic={}: {}",
-                    record.topic(), e.getMessage());
-            acknowledgment.acknowledge(); // ack to avoid blocking the partition on poison pills
+            throw new IllegalArgumentException("Unreadable record on " + record.topic() + ": " + e.getMessage(), e);
         }
+        Mono<Void> processing = switch (record.topic()) {
+            case TntTopics.BILLING_COMPENSATION_PAID -> handleCompensationPaid(json);
+            case TntTopics.INCIDENT_EVENTS -> TntAggregateEvent.isAggregateEvent(json)
+                    && ESCALATED_TO_DISPUTE.equals(json.path("eventType").asText())
+                    ? handleIncidentEscalatedToDispute(fromIncidentEvent(json)) : Mono.<Void>empty();
+            default -> {
+                log.debug("Ignoring unhandled topic: {}", record.topic());
+                yield Mono.<Void>empty();
+            }
+        };
+        ReactiveListenerSupport.awaitBounded(processing.doOnError(e -> log.error(
+                "Failed to process record from topic={}: {}", record.topic(), e.getMessage())), PROCESSING_TIMEOUT);
+        acknowledgment.acknowledge();
+    }
+
+    static final String ESCALATED_TO_DISPUTE = "IncidentEscalatedToDispute";
+
+    /**
+     * Lot L8: the fields of the former {@code tnt.incident.escalated.to.dispute} record, read from
+     * {@code IncidentEscalatedToDispute} (payload = incident snapshot, {@code details.fraudReason}).
+     */
+    static JsonNode fromIncidentEvent(JsonNode event) {
+        JsonNode p = event.path("payload");
+        com.fasterxml.jackson.databind.node.ObjectNode legacy =
+                com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
+        legacy.put("incidentId", event.path("aggregateId").asText(null));
+        legacy.put("missionId", p.path("deliveryId").asText(null));
+        legacy.put("tenantId", event.path("tenantId").asText(null));
+        legacy.put("agencyId", p.path("agencyId").asText(null));
+        legacy.set("parcelIds", p.path("affectedParcelIds").isArray() ? p.path("affectedParcelIds")
+                : com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.arrayNode());
+        JsonNode details = event.path("details");
+        String reason = details.hasNonNull("fraudReason") ? details.path("fraudReason").asText()
+                : details.path("reason").asText(null);
+        if (reason != null) {
+            legacy.put("fraudReason", reason);
+        }
+        legacy.put("incidentType", p.path("type").asText(""));
+        legacy.put("trackingCode", p.path("trackingCode").asText(null));
+        return legacy;
     }
 
     // ── Handler: tnt.billing.compensation.paid ────────────────────────────────
@@ -128,6 +160,12 @@ public class DisputeEventConsumer {
      * @return Mono completing when the dispute is updated
      */
     private Mono<Void> handleCompensationPaid(JsonNode payload) {
+        String reason = payload.path("reason").asText();
+        if ("RETURN_COST".equals(reason) || "COURIER_REPLACEMENT".equals(reason)) {
+            // lot L6: a return paid by the compensation fund (QO-22); QO-11 / D-153: a replacement courier paid by
+            // the fund — neither is a dispute's indemnity
+            return Mono.empty();
+        }
         String disputeId       = payload.path("disputeId").asText();
         String tenantId        = payload.path("tenantId").asText();
         String paymentReference = payload.path("paymentReference").asText();
@@ -141,7 +179,7 @@ public class DisputeEventConsumer {
         log.info("Processing compensation payment confirmation: disputeId={} paymentRef={}",
                 disputeId, paymentReference);
 
-        return commandUseCase.processCompensation(
+        return commandUseCase.confirmCompensationPaid(
                 new ProcessCompensationCommand(
                         DisputeId.of(disputeId), tenantId, paymentReference, "BILLING_SYSTEM"))
                 .then();
@@ -182,6 +220,9 @@ public class DisputeEventConsumer {
         String fraudReason = payload.path("fraudReason").asText("Incident escalated to dispute");
         String incidentType = payload.path("incidentType").asText("");
         String trackingCode = payload.path("trackingCode").asText(null);
+        // lot L4: the first affected parcel, so that the parcel goes UNDER_DISPUTE (P12); else resolved from missionId
+        JsonNode parcelIds = payload.path("parcelIds");
+        String parcelId = parcelIds.isArray() && !parcelIds.isEmpty() ? parcelIds.get(0).asText(null) : null;
 
         if (tenantId == null || tenantId.isBlank()) {
             log.warn("IncidentEscalatedToDispute event missing tenantId — skipping auto-dispute creation");
@@ -220,16 +261,17 @@ public class DisputeEventConsumer {
                 category,
                 priority,
                 missionId,
-                null,              // packageId: not available at this level; linked via missionId
+                parcelId,          // lot L4: first affected parcel, else the parcel of missionId
                 trackingCode,
                 description,
                 (respondentType == RespondentType.AGENCY) ? agencyId : null, // respondentOrgId
                 null,              // impliedSubDelivererId
-                Boolean.FALSE      // subDelivererInvolved
+                Boolean.FALSE,     // subDelivererInvolved
+                incidentId         // lot L4: openedFromIncidentId of DisputeOpen
         );
 
-        return commandUseCase.openDispute(command)
-                .doOnSuccess(dispute -> log.info(
+        return commandUseCase.openFromIncident(command)
+                .doOnNext(dispute -> log.info(
                         "Auto-dispute created: disputeId={} incidentId={} cause={} priority={}",
                         dispute.getId(), incidentId, cause, priority))
                 .doOnError(ex -> log.error(

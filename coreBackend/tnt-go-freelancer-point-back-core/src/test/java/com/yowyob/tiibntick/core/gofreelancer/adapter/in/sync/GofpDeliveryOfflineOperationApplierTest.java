@@ -8,7 +8,7 @@ import com.yowyob.tiibntick.core.gofreelancer.application.port.out.DeliveryRepos
 import com.yowyob.tiibntick.core.gofreelancer.application.service.DeliveryProofService;
 import com.yowyob.tiibntick.core.gofreelancer.application.service.DeliveryStatusApplicationService;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryStatus;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryStatus;
 import com.yowyob.tiibntick.core.sync.domain.model.OfflineOpId;
 import com.yowyob.tiibntick.core.sync.domain.model.OfflineOperation;
 import com.yowyob.tiibntick.core.sync.domain.model.enums.OfflineOpType;
@@ -50,7 +50,7 @@ class GofpDeliveryOfflineOperationApplierTest {
     private Delivery delivery(DeliveryStatus status) {
         Delivery d = new Delivery();
         d.setId(deliveryId);
-        d.setStatus(status);
+        com.yowyob.tiibntick.core.gofreelancer.TestDeliveries.status(d, status);
         return d;
     }
 
@@ -85,7 +85,7 @@ class GofpDeliveryOfflineOperationApplierTest {
     }
 
     @Test
-    @DisplayName("DELIVERY_CONFIRMATION defaults to DELIVERED; HUB_DEPOSIT to AT_RELAY_POINT with its relay point")
+    @DisplayName("DELIVERY_CONFIRMATION defaults to DELIVERED; HUB_DEPOSIT to AT_RELAY_HUB with its relay point")
     void defaults() {
         owned();
         UUID relay = UUID.randomUUID();
@@ -102,7 +102,7 @@ class GofpDeliveryOfflineOperationApplierTest {
                         "{\"relayPointId\":\"" + relay + "\",\"clientId\":\"" + UUID.randomUUID() + "\",\"storageFee\":150}")))
                 .expectNextCount(1).verifyComplete();
         verify(statusService, org.mockito.Mockito.times(2)).updateStatus(org.mockito.ArgumentMatchers.eq(deliveryId), dto.capture());
-        assertThat(dto.getValue().getStatus()).isEqualTo(DeliveryStatus.AT_RELAY_POINT);
+        assertThat(dto.getValue().getStatus()).isEqualTo(DeliveryStatus.AT_RELAY_HUB);
         assertThat(dto.getValue().getRelayPointId()).isEqualTo(relay);
         assertThat(dto.getValue().getStorageFee()).isEqualTo(150.0);
     }
@@ -197,8 +197,8 @@ class GofpDeliveryOfflineOperationApplierTest {
     @Test
     @DisplayName("forward ranking: delivered is beyond relay deposit, and off-path states are never 'reached'")
     void ranking() {
-        assertThat(GofpDeliveryOfflineOperationApplier.alreadyReached(DeliveryStatus.DELIVERED, DeliveryStatus.AT_RELAY_POINT)).isTrue();
-        assertThat(GofpDeliveryOfflineOperationApplier.alreadyReached(DeliveryStatus.AT_RELAY_POINT, DeliveryStatus.DELIVERED)).isFalse();
+        assertThat(GofpDeliveryOfflineOperationApplier.alreadyReached(DeliveryStatus.DELIVERED, DeliveryStatus.AT_RELAY_HUB)).isTrue();
+        assertThat(GofpDeliveryOfflineOperationApplier.alreadyReached(DeliveryStatus.AT_RELAY_HUB, DeliveryStatus.DELIVERED)).isFalse();
         assertThat(GofpDeliveryOfflineOperationApplier.alreadyReached(DeliveryStatus.DELIVERED, DeliveryStatus.FAILED)).isFalse();
         assertThat(GofpDeliveryOfflineOperationApplier.alreadyReached(DeliveryStatus.FAILED, DeliveryStatus.FAILED)).isTrue();
         assertThat(GofpDeliveryOfflineOperationApplier.alreadyReached(DeliveryStatus.PAUSED_BY_INCIDENT, DeliveryStatus.IN_TRANSIT)).isFalse();

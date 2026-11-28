@@ -11,4 +11,9 @@ public interface DisputeEscalationR2dbcRepository extends ReactiveCrudRepository
 
     @Query("SELECT * FROM tnt_dispute_escalations WHERE dispute_id = :disputeId ORDER BY escalated_at ASC")
     Flux<DisputeEscalationEntity> findByDisputeId(String disputeId);
+
+    /** Lot L4: replaces one dispute's history (never {@code deleteAll()}). */
+    @org.springframework.data.r2dbc.repository.Modifying
+    @org.springframework.data.r2dbc.repository.Query("DELETE FROM tnt_dispute_escalations WHERE dispute_id = :disputeId")
+    reactor.core.publisher.Mono<Integer> deleteByDisputeId(String disputeId);
 }

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="
+           http://www.liquibase.org/xml/ns/dbchangelog
+           http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.23.xsd">
+
+    <!-- Lot evt-l2 — relay storage (spec cible-evenements-colis-livraison.md §5, decisions QO-29, QO-30, D-130). -->
+
+    <changeSet id="evt-l2-001-relay-point-storage-days" author="evt-l2" labels="evt-l2">
+        <comment>
+            D-130: storage duration (days) chosen by an independent relay, checked against the platform bounds
+            (3 to 30 days by default) when the relay is registered or updated. NULL = the platform value applies.
+            Additive and idempotent.
+        </comment>
+        <sql splitStatements="false">
+            ALTER TABLE gofp_relay_points ADD COLUMN IF NOT EXISTS storage_days INTEGER;
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

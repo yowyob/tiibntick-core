@@ -15,3 +15,18 @@ databaseChangeLog:
   - include:
       file: db/changelog/changes/i18n-004-seed-profile-welcome.sql
       relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/i18n-005-seed-gofp-localized-notifications.sql
+      relativeToChangelogFile: false
+  # Go-Freelancer de-duplication, corrections after lots L3/L4 (gdd-l4-419, decision D-129).
+  - include:
+      file: db/changelog/changes/gdd-l4-i18n.sql
+      relativeToChangelogFile: false
+  # Lot L8 (spec §2.3): template keys follow the delivery vocabulary (mission -> delivery, relay point -> relay hub).
+  - include:
+      file: db/changelog/changes/i18n-006-rename-delivery-vocabulary-keys.sql
+      relativeToChangelogFile: false
+  # TNT_ADMIN registry alerts (decision D-172, maintainer directive of 2026-11-27): e-mail and in-app texts, fr/en.
+  - include:
+      file: db/changelog/changes/i18n-007-seed-platform-admin-alerts.sql
+      relativeToChangelogFile: false

@@ -197,6 +197,14 @@ public final class TntPermissionCatalog {
         add(catalog, "admin:audit",    "Admin Audit",    "Access full audit trail.",                        "ADMIN", "TENANT",       false, true);
         add(catalog, "admin:settings", "Admin Settings", "Manage platform settings and configuration.",     "ADMIN", "TENANT",       false, true);
 
+        // ── Organization delivery settings (lot L1, decision D-087 / [B.5]) ─────────
+        // Assignable: the agency's manager decides who in the organization holds them.
+        add(catalog, "organization:delivery-settings:read",  "Delivery Settings Read",
+                "Read the effective delivery thresholds of one's organization.", "ORGANIZATION", "ORGANIZATION", false, true);
+        add(catalog, "organization:delivery-settings:write", "Delivery Settings Write",
+                "Override the platform delivery thresholds for one's TiiBnTick Agency organization.",
+                "ORGANIZATION", "ORGANIZATION", false, true);
+
         // ── Scope-level permissions (system-protected) ───────────────────────────
         add(catalog, "system:admin", "System Admin", "Full system-level administration.", "SYSTEM", "SYSTEM", true, false);
         add(catalog, "tenant:admin", "Tenant Admin", "Full tenant-level administration.", "SYSTEM", "TENANT", true, false);

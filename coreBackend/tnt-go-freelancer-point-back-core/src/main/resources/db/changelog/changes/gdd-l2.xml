@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="
+           http://www.liquibase.org/xml/ns/dbchangelog
+           http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.23.xsd">
+
+    <!-- Lot L2 (Go-Freelancer de-duplication): the announcement lives only in tnt-delivery-core.
+         The core columns come from gdd-l2-201 (tnt-delivery-core, gdd-l2-delivery.yaml), which runs
+         before this file (tnt-delivery-master precedes tnt-gofp-master in tnt-core-master).
+
+         Diagnostic to attach to the migration report (mirror rows without a core announcement,
+         left untouched, dropped with the table at closure):
+           SELECT count(*) FROM announcements l
+            WHERE NOT EXISTS (SELECT 1 FROM tnt_delivery_announcements a WHERE a.id = l.id); -->
+
+    <!-- Backfill of the core announcement from the gofp mirror (same id). Existing core values win
+         (COALESCE): idempotent, never overwrites. First/last names are folded into one name, as the
+         publication path already does. Guarded on the mirror's link column so that a database
+         rebuilt without the go-need-announcement changeset (upgrade test) is not broken. -->
+    <changeSet id="gdd-l2-202-backfill-announcement-details" author="gdd-l2" labels="gdd-l2">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="announcements"/>
+            <tableExists tableName="tnt_delivery_announcements"/>
+            <columnExists tableName="announcements" columnName="delivery_need_id"/>
+            <columnExists tableName="tnt_delivery_announcements" columnName="origin_ref_id"/>
+        </preConditions>
+        <sql splitStatements="false" stripComments="true">
+            UPDATE tnt_delivery_announcements a
+               SET sender_name            = COALESCE(a.sender_name,
+                                               LEFT(NULLIF(TRIM(CONCAT_WS(' ', l.shipper_first_name, l.shipper_last_name)), ''), 150)),
+                   sender_phone           = COALESCE(a.sender_phone, LEFT(l.shipper_phone, 30)),
+                   sender_email           = COALESCE(a.sender_email, LEFT(l.shipper_email, 255)),
+                   recipient_email        = COALESCE(a.recipient_email, LEFT(l.recipient_email, 255)),
+                   required_vehicle_type  = COALESCE(a.required_vehicle_type, LEFT(l.required_vehicle_type, 40)),
+                   payment_method         = COALESCE(a.payment_method, LEFT(l.payment_method, 30)),
+                   transport_method       = COALESCE(a.transport_method, LEFT(l.transport_method, 30)),
+                   distance_km            = COALESCE(a.distance_km, CAST(l.distance AS NUMERIC(10,3))),
+                   estimated_duration_min = COALESCE(a.estimated_duration_min, l.duration),
+                   destination_hub_id     = COALESCE(a.destination_hub_id, l.destination_relay_point_id),
+                   handover_signature_ref = COALESCE(a.handover_signature_ref, LEFT(l.signature_url, 500)),
+                   service_fee            = COALESCE(a.service_fee, CAST(l.logistics_price AS NUMERIC(14,2))),
+                   origin_ref_type        = COALESCE(a.origin_ref_type,
+                                               CASE WHEN l.delivery_need_id IS NOT NULL THEN 'DELIVERY_NEED' END),
+                   origin_ref_id          = COALESCE(a.origin_ref_id, l.delivery_need_id)
+              FROM announcements l
+             WHERE l.id = a.id
+        </sql>
+    </changeSet>
+
+    <!-- The mirror is no longer written: its NOT NULL address columns must not block anything
+         until the table is dropped at closure. -->
+    <changeSet id="gdd-l2-204-announcements-relax-not-null" author="gdd-l2" labels="gdd-l2">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="announcements"/>
+        </preConditions>
+        <sql splitStatements="true" stripComments="true">
+            ALTER TABLE announcements ALTER COLUMN pickup_address_id DROP NOT NULL;
+            ALTER TABLE announcements ALTER COLUMN delivery_address_id DROP NOT NULL;
+        </sql>
+    </changeSet>
+
+    <!-- delivery_needs keeps its product data; it gains the core ids of its announcement and parcel.
+         packet_id is renamed parcel_id (moderator decision after lot L1: it already holds the core parcel
+         id): ADD + copy here, the code reads and writes parcel_id only, packet_id is dropped at closure.
+         status / delivery_id / assigned_freelancer_id are derived from the core from now on: the
+         stored values are ignored (status no longer written, hence nullable) and dropped at closure. -->
+    <changeSet id="gdd-l2-210-delivery-needs-core-refs" author="gdd-l2" labels="gdd-l2">
+        <sql splitStatements="true" stripComments="true">
+            ALTER TABLE delivery_needs ADD COLUMN IF NOT EXISTS announcement_id UUID;
+            ALTER TABLE delivery_needs ADD COLUMN IF NOT EXISTS parcel_id UUID;
+            UPDATE delivery_needs SET parcel_id = packet_id WHERE parcel_id IS NULL AND packet_id IS NOT NULL;
+            ALTER TABLE delivery_needs ALTER COLUMN status DROP NOT NULL;
+            CREATE INDEX IF NOT EXISTS idx_delivery_needs_announcement_id
+                ON delivery_needs (announcement_id) WHERE announcement_id IS NOT NULL;
+        </sql>
+    </changeSet>
+
+    <!-- announcement_id of an already published need, from the mirror link (c43). Guarded like 202. -->
+    <changeSet id="gdd-l2-211-delivery-needs-announcement-backfill" author="gdd-l2" labels="gdd-l2">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="announcements"/>
+            <columnExists tableName="announcements" columnName="delivery_need_id"/>
+        </preConditions>
+        <sql splitStatements="false" stripComments="true">
+            UPDATE delivery_needs n
+               SET announcement_id = l.id
+              FROM announcements l
+             WHERE l.delivery_need_id = n.id
+               AND n.announcement_id IS NULL
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

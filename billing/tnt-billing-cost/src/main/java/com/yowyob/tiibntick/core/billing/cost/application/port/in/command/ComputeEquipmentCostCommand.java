@@ -25,5 +25,5 @@ public record ComputeEquipmentCostCommand(
         @Positive double distanceKm,
 
         /** Optional mission ID for tracing. */
-        String missionId
+        String deliveryId
 ) {}

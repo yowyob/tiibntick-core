@@ -48,17 +48,22 @@ public class TntDisputeCoreConfig {
 
     @Bean
     @ConditionalOnMissingBean(IDisputeCommandUseCase.class)
-    public IDisputeCommandUseCase disputeCommandUseCase(
+    public DisputeCommandService disputeCommandUseCase(
             IDisputeRepository repository,
-            IDisputeEventPublisher eventPublisher,
             IDisputeNotificationPort notificationPort,
-            IDeliveryStatusPort deliveryStatusPort,
-            IBillingCompensationPort billingCompensationPort,
+            IDisputeParcelPort parcelPort,
+            org.springframework.beans.factory.ObjectProvider<IDisputeCompensationPort> compensationPorts,
             IBlockchainProofPort blockchainProofPort,
             IDisputeReferenceGenerator referenceGenerator) {
+        // The Kernel compensation fund is billing-wallet's adapter (lot L5). Resolved through a provider rather than
+        // a @ConditionalOnMissingBean fallback bean, whose outcome would depend on the import order of the two
+        // module configurations; without it every payment answers 503 COMPENSATION_UNAVAILABLE (spec §4.3).
+        IDisputeCompensationPort compensationPort = compensationPorts.getIfAvailable(
+                com.yowyob.tiibntick.core.dispute.infrastructure.adapter.out.compensation
+                        .UnavailableDisputeCompensationAdapter::new);
         return new DisputeCommandService(
-                repository, eventPublisher, notificationPort,
-                deliveryStatusPort, billingCompensationPort, blockchainProofPort,
+                repository, notificationPort,
+                parcelPort, compensationPort, blockchainProofPort,
                 referenceGenerator);
     }
 
@@ -72,8 +77,7 @@ public class TntDisputeCoreConfig {
     @ConditionalOnMissingBean(IEvidenceUseCase.class)
     public IEvidenceUseCase evidenceUseCase(
             IDisputeRepository repository,
-            IDisputeEventPublisher eventPublisher,
             IBlockchainProofPort blockchainProofPort) {
-        return new EvidenceApplicationService(repository, eventPublisher, blockchainProofPort);
+        return new EvidenceApplicationService(repository, blockchainProofPort);
     }
 }

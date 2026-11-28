@@ -14,7 +14,7 @@ import com.yowyob.tiibntick.core.gofreelancer.domain.model.Delivery;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.DeliveryNeed;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.GofpRelayPoint;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.RelayDeposit;
-import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.delivery.DeliveryStatus;
+import com.yowyob.tiibntick.core.delivery.domain.model.enums.DeliveryStatus;
 import com.yowyob.tiibntick.core.gofreelancer.domain.model.enums.relaypoint.RelayPointStatus;
 import com.yowyob.tiibntick.core.trust.application.port.in.RecordCustodyTransferUseCase;
 import com.yowyob.tiibntick.core.trust.application.port.in.RecordMissionUseCase;
@@ -85,9 +85,9 @@ class RelayDepositRulesTest {
     void setUp() {
         Delivery delivery = new Delivery();
         delivery.setId(deliveryId);
-        delivery.setFreelancerId(driver);
+        com.yowyob.tiibntick.core.gofreelancer.TestDeliveries.driver(delivery, driver);
         delivery.setDeliveryNeedId(needId);
-        delivery.setStatus(DeliveryStatus.IN_TRANSIT);
+        com.yowyob.tiibntick.core.gofreelancer.TestDeliveries.status(delivery, DeliveryStatus.IN_TRANSIT);
 
         need = new DeliveryNeed();
         need.setId(needId);
@@ -104,8 +104,8 @@ class RelayDepositRulesTest {
         when(needs.findById(needId)).thenReturn(Mono.just(need));
         when(lifecycle.findState(tenantId, deliveryId)).thenReturn(Mono.just(
                 new CoreDeliveryState(deliveryId, "IN_TRANSIT", "TNT-1", driver, null, null)));
-        when(lifecycle.depositAtRelayPoint(eq(tenantId), eq(deliveryId), eq(driver), any())).thenReturn(Mono.just(
-                new CoreDeliveryState(deliveryId, "AT_RELAY_POINT", "TNT-1", driver, null, null)));
+        when(lifecycle.depositAtRelayHub(eq(tenantId), eq(deliveryId), eq(driver), any(), any())).thenReturn(Mono.just(
+                new CoreDeliveryState(deliveryId, "AT_RELAY_HUB", "TNT-1", driver, null, null)));
         when(relayDepositService.createRelayDeposit(any(), any(), any(), any(), any()))
                 .thenReturn(Mono.just(new RelayDeposit()));
         when(custody.record(any())).thenReturn(Mono.empty());
@@ -140,10 +140,31 @@ class RelayDepositRulesTest {
 
     private static DeliveryStatusUpdateDTO deposit(UUID relayPointId, UUID clientId) {
         DeliveryStatusUpdateDTO d = new DeliveryStatusUpdateDTO();
-        d.setStatus(DeliveryStatus.AT_RELAY_POINT);
+        d.setStatus(DeliveryStatus.AT_RELAY_HUB);
         d.setRelayPointId(relayPointId);
         d.setClientId(clientId);
         return d;
+    }
+
+    @Test
+    @DisplayName("D-149: a deposit at the destination relay ends the mission (anchoring 'mission completed')")
+    void depositAtDestinationEndsTheMission() {
+        when(lifecycle.depositAtRelayHub(eq(tenantId), eq(deliveryId), eq(driver), any(), any())).thenReturn(Mono.just(
+                new CoreDeliveryState(deliveryId, "AT_RELAY_HUB", "TNT-1", driver, null, null, null, null, null,
+                        null, null, null, null, null, null, 3, java.time.Instant.now().plusSeconds(86_400), true)));
+        StepVerifier.create(service().updateStatus(deliveryId, deposit(chosenProfile, null)))
+                .expectNextCount(1).verifyComplete();
+        verify(missions).recordCompleted(eq(deliveryId.toString()), eq(driver.toString()), any());
+    }
+
+    @Test
+    @DisplayName("D-149: a deposit at a relay on the way ends nothing: no anchoring, no payment")
+    void depositOnTheWayEndsNothing() {
+        StepVerifier.create(service().updateStatus(deliveryId, deposit(chosenProfile, null)))
+                .expectNextCount(1).verifyComplete();
+        verify(missions, never()).recordCompleted(any(), any(), any());
+        org.mockito.Mockito.verifyNoInteractions(settlements);
+        verify(relayDepositService).createRelayDeposit(any(), any(), eq(chosenHub), any(), eq(driver));
     }
 
     @Test
@@ -155,6 +176,30 @@ class RelayDepositRulesTest {
         ArgumentCaptor<UUID> client = ArgumentCaptor.forClass(UUID.class);
         verify(relayDepositService).createRelayDeposit(eq(needId), client.capture(), eq(chosenHub), any(), eq(driver));
         assertThat(client.getValue()).isEqualTo(sender);
+    }
+
+    @Test
+    @DisplayName("lot L1: the deposit is keyed on the parcel the need registered, not on the need")
+    void depositKey_isTheNeedParcel() {
+        UUID parcel = UUID.randomUUID();
+        need.setPacketId(parcel);
+        StepVerifier.create(service().updateStatus(deliveryId, deposit(chosenProfile, null)))
+                .expectNextCount(1).verifyComplete();
+        verify(relayDepositService).createRelayDeposit(eq(parcel), eq(sender), eq(chosenHub), any(), eq(driver));
+    }
+
+    @Test
+    @DisplayName("lot L1: the parcel the core delivery carries is the deposit key (same id from the need to the hub)")
+    void depositKey_isTheCoreParcel() {
+        UUID parcel = UUID.randomUUID();
+        need.setPacketId(parcel);
+        when(lifecycle.findState(tenantId, deliveryId)).thenReturn(Mono.just(new CoreDeliveryState(
+                deliveryId, "IN_TRANSIT", "TNT-1", driver, null, null, null, null, null, null, null, null,
+                null, parcel, null)));
+        StepVerifier.create(service().updateStatus(deliveryId, deposit(chosenProfile, null)))
+                .expectNextCount(1).verifyComplete();
+        verify(relayDepositService).createRelayDeposit(eq(parcel), eq(sender), eq(chosenHub), any(), eq(driver));
+        verify(relayDepositService, never()).createRelayDeposit(eq(needId), any(), any(), any(), any());
     }
 
     @Test
@@ -170,7 +215,7 @@ class RelayDepositRulesTest {
     void otherRelayPoint_isRefused() {
         StepVerifier.create(service().updateStatus(deliveryId, deposit(otherProfile, sender)))
                 .expectError(IllegalArgumentException.class).verify();
-        verify(lifecycle, never()).depositAtRelayPoint(any(), any(), any(), any());
+        verify(lifecycle, never()).depositAtRelayHub(any(), any(), any(), any(), any());
         verify(relayDepositService, never()).createRelayDeposit(any(), any(), any(), any(), any());
     }
 
@@ -180,7 +225,7 @@ class RelayDepositRulesTest {
         need.setTargetRelayPointId(null);
         StepVerifier.create(service().updateStatus(deliveryId, deposit(chosenProfile, sender)))
                 .expectError(IllegalArgumentException.class).verify();
-        verify(lifecycle, never()).depositAtRelayPoint(any(), any(), any(), any());
+        verify(lifecycle, never()).depositAtRelayHub(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -189,7 +234,7 @@ class RelayDepositRulesTest {
         chosen.setStatus(RelayPointStatus.PENDING);
         StepVerifier.create(service().updateStatus(deliveryId, deposit(chosenProfile, sender)))
                 .expectError(IllegalArgumentException.class).verify();
-        verify(lifecycle, never()).depositAtRelayPoint(any(), any(), any(), any());
+        verify(lifecycle, never()).depositAtRelayHub(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -198,6 +243,6 @@ class RelayDepositRulesTest {
         chosen.setIsActive(false);
         StepVerifier.create(service().updateStatus(deliveryId, deposit(chosenProfile, sender)))
                 .expectError(IllegalArgumentException.class).verify();
-        verify(lifecycle, never()).depositAtRelayPoint(any(), any(), any(), any());
+        verify(lifecycle, never()).depositAtRelayHub(any(), any(), any(), any(), any());
     }
 }
